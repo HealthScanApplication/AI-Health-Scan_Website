@@ -1,4 +1,4 @@
-# HealthScan 🌱 - Complete Marketing Platform & Admin Dashboard
+# AI-Health-Scan • Website
 
 [![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://healthscan.live)
 [![Real API Integration](https://img.shields.io/badge/APIs-16%2B%20Real%20Sources-blue.svg)](#api-integrations)
