@@ -1,0 +1,2111 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 14px;
+  --text-base: 1rem; /* 14px base size for consistent button/input sizing */
+  --text-major-cta: 1.125rem; /* 18px for major CTA buttons */
+  --text-standard-density: 1rem; /* 16px for standard density buttons and inputs */
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #16a34a;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.0058 264.53);
+  --secondary-foreground: #030213;
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #22c55e;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: transparent;
+  --input-background: #f8fdf9;
+  --switch-background: #cbced4;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #030213;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  
+  /* HealthScan brand colors */
+  --healthscan-green: #16a34a;
+  --healthscan-light-green: #22c55e;
+  --healthscan-red-accent: #dc2626;
+  --healthscan-bg-light: #f8fdf9;
+  --healthscan-text-muted: #6b7280;
+  --healthscan-dark-turquoise: #008B8B;
+  
+  /* Email banner height variable - enhanced for better proportions and spacing */
+  --email-banner-height: 70px;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* HealthScan brand utilities */
+  --color-healthscan-green: var(--healthscan-green);
+  --color-healthscan-light-green: var(--healthscan-light-green);
+  --color-healthscan-red-accent: var(--healthscan-red-accent);
+  --color-healthscan-bg-light: var(--healthscan-bg-light);
+  --color-healthscan-text-muted: var(--healthscan-text-muted);
+  --color-healthscan-dark-turquoise: var(--healthscan-dark-turquoise);
+  
+  /* Button density text sizes */
+  --text-size-major-cta: var(--text-major-cta);
+  --text-size-standard-density: var(--text-standard-density);
+  
+  /* Button density utilities */
+  --button-major: 56px;
+  --button-standard: 56px;
+  --input-standard: 56px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+  /* Prevent mobile zoom and improve touch behavior */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+  
+  /* Improve touch behavior for interactive elements */
+  button, a, input, textarea, select {
+    touch-action: manipulation;
+  }
+  
+  /* Prevent iOS bounce scroll on modals */
+  .modal-no-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which has an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    textarea {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    select {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* Accessibility - Skip Link */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.sr-only:focus,
+.focus\:not-sr-only:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0.5rem 1rem !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* Animation delays for staggered effects */
+.animation-delay-1000 {
+  animation-delay: 1s;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-3000 {
+  animation-delay: 3s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Enhanced moving gradient animations */
+@keyframes gradient-move {
+  0% {
+    background-position: 0% 50%;
+    transform: rotate(0deg);
+  }
+  25% {
+    background-position: 100% 50%;
+    transform: rotate(1deg);
+  }
+  50% {
+    background-position: 100% 100%;
+    transform: rotate(0deg);
+  }
+  75% {
+    background-position: 50% 100%;
+    transform: rotate(-1deg);
+  }
+  100% {
+    background-position: 0% 50%;
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 0%;
+    opacity: 0.8;
+  }
+  33% {
+    background-position: 50% 50%;
+    opacity: 1;
+  }
+  66% {
+    background-position: 100% 100%;
+    opacity: 0.9;
+  }
+  100% {
+    background-position: 0% 0%;
+    opacity: 0.8;
+  }
+}
+
+@keyframes gradient-wave {
+  0% {
+    background-position: 0% 0%;
+    transform: translateX(0%) scale(1);
+  }
+  25% {
+    background-position: 25% 25%;
+    transform: translateX(2%) scale(1.02);
+  }
+  50% {
+    background-position: 50% 50%;
+    transform: translateX(0%) scale(1);
+  }
+  75% {
+    background-position: 75% 75%;
+    transform: translateX(-2%) scale(0.98);
+  }
+  100% {
+    background-position: 100% 100%;
+    transform: translateX(0%) scale(1);
+  }
+}
+
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+    transform: rotate(0deg) scale(1);
+  }
+  33% {
+    background-position: 100% 0%;
+    transform: rotate(2deg) scale(1.05);
+  }
+  66% {
+    background-position: 0% 100%;
+    transform: rotate(-1deg) scale(0.95);
+  }
+  100% {
+    background-position: 0% 50%;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+/* Floating blob animations */
+@keyframes blob-float-1 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate(30px, -20px) scale(1.1) rotate(5deg);
+  }
+  50% {
+    transform: translate(-15px, -40px) scale(0.9) rotate(-3deg);
+  }
+  75% {
+    transform: translate(-25px, 10px) scale(1.05) rotate(8deg);
+  }
+}
+
+@keyframes blob-float-2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  30% {
+    transform: translate(-40px, 25px) scale(1.15) rotate(-7deg);
+  }
+  60% {
+    transform: translate(20px, -30px) scale(0.85) rotate(4deg);
+  }
+  90% {
+    transform: translate(35px, 15px) scale(1.08) rotate(-2deg);
+  }
+}
+
+@keyframes blob-float-3 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  20% {
+    transform: translate(25px, 35px) scale(0.95) rotate(6deg);
+  }
+  40% {
+    transform: translate(-30px, 20px) scale(1.12) rotate(-4deg);
+  }
+  80% {
+    transform: translate(10px, -25px) scale(1.03) rotate(9deg);
+  }
+}
+
+@keyframes blob-float-4 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  35% {
+    transform: translate(45px, -15px) scale(1.2) rotate(-8deg);
+  }
+  70% {
+    transform: translate(-20px, 40px) scale(0.8) rotate(5deg);
+  }
+}
+
+@keyframes blob-float-5 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  40% {
+    transform: translate(-35px, -25px) scale(1.1) rotate(7deg);
+  }
+  80% {
+    transform: translate(20px, 30px) scale(0.9) rotate(-5deg);
+  }
+}
+
+@keyframes blob-float-6 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate(15px, -20px) scale(1.3) rotate(10deg);
+  }
+}
+
+@keyframes blob-float-7 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate(-25px, 15px) scale(0.7) rotate(-6deg);
+  }
+  66% {
+    transform: translate(30px, -10px) scale(1.25) rotate(8deg);
+  }
+}
+
+@keyframes mesh-flow {
+  0% {
+    background-position: 0% 0%, 0% 0%;
+    transform: rotate(0deg);
+  }
+  25% {
+    background-position: 100% 50%, 50% 100%;
+    transform: rotate(1deg);
+  }
+  50% {
+    background-position: 50% 100%, 100% 50%;
+    transform: rotate(0deg);
+  }
+  75% {
+    background-position: 0% 50%, 50% 0%;
+    transform: rotate(-1deg);
+  }
+  100% {
+    background-position: 0% 0%, 0% 0%;
+    transform: rotate(0deg);
+  }
+}
+
+.animate-gradient-move {
+  background-size: 400% 400%;
+  animation: gradient-move 12s ease-in-out infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 300% 300%;
+  animation: gradient-shift 8s ease-in-out infinite;
+}
+
+.animate-gradient-wave {
+  background-size: 200% 200%;
+  animation: gradient-wave 10s ease-in-out infinite;
+}
+
+.animate-gradient-flow {
+  background-size: 350% 350%;
+  animation: gradient-flow 18s ease-in-out infinite;
+}
+
+/* Blob animation classes */
+.animate-blob-float-1 {
+  animation: blob-float-1 20s ease-in-out infinite;
+}
+
+.animate-blob-float-2 {
+  animation: blob-float-2 25s ease-in-out infinite;
+}
+
+.animate-blob-float-3 {
+  animation: blob-float-3 18s ease-in-out infinite;
+}
+
+.animate-blob-float-4 {
+  animation: blob-float-4 22s ease-in-out infinite;
+}
+
+.animate-blob-float-5 {
+  animation: blob-float-5 16s ease-in-out infinite;
+}
+
+.animate-blob-float-6 {
+  animation: blob-float-6 14s ease-in-out infinite;
+}
+
+.animate-blob-float-7 {
+  animation: blob-float-7 19s ease-in-out infinite;
+}
+
+.animate-mesh-flow {
+  animation: mesh-flow 30s linear infinite;
+}
+
+/* Animated Headline Text Transitions */
+@keyframes text-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(15px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes text-fade-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+@keyframes text-slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes text-bounce-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-5px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 0 0 5px rgba(22, 163, 74, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(22, 163, 74, 0.6), 0 0 30px rgba(34, 197, 94, 0.4);
+  }
+}
+
+@keyframes word-cycle {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  90% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-15px) scale(0.95);
+  }
+}
+
+.animate-text-fade-in {
+  animation: text-fade-in 0.6s ease-out forwards;
+}
+
+.animate-text-fade-out {
+  animation: text-fade-out 0.3s ease-in forwards;
+}
+
+.animate-text-slide-up {
+  animation: text-slide-up 0.5s ease-out forwards;
+}
+
+.animate-text-bounce-in {
+  animation: text-bounce-in 0.7s ease-out forwards;
+}
+
+.animate-text-glow {
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+.animate-word-cycle {
+  animation: word-cycle 2.5s ease-in-out infinite;
+}
+
+/* Enhanced transition utilities */
+.transition-600 {
+  transition-duration: 600ms;
+}
+
+.transition-300 {
+  transition-duration: 300ms;
+}
+
+/* Celebration animations */
+@keyframes bounce-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-20px) rotate(5deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(-5deg);
+  }
+  75% {
+    transform: translateY(-30px) rotate(3deg);
+  }
+}
+
+@keyframes bounce-float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-25px) rotate(10deg);
+  }
+}
+
+.animate-bounce-float {
+  animation: bounce-float 1.5s ease-in-out infinite;
+}
+
+.animate-bounce-float-delayed {
+  animation: bounce-float 1.5s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+
+.animate-bounce-float-slow {
+  animation: bounce-float-slow 2s ease-in-out infinite;
+}
+
+.animate-bounce-float-delayed-slow {
+  animation: bounce-float-slow 2s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+/* Countdown Timer Animations */
+@keyframes countdown-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(22, 163, 74, 0.1), 0 0 40px rgba(22, 163, 74, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(22, 163, 74, 0.2), 0 0 60px rgba(22, 163, 74, 0.1);
+  }
+}
+
+@keyframes countdown-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes countdown-digit-flip {
+  0% {
+    transform: rotateX(0deg);
+  }
+  50% {
+    transform: rotateX(-90deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+@keyframes countdown-shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+@keyframes separator-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.animate-countdown-glow {
+  animation: countdown-glow 3s ease-in-out infinite;
+}
+
+.animate-countdown-pulse {
+  animation: countdown-pulse 2s ease-in-out infinite;
+}
+
+.animate-countdown-digit-flip {
+  animation: countdown-digit-flip 0.6s ease-in-out;
+}
+
+.animate-countdown-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: countdown-shimmer 2s infinite;
+}
+
+.animate-separator-pulse {
+  animation: separator-pulse 1.5s ease-in-out infinite;
+}
+
+/* Gradient Animation for Headline Text */
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}
+
+/* Gradient Loop Animation for Waitlist Button */
+@keyframes gradient-loop {
+  0% {
+    background-position: -100% 50%;
+    opacity: 0.4;
+  }
+  50% {
+    background-position: 100% 50%;
+    opacity: 1.0;
+  }
+  100% {
+    background-position: 200% 50%;
+    opacity: 0.4;
+  }
+}
+
+.animate-gradient-loop {
+  background-size: 150% 100%;
+  animation: gradient-loop 1.5s ease-out infinite;
+}
+
+/* Enhanced Shake Animation with Angular Skew for Join Waitlist Button */
+@keyframes button-shake {
+  0%, 100% {
+    transform: translateX(0) translateY(0) rotate(0deg);
+  }
+  10% {
+    transform: translateX(-1px) translateY(-0.5px) rotate(-0.5deg);
+  }
+  20% {
+    transform: translateX(1px) translateY(0.5px) rotate(0.5deg);
+  }
+  30% {
+    transform: translateX(-1px) translateY(0.5px) rotate(-0.3deg);
+  }
+  40% {
+    transform: translateX(1px) translateY(-0.5px) rotate(0.3deg);
+  }
+  50% {
+    transform: translateX(-1px) translateY(-0.3px) rotate(-0.4deg);
+  }
+  60% {
+    transform: translateX(1px) translateY(0.3px) rotate(0.4deg);
+  }
+  70% {
+    transform: translateX(-1px) translateY(0.4px) rotate(-0.2deg);
+  }
+  80% {
+    transform: translateX(1px) translateY(-0.4px) rotate(0.2deg);
+  }
+  90% {
+    transform: translateX(-1px) translateY(0.2px) rotate(-0.1deg);
+  }
+}
+
+.animate-button-shake {
+  animation: button-shake 0.6s ease-in-out;
+}
+
+/* Enhanced Refer Button Animations - Fast Wobble and Hover Effects */
+
+/* Fast Wobble Animation - Increased frequency from 0.6s to 0.3s */
+@keyframes button-shake-fast {
+  0%, 100% {
+    transform: translateX(0) translateY(0) rotate(0deg);
+  }
+  5% {
+    transform: translateX(-1.5px) translateY(-0.8px) rotate(-0.6deg);
+  }
+  10% {
+    transform: translateX(1.5px) translateY(0.8px) rotate(0.6deg);
+  }
+  15% {
+    transform: translateX(-1.2px) translateY(0.6px) rotate(-0.4deg);
+  }
+  20% {
+    transform: translateX(1.2px) translateY(-0.6px) rotate(0.4deg);
+  }
+  25% {
+    transform: translateX(-1px) translateY(-0.4px) rotate(-0.5deg);
+  }
+  30% {
+    transform: translateX(1px) translateY(0.4px) rotate(0.5deg);
+  }
+  35% {
+    transform: translateX(-1.3px) translateY(0.5px) rotate(-0.3deg);
+  }
+  40% {
+    transform: translateX(1.3px) translateY(-0.5px) rotate(0.3deg);
+  }
+  45% {
+    transform: translateX(-0.8px) translateY(0.3px) rotate(-0.2deg);
+  }
+  50% {
+    transform: translateX(0.8px) translateY(-0.3px) rotate(0.2deg);
+  }
+  55% {
+    transform: translateX(-1px) translateY(0.4px) rotate(-0.4deg);
+  }
+  60% {
+    transform: translateX(1px) translateY(-0.4px) rotate(0.4deg);
+  }
+  65% {
+    transform: translateX(-0.7px) translateY(0.2px) rotate(-0.2deg);
+  }
+  70% {
+    transform: translateX(0.7px) translateY(-0.2px) rotate(0.2deg);
+  }
+  75% {
+    transform: translateX(-0.5px) translateY(0.3px) rotate(-0.1deg);
+  }
+  80% {
+    transform: translateX(0.5px) translateY(-0.3px) rotate(0.1deg);
+  }
+  85% {
+    transform: translateX(-0.4px) translateY(0.1px) rotate(-0.1deg);
+  }
+  90% {
+    transform: translateX(0.4px) translateY(-0.1px) rotate(0.1deg);
+  }
+  95% {
+    transform: translateX(-0.2px) translateY(0.1px) rotate(-0.05deg);
+  }
+}
+
+/* Ultra Fast Wobble - For very frequent wobbling */
+@keyframes button-shake-ultra-fast {
+  0%, 100% {
+    transform: translateX(0) translateY(0) rotate(0deg);
+  }
+  10% {
+    transform: translateX(-1px) translateY(-0.5px) rotate(-0.4deg);
+  }
+  20% {
+    transform: translateX(1px) translateY(0.5px) rotate(0.4deg);
+  }
+  30% {
+    transform: translateX(-0.8px) translateY(0.3px) rotate(-0.3deg);
+  }
+  40% {
+    transform: translateX(0.8px) translateY(-0.3px) rotate(0.3deg);
+  }
+  50% {
+    transform: translateX(-0.6px) translateY(-0.2px) rotate(-0.2deg);
+  }
+  60% {
+    transform: translateX(0.6px) translateY(0.2px) rotate(0.2deg);
+  }
+  70% {
+    transform: translateX(-0.4px) translateY(0.2px) rotate(-0.1deg);
+  }
+  80% {
+    transform: translateX(0.4px) translateY(-0.2px) rotate(0.1deg);
+  }
+  90% {
+    transform: translateX(-0.2px) translateY(0.1px) rotate(-0.05deg);
+  }
+}
+
+/* Continuous Hover Wobble - Subtle continuous motion */
+@keyframes button-hover-wobble {
+  0%, 100% {
+    transform: translateX(0) translateY(0) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translateX(0.5px) translateY(-0.3px) rotate(0.2deg) scale(1.02);
+  }
+  50% {
+    transform: translateX(-0.3px) translateY(0.5px) rotate(-0.1deg) scale(1.01);
+  }
+  75% {
+    transform: translateX(0.4px) translateY(0.2px) rotate(0.15deg) scale(1.02);
+  }
+}
+
+/* Hover Glow Effect */
+@keyframes button-hover-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(22, 163, 74, 0.2), 0 0 40px rgba(22, 163, 74, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(22, 163, 74, 0.4), 0 0 60px rgba(22, 163, 74, 0.2), 0 0 80px rgba(34, 197, 94, 0.1);
+  }
+}
+
+/* Hover Scale Pulse */
+@keyframes button-hover-scale {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Enhanced Refer Button Animation Classes */
+.animate-button-shake-fast {
+  animation: button-shake-fast 0.3s ease-in-out;
+}
+
+.animate-button-shake-ultra-fast {
+  animation: button-shake-ultra-fast 0.2s ease-in-out;
+}
+
+.animate-button-hover-wobble {
+  animation: button-hover-wobble 2s ease-in-out infinite;
+}
+
+.animate-button-hover-glow {
+  animation: button-hover-glow 2s ease-in-out infinite;
+}
+
+.animate-button-hover-scale {
+  animation: button-hover-scale 1.5s ease-in-out infinite;
+}
+
+/* Combined Hover Effects for Refer Button */
+.refer-button-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.refer-button-hover:hover {
+  transform: scale(1.03);
+  filter: brightness(1.1);
+}
+
+/* Continuous wobble while hovering */
+.refer-button-hover:hover .animate-button-shake {
+  animation: button-hover-wobble 1.2s ease-in-out infinite;
+}
+
+/* Fast wobble trigger on hover */
+.refer-button-fast-hover:hover {
+  animation: button-shake-fast 0.3s ease-in-out infinite;
+}
+
+/* Ultra fast wobble trigger on hover */
+.refer-button-ultra-hover:hover {
+  animation: button-shake-ultra-fast 0.2s ease-in-out infinite;
+}
+
+/* Combined hover effect with glow and wobble */
+.refer-button-enhanced:hover {
+  animation: 
+    button-hover-wobble 1.2s ease-in-out infinite,
+    button-hover-glow 2s ease-in-out infinite;
+  transform: scale(1.05);
+  filter: brightness(1.15) saturate(1.1);
+}
+
+/* Hover state that increases wobble frequency */
+.refer-button-frequency:hover {
+  animation: button-shake-fast 0.25s ease-in-out infinite;
+}
+
+/* White transparent gradient luminosity animation */
+@keyframes gradientLuminosity {
+  0% {
+    background-position: 0% 50%;
+    opacity: 0.25;
+  }
+  25% {
+    background-position: 100% 50%;
+    opacity: 0.4;
+  }
+  50% {
+    background-position: 100% 100%;
+    opacity: 0.15;
+  }
+  75% {
+    background-position: 0% 100%;
+    opacity: 0.35;
+  }
+  100% {
+    background-position: 0% 50%;
+    opacity: 0.25;
+  }
+}
+
+/* 3D Card Tilt Effects */
+.hover\:rotate-x-2:hover {
+  transform: rotateX(2deg);
+}
+
+.hover\:rotate-x-3:hover {
+  transform: rotateX(3deg);
+}
+
+.hover\:-rotate-x-2:hover {
+  transform: rotateX(-2deg);
+}
+
+.hover\:rotate-y-4:hover {
+  transform: rotateY(4deg);
+}
+
+.hover\:rotate-y-6:hover {
+  transform: rotateY(6deg);
+}
+
+.hover\:-rotate-y-6:hover {
+  transform: rotateY(-6deg);
+}
+
+/* Enhanced auto-fit grid for admin cards with better height management */
+.auto-fit-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: stretch; /* Make all cards stretch to the same height */
+  grid-auto-rows: 1fr; /* Make all rows the same height */
+}
+
+/* Ensure card content fills the full height */
+.auto-fit-cards > * {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Make card content area expand to fill available space */
+.auto-fit-cards .card-content-fill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure card content sections distribute evenly */
+.auto-fit-cards .card-content-fill > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* Line clamp utilities for text truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ENHANCED EMAIL BANNER AND HEADER SPACING SYSTEM */
+
+/* Base banner height variable for consistent spacing */
+:root {
+  --email-banner-height: 60px;
+  --header-height: 64px;
+}
+
+/* Email confirmation banner slide-in animation */
+@keyframes banner-slide-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-banner-slide-down {
+  animation: banner-slide-down 0.3s ease-out;
+}
+
+/* Header spacing utilities with email banner awareness */
+.header-offset {
+  padding-top: var(--header-height); /* 64px - matches header height */
+}
+
+.header-offset-safe {
+  padding-top: calc(var(--header-height) + env(safe-area-inset-top)); /* Accounts for mobile notches */
+}
+
+/* Email confirmation banner spacing */
+.banner-offset {
+  padding-top: var(--email-banner-height); /* 60px - matches email banner height */
+}
+
+/* Combined offset for header + banner - UPDATED CALCULATION */
+.header-offset.banner-offset {
+  padding-top: calc(var(--header-height) + var(--email-banner-height)); /* 64px header + 60px banner = 124px */
+}
+
+/* Header positioning with email banner present */
+.header-with-banner {
+  top: var(--email-banner-height) !important; /* Push header down by banner height */
+}
+
+/* Main content spacing when email banner is present */
+.main-content-with-banner {
+  margin-top: calc(var(--email-banner-height) + var(--header-height)); /* Full offset for both banner and header */
+}
+
+.main-content-without-banner {
+  margin-top: var(--header-height); /* Only header offset */
+}
+
+/* Toast notifications positioning in bottom-right corner */
+.toast-bottom-right {
+  bottom: 1rem !important; /* Position toasts from bottom */
+  right: 1rem !important; /* Position toasts from right */
+}
+
+/* Email Banner Organic Animations */
+@keyframes banner-organic-glow {
+  0%, 100% {
+    box-shadow: 
+      0 4px 20px rgba(22, 163, 74, 0.05),
+      0 1px 6px rgba(22, 163, 74, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 6px 30px rgba(22, 163, 74, 0.08),
+      0 2px 12px rgba(22, 163, 74, 0.15),
+      0 0 40px rgba(34, 197, 94, 0.05);
+  }
+}
+
+@keyframes banner-icon-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-2px) rotate(1deg);
+  }
+  50% {
+    transform: translateY(-1px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-3px) rotate(-1deg);
+  }
+}
+
+@keyframes banner-text-shimmer {
+  0% {
+    background-position: -100% 0;
+    opacity: 1;
+  }
+  50% {
+    background-position: 100% 0;
+    opacity: 0.8;
+  }
+  100% {
+    background-position: 200% 0;
+    opacity: 1;
+  }
+}
+
+@keyframes banner-border-flow {
+  0% {
+    background-position: 0% 50%;
+    opacity: 0.3;
+  }
+  50% {
+    background-position: 100% 50%;
+    opacity: 0.6;
+  }
+  100% {
+    background-position: 200% 50%;
+    opacity: 0.3;
+  }
+}
+
+.animate-banner-organic-glow {
+  animation: banner-organic-glow 4s ease-in-out infinite;
+}
+
+.animate-banner-icon-float {
+  animation: banner-icon-float 3s ease-in-out infinite;
+}
+
+.animate-banner-text-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(22, 163, 74, 0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: banner-text-shimmer 3s ease-in-out infinite;
+}
+
+.animate-banner-border-flow {
+  background-size: 200% 100%;
+  animation: banner-border-flow 6s linear infinite;
+}
+
+/* Enhanced Header Scroll Animations with banner awareness */
+@keyframes header-slide-up-away {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+  100% {
+    transform: translateY(-100%) scale(0.98);
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+}
+
+@keyframes header-slide-down-return {
+  0% {
+    transform: translateY(-100%) scale(0.98);
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes header-slide-down-return-with-banner {
+  0% {
+    transform: translateY(-100%) scale(0.98);
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    transform: translateY(var(--email-banner-height)) scale(1);
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes header-fade-out-up {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-20px);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes header-fade-in-down {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(-20px);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes header-fade-in-down-with-banner {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(calc(var(--email-banner-height) - 20px));
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(var(--email-banner-height));
+    opacity: 1;
+  }
+}
+
+.animate-header-slide-up-away {
+  animation: header-slide-up-away 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-header-slide-down-return {
+  animation: header-slide-down-return 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-header-slide-down-return-with-banner {
+  animation: header-slide-down-return-with-banner 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-header-fade-out-up {
+  animation: header-fade-out-up 0.3s ease-in forwards;
+}
+
+.animate-header-fade-in-down {
+  animation: header-fade-in-down 0.4s ease-out forwards;
+}
+
+.animate-header-fade-in-down-with-banner {
+  animation: header-fade-in-down-with-banner 0.4s ease-out forwards;
+}
+
+/* Enhanced header transitions with directional states and banner awareness */
+.header-transition {
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+              opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              backdrop-filter 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header-hidden {
+  transform: translateY(-100%) scale(0.98);
+  opacity: 0;
+}
+
+.header-visible {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.header-visible-with-banner {
+  transform: translateY(var(--email-banner-height)) scale(1);
+  opacity: 1;
+  top: 0 !important; /* Reset top since we're using transform */
+}
+
+.header-scrolling-down {
+  transform: translateY(-105%);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 1, 1), 
+              opacity 0.3s cubic-bezier(0.4, 0, 1, 1);
+}
+
+.header-scrolling-up {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.4s cubic-bezier(0, 0, 0.2, 1), 
+              opacity 0.4s cubic-bezier(0, 0, 0.2, 1);
+}
+
+.header-scrolling-up-with-banner {
+  transform: translateY(var(--email-banner-height));
+  opacity: 1;
+  transition: transform 0.4s cubic-bezier(0, 0, 0.2, 1), 
+              opacity 0.4s cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* Mobile responsive banner and header adjustments */
+@media (max-width: 640px) {
+  :root {
+    --email-banner-height: 76px; /* Enhanced mobile height for better touch targets and spacing */
+    --header-height: 60px; /* Slightly shorter header on mobile */
+  }
+  
+  /* Ensure banner content is properly sized on mobile */
+  .banner-mobile-padding {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Adjust header positioning for mobile */
+  .header-with-banner-mobile {
+    top: var(--email-banner-height) !important;
+  }
+  
+  /* Mobile-specific main content spacing */
+  .main-content-with-banner-mobile {
+    margin-top: calc(var(--email-banner-height) + var(--header-height));
+    padding-top: 1rem; /* Additional spacing on mobile */
+  }
+}
+
+/* Desktop: Properly centered modal behavior */
+[data-radix-dialog-content].modal-fullscreen-8px {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 640px !important; /* Fixed width between 640-720px range */
+  max-width: 720px !important;
+  height: auto !important;
+  max-height: 90vh !important;
+  margin: 0 !important;
+  border-radius: 0.75rem !important;
+}
+
+/* Tablet: Responsive width with centering */
+@media (max-width: 768px) and (min-width: 481px) {
+  [data-radix-dialog-content].modal-fullscreen-8px {
+    width: 90vw !important;
+    max-width: 640px !important;
+  }
+}
+
+/* Mobile: Edge-to-edge with minimal gaps and dynamic viewport height */
+@media (max-width: 480px) {
+  [data-radix-dialog-content].modal-fullscreen-8px {
+    position: fixed !important;
+    top: 0.25rem !important; /* 4px gap on mobile */
+    left: 0.25rem !important; 
+    right: 0.25rem !important; 
+    bottom: 0.25rem !important; 
+    width: calc(100vw - 0.5rem) !important; /* Full width minus gaps */
+    height: calc(100dvh - 0.5rem) !important; /* Dynamic viewport height minus gaps */
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    border-radius: 0.75rem !important;
+  }
+  
+  /* Fallback for browsers that don't support dvh */
+  @supports not (height: 100dvh) {
+    [data-radix-dialog-content].modal-fullscreen-8px {
+      height: calc(100vh - 0.5rem) !important;
+    }
+  }
+  
+  /* Alternative approach using svh for small viewport */
+  @supports (height: 100svh) {
+    [data-radix-dialog-content].modal-fullscreen-8px {
+      height: calc(100svh - 0.5rem) !important;
+    }
+  }
+}
+
+/* Ensure dialog overlay covers full screen and supports centering */
+[data-radix-dialog-overlay] {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Override default radix positioning for our custom modal */
+[data-radix-dialog-overlay]:has(.modal-fullscreen-8px) {
+  align-items: stretch !important;
+  justify-content: stretch !important;
+}
+
+/* Prevent zoom on input focus for mobile devices while maintaining consistency */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+textarea,
+select {
+  font-size: max(16px, var(--text-base)) !important; /* Prevent iOS zoom while respecting base size */
+}
+
+button {
+  font-size: max(16px, var(--text-base)) !important; /* Ensure buttons match input size */
+}
+
+@media (max-width: 640px) {
+  /* Additional mobile input zoom prevention - ensure buttons and inputs are consistent */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select,
+  button {
+    font-size: max(16px, var(--text-base)) !important; /* Force minimum 16px to prevent zoom while keeping consistency */
+    transform-origin: top left;
+    zoom: 1 !important;
+  }
+  
+  /* Prevent zoom on focus while maintaining size consistency */
+  input:focus,
+  textarea:focus,
+  select:focus,
+  button:focus {
+    font-size: max(16px, var(--text-base)) !important;
+    zoom: 1 !important;
+  }
+}
+
+/* Ensure modals have consistent overflow behavior */
+[data-radix-dialog-content] {
+  overflow-y: auto !important;
+}
+
+/* Fix for Safari modal positioning */
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  [data-radix-dialog-overlay] {
+    display: -webkit-flex !important;
+    -webkit-align-items: center !important;
+    -webkit-justify-content: center !important;
+  }
+  
+  [data-radix-dialog-overlay]:has(.modal-fullscreen-8px) {
+    -webkit-align-items: stretch !important;
+    -webkit-justify-content: stretch !important;
+  }
+}
+
+/* Input and button zoom prevention utilities - consistent sizing */
+.input-no-zoom {
+  font-size: max(16px, var(--text-base)) !important;
+  zoom: 1 !important;
+}
+
+.input-no-zoom:focus {
+  font-size: max(16px, var(--text-base)) !important;
+  zoom: 1 !important;
+}
+
+.button-no-zoom {
+  font-size: max(16px, var(--text-base)) !important;
+  zoom: 1 !important;
+}
+
+.button-no-zoom:focus {
+  font-size: max(16px, var(--text-base)) !important;
+  zoom: 1 !important;
+}
+
+/* Global consistent text sizing for form elements */
+.consistent-text-size {
+  font-size: max(16px, var(--text-base)) !important;
+}
+
+/* Button Density System - Standardized 56px height with different text densities */
+
+/* Major CTA Button Density - Use h-14 for standardized 56px height */
+.btn-major {
+  height: 3.5rem; /* 56px - equivalent to h-14 */
+  font-size: max(18px, 1.125rem); /* 18px minimum for major CTAs */
+  font-weight: 500; /* font-medium equivalent */
+  line-height: 1.4;
+  padding-left: 1.5rem; /* px-6 */
+  padding-right: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem; /* rounded-xl */
+}
+
+/* Standard Button Density - Use h-14 with smaller text */
+.btn-standard {
+  height: 3.5rem; /* 56px - equivalent to h-14 */
+  font-size: max(16px, 1rem); /* 16px minimum to prevent zoom */
+  font-weight: 400; /* font-normal equivalent */
+  line-height: 1.5;
+  padding-left: 1rem; /* px-4 */
+  padding-right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem; /* rounded-xl */
+}
+
+/* Input Field Density - Matches standard button density */
+.input-standard {
+  height: 3.5rem; /* 56px - equivalent to h-14 */
+  font-size: max(16px, 1rem); /* 16px minimum to prevent zoom */
+  font-weight: 400; /* font-normal equivalent */
+  line-height: 1.5;
+  padding-left: 1rem; /* px-4 */
+  padding-right: 1rem;
+  border-radius: 0.75rem; /* rounded-xl */
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 640px) {
+  .btn-major {
+    font-size: max(18px, 1.125rem); /* Maintain larger text on mobile */
+    padding-left: 1.25rem; /* px-5 */
+    padding-right: 1.25rem;
+  }
+  
+  .btn-standard {
+    font-size: max(16px, 1rem); /* Prevent zoom while maintaining consistency */
+    padding-left: 0.875rem; /* px-3.5 */
+    padding-right: 0.875rem;
+  }
+  
+  .input-standard {
+    font-size: max(16px, 1rem); /* Prevent zoom */
+    padding-left: 0.875rem; /* px-3.5 */
+    padding-right: 0.875rem;
+  }
+}
+
+/* Focus states for density system */
+.btn-major:focus,
+.btn-standard:focus {
+  outline: 2px solid var(--healthscan-green);
+  outline-offset: 2px;
+}
+
+.input-standard:focus {
+  outline: 2px solid var(--healthscan-green);
+  outline-offset: 0px;
+  border-color: var(--healthscan-green);
+}
+
+/* Profile Avatar Hover Circle Effect */
+.avatar-hover-circle {
+  transition: border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.avatar-hover-circle:hover {
+  border-radius: 50% !important;
+  transform: scale(1.05);
+}
+
+/* Enhanced avatar hover effects with smooth transitions */
+.avatar-with-hover-effects {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.avatar-with-hover-effects:hover {
+  border-radius: 50% !important;
+  transform: scale(1.05) rotate(2deg);
+  box-shadow: 0 8px 25px rgba(22, 163, 74, 0.2), 0 4px 12px rgba(22, 163, 74, 0.1);
+}
+
+/* Ensure avatar images maintain aspect ratio during hover transition */
+.avatar-with-hover-effects img {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+.avatar-with-hover-effects:hover img {
+  transform: scale(1.1);
+}
+
+/* Avatar fallback text transitions */
+.avatar-with-hover-effects .avatar-fallback {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.avatar-with-hover-effects:hover .avatar-fallback {
+  background-color: var(--healthscan-light-green);
+  transform: scale(1.1);
+}
+
+/* Enhanced mobile viewport handling with better touch behavior */
+@media (max-width: 480px) {
+  /* Ensure proper viewport behavior on mobile */
+  html {
+    height: 100%;
+    height: 100dvh; /* Dynamic viewport height when supported */
+    overflow-x: hidden; /* Prevent horizontal scroll */
+    overflow-y: auto; /* Allow vertical scrolling */
+  }
+  
+  body {
+    height: auto; /* Let body expand naturally */
+    min-height: 100vh; /* Minimum viewport height */
+    min-height: 100dvh; /* Dynamic viewport height when supported */
+    overflow-x: hidden; /* Prevent horizontal scroll */
+    overflow-y: auto; /* Allow vertical scrolling */
+    position: relative; /* Ensure proper positioning */
+  }
+  
+  /* Ensure main content is scrollable */
+  main {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  
+  /* Ensure modal content respects mobile viewport changes */
+  [data-radix-dialog-content].modal-fullscreen-8px {
+    /* Use dvh for better mobile viewport handling */
+    height: calc(100dvh - 0.5rem) !important;
+    min-height: calc(100dvh - 0.5rem) !important;
+    max-height: calc(100dvh - 0.5rem) !important;
+    /* Ensure proper touch scrolling */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    /* Force hardware acceleration for smoother scrolling */
+    transform: translateZ(0);
+    will-change: transform, height;
+  }
+  
+  /* Fallback for browsers without dvh support */
+  @supports not (height: 100dvh) {
+    [data-radix-dialog-content].modal-fullscreen-8px {
+      height: calc(100vh - 0.5rem) !important;
+      min-height: calc(100vh - 0.5rem) !important;
+      max-height: calc(100vh - 0.5rem) !important;
+    }
+    
+    main {
+      min-height: 100vh;
+    }
+    
+    body {
+      min-height: 100vh;
+    }
+  }
+  
+  /* Better handling for iOS Safari with its changing viewport */
+  @supports (-webkit-touch-callout: none) {
+    [data-radix-dialog-content].modal-fullscreen-8px {
+      height: calc(100dvh - 0.5rem) !important;
+      /* iOS Safari specific adjustments */
+      -webkit-transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+    }
+    
+    @supports not (height: 100dvh) {
+      [data-radix-dialog-content].modal-fullscreen-8px {
+        height: calc(100vh - 0.5rem) !important;
+      }
+    }
+  }
+  
+  /* Handle orientation changes specifically */
+  @media (orientation: landscape) {
+    [data-radix-dialog-content].modal-fullscreen-8px {
+      height: calc(100dvh - 0.5rem) !important;
+      min-height: calc(100dvh - 0.5rem) !important;
+    }
+  }
+  
+  @media (orientation: portrait) {
+    [data-radix-dialog-content].modal-fullscreen-8px {
+      height: calc(100dvh - 0.5rem) !important;
+      min-height: calc(100dvh - 0.5rem) !important;
+    }
+  }
+}
+
+/* Hide ALL scrollbars globally while maintaining scroll functionality */
+
+/* Global scrollbar hiding for all elements */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* WebKit browsers (Chrome, Safari, Edge) */
+}
+
+/* Hide scrollbars for html and body */
+html {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+html::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+body::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for main content areas */
+main {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+main::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for all overflow containers */
+.overflow-auto,
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-scroll,
+.overflow-y-scroll,
+.overflow-x-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.overflow-auto::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-scroll::-webkit-scrollbar,
+.overflow-y-scroll::-webkit-scrollbar,
+.overflow-x-scroll::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for modal and dialog content */
+[data-radix-dialog-content] {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+[data-radix-dialog-content]::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for any element with scroll behavior */
+[style*="overflow"] {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+[style*="overflow"]::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for specific UI components that might scroll */
+textarea,
+select[multiple],
+.scroll-area,
+.scrollable-content {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+textarea::-webkit-scrollbar,
+select[multiple]::-webkit-scrollbar,
+.scroll-area::-webkit-scrollbar,
+.scrollable-content::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Mobile scrolling improvements for all pages */
+@media (max-width: 768px) {
+  /* Ensure all sections are scrollable with hidden scrollbars */
+  section {
+    overflow-x: hidden;
+    position: relative;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  
+  section::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
+  
+  /* Ensure containers don't exceed viewport width and hide scrollbars */
+  .container, .max-w-7xl, .max-w-6xl, .max-w-5xl {
+    overflow-x: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  
+  .container::-webkit-scrollbar, 
+  .max-w-7xl::-webkit-scrollbar, 
+  .max-w-6xl::-webkit-scrollbar, 
+  .max-w-5xl::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
+  
+  /* Improve touch scrolling for all scrollable areas with hidden scrollbars */
+  .overflow-y-auto, .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  
+  .overflow-y-auto::-webkit-scrollbar, 
+  .overflow-auto::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
+  
+  /* Ensure fixed positioned elements don't interfere with scrolling */
+  .fixed {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Prevent horizontal overflow on mobile */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Ensure grids and flexbox don't overflow and hide scrollbars */
+  .grid {
+    overflow-x: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  
+  .grid::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
+  
+  .flex {
+    overflow-x: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  
+  .flex::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
+  
+  /* Mobile-specific padding adjustments */
+  .px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Ensure modal dialogs are properly scrollable with hidden scrollbars */
+[data-radix-dialog-content] {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+[data-radix-dialog-content]::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for all Radix UI components */
+[data-radix-scroll-area-viewport],
+[data-radix-select-content],
+[data-radix-dropdown-menu-content],
+[data-radix-context-menu-content],
+[data-radix-popover-content] {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar,
+[data-radix-select-content]::-webkit-scrollbar,
+[data-radix-dropdown-menu-content]::-webkit-scrollbar,
+[data-radix-context-menu-content]::-webkit-scrollbar,
+[data-radix-popover-content]::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for table containers and data displays */
+.table-container,
+.data-container,
+.admin-panel,
+.dashboard-container,
+table,
+tbody,
+thead,
+.table-wrapper {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.table-container::-webkit-scrollbar,
+.data-container::-webkit-scrollbar,
+.admin-panel::-webkit-scrollbar,
+.dashboard-container::-webkit-scrollbar,
+table::-webkit-scrollbar,
+tbody::-webkit-scrollbar,
+thead::-webkit-scrollbar,
+.table-wrapper::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Hide scrollbars for code blocks and pre elements */
+pre,
+code,
+.code-block,
+.syntax-highlight {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+pre::-webkit-scrollbar,
+code::-webkit-scrollbar,
+.code-block::-webkit-scrollbar,
+.syntax-highlight::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Mobile-specific modal improvements */
+@media (max-width: 640px) {
+  [data-radix-dialog-content] {
+    /* Ensure modals are fully scrollable on small screens with hidden scrollbars */
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  
+  [data-radix-dialog-content]::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
+  
+  /* Ensure modal content doesn't exceed screen bounds and hide scrollbars */
+  [data-radix-dialog-content] > * {
+    max-width: 100%;
+    overflow-x: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  
+  [data-radix-dialog-content] > *::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
+  }
+}

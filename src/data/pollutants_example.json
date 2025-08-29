@@ -1,0 +1,454 @@
+[
+  {
+    "name": "Bisphenol A (BPA)",
+    "category": "Chemical Pollutants",
+    "type": "Endocrine Disruptor",
+    "toxicity_level": "Moderate",
+    "regulatory_limit": 0.05,
+    "unit": "mg/kg",
+    "description": "Chemical compound used in plastic production that can leach into food and beverages. BPA is commonly found in polycarbonate plastics and epoxy resins used to coat the inside of metal products.",
+    "health_effects": [
+      "Hormonal disruption",
+      "Reproductive issues",
+      "Cardiovascular effects",
+      "Developmental problems in children",
+      "Increased cancer risk"
+    ],
+    "sources": [
+      "Plastic containers",
+      "Canned foods",
+      "Thermal receipts",
+      "Water bottles",
+      "Food packaging"
+    ],
+    "detection_methods": [
+      "HPLC-MS/MS",
+      "ELISA",
+      "Gas chromatography"
+    ],
+    "mitigation": [
+      "Use BPA-free products",
+      "Avoid heating plastic",
+      "Choose glass containers",
+      "Reduce canned food consumption"
+    ],
+    "cas_number": "80-05-7",
+    "molecular_formula": "C15H16O2",
+    "molecular_weight": 228.29,
+    "solubility": "Water soluble",
+    "persistence": "Moderate",
+    "bioaccumulation": "Low to moderate",
+    "exposure_routes": ["Ingestion", "Dermal contact", "Inhalation"],
+    "vulnerable_populations": ["Pregnant women", "Children", "Infants"],
+    "regulatory_status": "Restricted in some countries",
+    "alternatives": ["BPS", "BPF", "Tritan plastic"]
+  },
+  {
+    "name": "Lead",
+    "category": "Heavy Metals",
+    "type": "Neurotoxin",
+    "toxicity_level": "High",
+    "regulatory_limit": 0.01,
+    "unit": "mg/L",
+    "description": "Toxic heavy metal that accumulates in the body and affects multiple organ systems, particularly the nervous system. No safe level of lead exposure has been identified.",
+    "health_effects": [
+      "Neurological damage",
+      "Developmental delays",
+      "Kidney damage",
+      "Anemia",
+      "High blood pressure",
+      "Reproductive problems"
+    ],
+    "sources": [
+      "Old paint",
+      "Lead pipes",
+      "Contaminated soil",
+      "Industrial emissions",
+      "Some imported products",
+      "Lead-glazed pottery"
+    ],
+    "detection_methods": [
+      "ICP-MS",
+      "Atomic absorption spectroscopy",
+      "XRF analysis"
+    ],
+    "mitigation": [
+      "Test water sources",
+      "Replace old pipes",
+      "Proper soil remediation",
+      "Paint abatement",
+      "Regular blood testing"
+    ],
+    "cas_number": "7439-92-1",
+    "molecular_formula": "Pb",
+    "atomic_weight": 207.2,
+    "solubility": "Insoluble in water",
+    "persistence": "Very high",
+    "bioaccumulation": "High",
+    "exposure_routes": ["Ingestion", "Inhalation", "Dermal contact"],
+    "vulnerable_populations": ["Children under 6", "Pregnant women", "Fetuses"],
+    "regulatory_status": "Strictly regulated worldwide",
+    "target_organs": ["Brain", "Kidneys", "Blood", "Nervous system"]
+  },
+  {
+    "name": "Mercury",
+    "category": "Heavy Metals",
+    "type": "Neurotoxin",
+    "toxicity_level": "High",
+    "regulatory_limit": 0.002,
+    "unit": "mg/L",
+    "description": "Highly toxic heavy metal that primarily affects the nervous system. Methylmercury is particularly dangerous as it easily crosses the blood-brain barrier.",
+    "health_effects": [
+      "Neurological damage",
+      "Memory problems",
+      "Motor skill impairment",
+      "Vision problems",
+      "Hearing loss",
+      "Kidney damage"
+    ],
+    "sources": [
+      "Fish consumption",
+      "Dental amalgams",
+      "Industrial emissions",
+      "Coal burning",
+      "Gold mining",
+      "Broken thermometers"
+    ],
+    "detection_methods": [
+      "Cold vapor atomic absorption",
+      "ICP-MS",
+      "Direct mercury analyzer"
+    ],
+    "mitigation": [
+      "Limit high-mercury fish",
+      "Proper amalgam removal",
+      "Industrial controls",
+      "Safe disposal of mercury products"
+    ],
+    "cas_number": "7439-97-6",
+    "molecular_formula": "Hg",
+    "atomic_weight": 200.59,
+    "solubility": "Slightly soluble in water",
+    "persistence": "Very high",
+    "bioaccumulation": "Very high",
+    "exposure_routes": ["Ingestion", "Inhalation", "Dermal contact"],
+    "vulnerable_populations": ["Pregnant women", "Children", "Fetuses"],
+    "regulatory_status": "Strictly regulated, Minamata Convention",
+    "forms": ["Elemental mercury", "Methylmercury", "Mercuric chloride"]
+  },
+  {
+    "name": "Cadmium",
+    "category": "Heavy Metals",
+    "type": "Carcinogen",
+    "toxicity_level": "High",
+    "regulatory_limit": 0.005,
+    "unit": "mg/L",
+    "description": "Toxic heavy metal that accumulates in kidneys and bones. Classified as a human carcinogen with a very long biological half-life.",
+    "health_effects": [
+      "Kidney damage",
+      "Bone disease",
+      "Cancer",
+      "Cardiovascular disease",
+      "Reproductive toxicity",
+      "Immune system suppression"
+    ],
+    "sources": [
+      "Cigarette smoke",
+      "Industrial emissions",
+      "Contaminated water",
+      "Seafood",
+      "Rice from contaminated soil",
+      "Batteries"
+    ],
+    "detection_methods": [
+      "ICP-MS",
+      "Atomic absorption spectroscopy",
+      "Voltammetry"
+    ],
+    "mitigation": [
+      "Avoid smoking",
+      "Limit shellfish consumption",
+      "Test water sources",
+      "Proper battery disposal",
+      "Soil remediation"
+    ],
+    "cas_number": "7440-43-9",
+    "molecular_formula": "Cd",
+    "atomic_weight": 112.41,
+    "solubility": "Insoluble in water",
+    "persistence": "Very high",
+    "bioaccumulation": "Very high",
+    "exposure_routes": ["Ingestion", "Inhalation"],
+    "vulnerable_populations": ["Smokers", "Industrial workers", "Children"],
+    "regulatory_status": "IARC Group 1 carcinogen",
+    "biological_half_life": "15-20 years"
+  },
+  {
+    "name": "Arsenic",
+    "category": "Heavy Metals",
+    "type": "Carcinogen",
+    "toxicity_level": "High",
+    "regulatory_limit": 0.01,
+    "unit": "mg/L",
+    "description": "Naturally occurring metalloid that is toxic in inorganic forms. Long-term exposure increases cancer risk and causes numerous health problems.",
+    "health_effects": [
+      "Cancer (skin, lung, bladder)",
+      "Cardiovascular disease",
+      "Diabetes",
+      "Skin lesions",
+      "Neurological effects",
+      "Gastrointestinal problems"
+    ],
+    "sources": [
+      "Contaminated groundwater",
+      "Rice and rice products",
+      "Seafood",
+      "Industrial emissions",
+      "Mining activities",
+      "Pressure-treated wood"
+    ],
+    "detection_methods": [
+      "ICP-MS",
+      "Hydride generation AAS",
+      "XRF spectroscopy"
+    ],
+    "mitigation": [
+      "Test well water",
+      "Vary rice consumption",
+      "Choose low-arsenic foods",
+      "Water filtration",
+      "Soil testing"
+    ],
+    "cas_number": "7440-38-2",
+    "molecular_formula": "As",
+    "atomic_weight": 74.92,
+    "solubility": "Variable by compound",
+    "persistence": "High",
+    "bioaccumulation": "Moderate",
+    "exposure_routes": ["Ingestion", "Inhalation", "Dermal contact"],
+    "vulnerable_populations": ["Well water users", "High rice consumers"],
+    "regulatory_status": "IARC Group 1 carcinogen",
+    "forms": ["Inorganic arsenic", "Organic arsenic", "Arsenate", "Arsenite"]
+  },
+  {
+    "name": "PCBs (Polychlorinated Biphenyls)",
+    "category": "Chemical Pollutants",
+    "type": "Persistent Organic Pollutant",
+    "toxicity_level": "High",
+    "regulatory_limit": 0.0005,
+    "unit": "mg/kg",
+    "description": "Synthetic organic chemicals that were widely used in industrial applications. They persist in the environment and bioaccumulate in food chains.",
+    "health_effects": [
+      "Cancer",
+      "Immune system suppression",
+      "Reproductive disorders",
+      "Developmental effects",
+      "Liver damage",
+      "Skin disorders"
+    ],
+    "sources": [
+      "Old electrical equipment",
+      "Fish (especially fatty fish)",
+      "Contaminated sites",
+      "Building materials",
+      "Waste sites"
+    ],
+    "detection_methods": [
+      "GC-MS",
+      "HPLC",
+      "Immunoassay"
+    ],
+    "mitigation": [
+      "Limit fatty fish consumption",
+      "Proper disposal of old equipment",
+      "Site remediation",
+      "Avoid contaminated areas"
+    ],
+    "cas_number": "1336-36-3",
+    "molecular_formula": "C12H10-xClx",
+    "solubility": "Low water solubility",
+    "persistence": "Very high",
+    "bioaccumulation": "Very high",
+    "exposure_routes": ["Ingestion", "Inhalation", "Dermal contact"],
+    "vulnerable_populations": ["Fish consumers", "Workers in contaminated buildings"],
+    "regulatory_status": "Banned in most countries",
+    "stockholm_convention": "Listed in Annex A"
+  },
+  {
+    "name": "PFAS (Per- and Polyfluorinated Substances)",
+    "category": "Chemical Pollutants",
+    "type": "Persistent Organic Pollutant",
+    "toxicity_level": "High",
+    "regulatory_limit": 0.00004,
+    "unit": "mg/L",
+    "description": "Large group of synthetic chemicals that are extremely persistent in the environment and human body. Known as 'forever chemicals' due to their stability.",
+    "health_effects": [
+      "Cancer",
+      "Liver damage",
+      "Immune system effects",
+      "High cholesterol",
+      "Pregnancy complications",
+      "Kidney disease"
+    ],
+    "sources": [
+      "Non-stick cookware",
+      "Water-resistant clothing",
+      "Food packaging",
+      "Firefighting foam",
+      "Contaminated water",
+      "Industrial processes"
+    ],
+    "detection_methods": [
+      "LC-MS/MS",
+      "GC-MS",
+      "Immunoassay"
+    ],
+    "mitigation": [
+      "Avoid non-stick cookware",
+      "Filter drinking water",
+      "Choose PFAS-free products",
+      "Reduce fast food consumption"
+    ],
+    "cas_number": "Multiple",
+    "molecular_formula": "Variable",
+    "solubility": "Variable",
+    "persistence": "Extremely high",
+    "bioaccumulation": "High",
+    "exposure_routes": ["Ingestion", "Inhalation", "Dermal contact"],
+    "vulnerable_populations": ["General population", "Workers", "Communities near contaminated sites"],
+    "regulatory_status": "Increasing regulations globally",
+    "common_types": ["PFOA", "PFOS", "PFNA", "PFHxS"]
+  },
+  {
+    "name": "Dioxins",
+    "category": "Chemical Pollutants",
+    "type": "Persistent Organic Pollutant",
+    "toxicity_level": "Very High",
+    "regulatory_limit": 0.000001,
+    "unit": "mg/kg",
+    "description": "Highly toxic compounds that are unintentional byproducts of various industrial processes. They are among the most toxic chemicals known.",
+    "health_effects": [
+      "Cancer",
+      "Reproductive disorders",
+      "Developmental problems",
+      "Immune system damage",
+      "Hormone disruption",
+      "Skin disorders"
+    ],
+    "sources": [
+      "Industrial processes",
+      "Waste incineration",
+      "Forest fires",
+      "Fatty foods (meat, dairy)",
+      "Contaminated sites"
+    ],
+    "detection_methods": [
+      "HRGC-HRMS",
+      "CALUX bioassay",
+      "GC-MS/MS"
+    ],
+    "mitigation": [
+      "Reduce fatty food consumption",
+      "Choose organic products",
+      "Avoid burning waste",
+      "Site remediation"
+    ],
+    "cas_number": "1746-01-6",
+    "molecular_formula": "C12H4Cl4O2",
+    "solubility": "Very low water solubility",
+    "persistence": "Extremely high",
+    "bioaccumulation": "Extremely high",
+    "exposure_routes": ["Ingestion", "Inhalation"],
+    "vulnerable_populations": ["General population", "Workers", "Breastfeeding infants"],
+    "regulatory_status": "Stockholm Convention POPs",
+    "most_toxic": "2,3,7,8-TCDD"
+  },
+  {
+    "name": "Glyphosate",
+    "category": "Pesticides",
+    "type": "Herbicide",
+    "toxicity_level": "Moderate",
+    "regulatory_limit": 0.7,
+    "unit": "mg/kg",
+    "description": "Most widely used herbicide globally. Systemic herbicide that kills plants by inhibiting a specific enzyme pathway.",
+    "health_effects": [
+      "Possible carcinogen",
+      "Endocrine disruption",
+      "Gastrointestinal effects",
+      "Skin irritation",
+      "Eye irritation"
+    ],
+    "sources": [
+      "Agricultural products",
+      "Grain products",
+      "Processed foods",
+      "Groundwater",
+      "Surface water"
+    ],
+    "detection_methods": [
+      "ELISA",
+      "LC-MS/MS",
+      "GC-MS"
+    ],
+    "mitigation": [
+      "Choose organic products",
+      "Wash produce thoroughly",
+      "Filter water",
+      "Support sustainable farming"
+    ],
+    "cas_number": "1071-83-6",
+    "molecular_formula": "C3H8NO5P",
+    "molecular_weight": 169.07,
+    "solubility": "High water solubility",
+    "persistence": "Moderate",
+    "bioaccumulation": "Low",
+    "exposure_routes": ["Ingestion", "Inhalation", "Dermal contact"],
+    "vulnerable_populations": ["Agricultural workers", "General population"],
+    "regulatory_status": "IARC Group 2A (probable carcinogen)",
+    "trade_names": ["Roundup", "Ranger Pro", "Accord"]
+  },
+  {
+    "name": "Atrazine",
+    "category": "Pesticides",
+    "type": "Herbicide",
+    "toxicity_level": "Moderate",
+    "regulatory_limit": 0.003,
+    "unit": "mg/L",
+    "description": "Widely used triazine herbicide for controlling weeds. Persistent in groundwater and linked to endocrine disruption.",
+    "health_effects": [
+      "Endocrine disruption",
+      "Reproductive effects",
+      "Cancer risk",
+      "Immune system effects",
+      "Developmental problems"
+    ],
+    "sources": [
+      "Agricultural runoff",
+      "Drinking water",
+      "Corn products",
+      "Surface water",
+      "Groundwater"
+    ],
+    "detection_methods": [
+      "ELISA",
+      "LC-MS/MS",
+      "GC-MS"
+    ],
+    "mitigation": [
+      "Water filtration",
+      "Choose organic corn products",
+      "Support atrazine-free farming",
+      "Test well water"
+    ],
+    "cas_number": "1912-24-9",
+    "molecular_formula": "C8H14ClN5",
+    "molecular_weight": 215.68,
+    "solubility": "Moderate water solubility",
+    "persistence": "High in groundwater",
+    "bioaccumulation": "Low to moderate",
+    "exposure_routes": ["Ingestion", "Inhalation"],
+    "vulnerable_populations": ["Agricultural communities", "Well water users"],
+    "regulatory_status": "Banned in EU, regulated in US",
+    "half_life": "60-100 days in soil"
+  }
+]
