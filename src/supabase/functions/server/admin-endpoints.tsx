@@ -63,11 +63,43 @@ async function getDetailedStats(): Promise<any> {
   try {
     console.log('📊 Fetching detailed statistics with quality metrics...')
     
-    const dataTypes = ['nutrient', 'pollutant', 'ingredient', 'product', 'parasite', 'scan', 'meal']
     const detailedStats: any = {}
     
-    for (const dataType of dataTypes) {
-      const records = await kv.getByPrefix(`${dataType}_`)
+    // Query from new Supabase tables with correct structure
+    const tableQueries = [
+      { key: 'nutrients', table: 'catalog_elements', category: 'beneficial' },
+      { key: 'pollutants', table: 'catalog_elements', category: 'hazardous' },
+      { key: 'ingredients', table: 'catalog_ingredients', category: null },
+      { key: 'products', table: 'catalog_recipes', category: null },
+      { key: 'parasites', table: 'catalog_elements', category: 'hazardous' },
+      { key: 'scans', table: 'scans', category: null },
+      { key: 'meals', table: 'catalog_recipes', category: 'meal' }
+    ]
+    
+    for (const query of tableQueries) {
+      let records: any[] = []
+      
+      try {
+        let queryBuilder = supabase.from(query.table).select('*')
+        
+        // Add category filter if needed
+        if (query.category) {
+          queryBuilder = queryBuilder.eq('category', query.category)
+        }
+        
+        const { data, error } = await queryBuilder
+        
+        if (error) {
+          console.warn(`⚠️ Error fetching ${query.key} from ${query.table}:`, error)
+          records = []
+        } else {
+          records = data || []
+        }
+      } catch (err) {
+        console.warn(`⚠️ Failed to query ${query.table}:`, err)
+        records = []
+      }
+      
       const total = records.length
       
       // Analyze data quality
@@ -110,7 +142,7 @@ async function getDetailedStats(): Promise<any> {
         }
       })
       
-      const target = TARGET_COUNTS[dataType as keyof typeof TARGET_COUNTS] || 50
+      const target = TARGET_COUNTS[query.key as keyof typeof TARGET_COUNTS] || 50
       const coverage = Math.min((total / target) * 100, 100)
       
       // Calculate quality score
@@ -122,12 +154,7 @@ async function getDetailedStats(): Promise<any> {
         qualityScore = Math.round(imageQuality + metadataQuality + sourceQuality + 50) // Base 50%
       }
       
-      detailedStats[dataType === 'nutrient' ? 'nutrients' : 
-                   dataType === 'pollutant' ? 'pollutants' : 
-                   dataType === 'ingredient' ? 'ingredients' :
-                   dataType === 'product' ? 'products' :
-                   dataType === 'parasite' ? 'parasites' :
-                   dataType === 'scan' ? 'scans' : 'meals'] = {
+      detailedStats[query.key] = {
         current: total,
         target,
         withImages,
