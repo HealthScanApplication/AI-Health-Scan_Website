@@ -17,13 +17,13 @@ export interface AdminStats {
 export type AdminTab = 'overview' | 'database' | 'imports' | 'seeding' | 'nutrients' | 'ingredients' | 'pollutants' | 'products' | 'scans' | 'parasites' | 'meals';
 
 export const dataTypeStats = (stats: AdminStats) => [
-  { name: 'nutrients', count: stats.nutrients, color: 'emerald', icon: '🥬' },
-  { name: 'ingredients', count: stats.ingredients, color: 'blue', icon: '🧪' },
-  { name: 'pollutants', count: stats.pollutants, color: 'red', icon: '⚠️' },
-  { name: 'products', count: stats.products, color: 'purple', icon: '📦' },
-  { name: 'scans', count: stats.scans, color: 'violet', icon: '📱' },
-  { name: 'parasites', count: stats.parasites, color: 'orange', icon: '🦠' },
-  { name: 'meals', count: stats.meals, color: 'green', icon: '🍽️' }
+  { name: 'nutrients', label: 'Nutrients (Beneficial)', table: 'catalog_elements', category: 'beneficial', count: stats.nutrients, color: 'emerald', icon: '🥬' },
+  { name: 'ingredients', label: 'Ingredients', table: 'catalog_ingredients', category: 'raw,processed,meals', count: stats.ingredients, color: 'blue', icon: '🧪' },
+  { name: 'pollutants', label: 'Pollutants (Hazardous)', table: 'catalog_elements', category: 'hazardous', count: stats.pollutants, color: 'red', icon: '⚠️' },
+  { name: 'products', label: 'Recipes/Meals', table: 'catalog_recipes', category: 'meal,beverage,condiment', count: stats.products, color: 'purple', icon: '📦' },
+  { name: 'scans', label: 'Scans', table: 'scans', category: null, count: stats.scans, color: 'violet', icon: '📱' },
+  { name: 'parasites', label: 'Parasites (Hazardous)', table: 'catalog_elements', category: 'hazardous', count: stats.parasites, color: 'orange', icon: '🦠' },
+  { name: 'meals', label: 'Meals', table: 'catalog_recipes', category: 'meal', count: stats.meals, color: 'green', icon: '🍽️' }
 ];
 
 export const dataPotentials = {
