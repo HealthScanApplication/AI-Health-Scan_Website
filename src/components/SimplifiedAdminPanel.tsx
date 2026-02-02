@@ -56,6 +56,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [elementFilter, setElementFilter] = useState<'all' | 'beneficial' | 'hazardous'>('all');
 
   const tabs = [
     { id: 'users', label: 'Users', icon: '👤', table: 'auth.users' },
@@ -194,13 +195,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
   const filteredRecords = records.filter(record => {
     const searchLower = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = (
       (record.name?.toLowerCase().includes(searchLower)) ||
       (record.email?.toLowerCase().includes(searchLower)) ||
       (record.title?.toLowerCase().includes(searchLower)) ||
       (record.category?.toLowerCase().includes(searchLower))
     );
-  });
+    
+    // Filter by element type if on elements tab
+    if (activeTab === 'elements' && elementFilter !== 'all') {
+      const category = record.category?.toLowerCase() || '';
+      if (elementFilter === 'beneficial' && !category.includes('beneficial')) return false;
+      if (elementFilter === 'hazardous' && !category.includes('hazardous')) return false;
+    }
+    
+    return matchesSearch;
+  }).map((record, index) => ({ ...record, _displayIndex: index }));
 
   const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23e5e7eb" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" font-size="14" fill="%236b7280" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
 
@@ -214,116 +224,110 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
   const renderTableHeader = () => {
     const isWaitlist = activeTab === 'waitlist';
+    const colWidth = 'flex-1';
+    
     return (
       <div className="flex items-center bg-gray-100 border-b font-semibold text-sm sticky top-0">
-        <div className="w-12 px-4 py-3 text-center">Select</div>
-        <div className="w-28 px-4 py-3 text-center">Image</div>
-        <div className="flex-1 px-4 py-3 min-w-0">Name</div>
-        <div className="w-40 px-4 py-3">Category/Email</div>
+        <div className={`${colWidth} px-3 py-3 text-center min-w-[60px]`}>ID</div>
+        <div className={`${colWidth} px-3 py-3 text-center min-w-[100px]`}>Image</div>
+        <div className={`${colWidth} px-3 py-3 min-w-[140px]`}>Name</div>
+        <div className={`${colWidth} px-3 py-3 min-w-[120px]`}>Description</div>
+        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>Category</div>
         {isWaitlist && (
           <>
-            <div className="w-24 px-4 py-3 text-center">Email Sent</div>
-            <div className="w-24 px-4 py-3 text-center">Referrals</div>
+            <div className={`${colWidth} px-3 py-3 text-center min-w-[90px]`}>Email</div>
+            <div className={`${colWidth} px-3 py-3 text-center min-w-[80px]`}>Referrals</div>
           </>
         )}
-        <div className="w-48 px-4 py-3">Description</div>
-        <div className="w-32 px-4 py-3">Actions</div>
+        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>Created</div>
+        <div className={`${colWidth} px-3 py-3 text-center min-w-[100px]`}>Actions</div>
       </div>
     );
   };
 
-  const renderRecordRow = (record: AdminRecord) => {
+  const renderRecordRow = (record: AdminRecord & { _displayIndex?: number }) => {
     const imageUrl = getImageUrl(record);
     const displayName = getDisplayName(record);
     const isSelected = selectedRecords.has(record.id);
     const isWaitlist = activeTab === 'waitlist';
+    const colWidth = 'flex-1';
+    const displayIndex = record._displayIndex ?? 0;
 
     return (
       <div key={record.id} className={`flex items-center border-b hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
-        {/* Checkbox */}
-        <div className="w-12 px-4 py-3 text-center flex justify-center">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={(e) => {
-              const newSelected = new Set(selectedRecords);
-              if (e.target.checked) {
-                newSelected.add(record.id);
-              } else {
-                newSelected.delete(record.id);
-              }
-              setSelectedRecords(newSelected);
-            }}
-            className="w-4 h-4"
-            title="Select record"
-          />
+        {/* ID */}
+        <div className={`${colWidth} px-3 py-3 text-center min-w-[60px] font-semibold text-gray-700`}>
+          {displayIndex}
         </div>
 
         {/* Image */}
-        <div className="w-28 px-4 py-3 text-center flex justify-center cursor-pointer" onClick={() => handleEdit(record)}>
+        <div className={`${colWidth} px-3 py-3 text-center flex justify-center cursor-pointer min-w-[100px]`} onClick={() => handleEdit(record)}>
           <img 
             src={imageUrl} 
             alt={displayName} 
-            className="w-20 h-20 rounded object-cover hover:opacity-80 transition-opacity"
+            className="w-16 h-16 rounded object-cover hover:opacity-80 transition-opacity"
             loading="lazy"
           />
         </div>
 
         {/* Name */}
-        <div className="flex-1 px-4 py-3 min-w-0 cursor-pointer" onClick={() => handleEdit(record)}>
+        <div className={`${colWidth} px-3 py-3 min-w-[140px] cursor-pointer`} onClick={() => handleEdit(record)}>
           <div className="font-medium text-gray-900 truncate hover:text-blue-600">{displayName}</div>
-          {record.created_at && (
-            <div className="text-xs text-gray-500">
-              {new Date(record.created_at).toLocaleDateString()}
-            </div>
+        </div>
+
+        {/* Description */}
+        <div className={`${colWidth} px-3 py-3 min-w-[120px]`}>
+          {record.description && (
+            <div className="text-sm text-gray-600 truncate">{record.description}</div>
           )}
         </div>
 
         {/* Category/Email */}
-        <div className="w-40 px-4 py-3">
-          {record.category && <Badge className="mb-1 block w-fit">{record.category}</Badge>}
-          {record.email && <div className="text-sm text-gray-600 truncate">{record.email}</div>}
+        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>
+          {record.category && <Badge className="mb-1 block w-fit text-xs">{record.category}</Badge>}
+          {record.email && <div className="text-xs text-gray-600 truncate">{record.email}</div>}
         </div>
 
         {/* Email Sent & Referrals (Waitlist only) */}
         {isWaitlist && (
           <>
-            <div className="w-24 px-4 py-3 text-center">
+            <div className={`${colWidth} px-3 py-3 text-center min-w-[90px]`}>
               {record.emailsSent || record.email_sent ? (
-                <Badge className="bg-green-100 text-green-800">✓ Sent</Badge>
+                <Badge className="bg-green-100 text-green-800 text-xs">✓ Sent</Badge>
               ) : (
-                <Badge variant="outline">Pending</Badge>
+                <Badge variant="outline" className="text-xs">Pending</Badge>
               )}
             </div>
-            <div className="w-24 px-4 py-3 text-center">
-              <span className="font-semibold text-gray-900">{record.referrals || 0}</span>
+            <div className={`${colWidth} px-3 py-3 text-center min-w-[80px]`}>
+              <span className="font-semibold text-gray-900 text-sm">{record.referrals || 0}</span>
             </div>
           </>
         )}
 
-        {/* Description */}
-        <div className="w-48 px-4 py-3">
-          {record.description && (
-            <div className="text-sm text-gray-600 line-clamp-2">{record.description}</div>
+        {/* Created Date */}
+        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>
+          {record.created_at && (
+            <div className="text-xs text-gray-500 border-t border-gray-300 pt-1">
+              {new Date(record.created_at).toLocaleDateString()}
+            </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="w-32 px-4 py-3 flex gap-1">
+        <div className={`${colWidth} px-3 py-3 text-center min-w-[100px] flex gap-1 justify-center`}>
           <Button
             size="sm"
             variant="outline"
             onClick={() => handleEdit(record)}
-            className="gap-1"
+            className="gap-1 h-8 px-2"
           >
             <Edit className="w-3 h-3" />
-            Edit
           </Button>
           <Button
             size="sm"
             variant="destructive"
             onClick={() => handleDelete(record.id)}
-            className="gap-1"
+            className="gap-1 h-8 px-2"
           >
             <Trash2 className="w-3 h-3" />
           </Button>
@@ -352,6 +356,42 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             {tabs.map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
+                {/* Element Filter Tabs */}
+                {tab.id === 'elements' && (
+                  <div className="flex gap-2 border-b">
+                    <button
+                      onClick={() => setElementFilter('all')}
+                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                        elementFilter === 'all'
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setElementFilter('beneficial')}
+                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                        elementFilter === 'beneficial'
+                          ? 'border-green-600 text-green-600'
+                          : 'border-transparent text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Beneficial
+                    </button>
+                    <button
+                      onClick={() => setElementFilter('hazardous')}
+                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                        elementFilter === 'hazardous'
+                          ? 'border-red-600 text-red-600'
+                          : 'border-transparent text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Hazardous
+                    </button>
+                  </div>
+                )}
+
                 {/* Search Bar and Bulk Actions */}
                 <div className="space-y-2">
                   <div className="flex gap-2">
