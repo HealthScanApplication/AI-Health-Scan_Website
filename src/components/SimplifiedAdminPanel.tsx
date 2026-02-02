@@ -329,7 +329,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               )}
             </div>
 
-            {/* Right Column - Email/Referrals/Actions */}
+            {/* Right Column - Email/Referrals */}
             <div className="flex flex-col items-end gap-2">
               {isWaitlist && (
                 <div className="flex flex-col items-end gap-1">
@@ -349,28 +349,6 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   <span className="text-xs text-gray-600">Referrals: <span className="font-semibold">{record.referrals || 0}</span></span>
                 </div>
               )}
-              
-              {/* Actions */}
-              <div className="flex gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleEdit(record)}
-                  className="h-8 w-8 p-0 hover:bg-blue-100"
-                  title="Edit"
-                >
-                  <Edit className="w-4 h-4 text-blue-600" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleDelete(record.id)}
-                  className="h-8 w-8 p-0 hover:bg-red-100"
-                  title="Delete"
-                >
-                  <Trash2 className="w-4 h-4 text-red-600" />
-                </Button>
-              </div>
             </div>
           </div>
         </div>
