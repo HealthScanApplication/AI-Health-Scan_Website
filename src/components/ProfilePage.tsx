@@ -56,6 +56,7 @@ import { Clock, CheckCircle, Users2 } from 'lucide-react';
 interface ProfilePageProps {
   user: any;
   onNavigateToSettings: () => void;
+  onNavigateToHome?: () => void;
 }
 
 interface UserStats {
@@ -111,7 +112,7 @@ interface UserPreferences {
   detailedReports: boolean;
 }
 
-export function ProfilePage({ user, onNavigateToSettings }: ProfilePageProps) {
+export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: ProfilePageProps) {
   const { user: authUser } = useAuth();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -263,7 +264,7 @@ export function ProfilePage({ user, onNavigateToSettings }: ProfilePageProps) {
           const data = await response.json();
           setUserStats({
             totalReferrals: data.referralCount || 0,
-            queuePosition: null, // Don't display queue position
+            queuePosition: data.queuePosition || null,
             totalRewards: data.totalRewards || 0,
             currentTier: data.currentTier || 'Tier 1',
             joinedDate: authUser.created_at || new Date().toISOString(),
@@ -273,7 +274,7 @@ export function ProfilePage({ user, onNavigateToSettings }: ProfilePageProps) {
           // Set default values
           setUserStats({
             totalReferrals: 0,
-            queuePosition: null, // Don't display queue position
+            queuePosition: null,
             totalRewards: 0,
             currentTier: 'Tier 1',
             joinedDate: authUser.created_at || new Date().toISOString(),
@@ -284,7 +285,7 @@ export function ProfilePage({ user, onNavigateToSettings }: ProfilePageProps) {
         console.error('Error fetching user stats:', error);
         setUserStats({
           totalReferrals: 0,
-          queuePosition: null, // Don't display queue position
+          queuePosition: null,
           totalRewards: 0,
           currentTier: 'Tier 1',
           joinedDate: authUser.created_at || new Date().toISOString(),
@@ -802,8 +803,19 @@ export function ProfilePage({ user, onNavigateToSettings }: ProfilePageProps) {
                   className="btn-standard mb-4 border-[var(--healthscan-green)]/30 hover:bg-[var(--healthscan-green)]/10"
                 >
                   <Settings className="w-4 h-4 mr-2" />
-                  Account Settings
+                  Settings
                 </Button>
+
+                {/* Back to Home Button */}
+                {onNavigateToHome && (
+                  <Button 
+                    onClick={onNavigateToHome}
+                    variant="outline"
+                    className="btn-standard w-full border-[var(--healthscan-green)]/30 hover:bg-[var(--healthscan-green)]/10"
+                  >
+                    ← Back to Home
+                  </Button>
+                )}
               </div>
 
               {/* Email Verification Status */}
