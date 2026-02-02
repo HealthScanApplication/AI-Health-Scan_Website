@@ -26,9 +26,9 @@ const HealthScanLogo = `<img src="https://1debfa3241af40447f297e52b30a6022740a99
 
 // Enhanced email templates for HealthScan with improved vertical spacing and branding
 export const EMAIL_TEMPLATES = {
-  // Enhanced Bitly-style waitlist confirmation email with HealthScan logo
-  waitlistConfirmationBitlyStyle: (email: string, position: number, confirmationLink: string): EmailTemplate => ({
-    subject: 'You\'re almost there! 🌱',
+  // Enhanced Bitly-style waitlist confirmation email with HealthScan logo, queue position, and referral
+  waitlistConfirmationBitlyStyle: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => ({
+    subject: 'Welcome to HealthScan! 🌱 You\'re #' + position + ' in queue',
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f8fdf9;">
         <!-- Enhanced Logo Section with HealthScan Brand -->
@@ -42,26 +42,57 @@ export const EMAIL_TEMPLATES = {
         <!-- Main Content with Enhanced Spacing -->
         <div style="background-color: #ffffff; border-radius: 16px; padding: 56px 48px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); margin-bottom: 32px;">
           <!-- Headline with Better Spacing -->
-          <h1 style="font-size: 32px; font-weight: 600; color: #1a1a1a; margin: 0 0 32px 0; line-height: 1.25;">
-            You're almost there! 🎉
+          <h1 style="font-size: 32px; font-weight: 600; color: #1a1a1a; margin: 0 0 16px 0; line-height: 1.25;">
+            Welcome! 🎉
           </h1>
+          
+          <!-- Queue Position Badge -->
+          <div style="display: inline-block; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 1px solid #93c5fd; border-radius: 8px; padding: 12px 20px; margin-bottom: 32px;">
+            <p style="font-size: 16px; color: #1e40af; margin: 0; font-weight: 600;">
+              You're #${position} in the queue 📍
+            </p>
+          </div>
           
           <!-- Description with Improved Vertical Rhythm -->
           <p style="font-size: 17px; color: #4a4a4a; line-height: 1.6; margin: 0 0 28px 0;">
-            You're so close to getting updates about new HealthScan features, helpful tips, ideas, and inspiration.
+            You're so close to getting early access to HealthScan - our revolutionary AI-powered health scanner launching February 27th, 2026.
           </p>
           
           <p style="font-size: 17px; color: #4a4a4a; line-height: 1.6; margin: 0 0 40px 0;">
-            All you have to do is click below and you're good to go!
+            All you have to do is confirm your email below and you're all set!
           </p>
           
           <!-- Enhanced CTA Button with Better Spacing -->
           <div style="text-align: center; margin: 48px 0;">
             <a href="${confirmationLink}" 
                style="display: inline-block; background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: white; padding: 18px 36px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 17px; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.3); transition: all 0.2s;">
-              Confirm your email opt-in status here 💚
+              ✅ Confirm Your Email
             </a>
           </div>
+          
+          <!-- Referral Section -->
+          ${referralLink ? `
+          <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fcd34d; border-radius: 12px; padding: 28px; margin: 32px 0;">
+            <h3 style="color: #92400e; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">
+              🚀 Move Up Faster!
+            </h3>
+            <p style="color: #78350f; margin: 0 0 20px 0; font-size: 15px; line-height: 1.6;">
+              Share your referral link with friends. For each person who joins using your code, you'll move up in the queue!
+            </p>
+            <div style="background: white; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; word-break: break-all;">
+              <p style="color: #78350f; font-size: 13px; margin: 0 0 8px 0; font-weight: 500;">Your referral code:</p>
+              <p style="color: #16a34a; font-size: 16px; font-weight: 600; margin: 0; font-family: monospace;">
+                ${referralCode}
+              </p>
+            </div>
+            <div style="text-align: center;">
+              <a href="${referralLink}" 
+                 style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);">
+                � Share Your Link
+              </a>
+            </div>
+          </div>
+          ` : ''}
           
           <!-- Unsubscribe Note with Improved Spacing -->
           <p style="font-size: 15px; color: #8a8a8a; text-align: center; margin: 40px 0 0 0; font-style: italic;">
@@ -83,27 +114,35 @@ export const EMAIL_TEMPLATES = {
               </p>
             </div>
             <p style="font-size: 12px; color: #b0b0b0; margin: 8px 0 0 0;">
-              You're position #${position} on our waitlist 🌱
+              Launching February 27th, 2026 🚀
             </p>
           </div>
         </div>
       </div>
     `,
     text: `
-You're almost there! 🎉
+Welcome to HealthScan! 🎉
 
-You're so close to getting updates about new HealthScan features, helpful tips, ideas, and inspiration.
+You're #${position} in the queue 📍
 
-All you have to do is click below and you're good to go!
+You're so close to getting early access to HealthScan - our revolutionary AI-powered health scanner launching February 27th, 2026.
 
 Confirm your email: ${confirmationLink}
 
+${referralLink ? `
+🚀 Move Up Faster!
+Share your referral link with friends. For each person who joins using your code, you'll move up in the queue!
+
+Your referral code: ${referralCode}
+Share your link: ${referralLink}
+` : ''}
+
 (You can unsubscribe at any time)
 
-If you didn't sign up for HealthScan, or you're not sure why you received this email, you can delete it. You will not receive future email marketing communications if you don't click the button above.
+If you didn't sign up for HealthScan, or you're not sure why you received this email, you can delete it.
 
-HealthScan • Building the future of health scanning
-You're position #${position} on our waitlist 🌱
+HealthScan Team • Building the future of health scanning
+Launching February 27th, 2026 🚀
     `
   }),
 
