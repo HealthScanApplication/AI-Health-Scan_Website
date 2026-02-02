@@ -57,6 +57,10 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [elementFilter, setElementFilter] = useState<'all' | 'beneficial' | 'hazardous'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
 
   const tabs = [
     { id: 'users', label: 'Users', icon: '👤', table: 'auth.users' },
@@ -193,10 +197,37 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     }
   };
 
+  const handleResendEmail = async (recordId: string, email: string) => {
+    setResendingEmail(recordId);
+    try {
+      const response = await fetch('/api/resend-welcome-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ email, recordId })
+      });
+
+      if (response.ok) {
+        toast.success('Welcome email resent successfully');
+        fetchRecords();
+      } else {
+        toast.error('Failed to resend email');
+      }
+    } catch (error) {
+      console.error('Error resending email:', error);
+      toast.error('Error resending email');
+    } finally {
+      setResendingEmail(null);
+    }
+  };
+
   const filteredRecords = records.filter(record => {
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = (
       (record.name?.toLowerCase().includes(searchLower)) ||
+      (record.name_common?.toLowerCase().includes(searchLower)) ||
       (record.email?.toLowerCase().includes(searchLower)) ||
       (record.title?.toLowerCase().includes(searchLower)) ||
       (record.category?.toLowerCase().includes(searchLower))
@@ -209,8 +240,21 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       if (elementFilter === 'hazardous' && !category.includes('hazardous')) return false;
     }
     
+    // Filter by category if categoryFilter is set
+    if (categoryFilter !== 'all' && record.category !== categoryFilter) return false;
+    
     return matchesSearch;
   }).map((record, index) => ({ ...record, _displayIndex: index }));
+
+  // Get unique categories for filter dropdown
+  const uniqueCategories = Array.from(new Set(records.map(r => r.category).filter(Boolean)));
+  
+  // Pagination
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23e5e7eb" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" font-size="14" fill="%236b7280" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
 
