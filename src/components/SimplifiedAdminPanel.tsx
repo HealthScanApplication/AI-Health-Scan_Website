@@ -280,7 +280,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   };
 
   const getImageUrl = (record: AdminRecord) => {
-    return record.image_url || record.avatar_url || PLACEHOLDER_IMAGE;
+    // Try multiple possible image field names
+    let imageUrl = record.image_url || record.avatar_url;
+    
+    // For recipes, also check for images array or image field
+    if (!imageUrl && activeTab === 'recipes') {
+      // Check if images is an array and get first image
+      if (Array.isArray(record.images) && record.images.length > 0) {
+        imageUrl = record.images[0];
+      } else if (typeof record.images === 'string') {
+        imageUrl = record.images;
+      } else if (record.image) {
+        imageUrl = record.image;
+      }
+    }
+    
+    return imageUrl || PLACEHOLDER_IMAGE;
   };
 
   const renderTableHeader = () => {
