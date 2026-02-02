@@ -136,35 +136,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         const errorText = await response.text();
         console.warn(`⚠️ Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
         console.warn(`📝 Error response:`, errorText);
-        
-        // If 403 Forbidden, likely RLS issue - try with service role
-        if (response.status === 403 && activeTab === 'elements') {
-          console.log(`🔧 Attempting workaround for RLS issue on ${currentTab.table}...`);
-          try {
-            const retryUrl = `${url}&select=*`;
-            const retryResponse = await fetch(retryUrl, {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'apikey': publicAnonKey,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-              }
-            });
-            
-            if (retryResponse.ok) {
-              const retryData = await retryResponse.json();
-              console.log(`✅ Workaround successful! Loaded ${retryData?.length || 0} records`);
-              setRecords(Array.isArray(retryData) ? retryData : []);
-            } else {
-              setRecords([]);
-            }
-          } catch (retryError) {
-            console.error(`❌ Workaround failed:`, retryError);
-            setRecords([]);
-          }
-        } else {
-          setRecords([]);
-        }
+        setRecords([]);
       }
     } catch (error) {
       console.error(`❌ Error fetching ${currentTab.label}:`, error);
