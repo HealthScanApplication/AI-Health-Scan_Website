@@ -26,95 +26,84 @@ const HealthScanLogo = `<img src="https://1debfa3241af40447f297e52b30a6022740a99
 
 // Enhanced email templates for HealthScan with improved vertical spacing and branding
 export const EMAIL_TEMPLATES = {
-  // Enhanced Bitly-style waitlist confirmation email with HealthScan logo, queue position, and referral
+  // Clean, modern waitlist confirmation email matching website design
   waitlistConfirmationBitlyStyle: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => ({
-    subject: 'Welcome to HealthScan! 🌱 You\'re #' + position + ' in queue',
+    subject: 'Welcome to HealthScan! You\'re #' + position + ' in queue',
     html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f8fdf9;">
-        <!-- Enhanced Logo Section with HealthScan Brand -->
-        <div style="text-align: left; margin-bottom: 48px;">
-          <div style="display: inline-flex; align-items: center; gap: 14px; padding: 14px 24px; background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); border-radius: 100px; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.25);">
-            ${HealthScanLogo}
-            <span style="color: white; font-weight: 600; font-size: 19px; letter-spacing: -0.5px;">HealthScan</span>
-          </div>
-        </div>
-        
-        <!-- Main Content with Enhanced Spacing -->
-        <div style="background-color: #ffffff; border-radius: 16px; padding: 56px 48px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); margin-bottom: 32px;">
-          <!-- Headline with Better Spacing -->
-          <h1 style="font-size: 32px; font-weight: 600; color: #1a1a1a; margin: 0 0 16px 0; line-height: 1.25;">
-            Welcome! 🎉
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+        <!-- Header with gradient background -->
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px 20px; text-align: center;">
+          <h1 style="color: #ffffff; font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.5px;">
+            HealthScan
           </h1>
-          
-          <!-- Queue Position Badge -->
-          <div style="display: inline-block; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 1px solid #93c5fd; border-radius: 8px; padding: 12px 20px; margin-bottom: 32px;">
-            <p style="font-size: 16px; color: #1e40af; margin: 0; font-weight: 600;">
-              You're #${position} in the queue 📍
+          <p style="color: #cbd5e1; font-size: 14px; margin: 8px 0 0 0;">AI-Powered Health Scanning</p>
+        </div>
+
+        <!-- Main Content -->
+        <div style="padding: 40px 30px;">
+          <!-- Welcome Message -->
+          <h2 style="color: #0f172a; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">
+            Welcome to HealthScan!
+          </h2>
+          <p style="color: #64748b; font-size: 14px; margin: 0 0 32px 0; line-height: 1.6;">
+            You're on your way to early access to our revolutionary AI-powered health scanner.
+          </p>
+
+          <!-- Queue Position Card -->
+          <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #0284c7; border-radius: 8px; padding: 20px; margin-bottom: 32px;">
+            <p style="color: #0c4a6e; font-size: 13px; margin: 0 0 8px 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">
+              Queue Position
+            </p>
+            <p style="color: #0284c7; font-size: 32px; font-weight: 700; margin: 0;">
+              #${position}
             </p>
           </div>
-          
-          <!-- Description with Improved Vertical Rhythm -->
-          <p style="font-size: 17px; color: #4a4a4a; line-height: 1.6; margin: 0 0 28px 0;">
-            You're so close to getting early access to HealthScan - our revolutionary AI-powered health scanner launching February 27th, 2026.
-          </p>
-          
-          <p style="font-size: 17px; color: #4a4a4a; line-height: 1.6; margin: 0 0 40px 0;">
-            All you have to do is confirm your email below and you're all set!
-          </p>
-          
-          <!-- Enhanced CTA Button with Better Spacing -->
-          <div style="text-align: center; margin: 48px 0;">
+
+          <!-- Key Info -->
+          <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin-bottom: 32px;">
+            <p style="color: #1e293b; font-size: 14px; line-height: 1.6; margin: 0;">
+              <strong>Launch Date:</strong> February 27th, 2026<br>
+              <strong>Status:</strong> Early Access Confirmed
+            </p>
+          </div>
+
+          <!-- CTA Button -->
+          <div style="text-align: center; margin-bottom: 32px;">
             <a href="${confirmationLink}" 
-               style="display: inline-block; background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: white; padding: 18px 36px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 17px; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.3); transition: all 0.2s;">
-              ✅ Confirm Your Email
+               style="display: inline-block; background: #0284c7; color: white; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; transition: background 0.2s;">
+              Confirm Email Address
             </a>
           </div>
-          
+
           <!-- Referral Section -->
           ${referralLink ? `
-          <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fcd34d; border-radius: 12px; padding: 28px; margin: 32px 0;">
-            <h3 style="color: #92400e; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">
-              🚀 Move Up Faster!
+          <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 24px; margin-bottom: 32px;">
+            <h3 style="color: #92400e; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">
+              Earn Early Access Faster
             </h3>
-            <p style="color: #78350f; margin: 0 0 20px 0; font-size: 15px; line-height: 1.6;">
-              Share your referral link with friends. For each person who joins using your code, you'll move up in the queue!
+            <p style="color: #78350f; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+              Share your referral code with friends. Each person who signs up moves you up in the queue!
             </p>
-            <div style="background: white; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; word-break: break-all;">
-              <p style="color: #78350f; font-size: 13px; margin: 0 0 8px 0; font-weight: 500;">Your referral code:</p>
-              <p style="color: #16a34a; font-size: 16px; font-weight: 600; margin: 0; font-family: monospace;">
+            <div style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 12px; border: 1px solid #fcd34d;">
+              <p style="color: #92400e; font-size: 12px; margin: 0 0 4px 0; font-weight: 500;">Your Referral Code</p>
+              <p style="color: #b45309; font-size: 18px; font-weight: 700; margin: 0; font-family: 'Courier New', monospace; letter-spacing: 1px;">
                 ${referralCode}
               </p>
             </div>
-            <div style="text-align: center;">
-              <a href="${referralLink}" 
-                 style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);">
-                � Share Your Link
-              </a>
-            </div>
+            <a href="${referralLink}" 
+               style="display: inline-block; background: #b45309; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              Share Link
+            </a>
           </div>
           ` : ''}
-          
-          <!-- Unsubscribe Note with Improved Spacing -->
-          <p style="font-size: 15px; color: #8a8a8a; text-align: center; margin: 40px 0 0 0; font-style: italic;">
-            (You can unsubscribe at any time)
-          </p>
-        </div>
-        
-        <!-- Enhanced Footer with Better Vertical Spacing -->
-        <div style="margin-top: 40px; padding: 0 24px;">
-          <p style="font-size: 14px; color: #8a8a8a; line-height: 1.6; margin: 0 0 32px 0;">
-            If you didn't sign up for HealthScan, or you're not sure why you received this email, you can delete it. You will not receive future email marketing communications if you don't click the button above.
-          </p>
-          
-          <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e5e5; text-align: center;">
-            <div style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              ${HealthScanLogo.replace('36px', '20px').replace('36px', '20px')}
-              <p style="font-size: 13px; color: #b0b0b0; margin: 0; font-weight: 500;">
-                HealthScan • Building the future of health scanning
-              </p>
-            </div>
-            <p style="font-size: 12px; color: #b0b0b0; margin: 8px 0 0 0;">
-              Launching February 27th, 2026 🚀
+
+          <!-- Footer -->
+          <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; text-align: center;">
+            <p style="color: #94a3b8; font-size: 12px; margin: 0 0 8px 0;">
+              Questions? Reply to this email or visit our website.
+            </p>
+            <p style="color: #cbd5e1; font-size: 11px; margin: 0;">
+              © 2026 HealthScan. All rights reserved.
             </p>
           </div>
         </div>
