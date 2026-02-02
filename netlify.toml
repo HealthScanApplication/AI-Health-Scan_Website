@@ -5,6 +5,12 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions]
+  node_bundler = "esbuild"
+
+[context.production.environment]
+  SECRETS_SCAN_ENABLED = "false"
+
 [[redirects]]
   from = "/"
   to = "/index.html"
