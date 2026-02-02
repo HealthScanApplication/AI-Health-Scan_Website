@@ -261,10 +261,15 @@ export function useAdminData(): UseAdminDataReturn {
 
   // Refresh all stats
   const refreshAllStats = useCallback(async (): Promise<void> => {
-    await Promise.all([
-      fetchRealTimeStats(),
-      fetchDetailedStats()
-    ]);
+    try {
+      await Promise.all([
+        fetchRealTimeStats(),
+        fetchDetailedStats()
+      ]);
+    } catch (error) {
+      console.error('❌ Error refreshing stats:', error);
+      toast.error('Failed to refresh statistics');
+    }
   }, [fetchRealTimeStats, fetchDetailedStats]);
 
   // Get current count for a data type

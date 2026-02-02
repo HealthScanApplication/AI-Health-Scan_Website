@@ -121,81 +121,83 @@ export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDas
         healthscanAdminApi.getEngagementStats(timeframe)
       ])
 
-      if (metricsResponse.success) {
+      if (metricsResponse.success && metricsResponse.data) {
         setMetrics(metricsResponse.data)
       }
 
-      if (leaderboardResponse.success) {
+      if (leaderboardResponse.success && leaderboardResponse.data) {
         setLeaderboard(leaderboardResponse.data.entries || [])
       }
 
-      if (conversionResponse.success) {
+      if (conversionResponse.success && conversionResponse.data) {
         // Transform conversion data into funnel format
+        const data = conversionResponse.data
         const funnelData: ConversionFunnel[] = [
           {
             step: 'Invites Sent',
-            count: conversionResponse.data.invitesSent || 0,
+            count: data.invitesSent ?? 0,
             conversionRate: 100,
             dropoffRate: 0
           },
           {
             step: 'Invites Opened',
-            count: conversionResponse.data.invitesOpened || 0,
-            conversionRate: ((conversionResponse.data.invitesOpened || 0) / (conversionResponse.data.invitesSent || 1)) * 100,
+            count: data.invitesOpened ?? 0,
+            conversionRate: ((data.invitesOpened ?? 0) / (data.invitesSent ?? 1)) * 100,
             dropoffRate: 0
           },
           {
             step: 'Registrations',
-            count: conversionResponse.data.registrations || 0,
-            conversionRate: ((conversionResponse.data.registrations || 0) / (conversionResponse.data.invitesSent || 1)) * 100,
+            count: data.registrations ?? 0,
+            conversionRate: ((data.registrations ?? 0) / (data.invitesSent ?? 1)) * 100,
             dropoffRate: 0
           },
           {
             step: 'Confirmations',
-            count: conversionResponse.data.confirmations || 0,
-            conversionRate: ((conversionResponse.data.confirmations || 0) / (conversionResponse.data.invitesSent || 1)) * 100,
+            count: data.confirmations ?? 0,
+            conversionRate: ((data.confirmations ?? 0) / (data.invitesSent ?? 1)) * 100,
             dropoffRate: 0
           }
         ]
         setConversionFunnel(funnelData)
       }
 
-      if (performanceResponse.success) {
+      if (performanceResponse.success && performanceResponse.data) {
         // Transform performance data for time series
-        const timeData = performanceResponse.data.dailyStats?.map((stat: any) => ({
-          date: new Date(stat.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          referrals: stat.referrals || 0,
-          confirmations: stat.confirmations || 0,
-          rewards: stat.rewards || 0
-        })) || []
+        const timeData = (performanceResponse.data.dailyStats || []).map((stat: any) => ({
+          date: new Date(stat?.date || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          referrals: stat?.referrals ?? 0,
+          confirmations: stat?.confirmations ?? 0,
+          rewards: stat?.rewards ?? 0
+        }))
         setTimeSeriesData(timeData)
       }
 
-      if (engagementResponse.success) {
+      if (engagementResponse.success && engagementResponse.data) {
         // Transform engagement data for tier analysis
+        const data = engagementResponse.data
         const tiers: TierAnalysis[] = [
           {
             tier: 'Basic',
-            users: engagementResponse.data.basicUsers || 0,
-            avgReferrals: engagementResponse.data.basicAvgReferrals || 0,
-            conversionRate: engagementResponse.data.basicConversion || 0,
-            totalRewards: engagementResponse.data.basicRewards || 0,
+            users: data.basicUsers ?? 0,
+            avgReferrals: data.basicAvgReferrals ?? 0,
+            conversionRate: data.basicConversion ?? 0,
+            totalRewards: data.basicRewards ?? 0,
             color: '#6b7280'
           },
           {
             tier: 'Premium',
-            users: engagementResponse.data.premiumUsers || 0,
-            avgReferrals: engagementResponse.data.premiumAvgReferrals || 0,
-            conversionRate: engagementResponse.data.premiumConversion || 0,
-            totalRewards: engagementResponse.data.premiumRewards || 0,
+            users: data.premiumUsers ?? 0,
+            avgReferrals: data.premiumAvgReferrals ?? 0,
+            conversionRate: data.premiumConversion ?? 0,
+            totalRewards: data.premiumRewards ?? 0,
             color: '#3b82f6'
           },
           {
             tier: 'Pro',
-            users: engagementResponse.data.proUsers || 0,
-            avgReferrals: engagementResponse.data.proAvgReferrals || 0,
-            conversionRate: engagementResponse.data.proConversion || 0,
-            totalRewards: engagementResponse.data.proRewards || 0,
+            users: data.proUsers ?? 0,
+            avgReferrals: data.proAvgReferrals ?? 0,
+            conversionRate: data.proConversion ?? 0,
+            totalRewards: data.proRewards ?? 0,
             color: '#8b5cf6'
           },
           {

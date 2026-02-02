@@ -66,16 +66,29 @@ class HealthScanAdminApiService {
 
       clearTimeout(timeoutId)
 
-      const data = await response.json()
+      let data;
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        if (response.ok) {
+          return {
+            success: true,
+            data: undefined,
+            message: 'Empty response'
+          }
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || `HTTP ${response.status}: ${response.statusText}`)
+        throw new Error(data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       return {
         success: true,
-        data: data.data || data,
-        message: data.message
+        data: data?.data || data,
+        message: data?.message
       }
     } catch (error: any) {
       clearTimeout(timeoutId)

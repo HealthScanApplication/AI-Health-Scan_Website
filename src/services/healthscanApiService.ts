@@ -142,15 +142,19 @@ class HealthScanApiClient {
     try {
       console.log(`🔗 HealthScan API Request: ${options.method || 'GET'} ${url}`);
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
       const response = await fetch(url, {
         ...options,
         headers: {
           ...this.defaultHeaders,
           ...options.headers,
         },
-        // Add timeout for production reliability
-        signal: AbortSignal.timeout(30000), // 30 second timeout
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       // Handle 404 specifically as a graceful failure
       if (response.status === 404) {
@@ -188,11 +192,18 @@ class HealthScanApiClient {
 
       if (!response.ok) {
         console.error(`❌ HealthScan API Error: ${response.status}`, data);
-        throw new Error(data.error || data.message || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       console.log(`✅ HealthScan API Success: ${endpoint}`, data);
-      return data;
+      return data || {
+        success: true,
+        data: [] as T,
+        meta: {
+          total: 0,
+          timestamp: new Date().toISOString()
+        }
+      };
 
     } catch (error: any) {
       console.error(`❌ HealthScan API Request Failed: ${endpoint}`, error);
