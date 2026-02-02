@@ -103,6 +103,14 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         const data = await response.json();
         console.log(`✅ Loaded ${data?.length || 0} ${currentTab.label}`);
         console.log(`📋 Sample data:`, data?.slice(0, 2));
+        if (activeTab === 'recipes') {
+          console.log(`🖼️ Recipe images debug:`, data?.slice(0, 3).map(r => ({
+            id: r.id,
+            name: r.name_common || r.name,
+            image_url: r.image_url,
+            has_image: !!r.image_url
+          })));
+        }
         setRecords(Array.isArray(data) ? data : []);
       } else {
         const errorText = await response.text();
