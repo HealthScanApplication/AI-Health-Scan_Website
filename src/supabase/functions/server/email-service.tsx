@@ -26,83 +26,85 @@ const HealthScanLogo = `<img src="https://1debfa3241af40447f297e52b30a6022740a99
 
 // Enhanced email templates for HealthScan with improved vertical spacing and branding
 export const EMAIL_TEMPLATES = {
-  // Clean, modern waitlist confirmation email matching website design
+  // Clean, modern waitlist confirmation email with Poppins font and vibrant gradient
   waitlistConfirmationBitlyStyle: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => ({
     subject: 'Welcome to HealthScan! You\'re #' + position + ' in queue',
     html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-        <!-- Header with gradient background -->
-        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 40px 20px; text-align: center;">
-          <h1 style="color: #ffffff; font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.5px;">
+      <div style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+        <!-- Header with vibrant gradient -->
+        <div style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #3b82f6 100%); padding: 48px 20px; text-align: center;">
+          <h1 style="color: #ffffff; font-size: 32px; font-weight: 600; margin: 0; letter-spacing: -0.8px; font-family: 'Poppins', sans-serif;">
             HealthScan
           </h1>
-          <p style="color: #cbd5e1; font-size: 14px; margin: 8px 0 0 0;">AI-Powered Health Scanning</p>
+          <p style="color: rgba(255, 255, 255, 0.9); font-size: 13px; margin: 8px 0 0 0; font-weight: 300; letter-spacing: 0.5px;">
+            AI-Powered Health Scanning
+          </p>
         </div>
 
         <!-- Main Content -->
-        <div style="padding: 40px 30px;">
+        <div style="padding: 48px 32px;">
           <!-- Welcome Message -->
-          <h2 style="color: #0f172a; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">
+          <h2 style="color: #1f2937; font-size: 26px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
             Welcome to HealthScan!
           </h2>
-          <p style="color: #64748b; font-size: 14px; margin: 0 0 32px 0; line-height: 1.6;">
+          <p style="color: #6b7280; font-size: 15px; margin: 0 0 36px 0; line-height: 1.7; font-weight: 300; font-family: 'Poppins', sans-serif;">
             You're on your way to early access to our revolutionary AI-powered health scanner.
           </p>
 
           <!-- Queue Position Card -->
-          <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #0284c7; border-radius: 8px; padding: 20px; margin-bottom: 32px;">
-            <p style="color: #0c4a6e; font-size: 13px; margin: 0 0 8px 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">
+          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%); border-left: 4px solid #10b981; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+            <p style="color: #059669; font-size: 12px; margin: 0 0 10px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-family: 'Poppins', sans-serif;">
               Queue Position
             </p>
-            <p style="color: #0284c7; font-size: 32px; font-weight: 700; margin: 0;">
+            <p style="color: #10b981; font-size: 36px; font-weight: 600; margin: 0; font-family: 'Poppins', sans-serif;">
               #${position}
             </p>
           </div>
 
           <!-- Key Info -->
-          <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin-bottom: 32px;">
-            <p style="color: #1e293b; font-size: 14px; line-height: 1.6; margin: 0;">
-              <strong>Launch Date:</strong> February 27th, 2026<br>
-              <strong>Status:</strong> Early Access Confirmed
+          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(6, 182, 212, 0.04) 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; border: 1px solid rgba(16, 185, 129, 0.1);">
+            <p style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
+              <span style="font-weight: 600; color: #1f2937;">Launch Date:</span> February 27th, 2026<br>
+              <span style="font-weight: 600; color: #1f2937;">Status:</span> Early Access Confirmed
             </p>
           </div>
 
           <!-- CTA Button -->
-          <div style="text-align: center; margin-bottom: 32px;">
+          <div style="text-align: center; margin-bottom: 36px;">
             <a href="${confirmationLink}" 
-               style="display: inline-block; background: #0284c7; color: white; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; transition: background 0.2s;">
+               style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%); color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; font-family: 'Poppins', sans-serif; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); transition: transform 0.2s;">
               Confirm Email Address
             </a>
           </div>
 
           <!-- Referral Section -->
           ${referralLink ? `
-          <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 24px; margin-bottom: 32px;">
-            <h3 style="color: #92400e; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">
+          <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 28px; margin-bottom: 32px;">
+            <h3 style="color: #b45309; font-size: 16px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
               Earn Early Access Faster
             </h3>
-            <p style="color: #78350f; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+            <p style="color: #92400e; font-size: 14px; line-height: 1.7; margin: 0 0 18px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
               Share your referral code with friends. Each person who signs up moves you up in the queue!
             </p>
-            <div style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 12px; border: 1px solid #fcd34d;">
-              <p style="color: #92400e; font-size: 12px; margin: 0 0 4px 0; font-weight: 500;">Your Referral Code</p>
-              <p style="color: #b45309; font-size: 18px; font-weight: 700; margin: 0; font-family: 'Courier New', monospace; letter-spacing: 1px;">
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 14px; border: 1px solid #fcd34d;">
+              <p style="color: #92400e; font-size: 11px; margin: 0 0 6px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Poppins', sans-serif;">Your Referral Code</p>
+              <p style="color: #b45309; font-size: 20px; font-weight: 600; margin: 0; font-family: 'Courier New', monospace; letter-spacing: 2px;">
                 ${referralCode}
               </p>
             </div>
             <a href="${referralLink}" 
-               style="display: inline-block; background: #b45309; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">
+               style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; font-family: 'Poppins', sans-serif;">
               Share Link
             </a>
           </div>
           ` : ''}
 
           <!-- Footer -->
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; text-align: center;">
-            <p style="color: #94a3b8; font-size: 12px; margin: 0 0 8px 0;">
+          <div style="border-top: 1px solid #e5e7eb; padding-top: 28px; text-align: center;">
+            <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
               Questions? Reply to this email or visit our website.
             </p>
-            <p style="color: #cbd5e1; font-size: 11px; margin: 0;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
               © 2026 HealthScan. All rights reserved.
             </p>
           </div>
