@@ -28,7 +28,7 @@ const HealthScanLogo = `<img src="https://1debfa3241af40447f297e52b30a6022740a99
 export const EMAIL_TEMPLATES = {
   // Clean, modern waitlist confirmation email with Poppins font and vibrant gradient
   waitlistConfirmationBitlyStyle: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => ({
-    subject: 'Welcome to HealthScan! You\'re #' + position + ' in queue',
+    subject: 'Welcome to HealthScan! 🌱 You\'re #' + position + ' in queue',
     html: `
       <div style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
         <!-- Header with vibrant gradient and logo -->
