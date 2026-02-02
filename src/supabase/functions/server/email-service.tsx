@@ -210,52 +210,68 @@ This email was sent to ${email}. If you didn't sign up, you can ignore this emai
 
   // Enhanced email confirmed template
   emailConfirmed: (email: string, position: number, referralLink: string): EmailTemplate => ({
-    subject: '✅ Email Confirmed - Your HealthScan Journey Begins!',
+    subject: 'Welcome to HealthScan! You\'re #' + position + ' in queue',
     html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f8fdf9;">
-        <!-- Enhanced Header with Logo -->
-        <div style="text-align: center; margin-bottom: 40px;">
-          <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            ${HealthScanLogo}
-            <h1 style="color: #16a34a; font-size: 32px; margin: 0; font-weight: 600;">HealthScan</h1>
+      <div style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+        <!-- Header with vibrant gradient -->
+        <div style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #3b82f6 100%); padding: 48px 20px; text-align: center;">
+          <h1 style="color: #ffffff; font-size: 32px; font-weight: 600; margin: 0; letter-spacing: -0.8px; font-family: 'Poppins', sans-serif;">
+            HealthScan
+          </h1>
+          <p style="color: rgba(255, 255, 255, 0.9); font-size: 13px; margin: 8px 0 0 0; font-weight: 300; letter-spacing: 0.5px;">
+            AI-Powered Health Scanning
+          </p>
+        </div>
+
+        <!-- Main Content -->
+        <div style="padding: 48px 32px;">
+          <!-- Welcome Message -->
+          <h2 style="color: #1f2937; font-size: 26px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
+            Welcome to HealthScan!
+          </h2>
+          <p style="color: #6b7280; font-size: 15px; margin: 0 0 36px 0; line-height: 1.7; font-weight: 300; font-family: 'Poppins', sans-serif;">
+            You're on your way to early access to our revolutionary AI-powered health scanner.
+          </p>
+
+          <!-- Queue Position Card -->
+          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%); border-left: 4px solid #10b981; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+            <p style="color: #059669; font-size: 12px; margin: 0 0 10px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-family: 'Poppins', sans-serif;">
+              Queue Position
+            </p>
+            <p style="color: #10b981; font-size: 36px; font-weight: 600; margin: 0; font-family: 'Poppins', sans-serif;">
+              #${position}
+            </p>
           </div>
-          <p style="color: #6b7280; font-size: 17px; margin: 0;">Your AI-Powered Health Scanner</p>
-        </div>
-        
-        <!-- Confirmation Section with Enhanced Spacing -->
-        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 36px; border-radius: 16px; margin-bottom: 32px; text-align: center; border: 1px solid #bbf7d0;">
-          <h2 style="color: #065f46; margin: 0 0 24px 0; font-size: 28px; font-weight: 600;">✅ Email Confirmed!</h2>
-          <p style="color: #374151; font-size: 19px; margin: 0 0 20px 0; font-weight: 500;">
-            You're officially <strong>#${position}</strong> on the HealthScan waitlist!
-          </p>
-          <p style="color: #16a34a; font-weight: 600; font-size: 17px; margin: 0;">
-            🗓️ Launch Date: February 27th, 2026
-          </p>
-        </div>
-        
-        <!-- Referral Section with Enhanced Design -->
-        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 32px; border-radius: 16px; margin: 32px 0; border: 1px solid #fcd34d;">
-          <h3 style="color: #92400e; margin: 0 0 20px 0; font-size: 22px; font-weight: 600;">🚀 Move Up Faster!</h3>
-          <p style="color: #78350f; margin: 0 0 24px 0; font-size: 16px; line-height: 1.6;">
-            Share HealthScan with friends and move up in the queue for each person who joins:
-          </p>
-          <div style="text-align: center;">
+
+          <!-- Key Info -->
+          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(6, 182, 212, 0.04) 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; border: 1px solid rgba(16, 185, 129, 0.1);">
+            <p style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
+              <span style="font-weight: 600; color: #1f2937;">Launch Date:</span> February 27th, 2026<br>
+              <span style="font-weight: 600; color: #1f2937;">Status:</span> Early Access Confirmed
+            </p>
+          </div>
+
+          <!-- Referral Section -->
+          <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 28px; margin-bottom: 32px;">
+            <h3 style="color: #b45309; font-size: 16px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
+              Earn Early Access Faster
+            </h3>
+            <p style="color: #92400e; font-size: 14px; line-height: 1.7; margin: 0 0 18px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
+              Share your referral link with friends. Each person who signs up moves you up in the queue!
+            </p>
             <a href="${referralLink}" 
-               style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 16px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);">
-              📢 Share Your Link
+               style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; font-family: 'Poppins', sans-serif;">
+              Share Link
             </a>
           </div>
-        </div>
-        
-        <!-- Enhanced Footer -->
-        <div style="border-top: 1px solid #e5e7eb; padding-top: 24px; margin-top: 40px; text-align: center;">
-          <p style="color: #6b7280; font-size: 15px; margin: 0 0 16px 0;">
-            Questions? Reply to this email - we'd love to hear from you!
-          </p>
-          <div style="display: inline-flex; align-items: center; gap: 8px;">
-            ${HealthScanLogo.replace('36px', '18px').replace('36px', '18px')}
-            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
-              HealthScan Team • Building the future of health scanning
+
+          <!-- Footer -->
+          <div style="border-top: 1px solid #e5e7eb; padding-top: 28px; text-align: center;">
+            <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
+              Questions? Reply to this email or visit our website.
+            </p>
+            <p style="color: #9ca3af; font-size: 12px; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
+              © 2026 HealthScan. All rights reserved.
             </p>
           </div>
         </div>
