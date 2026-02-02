@@ -580,5 +580,52 @@ app.post('/make-server-ed0fe4c2/admin/resend-welcome-email', async (c) => {
   }
 })
 
+// Get waitlist data from KV store for admin panel
+app.get('/make-server-ed0fe4c2/admin/waitlist', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    
+    // Validate admin access
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    console.log('📊 Fetching waitlist data from KV store...')
+    
+    // Get all waitlist users from KV store
+    const allKeys = await kv.getByPrefix('waitlist_user_')
+    
+    if (!allKeys || allKeys.length === 0) {
+      console.log('📭 No waitlist users found')
+      return c.json([])
+    }
+
+    // Transform KV data to admin panel format
+    const waitlistUsers = allKeys.map((user: any, index: number) => ({
+      id: user.email || `waitlist_${index}`,
+      email: user.email,
+      position: user.position || 0,
+      referralCode: user.referralCode,
+      referrals: user.referrals || 0,
+      emailsSent: user.emailsSent || 0,
+      email_sent: (user.emailsSent || 0) > 0,
+      created_at: user.signupDate || user.createdAt,
+      confirmed: user.confirmed || false,
+      lastEmailSent: user.lastEmailSent
+    }))
+
+    console.log(`✅ Retrieved ${waitlistUsers.length} waitlist users from KV store`)
+    
+    return c.json(waitlistUsers)
+  } catch (error) {
+    console.error('❌ Error fetching waitlist data:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message || 'Internal server error'
+    }, 500)
+  }
+})
+
 // Start server
 Deno.serve(app.fetch)

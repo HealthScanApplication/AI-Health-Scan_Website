@@ -83,7 +83,36 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       console.log(`🔑 API Key: ${publicAnonKey ? 'Present' : 'Missing'}`);
       
       // Build query with proper filters
-      let url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`;
+      let url: string;
+      
+      // Use custom endpoint for waitlist data from KV store
+      if (activeTab === 'waitlist') {
+        const baseUrl = 'https://ljqlvvbktgiflkxywsld.functions.supabase.co';
+        url = `${baseUrl}/make-server-ed0fe4c2/admin/waitlist`;
+        console.log(`🌐 Fetching waitlist from KV store: ${url}`);
+        
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ Loaded ${data?.length || 0} waitlist users from KV store`);
+          setRecords(Array.isArray(data) ? data : []);
+        } else {
+          const errorText = await response.text();
+          console.warn(`⚠️ Failed to fetch waitlist:`, response.status, response.statusText);
+          console.warn(`📝 Error response:`, errorText);
+          setRecords([]);
+        }
+        setLoading(false);
+        return;
+      }
+      
+      url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`;
       
       // Add ordering for elements
       if (activeTab === 'elements') {
