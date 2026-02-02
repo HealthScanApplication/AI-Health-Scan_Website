@@ -496,5 +496,79 @@ app.get('/make-server-ed0fe4c2/blog/service-health', (c) => {
   })
 })
 
+// Admin endpoint to resend welcome email
+app.post('/make-server-ed0fe4c2/admin/resend-welcome-email', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    
+    // Validate admin access
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const { email, recordId } = await c.req.json()
+
+    if (!email || typeof email !== 'string') {
+      return c.json({ success: false, error: 'Valid email is required' }, 400)
+    }
+
+    const normalizedEmail = email.trim().toLowerCase()
+
+    // Create email service
+    const emailService = createEmailService()
+
+    // Get waitlist user info to send with email
+    let position = 0
+    let referralCode = 'unknown'
+    
+    try {
+      const waitlistUser = await kv.get(`waitlist_user_${normalizedEmail}`)
+      if (waitlistUser) {
+        position = waitlistUser.position || 0
+        referralCode = waitlistUser.referralCode || 'unknown'
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not retrieve waitlist user info:', error)
+    }
+
+    // Send welcome email
+    const result = await emailService.sendEmailConfirmed(normalizedEmail, position, referralCode)
+
+    if (result.success) {
+      // Update email tracking in KV store
+      try {
+        const waitlistUser = await kv.get(`waitlist_user_${normalizedEmail}`)
+        if (waitlistUser) {
+          waitlistUser.emailsSent = (waitlistUser.emailsSent || 0) + 1
+          waitlistUser.lastEmailSent = new Date().toISOString()
+          await kv.set(`waitlist_user_${normalizedEmail}`, waitlistUser)
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not update email tracking:', error)
+      }
+
+      console.log(`✅ Welcome email resent to ${normalizedEmail}`)
+      return c.json({ 
+        success: true, 
+        message: 'Welcome email sent successfully',
+        email: normalizedEmail
+      })
+    } else {
+      console.error(`❌ Failed to send email to ${normalizedEmail}:`, result.error)
+      return c.json({ 
+        success: false, 
+        error: result.error || 'Failed to send email'
+      }, 500)
+    }
+  } catch (error) {
+    console.error('❌ Error in resend-welcome-email endpoint:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message || 'Internal server error'
+    }, 500)
+  }
+})
+
 // Start server
 Deno.serve(app.fetch)

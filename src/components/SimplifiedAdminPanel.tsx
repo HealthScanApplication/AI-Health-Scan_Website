@@ -215,7 +215,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const handleResendEmail = async (recordId: string, email: string) => {
     setResendingEmail(recordId);
     try {
-      const response = await fetch('/api/resend-welcome-email', {
+      const baseUrl = 'https://ljqlvvbktgiflkxywsld.functions.supabase.co';
+      const response = await fetch(`${baseUrl}/make-server-ed0fe4c2/admin/resend-welcome-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -228,7 +229,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         toast.success('Welcome email resent successfully');
         fetchRecords();
       } else {
-        toast.error('Failed to resend email');
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to resend email');
       }
     } catch (error) {
       console.error('Error resending email:', error);
