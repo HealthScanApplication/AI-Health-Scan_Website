@@ -85,7 +85,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       // Build query with proper filters
       let url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`;
       
-      // Add category filter for elements
+      // Add ordering for elements
       if (activeTab === 'elements') {
         url += '&order=category.asc,name.asc';
       } else if (activeTab !== 'users') {
@@ -93,6 +93,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       }
 
       console.log(`🌐 Fetching URL: ${url}`);
+      console.log(`📊 Table: ${currentTab.table}, Tab: ${activeTab}`);
 
       const response = await fetch(url, {
         headers: {
@@ -108,14 +109,27 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         const data = await response.json();
         console.log(`✅ Loaded ${data?.length || 0} ${currentTab.label}`);
         console.log(`📋 Sample data:`, data?.slice(0, 2));
+        
+        if (activeTab === 'elements') {
+          console.log(`🧪 Elements debug:`, data?.slice(0, 3).map((e: any) => ({
+            id: e.id,
+            name: e.name_common || e.name,
+            category: e.category,
+            created_at: e.created_at,
+            has_image: !!e.image_url
+          })));
+        }
+        
         if (activeTab === 'recipes') {
-          console.log(`🖼️ Recipe images debug:`, data?.slice(0, 3).map(r => ({
+          console.log(`🖼️ Recipe images debug:`, data?.slice(0, 3).map((r: any) => ({
             id: r.id,
             name: r.name_common || r.name,
             image_url: r.image_url,
+            created_at: r.created_at,
             has_image: !!r.image_url
           })));
         }
+        
         setRecords(Array.isArray(data) ? data : []);
       } else {
         const errorText = await response.text();
