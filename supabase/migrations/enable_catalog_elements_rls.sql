@@ -21,9 +21,8 @@ CREATE POLICY "Enable update for authenticated users" ON public.catalog_elements
   USING (auth.role() = 'authenticated')
   WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable delete for authenticated users" ON public.catalog_elements
-  FOR DELETE
-  USING (auth.role() = 'authenticated');
+-- DELETE operations are NOT allowed for authenticated users
+-- Only service role can delete elements
 
 -- Policy 3: Allow anonymous users to read (public access)
 CREATE POLICY "Enable read for anonymous users" ON public.catalog_elements
@@ -32,5 +31,5 @@ CREATE POLICY "Enable read for anonymous users" ON public.catalog_elements
 
 -- Grant permissions
 GRANT SELECT ON public.catalog_elements TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.catalog_elements TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.catalog_elements TO authenticated;
 GRANT SELECT ON public.catalog_elements TO anon;
