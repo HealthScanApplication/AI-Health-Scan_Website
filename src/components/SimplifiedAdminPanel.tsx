@@ -521,18 +521,15 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   )}
                 </div>
 
-                {/* Records Table */}
-                <div className="border rounded-lg overflow-hidden">
-                  {renderTableHeader()}
-                  <div className="bg-white">
-                    {loading ? (
-                      <div className="text-center py-8 text-gray-500">Loading...</div>
-                    ) : paginatedRecords.length > 0 ? (
-                      paginatedRecords.map(record => renderRecordRow(record))
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">No records found</div>
-                    )}
-                  </div>
+                {/* Records Container */}
+                <div className="space-y-3">
+                  {loading ? (
+                    <div className="text-center py-12 text-gray-500">Loading...</div>
+                  ) : paginatedRecords.length > 0 ? (
+                    paginatedRecords.map(record => renderRecordRow(record))
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">No records found</div>
+                  )}
                 </div>
 
                 {/* Pagination */}
