@@ -283,23 +283,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
   const renderTableHeader = () => {
     const isWaitlist = activeTab === 'waitlist';
-    const colWidth = 'flex-1';
     
     return (
-      <div className="flex items-center bg-gray-100 border-b font-semibold text-sm sticky top-0">
-        <div className={`${colWidth} px-3 py-3 text-center min-w-[60px]`}>ID</div>
-        <div className={`${colWidth} px-3 py-3 text-center min-w-[100px]`}>Image</div>
-        <div className={`${colWidth} px-3 py-3 min-w-[140px]`}>Name</div>
-        <div className={`${colWidth} px-3 py-3 min-w-[120px]`}>Description</div>
-        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>Category</div>
+      <div className="grid grid-cols-12 gap-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
+        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">ID</div>
+        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Image</div>
+        <div className="col-span-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</div>
+        <div className="col-span-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</div>
+        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</div>
         {isWaitlist && (
           <>
-            <div className={`${colWidth} px-3 py-3 text-center min-w-[90px]`}>Email</div>
-            <div className={`${colWidth} px-3 py-3 text-center min-w-[80px]`}>Referrals</div>
+            <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Email</div>
+            <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Referrals</div>
           </>
         )}
-        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>Created</div>
-        <div className={`${colWidth} px-3 py-3 text-center min-w-[100px]`}>Actions</div>
+        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</div>
+        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Actions</div>
       </div>
     );
   };
@@ -309,94 +308,103 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     const displayName = getDisplayName(record);
     const isSelected = selectedRecords.has(record.id);
     const isWaitlist = activeTab === 'waitlist';
-    const colWidth = 'flex-1';
     const displayIndex = record._displayIndex ?? 0;
 
     return (
-      <div key={record.id} className={`flex items-center border-b hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+      <div key={record.id} className={`grid grid-cols-12 gap-4 border-b border-gray-200 px-6 py-4 hover:bg-blue-50 transition-colors ${isSelected ? 'bg-blue-100' : 'bg-white'}`}>
         {/* ID */}
-        <div className={`${colWidth} px-3 py-3 text-center min-w-[60px] font-semibold text-gray-700`}>
-          {displayIndex}
+        <div className="col-span-1 flex items-center">
+          <span className="font-semibold text-gray-700 text-sm">{displayIndex}</span>
         </div>
 
         {/* Image */}
-        <div className={`${colWidth} px-3 py-3 text-center flex justify-center cursor-pointer min-w-[100px]`} onClick={() => handleEdit(record)}>
+        <div className="col-span-1 flex items-center justify-center">
           <img 
             src={imageUrl} 
             alt={displayName} 
-            className="w-16 h-16 rounded object-cover hover:opacity-80 transition-opacity"
+            className="w-12 h-12 rounded-lg object-cover hover:shadow-md cursor-pointer transition-shadow"
+            onClick={() => handleEdit(record)}
             loading="lazy"
           />
         </div>
 
         {/* Name */}
-        <div className={`${colWidth} px-3 py-3 min-w-[140px] cursor-pointer`} onClick={() => handleEdit(record)}>
-          <div className="font-medium text-gray-900 truncate hover:text-blue-600">{displayName}</div>
-        </div>
-
-        {/* Description */}
-        <div className={`${colWidth} px-3 py-3 min-w-[120px]`}>
-          {record.description && (
-            <div className="text-sm text-gray-600 truncate">{record.description}</div>
+        <div className="col-span-2 flex flex-col justify-center">
+          <div 
+            className="font-semibold text-gray-900 text-sm truncate hover:text-blue-600 cursor-pointer transition-colors"
+            onClick={() => handleEdit(record)}
+          >
+            {displayName}
+          </div>
+          {record.category && (
+            <Badge className="w-fit text-xs mt-1 bg-blue-100 text-blue-800">{record.category}</Badge>
           )}
         </div>
 
-        {/* Category/Email */}
-        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>
-          {record.category && <Badge className="mb-1 block w-fit text-xs">{record.category}</Badge>}
-          {record.email && <div className="text-xs text-gray-600 truncate">{record.email}</div>}
+        {/* Description */}
+        <div className="col-span-3 flex items-center">
+          {record.description && (
+            <p className="text-sm text-gray-600 line-clamp-2">{record.description}</p>
+          )}
+        </div>
+
+        {/* Category (shown in name section, empty here for alignment) */}
+        <div className="col-span-1 flex items-center">
+          {/* Category badge moved to name section */}
         </div>
 
         {/* Email Sent & Referrals (Waitlist only) */}
         {isWaitlist && (
           <>
-            <div className={`${colWidth} px-3 py-3 text-center min-w-[120px]`}>
+            <div className="col-span-1 flex items-center justify-center">
               {record.emailsSent || record.email_sent ? (
-                <Badge className="bg-green-100 text-green-800 text-xs">✓ Sent</Badge>
+                <Badge className="bg-green-100 text-green-800 text-xs font-semibold">✓ Sent</Badge>
               ) : (
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleResendEmail(record.id, record.email || '')}
                   disabled={resendingEmail === record.id}
-                  className="h-7 px-2 text-xs"
+                  className="h-8 px-2 text-xs"
                 >
                   {resendingEmail === record.id ? 'Sending...' : 'Resend'}
                 </Button>
               )}
             </div>
-            <div className={`${colWidth} px-3 py-3 text-center min-w-[80px]`}>
+            <div className="col-span-1 flex items-center justify-center">
               <span className="font-semibold text-gray-900 text-sm">{record.referrals || 0}</span>
             </div>
           </>
         )}
 
         {/* Created Date */}
-        <div className={`${colWidth} px-3 py-3 min-w-[100px]`}>
+        <div className="col-span-1 flex items-center">
           {record.created_at && (
-            <div className="text-xs text-gray-500 border-t border-gray-300 pt-1">
-              {new Date(record.created_at).toLocaleDateString()}
+            <div className="text-xs text-gray-500">
+              {new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className={`${colWidth} px-3 py-3 text-center min-w-[100px] flex gap-1 justify-center`}>
+        <div className="col-span-1 flex items-center justify-center gap-2">
           <Button
             size="sm"
-            variant="outline"
+            variant="ghost"
             onClick={() => handleEdit(record)}
-            className="gap-1 h-8 px-2"
+            className="h-8 w-8 p-0 hover:bg-blue-100"
+            title="Edit"
           >
-            <Edit className="w-3 h-3" />
+            <Edit className="w-4 h-4 text-blue-600" />
           </Button>
           <Button
             size="sm"
-            variant="destructive"
+            variant="ghost"
             onClick={() => handleDelete(record.id)}
-            className="gap-1 h-8 px-2"
+            className="h-8 w-8 p-0 hover:bg-red-100"
+            title="Delete"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-4 h-4 text-red-600" />
           </Button>
         </div>
       </div>
