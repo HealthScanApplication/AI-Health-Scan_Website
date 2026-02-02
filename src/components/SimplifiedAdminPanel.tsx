@@ -64,54 +64,36 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     
     try {
       setLoading(true);
+      console.log(`📊 Fetching ${currentTab.label} from ${currentTab.table}...`);
       
-      let query = `SELECT * FROM ${currentTab.table}`;
+      // Build query with proper filters
+      let url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`;
       
       // Add category filter for elements
       if (activeTab === 'elements') {
-        query += ' ORDER BY category, name';
-      } else {
-        query += ' ORDER BY created_at DESC LIMIT 100';
+        url += '&order=category.asc,name.asc';
+      } else if (activeTab !== 'users') {
+        url += '&order=created_at.desc';
       }
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/rest/v1/rpc/execute_query`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'apikey': publicAnonKey
-          },
-          body: JSON.stringify({ query })
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'apikey': publicAnonKey,
+          'Content-Type': 'application/json'
         }
-      );
+      });
 
       if (response.ok) {
         const data = await response.json();
-        setRecords(data || []);
+        console.log(`✅ Loaded ${data?.length || 0} ${currentTab.label}`);
+        setRecords(Array.isArray(data) ? data : []);
       } else {
-        // Fallback: fetch directly from table
-        const { data, error } = await fetch(
-          `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'apikey': publicAnonKey
-            }
-          }
-        ).then(r => r.json()).then(d => ({ data: d, error: null })).catch(e => ({ data: null, error: e }));
-        
-        if (data) {
-          setRecords(data);
-        } else {
-          setRecords([]);
-          toast.error('Failed to load records');
-        }
+        console.warn(`⚠️ Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
+        setRecords([]);
       }
     } catch (error) {
-      console.error('Error fetching records:', error);
-      toast.error('Error loading records');
+      console.error(`❌ Error fetching ${currentTab.label}:`, error);
       setRecords([]);
     } finally {
       setLoading(false);
