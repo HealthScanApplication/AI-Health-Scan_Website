@@ -335,11 +335,19 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         {/* Email Sent & Referrals (Waitlist only) */}
         {isWaitlist && (
           <>
-            <div className={`${colWidth} px-3 py-3 text-center min-w-[90px]`}>
+            <div className={`${colWidth} px-3 py-3 text-center min-w-[120px]`}>
               {record.emailsSent || record.email_sent ? (
                 <Badge className="bg-green-100 text-green-800 text-xs">✓ Sent</Badge>
               ) : (
-                <Badge variant="outline" className="text-xs">Pending</Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleResendEmail(record.id, record.email || '')}
+                  disabled={resendingEmail === record.id}
+                  className="h-7 px-2 text-xs"
+                >
+                  {resendingEmail === record.id ? 'Sending...' : 'Resend'}
+                </Button>
               )}
             </div>
             <div className={`${colWidth} px-3 py-3 text-center min-w-[80px]`}>
@@ -436,6 +444,26 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   </div>
                 )}
 
+                {/* Category Filter */}
+                {uniqueCategories.length > 0 && (
+                  <div className="flex gap-2 items-center">
+                    <label className="text-sm font-medium text-gray-700">Filter by Category:</label>
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => {
+                        setCategoryFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Categories</option>
+                      {uniqueCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Search Bar and Bulk Actions */}
                 <div className="space-y-2">
                   <div className="flex gap-2">
@@ -444,7 +472,10 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       <Input
                         placeholder={`Search ${tab.label.toLowerCase()}...`}
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setCurrentPage(1);
+                        }}
                         className="pl-10"
                       />
                     </div>
@@ -526,18 +557,57 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   <div className="bg-white">
                     {loading ? (
                       <div className="text-center py-8 text-gray-500">Loading...</div>
-                    ) : filteredRecords.length > 0 ? (
-                      filteredRecords.map(record => renderRecordRow(record))
+                    ) : paginatedRecords.length > 0 ? (
+                      paginatedRecords.map(record => renderRecordRow(record))
                     ) : (
                       <div className="text-center py-8 text-gray-500">No records found</div>
                     )}
                   </div>
                 </div>
 
-                {/* Record Count */}
-                <div className="text-sm text-gray-600">
-                  Showing {filteredRecords.length} of {records.length} records
-                </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredRecords.length)} of {filteredRecords.length} records
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="gap-1"
+                      >
+                        ← Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                              currentPage === page
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="gap-1"
+                      >
+                        Next →
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
             ))}
           </Tabs>
