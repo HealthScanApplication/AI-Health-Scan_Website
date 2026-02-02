@@ -26,11 +26,13 @@ import { projectId, publicAnonKey } from '../utils/supabase/info';
 interface AdminRecord {
   id: string;
   name?: string;
+  name_common?: string;
   email?: string;
   title?: string;
   category?: string;
   description?: string;
   image_url?: string;
+  avatar_url?: string;
   created_at?: string;
   [key: string]: any;
 }
@@ -47,6 +49,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [loading, setLoading] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AdminRecord | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
+  const [bulkEditField, setBulkEditField] = useState('');
+  const [bulkEditValue, setBulkEditValue] = useState('');
 
   const tabs = [
     { id: 'users', label: 'Users', icon: '👤', table: 'auth.users' },
@@ -176,54 +181,83 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     );
   });
 
-  const renderRecordRow = (record: AdminRecord) => (
-    <div key={record.id} className="flex items-center justify-between p-4 bg-white border rounded-lg hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-4 flex-1">
-        {record.image_url && (
-          <img 
-            src={record.image_url} 
-            alt={record.name || 'Record'} 
-            className="w-12 h-12 rounded object-cover"
-            loading="lazy"
+  const getDisplayName = (record: AdminRecord) => {
+    return record.name_common || record.name || record.email || record.title || 'Unnamed';
+  };
+
+  const getImageUrl = (record: AdminRecord) => {
+    return record.image_url || record.avatar_url;
+  };
+
+  const renderRecordRow = (record: AdminRecord) => {
+    const imageUrl = getImageUrl(record);
+    const displayName = getDisplayName(record);
+    const isSelected = selectedRecords.has(record.id);
+
+    return (
+      <div key={record.id} className={`flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow ${isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}>
+        <div className="flex items-center gap-4 flex-1">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              const newSelected = new Set(selectedRecords);
+              if (e.target.checked) {
+                newSelected.add(record.id);
+              } else {
+                newSelected.delete(record.id);
+              }
+              setSelectedRecords(newSelected);
+            }}
+            className="w-4 h-4"
           />
-        )}
-        <div className="flex-1">
-          <div className="font-medium text-gray-900">
-            {record.name || record.email || record.title || 'Unnamed'}
+          {imageUrl && (
+            <img 
+              src={imageUrl} 
+              alt={displayName} 
+              className="w-12 h-12 rounded object-cover"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          )}
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">{displayName}</div>
+            {record.email && <div className="text-sm text-gray-600">{record.email}</div>}
+            {record.category && <Badge className="mt-1">{record.category}</Badge>}
+            {record.description && (
+              <div className="text-sm text-gray-600 line-clamp-2 mt-1">{record.description}</div>
+            )}
+            {record.created_at && (
+              <div className="text-xs text-gray-500 mt-1">
+                {new Date(record.created_at).toLocaleDateString()}
+              </div>
+            )}
           </div>
-          {record.email && <div className="text-sm text-gray-600">{record.email}</div>}
-          {record.category && <Badge className="mt-1">{record.category}</Badge>}
-          {record.description && (
-            <div className="text-sm text-gray-600 line-clamp-2 mt-1">{record.description}</div>
-          )}
-          {record.created_at && (
-            <div className="text-xs text-gray-500 mt-1">
-              {new Date(record.created_at).toLocaleDateString()}
-            </div>
-          )}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleEdit(record)}
+            className="gap-2"
+          >
+            <Edit className="w-4 h-4" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => handleDelete(record.id)}
+            className="gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </div>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => handleEdit(record)}
-          className="gap-2"
-        >
-          <Edit className="w-4 h-4" />
-          Edit
-        </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => handleDelete(record.id)}
-          className="gap-2"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="w-full space-y-6">
@@ -245,21 +279,88 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             {tabs.map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
-                {/* Search Bar */}
-                <div className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                    <Input
-                      placeholder={`Search ${tab.label.toLowerCase()}...`}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
+                {/* Search Bar and Bulk Actions */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                      <Input
+                        placeholder={`Search ${tab.label.toLowerCase()}...`}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button className="gap-2">
+                      <Plus className="w-4 h-4" />
+                      Add
+                    </Button>
                   </div>
-                  <Button className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add
-                  </Button>
+
+                  {/* Bulk Edit Section */}
+                  {selectedRecords.size > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                      <div className="text-sm font-medium text-blue-900">
+                        {selectedRecords.size} record(s) selected
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Field name (e.g., category, status)"
+                          value={bulkEditField}
+                          onChange={(e) => setBulkEditField(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Input
+                          placeholder="New value"
+                          value={bulkEditValue}
+                          onChange={(e) => setBulkEditValue(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          onClick={async () => {
+                            if (!bulkEditField || !bulkEditValue || !currentTab) return;
+                            try {
+                              for (const recordId of selectedRecords) {
+                                await fetch(
+                                  `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?id=eq.${recordId}`,
+                                  {
+                                    method: 'PATCH',
+                                    headers: {
+                                      'Authorization': `Bearer ${accessToken}`,
+                                      'Content-Type': 'application/json',
+                                      'apikey': publicAnonKey
+                                    },
+                                    body: JSON.stringify({ [bulkEditField]: bulkEditValue })
+                                  }
+                                );
+                              }
+                              toast.success(`Updated ${selectedRecords.size} records`);
+                              setSelectedRecords(new Set());
+                              setBulkEditField('');
+                              setBulkEditValue('');
+                              fetchRecords();
+                            } catch (error) {
+                              console.error('Bulk edit error:', error);
+                              toast.error('Failed to update records');
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Bulk Update
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedRecords(new Set());
+                            setBulkEditField('');
+                            setBulkEditValue('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Records List */}
