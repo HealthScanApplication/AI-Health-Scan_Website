@@ -6,8 +6,8 @@ const app = new Hono()
 interface LeaderboardUser {
   name: string
   email?: string
-  referralCode: string
-  referrals: number
+  referral_code: string
+  referral_count: number
   rank: number
   position_change?: number
   joinedDate?: string
@@ -38,8 +38,8 @@ app.get('/referral-leaderboard', async (c) => {
       .map((user: any, index: number) => ({
         name: user.name || `User ${index + 1}`,
         email: user.email || '',
-        referralCode: user.referralCode || `ref_${index + 1}`,
-        referrals: user.referralCount || 0,
+        referral_code: user.referralCode || `ref_${index + 1}`,
+        referral_count: user.referralCount || 0,
         rank: index + 1,
         position_change: user.position_change || 0,
         joinedDate: user.signupDate,
@@ -47,7 +47,7 @@ app.get('/referral-leaderboard', async (c) => {
         isAnonymous: user.isAnonymous || false
       }))
       // Sort by referral count descending
-      .sort((a: LeaderboardUser, b: LeaderboardUser) => b.referrals - a.referrals)
+      .sort((a: LeaderboardUser, b: LeaderboardUser) => b.referral_count - a.referral_count)
       // Add ranks after sorting
       .map((user: LeaderboardUser, index: number) => ({
         ...user,
@@ -79,11 +79,27 @@ app.get('/referral-leaderboard', async (c) => {
 app.get('/referral-stats/:referralCode', async (c) => {
   try {
     const referralCode = c.req.param('referralCode')
+    
+    if (!referralCode || typeof referralCode !== 'string') {
+      return c.json({
+        success: false,
+        error: 'Invalid referral code provided'
+      }, 400)
+    }
+    
     console.log(`📊 Fetching referral stats for code: ${referralCode}`)
 
     // Find user by referral code
     const allUsers = await kv.getByPrefix('waitlist_user_')
-    const user = allUsers.find((u: any) => u.referralCode === referralCode)
+    
+    if (!allUsers || !Array.isArray(allUsers)) {
+      return c.json({
+        success: false,
+        error: 'Unable to fetch user data'
+      }, 500)
+    }
+    
+    const user = allUsers.find((u: any) => u?.referralCode === referralCode)
 
     if (!user) {
       return c.json({
@@ -93,32 +109,32 @@ app.get('/referral-stats/:referralCode', async (c) => {
     }
 
     // Get all users who used this referral code
-    const referredUsers = allUsers.filter((u: any) => u.usedReferralCode === referralCode)
+    const referredUsers = allUsers.filter((u: any) => u?.usedReferralCode === referralCode) || []
 
     return c.json({
       success: true,
       stats: {
-        referralCode: user.referralCode,
-        email: user.email,
-        name: user.name,
-        totalReferrals: user.referralCount || 0,
+        referralCode: user.referralCode || referralCode,
+        email: user.email || '',
+        name: user.name || 'Anonymous',
+        totalReferrals: user.referralCount ?? 0,
         referredUsers: referredUsers.map((u: any) => ({
-          email: u.email,
-          name: u.name,
-          joinedDate: u.signupDate
+          email: u?.email || '',
+          name: u?.name || 'Anonymous',
+          joinedDate: u?.signupDate || new Date().toISOString()
         })),
-        joinedDate: user.signupDate,
-        rewardTier: getRewardTier(user.referralCount || 0)
+        joinedDate: user.signupDate || new Date().toISOString(),
+        rewardTier: getRewardTier(user.referralCount ?? 0)
       },
       timestamp: new Date().toISOString()
     })
 
   } catch (error: any) {
-    console.error('❌ Referral stats endpoint error:', error.message)
+    console.error('❌ Referral stats endpoint error:', error?.message || 'Unknown error')
     return c.json({
       success: false,
       error: 'Failed to fetch referral stats',
-      message: error.message
+      message: error?.message || 'An unexpected error occurred'
     }, 500)
   }
 })

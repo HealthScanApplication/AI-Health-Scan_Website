@@ -42,18 +42,23 @@ export function ReferralLeaderboard() {
       
       console.log('🏆 Fetching referral leaderboard...');
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/referral-leaderboard`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${publicAnonKey}`,
           'Content-Type': 'application/json'
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.log(`🏆 Leaderboard endpoint not available (${response.status})`);
         
-        // Show empty state instead of demo data
         setLeaderboard([]);
         setDatabaseConnected(false);
         setError(`Unable to load leaderboard (${response.status})`);
@@ -62,16 +67,15 @@ export function ReferralLeaderboard() {
 
       const data: LeaderboardResponse = await response.json();
       
-      if (data.success && data.leaderboard) {
+      if (data.success && data.leaderboard && Array.isArray(data.leaderboard)) {
         console.log('✅ Real leaderboard loaded:', data.leaderboard.length, 'users');
         
-        // Server now returns data in the correct format, just update field names if needed
         const transformedLeaderboard = data.leaderboard.map((user: any, index: number) => ({
           name: user.name || `User ${index + 1}`,
           email: user.email || '',
-          referral_code: user.referralCode || `ref_${index + 1}`, // Server uses referralCode
-          referral_count: user.referrals || 0, // Server uses referrals
-          reward: user.reward || getRewardTier(user.referrals || 0).tier,
+          referral_code: user.referral_code || user.referralCode || `ref_${index + 1}`,
+          referral_count: user.referral_count ?? user.referrals ?? 0,
+          reward: user.reward || getRewardTier(user.referral_count ?? user.referrals ?? 0).tier,
           created_at: user.created_at || user.joinedDate || new Date().toISOString(),
           rank: user.rank || (index + 1),
           position_change: user.position_change || 0,
@@ -86,15 +90,23 @@ export function ReferralLeaderboard() {
       } else {
         console.warn('⚠️ Leaderboard API returned failure or empty data');
         setLeaderboard([]);
-        setDatabaseConnected(data.databaseAvailable !== false);
+        setDatabaseConnected(data?.databaseAvailable !== false);
         setError('No referral activity yet - start sharing to see the leaderboard!');
       }
 
     } catch (fetchError: any) {
-      console.log('🏆 Leaderboard server unavailable:', fetchError.message);
+      if (fetchError.name === 'AbortError') {
+        console.error('🏆 Leaderboard request timeout');
+        setError('Request timed out - please check your connection and try again');
+      } else if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
+        console.error('🏆 Network error:', fetchError.message);
+        setError('Network error - unable to reach the server');
+      } else {
+        console.error('🏆 Leaderboard fetch error:', fetchError.message);
+        setError('Unable to load leaderboard data - please try again');
+      }
       setLeaderboard([]);
       setDatabaseConnected(false);
-      setError('Unable to load leaderboard data - please check your connection and try again');
     } finally {
       setLoading(false);
     }
