@@ -282,25 +282,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   };
 
   const renderTableHeader = () => {
-    const isWaitlist = activeTab === 'waitlist';
-    
-    return (
-      <div className="grid grid-cols-12 gap-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
-        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">ID</div>
-        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Image</div>
-        <div className="col-span-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</div>
-        <div className="col-span-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</div>
-        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</div>
-        {isWaitlist && (
-          <>
-            <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Email</div>
-            <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Referrals</div>
-          </>
-        )}
-        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</div>
-        <div className="col-span-1 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Actions</div>
-      </div>
-    );
+    // No header needed for card-based layout
+    return null;
   };
 
   const renderRecordRow = (record: AdminRecord & { _displayIndex?: number }) => {
@@ -311,101 +294,85 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     const displayIndex = record._displayIndex ?? 0;
 
     return (
-      <div key={record.id} className={`grid grid-cols-12 gap-4 border-b border-gray-200 px-6 py-4 hover:bg-blue-50 transition-colors ${isSelected ? 'bg-blue-100' : 'bg-white'}`}>
-        {/* ID */}
-        <div className="col-span-1 flex items-center">
-          <span className="font-semibold text-gray-700 text-sm">{displayIndex}</span>
-        </div>
-
+      <div key={record.id} className={`flex gap-4 p-4 mb-3 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all ${isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}>
         {/* Image */}
-        <div className="col-span-1 flex items-center justify-center">
+        <div className="flex-shrink-0">
           <img 
             src={imageUrl} 
             alt={displayName} 
-            className="w-12 h-12 rounded-lg object-cover hover:shadow-md cursor-pointer transition-shadow"
+            className="w-20 h-20 rounded-lg object-cover hover:shadow-lg cursor-pointer transition-shadow"
             onClick={() => handleEdit(record)}
             loading="lazy"
           />
         </div>
 
-        {/* Name */}
-        <div className="col-span-2 flex flex-col justify-center">
-          <div 
-            className="font-semibold text-gray-900 text-sm truncate hover:text-blue-600 cursor-pointer transition-colors"
-            onClick={() => handleEdit(record)}
-          >
-            {displayName}
-          </div>
-          {record.category && (
-            <Badge className="w-fit text-xs mt-1 bg-blue-100 text-blue-800">{record.category}</Badge>
-          )}
-        </div>
-
-        {/* Description */}
-        <div className="col-span-3 flex items-center">
-          {record.description && (
-            <p className="text-sm text-gray-600 line-clamp-2">{record.description}</p>
-          )}
-        </div>
-
-        {/* Category (shown in name section, empty here for alignment) */}
-        <div className="col-span-1 flex items-center">
-          {/* Category badge moved to name section */}
-        </div>
-
-        {/* Email Sent & Referrals (Waitlist only) */}
-        {isWaitlist && (
-          <>
-            <div className="col-span-1 flex items-center justify-center">
-              {record.emailsSent || record.email_sent ? (
-                <Badge className="bg-green-100 text-green-800 text-xs font-semibold">✓ Sent</Badge>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleResendEmail(record.id, record.email || '')}
-                  disabled={resendingEmail === record.id}
-                  className="h-8 px-2 text-xs"
-                >
-                  {resendingEmail === record.id ? 'Sending...' : 'Resend'}
-                </Button>
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div 
+                className="font-semibold text-gray-900 text-base truncate hover:text-blue-600 cursor-pointer transition-colors"
+                onClick={() => handleEdit(record)}
+              >
+                {displayName}
+              </div>
+              {record.category && (
+                <Badge className="text-xs mt-1 bg-blue-100 text-blue-800">{record.category}</Badge>
+              )}
+              {record.description && (
+                <p className="text-sm text-gray-600 line-clamp-2 mt-2">{record.description}</p>
+              )}
+              {record.created_at && (
+                <div className="text-xs text-gray-500 mt-2">
+                  {new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                </div>
               )}
             </div>
-            <div className="col-span-1 flex items-center justify-center">
-              <span className="font-semibold text-gray-900 text-sm">{record.referrals || 0}</span>
-            </div>
-          </>
-        )}
 
-        {/* Created Date */}
-        <div className="col-span-1 flex items-center">
-          {record.created_at && (
-            <div className="text-xs text-gray-500">
-              {new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+            {/* Right Column - Email/Referrals/Actions */}
+            <div className="flex flex-col items-end gap-2">
+              {isWaitlist && (
+                <div className="flex flex-col items-end gap-1">
+                  {record.emailsSent || record.email_sent ? (
+                    <Badge className="bg-green-100 text-green-800 text-xs font-semibold">✓ Sent</Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleResendEmail(record.id, record.email || '')}
+                      disabled={resendingEmail === record.id}
+                      className="h-7 px-2 text-xs"
+                    >
+                      {resendingEmail === record.id ? 'Sending...' : 'Resend'}
+                    </Button>
+                  )}
+                  <span className="text-xs text-gray-600">Referrals: <span className="font-semibold">{record.referrals || 0}</span></span>
+                </div>
+              )}
+              
+              {/* Actions */}
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleEdit(record)}
+                  className="h-8 w-8 p-0 hover:bg-blue-100"
+                  title="Edit"
+                >
+                  <Edit className="w-4 h-4 text-blue-600" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDelete(record.id)}
+                  className="h-8 w-8 p-0 hover:bg-red-100"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4 text-red-600" />
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="col-span-1 flex items-center justify-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => handleEdit(record)}
-            className="h-8 w-8 p-0 hover:bg-blue-100"
-            title="Edit"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => handleDelete(record.id)}
-            className="h-8 w-8 p-0 hover:bg-red-100"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4 text-red-600" />
-          </Button>
+          </div>
         </div>
       </div>
     );
