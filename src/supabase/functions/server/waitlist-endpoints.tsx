@@ -255,6 +255,9 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
       }, 400);
     }
     
+    const userAgent = c.req.header('User-Agent') || ''
+    const ipAddress = c.req.header('X-Forwarded-For') || c.req.header('X-Real-IP') || c.req.header('CF-Connecting-IP') || ''
+
     console.log('📝 Processing waitlist signup:', { 
       email: normalizedEmail ? 'normalized successfully' : 'normalization failed',
       emailLength: normalizedEmail?.length,
@@ -318,8 +321,8 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
             name: name?.trim() || normalizedEmail.split('@')[0],
             source: 'waitlist-existing',
             emailConfirmed: existingUser.confirmed || false,
-            userAgent: c.req.header('User-Agent') || '', // Use Hono's header method
-            ipAddress: c.req.header('X-Forwarded-For') || c.req.header('X-Real-IP') || '' // Use Hono's header method
+            userAgent,
+            ipAddress
           })
           googleSheetsResult = sheetsResult
           
@@ -529,8 +532,8 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         name: userName,
         source: source || 'waitlist',
         emailConfirmed: false,
-        userAgent: c.req.header('User-Agent') || '', // Use Hono's header method
-        ipAddress: c.req.header('X-Forwarded-For') || c.req.header('X-Real-IP') || '' // Use Hono's header method
+        userAgent,
+        ipAddress
       })
       
       googleSheetsResult = sheetsResult
@@ -577,8 +580,37 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
           emailError = emailResult.error
           console.error('❌ Failed to send confirmation email:', emailResult.error)
         }
+
+        try {
+          const adminResult = await emailService.sendAdminWaitlistAlert({
+            email: normalizedEmail,
+            name: userName,
+            position: calculatedPosition,
+            referralCode: userReferralCode,
+            usedReferralCode: referralCode,
+            totalWaitlist: currentCount + 1,
+            source: source || 'waitlist',
+            utm_source,
+            utm_medium,
+            utm_campaign,
+            ipAddress,
+            userAgent,
+            signupDate: userData.signupDate,
+            emailSent,
+            emailError,
+            emailError: emailError || undefined
+          })
+
+          if (adminResult.success) {
+            console.log('📧 Waitlist admin alert sent to waitlist@healthscan.live')
+          } else {
+            console.warn('⚠️ Waitlist admin alert failed:', adminResult.error)
+          }
+        } catch (alertError) {
+          console.warn('⚠️ Waitlist admin alert threw error:', alertError)
+        }
       } else {
-        console.log('📧 Email service not configured - skipping confirmation email')
+        console.log('📧 Email service not configured - skipping confirmation + admin alert emails')
         emailError = 'Email service not configured'
       }
     } catch (error) {

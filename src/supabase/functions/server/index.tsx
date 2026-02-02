@@ -10,6 +10,7 @@ import { handleEmailConfirmation, handleUserStatus } from './email-confirmation-
 import { zapierApp } from './zapier-endpoints.tsx'
 import { createEmailService } from './email-service.tsx'
 import { adminApp } from './admin-endpoints-fixed.tsx'
+import { referralApp } from './referral-endpoints.tsx'
 import blogRssApp from './blog-rss-endpoints.tsx'
 
 // Initialize Hono app
@@ -460,6 +461,9 @@ app.post('/make-server-ed0fe4c2/users/:id/send-verification', async (c) => {
 
 // Mount admin endpoints
 app.route('/', adminApp)
+
+// Mount Referral endpoints
+app.route('/make-server-ed0fe4c2', referralApp)
 
 // Mount Zapier endpoints
 app.route('/make-server-ed0fe4c2/zapier', zapierApp)

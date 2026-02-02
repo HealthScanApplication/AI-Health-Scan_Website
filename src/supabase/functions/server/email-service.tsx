@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { buildWaitlistAlertEmail, WaitlistAlertPayload } from './email-templates.ts'
 
 // Email service configuration
 interface EmailConfig {
@@ -543,6 +544,25 @@ HealthScan • Building the future of health scanning
       subject: emailTemplate.subject,
       html: emailTemplate.html,
       text: emailTemplate.text
+    })
+  }
+
+  // Send admin waitlist alert
+  async sendAdminWaitlistAlert(payload: WaitlistAlertPayload): Promise<{ success: boolean; error?: string }> {
+    const adminEmail = Deno.env.get('WAITLIST_ALERT_EMAIL') || 'waitlist@healthscan.live'
+
+    if (!adminEmail) {
+      console.log('📧 Waitlist alert skipped - WAITLIST_ALERT_EMAIL not configured')
+      return { success: false, error: 'WAITLIST_ALERT_EMAIL not configured' }
+    }
+
+    const template = buildWaitlistAlertEmail(payload)
+
+    return await this.sendEmail({
+      to: adminEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
     })
   }
 
