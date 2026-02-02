@@ -1,0 +1,37 @@
+# Workspace Roadmap
+
+## Active Briefs
+
+### B0_FILE_CLEANUP (Current)
+
+- **Goal**: Restore mandatory documentation, ensure required directories exist, clean unused files, and verify waitlist health (functionality + metrics).
+- **Milestones**:
+
+  1. Documentation baseline recreated (`_CONTEXT`, `_ROADMAP`, `B0_*` files).
+  2. Workspace audit (structure validation, missing folders, removal of redundant assets/code).
+  3. Waitlist verification (functional test plan executed, Supabase data reviewed, user count reported).
+
+- **Key Risks**:
+
+  - Outdated Supabase credentials/env vars.
+  - Hidden broken imports/components while cleaning unused files.
+  - Lack of automated tests around waitlist edge cases.
+
+- **Next Deliverables**:
+
+  - Document cleanup findings + waitlist metrics in `B0_CHECKLIST`.
+  - Provide remediation plan if Supabase data cannot be queried locally.
+
+## Backlog / Future Briefs
+
+1. **B1_WAITLIST_ENHANCEMENTS** *(placeholder)*: Enhanced verification flow, referral analytics, spam protection.
+2. **B2_MOBILE_HANDOFF** *(placeholder)*: Deep linking + native share improvements.
+3. **B3_EMAIL_CUSTOMIZER** *(placeholder)*: In-app template editor and A/B testing tooling.
+
+## Operational Checklist
+
+- Confirm `.env` contains Supabase + API keys (never commit).
+- Run automated tests (unit + integration) before merging.
+- Keep design assets synced inside `src/assets` with clear naming.
+- Update `B{N}_CHECKLIST` after each meaningful change.
+- Follow commit naming + branch rules outlined in `_CONTEXT`.

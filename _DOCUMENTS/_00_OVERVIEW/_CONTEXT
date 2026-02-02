@@ -1,0 +1,33 @@
+# Workspace Context
+
+## Project Overview
+
+- **Product**: AI-Health-Scan marketing site + admin dashboard supporting waitlist, referral system, and data integrations.
+- **Tech Stack**: React 18 + TypeScript, Vite, Tailwind CSS v4, Radix UI, Supabase (Postgres, Auth, Edge Functions), external APIs (USDA, FDA, EPA, etc.).
+- **Key Systems**: Waitlist signup, referral rewards, ConvertKit email capture, Google Sheets + Zapier sync, admin CRUD for nutrition/pollutant data, Supabase authentication.
+
+## Core Constraints
+
+1. **Documentation Order**: Always read `_CONTEXT` → `_ROADMAP` → `B{N}_CHECKLIST` → remaining brief docs before editing other files.
+2. **Branch & Commit Naming**: `[YYYY-MM-DD HH:mm][B{N}][VERB][category] Description` on `feature/B{N}_...` branches.
+3. **Testing Discipline**: Write/adjust tests before implementing features; verify with test runs immediately after.
+4. **Frontend Standards**: Intentional typography/colors, complete responsive layouts, tasteful animations, no generic "AI slop" designs.
+5. **Security**: Never commit secrets (.env). Follow Supabase project config guidelines.
+
+## Current Brief
+
+- **Code**: `B0_FILE_CLEANUP`
+- **Status**: In Progress (10%)
+- **Mandate**: Restore required documentation, ensure required folders exist, validate structure, clean unnecessary files, verify waitlist functionality & metrics.
+
+## Key References
+
+- Supabase Project ID: `ljqlvvbktgiflkxywsld`
+- Required environment variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE`, `JWT_SECRET`, `DB_PASSWORD`.
+
+## Workflow Expectations
+
+1. Keep project tidy—remove unused files, maintain thoughtful structure.
+2. When blocking tasks require user action, provide numbered, detailed instructions.
+3. Prefer minimal fixes targeting root causes; add regression tests.
+4. Document significant changes within brief files as progress occurs.
