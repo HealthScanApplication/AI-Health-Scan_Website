@@ -19,13 +19,13 @@ const getAuthHeaders = (accessToken: string) => ({
 })
 
 export interface AdminStats {
-  nutrients: { total: number; withImages: number }
-  ingredients: { total: number; withImages: number }
-  products: { total: number; withImages: number }
-  pollutants: { total: number; withImages: number }
-  scans: { total: number; withImages: number }
-  meals: { total: number; withImages: number }
-  parasites: { total: number; withImages: number }
+  nutrients: { total: number; withImages: number; table: string; category: string }
+  ingredients: { total: number; withImages: number; table: string; category: string }
+  products: { total: number; withImages: number; table: string; category: string }
+  pollutants: { total: number; withImages: number; table: string; category: string }
+  scans: { total: number; withImages: number; table: string; category: string }
+  meals: { total: number; withImages: number; table: string; category: string }
+  parasites: { total: number; withImages: number; table: string; category: string }
   users: { total: number; confirmed: number }
 }
 
