@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { HeroSection } from './HeroSection'
 import { ProfilePage } from './ProfilePage'
 import { SettingsPage } from './SettingsPage'
-import { AdminDashboard } from './AdminDashboard'
+import { SimplifiedAdminPanel } from './SimplifiedAdminPanel'
 import { NetworkDiagnostic } from './NetworkDiagnostic'
 import { LoginDiagnostic } from './LoginDiagnostic'
 import { Blog } from './Blog'
@@ -223,7 +223,7 @@ export function PageRenderer({
         <div className="min-h-screen bg-gray-50">
           {/* Mobile-optimized container with better padding */}
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 lg:py-8">
-            <AdminDashboard 
+            <SimplifiedAdminPanel 
               user={user}
               accessToken={finalAccessToken}
             />
