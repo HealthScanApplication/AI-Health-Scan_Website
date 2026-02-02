@@ -517,6 +517,14 @@ app.post('/make-server-ed0fe4c2/admin/resend-welcome-email', async (c) => {
 
     // Create email service
     const emailService = createEmailService()
+    
+    if (!emailService) {
+      console.error('❌ Email service not initialized - no API key configured')
+      return c.json({ 
+        success: false, 
+        error: 'Email service not configured. Please set RESEND_API_KEY, SENDGRID_API_KEY, or POSTMARK_API_KEY environment variable.'
+      }, 500)
+    }
 
     // Get waitlist user info to send with email
     let position = 0
@@ -531,6 +539,8 @@ app.post('/make-server-ed0fe4c2/admin/resend-welcome-email', async (c) => {
     } catch (error) {
       console.warn('⚠️ Could not retrieve waitlist user info:', error)
     }
+
+    console.log(`📧 Attempting to send welcome email to ${normalizedEmail} (position: ${position})`)
 
     // Send welcome email
     const result = await emailService.sendEmailConfirmed(normalizedEmail, position, referralCode)
