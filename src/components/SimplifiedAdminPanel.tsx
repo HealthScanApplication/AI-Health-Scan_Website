@@ -193,13 +193,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
   const renderTableHeader = () => {
     return (
-      <div className="grid grid-cols-12 gap-4 p-4 bg-gray-100 border-b font-semibold text-sm sticky top-0">
-        <div className="col-span-1">Select</div>
-        <div className="col-span-2">Image</div>
-        <div className="col-span-3">Name</div>
-        <div className="col-span-2">Category/Email</div>
-        <div className="col-span-2">Description</div>
-        <div className="col-span-2">Actions</div>
+      <div className="flex items-center bg-gray-100 border-b font-semibold text-sm sticky top-0">
+        <div className="w-12 px-4 py-3 text-center">Select</div>
+        <div className="w-28 px-4 py-3 text-center">Image</div>
+        <div className="flex-1 px-4 py-3 min-w-0">Name</div>
+        <div className="w-40 px-4 py-3">Category/Email</div>
+        <div className="w-48 px-4 py-3">Description</div>
+        <div className="w-32 px-4 py-3">Actions</div>
       </div>
     );
   };
@@ -210,9 +210,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     const isSelected = selectedRecords.has(record.id);
 
     return (
-      <div key={record.id} className={`grid grid-cols-12 gap-4 p-4 border-b items-center hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+      <div key={record.id} className={`flex items-center border-b hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
         {/* Checkbox */}
-        <div className="col-span-1 flex justify-center">
+        <div className="w-12 px-4 py-3 text-center flex justify-center">
           <input
             type="checkbox"
             checked={isSelected}
@@ -231,17 +231,17 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </div>
 
         {/* Image */}
-        <div className="col-span-2 flex justify-center">
+        <div className="w-28 px-4 py-3 text-center flex justify-center">
           <img 
             src={imageUrl} 
             alt={displayName} 
-            className="w-24 h-24 rounded object-cover"
+            className="w-20 h-20 rounded object-cover"
             loading="lazy"
           />
         </div>
 
         {/* Name */}
-        <div className="col-span-3">
+        <div className="flex-1 px-4 py-3 min-w-0">
           <div className="font-medium text-gray-900 truncate">{displayName}</div>
           {record.created_at && (
             <div className="text-xs text-gray-500">
@@ -251,36 +251,36 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </div>
 
         {/* Category/Email */}
-        <div className="col-span-2">
-          {record.category && <Badge className="mb-1">{record.category}</Badge>}
+        <div className="w-40 px-4 py-3">
+          {record.category && <Badge className="mb-1 block w-fit">{record.category}</Badge>}
           {record.email && <div className="text-sm text-gray-600 truncate">{record.email}</div>}
         </div>
 
         {/* Description */}
-        <div className="col-span-2">
+        <div className="w-48 px-4 py-3">
           {record.description && (
             <div className="text-sm text-gray-600 line-clamp-2">{record.description}</div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="col-span-2 flex gap-2">
+        <div className="w-32 px-4 py-3 flex gap-1">
           <Button
             size="sm"
             variant="outline"
             onClick={() => handleEdit(record)}
-            className="gap-2"
+            className="gap-1"
           >
-            <Edit className="w-4 h-4" />
+            <Edit className="w-3 h-3" />
             Edit
           </Button>
           <Button
             size="sm"
             variant="destructive"
             onClick={() => handleDelete(record.id)}
-            className="gap-2"
+            className="gap-1"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3 h-3" />
           </Button>
         </div>
       </div>
