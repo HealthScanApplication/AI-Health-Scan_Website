@@ -70,6 +70,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     try {
       setLoading(true);
       console.log(`📊 Fetching ${currentTab.label} from ${currentTab.table}...`);
+      console.log(`🔑 Access Token: ${accessToken ? 'Present' : 'Missing'}`);
+      console.log(`🔑 API Key: ${publicAnonKey ? 'Present' : 'Missing'}`);
       
       // Build query with proper filters
       let url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`;
@@ -81,6 +83,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         url += '&order=created_at.desc';
       }
 
+      console.log(`🌐 Fetching URL: ${url}`);
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -89,12 +93,17 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       });
 
+      console.log(`📡 Response Status: ${response.status} ${response.statusText}`);
+
       if (response.ok) {
         const data = await response.json();
         console.log(`✅ Loaded ${data?.length || 0} ${currentTab.label}`);
+        console.log(`📋 Sample data:`, data?.slice(0, 2));
         setRecords(Array.isArray(data) ? data : []);
       } else {
+        const errorText = await response.text();
         console.warn(`⚠️ Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
+        console.warn(`📝 Error response:`, errorText);
         setRecords([]);
       }
     } catch (error) {
