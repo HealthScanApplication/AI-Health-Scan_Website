@@ -31,8 +31,11 @@ export const EMAIL_TEMPLATES = {
     subject: 'Welcome to HealthScan! You\'re #' + position + ' in queue',
     html: `
       <div style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-        <!-- Header with vibrant gradient -->
+        <!-- Header with vibrant gradient and logo -->
         <div style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #3b82f6 100%); padding: 48px 20px; text-align: center;">
+          <div style="margin-bottom: 16px;">
+            <img src="https://healthscan.live/logo.png" alt="HealthScan" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; display: inline-block;">
+          </div>
           <h1 style="color: #ffffff; font-size: 32px; font-weight: 600; margin: 0; letter-spacing: -0.8px; font-family: 'Poppins', sans-serif;">
             HealthScan
           </h1>
@@ -70,12 +73,17 @@ export const EMAIL_TEMPLATES = {
           </div>
 
           <!-- CTA Button -->
-          <div style="text-align: center; margin-bottom: 36px;">
+          <div style="text-align: center; margin-bottom: 32px;">
             <a href="${confirmationLink}" 
-               style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%); color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; font-family: 'Poppins', sans-serif; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); transition: transform 0.2s;">
-              Confirm Email Address
+               style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%); color: white; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; font-family: 'Poppins', sans-serif; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); transition: transform 0.2s;">
+              Confirm your email opt-in status here 💚
             </a>
           </div>
+          
+          <!-- Confirmation Note -->
+          <p style="color: #6b7280; font-size: 13px; margin: 0 0 32px 0; text-align: center; font-weight: 300; font-family: 'Poppins', sans-serif;">
+            (You can unsubscribe at any time)
+          </p>
 
           <!-- Referral Section -->
           ${referralLink ? `
