@@ -140,7 +140,7 @@ You're position #${position} on our waitlist 🌱
         <div style="background: #f9fafb; padding: 28px; border-radius: 12px; margin: 32px 0; border: 1px solid #e5e7eb;">
           <h3 style="color: #374151; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">🚀 What's Next?</h3>
           <ul style="color: #6b7280; line-height: 1.8; margin: 0; padding-left: 20px;">
-            <li style="margin-bottom: 8px;">We'll notify you as soon as HealthScan launches on <strong>September 7th, 2025</strong></li>
+            <li style="margin-bottom: 8px;">We'll notify you as soon as HealthScan launches on <strong>February 27th, 2026</strong></li>
             <li style="margin-bottom: 8px;">You'll get exclusive early access before the general public</li>
             <li style="margin-bottom: 8px;">Share your referral link to move up in the queue</li>
             <li style="margin-bottom: 0;">Follow our progress and health tips on our blog</li>
@@ -169,7 +169,7 @@ Thank you for joining HealthScan! You're #${position} in line for early access.
 Please confirm your email by clicking this link: ${confirmationLink}
 
 What's Next:
-- We'll notify you when HealthScan launches on September 7th, 2025
+- We'll notify you when HealthScan launches on February 27th, 2026
 - You'll get exclusive early access
 - Share your referral link to move up in the queue
 
@@ -198,7 +198,7 @@ This email was sent to ${email}. If you didn't sign up, you can ignore this emai
             You're officially <strong>#${position}</strong> on the HealthScan waitlist!
           </p>
           <p style="color: #16a34a; font-weight: 600; font-size: 17px; margin: 0;">
-            🗓️ Launch Date: September 7th, 2025
+            🗓️ Launch Date: February 27th, 2026
           </p>
         </div>
         
@@ -234,7 +234,7 @@ This email was sent to ${email}. If you didn't sign up, you can ignore this emai
 🌱 HealthScan - Email Confirmed!
 
 ✅ You're officially #${position} on the HealthScan waitlist!
-🗓️ Launch Date: September 7th, 2025
+🗓️ Launch Date: February 27th, 2026
 
 🚀 Move Up Faster!
 Share HealthScan with friends: ${referralLink}

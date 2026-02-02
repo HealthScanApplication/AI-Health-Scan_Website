@@ -18,7 +18,7 @@ export function CountdownTimer() {
   });
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const launchDate = new Date("2025-09-07T00:00:00").getTime();
+  const launchDate = new Date("2026-02-27T00:00:00").getTime();
 
   useEffect(() => {
     // Calculate initial time immediately
@@ -119,7 +119,7 @@ export function CountdownTimer() {
             animation: 'gradient-x 4s ease infinite 1s'
           }}
         >
-          The beta has launched - download now!
+          The beta launched on February 27, 2026 — download now!
         </p>
       </div>
     );
@@ -161,7 +161,7 @@ export function CountdownTimer() {
           animation: 'gradient-x 5s ease infinite 1.5s'
         }}
       >
-        Until HealthScan Beta Launch
+        Until HealthScan Beta Launch • Feb 27, 2026
       </p>
     </div>
   );

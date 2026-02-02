@@ -232,7 +232,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
         {/* Launch Badge */}
         <div className="flex justify-center items-center mb-6 mt-4 sm:mt-0">
           <Badge variant="secondary" className="bg-gray-100 text-gray-500 text-xs font-normal border-gray-200 opacity-80">
-            Beta Launching Soon
+            Beta Launch • Feb 27, 2026
           </Badge>
         </div>
 
