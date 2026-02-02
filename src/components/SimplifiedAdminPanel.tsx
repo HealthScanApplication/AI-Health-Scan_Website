@@ -181,12 +181,27 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     );
   });
 
+  const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23e5e7eb" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" font-size="14" fill="%236b7280" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+
   const getDisplayName = (record: AdminRecord) => {
     return record.name_common || record.name || record.email || record.title || 'Unnamed';
   };
 
   const getImageUrl = (record: AdminRecord) => {
-    return record.image_url || record.avatar_url;
+    return record.image_url || record.avatar_url || PLACEHOLDER_IMAGE;
+  };
+
+  const renderTableHeader = () => {
+    return (
+      <div className="grid grid-cols-12 gap-4 p-4 bg-gray-100 border-b font-semibold text-sm sticky top-0">
+        <div className="col-span-1">Select</div>
+        <div className="col-span-2">Image</div>
+        <div className="col-span-3">Name</div>
+        <div className="col-span-2">Category/Email</div>
+        <div className="col-span-2">Description</div>
+        <div className="col-span-2">Actions</div>
+      </div>
+    );
   };
 
   const renderRecordRow = (record: AdminRecord) => {
@@ -195,8 +210,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     const isSelected = selectedRecords.has(record.id);
 
     return (
-      <div key={record.id} className={`flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow ${isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}>
-        <div className="flex items-center gap-4 flex-1">
+      <div key={record.id} className={`grid grid-cols-12 gap-4 p-4 border-b items-center hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+        {/* Checkbox */}
+        <div className="col-span-1 flex justify-center">
           <input
             type="checkbox"
             checked={isSelected}
@@ -210,33 +226,45 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               setSelectedRecords(newSelected);
             }}
             className="w-4 h-4"
+            title="Select record"
           />
-          {imageUrl && (
-            <img 
-              src={imageUrl} 
-              alt={displayName} 
-              className="w-12 h-12 rounded object-cover"
-              loading="lazy"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          )}
-          <div className="flex-1">
-            <div className="font-medium text-gray-900">{displayName}</div>
-            {record.email && <div className="text-sm text-gray-600">{record.email}</div>}
-            {record.category && <Badge className="mt-1">{record.category}</Badge>}
-            {record.description && (
-              <div className="text-sm text-gray-600 line-clamp-2 mt-1">{record.description}</div>
-            )}
-            {record.created_at && (
-              <div className="text-xs text-gray-500 mt-1">
-                {new Date(record.created_at).toLocaleDateString()}
-              </div>
-            )}
-          </div>
         </div>
-        <div className="flex gap-2">
+
+        {/* Image */}
+        <div className="col-span-2 flex justify-center">
+          <img 
+            src={imageUrl} 
+            alt={displayName} 
+            className="w-24 h-24 rounded object-cover"
+            loading="lazy"
+          />
+        </div>
+
+        {/* Name */}
+        <div className="col-span-3">
+          <div className="font-medium text-gray-900 truncate">{displayName}</div>
+          {record.created_at && (
+            <div className="text-xs text-gray-500">
+              {new Date(record.created_at).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+
+        {/* Category/Email */}
+        <div className="col-span-2">
+          {record.category && <Badge className="mb-1">{record.category}</Badge>}
+          {record.email && <div className="text-sm text-gray-600 truncate">{record.email}</div>}
+        </div>
+
+        {/* Description */}
+        <div className="col-span-2">
+          {record.description && (
+            <div className="text-sm text-gray-600 line-clamp-2">{record.description}</div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="col-span-2 flex gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -363,15 +391,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   )}
                 </div>
 
-                {/* Records List */}
-                <div className="space-y-2">
-                  {loading ? (
-                    <div className="text-center py-8 text-gray-500">Loading...</div>
-                  ) : filteredRecords.length > 0 ? (
-                    filteredRecords.map(record => renderRecordRow(record))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">No records found</div>
-                  )}
+                {/* Records Table */}
+                <div className="border rounded-lg overflow-hidden">
+                  {renderTableHeader()}
+                  <div className="bg-white">
+                    {loading ? (
+                      <div className="text-center py-8 text-gray-500">Loading...</div>
+                    ) : filteredRecords.length > 0 ? (
+                      filteredRecords.map(record => renderRecordRow(record))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">No records found</div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Record Count */}
