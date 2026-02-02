@@ -32,11 +32,11 @@ interface DataTypeStats {
 }
 
 const DATA_TYPES = [
-  { key: 'pollutants', label: 'Pollutants', icon: '🧪', description: 'Environmental contaminants and toxins' },
-  { key: 'nutrients', label: 'Nutrients', icon: '🍎', description: 'Vitamins, minerals, and nutritional compounds' },
-  { key: 'ingredients', label: 'Ingredients', icon: '🌾', description: 'Food ingredients and components' },
-  { key: 'products', label: 'Products', icon: '📦', description: 'Food products and brands' },
-  { key: 'parasites', label: 'Parasites', icon: '🦠', description: 'Parasites and pathogens' }
+  { key: 'nutrients', label: 'Nutrients (Beneficial)', icon: '�', table: 'catalog_elements', category: 'beneficial', description: 'Health-promoting elements' },
+  { key: 'ingredients', label: 'Ingredients', icon: '�', table: 'catalog_ingredients', category: null, description: 'Food ingredients and components' },
+  { key: 'pollutants', label: 'Pollutants (Hazardous)', icon: '⚠️', table: 'catalog_elements', category: 'hazardous', description: 'Environmental contaminants and toxins' },
+  { key: 'products', label: 'Recipes/Meals', icon: '📦', table: 'catalog_recipes', category: null, description: 'Prepared foods and recipes' },
+  { key: 'parasites', label: 'Parasites (Hazardous)', icon: '🦠', table: 'catalog_elements', category: 'hazardous', description: 'Parasites and pathogens' }
 ] as const;
 
 export function AdminDataManager({ accessToken, user }: AdminDataManagerProps) {
