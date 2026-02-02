@@ -34,6 +34,9 @@ interface AdminRecord {
   image_url?: string;
   avatar_url?: string;
   created_at?: string;
+  emailsSent?: number;
+  email_sent?: boolean;
+  referrals?: number;
   [key: string]: any;
 }
 
@@ -52,6 +55,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const tabs = [
     { id: 'users', label: 'Users', icon: '👤', table: 'auth.users' },
@@ -201,12 +205,19 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   };
 
   const renderTableHeader = () => {
+    const isWaitlist = activeTab === 'waitlist';
     return (
       <div className="flex items-center bg-gray-100 border-b font-semibold text-sm sticky top-0">
         <div className="w-12 px-4 py-3 text-center">Select</div>
         <div className="w-28 px-4 py-3 text-center">Image</div>
         <div className="flex-1 px-4 py-3 min-w-0">Name</div>
         <div className="w-40 px-4 py-3">Category/Email</div>
+        {isWaitlist && (
+          <>
+            <div className="w-24 px-4 py-3 text-center">Email Sent</div>
+            <div className="w-24 px-4 py-3 text-center">Referrals</div>
+          </>
+        )}
         <div className="w-48 px-4 py-3">Description</div>
         <div className="w-32 px-4 py-3">Actions</div>
       </div>
@@ -217,6 +228,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     const imageUrl = getImageUrl(record);
     const displayName = getDisplayName(record);
     const isSelected = selectedRecords.has(record.id);
+    const isWaitlist = activeTab === 'waitlist';
 
     return (
       <div key={record.id} className={`flex items-center border-b hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
@@ -240,18 +252,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </div>
 
         {/* Image */}
-        <div className="w-28 px-4 py-3 text-center flex justify-center">
+        <div className="w-28 px-4 py-3 text-center flex justify-center cursor-pointer" onClick={() => handleEdit(record)}>
           <img 
             src={imageUrl} 
             alt={displayName} 
-            className="w-20 h-20 rounded object-cover"
+            className="w-20 h-20 rounded object-cover hover:opacity-80 transition-opacity"
             loading="lazy"
           />
         </div>
 
         {/* Name */}
-        <div className="flex-1 px-4 py-3 min-w-0">
-          <div className="font-medium text-gray-900 truncate">{displayName}</div>
+        <div className="flex-1 px-4 py-3 min-w-0 cursor-pointer" onClick={() => handleEdit(record)}>
+          <div className="font-medium text-gray-900 truncate hover:text-blue-600">{displayName}</div>
           {record.created_at && (
             <div className="text-xs text-gray-500">
               {new Date(record.created_at).toLocaleDateString()}
@@ -264,6 +276,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           {record.category && <Badge className="mb-1 block w-fit">{record.category}</Badge>}
           {record.email && <div className="text-sm text-gray-600 truncate">{record.email}</div>}
         </div>
+
+        {/* Email Sent & Referrals (Waitlist only) */}
+        {isWaitlist && (
+          <>
+            <div className="w-24 px-4 py-3 text-center">
+              {record.emailsSent || record.email_sent ? (
+                <Badge className="bg-green-100 text-green-800">✓ Sent</Badge>
+              ) : (
+                <Badge variant="outline">Pending</Badge>
+              )}
+            </div>
+            <div className="w-24 px-4 py-3 text-center">
+              <span className="font-semibold text-gray-900">{record.referrals || 0}</span>
+            </div>
+          </>
+        )}
 
         {/* Description */}
         <div className="w-48 px-4 py-3">
@@ -436,20 +464,57 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
           {editingRecord && (
             <div className="space-y-4">
-              {/* Image Preview */}
-              {editingRecord.image_url && (
-                <div className="flex justify-center">
-                  <img 
-                    src={editingRecord.image_url} 
-                    alt="Record" 
-                    className="w-32 h-32 rounded object-cover"
-                  />
+              {/* Image Preview & Upload */}
+              <div className="space-y-2">
+                <Label>Image</Label>
+                <div className="flex gap-4 items-start">
+                  {editingRecord.image_url && (
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={editingRecord.image_url} 
+                        alt="Record" 
+                        className="w-32 h-32 rounded object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file && editingRecord) {
+                          setUploadingImage(true);
+                          try {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const base64 = event.target?.result as string;
+                              setEditingRecord({
+                                ...editingRecord,
+                                image_url: base64
+                              });
+                              toast.success('Image ready to upload');
+                            };
+                            reader.readAsDataURL(file);
+                          } catch (error) {
+                            toast.error('Failed to read image');
+                          } finally {
+                            setUploadingImage(false);
+                          }
+                        }
+                      }}
+                      disabled={uploadingImage}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Upload a new image to replace the current one
+                    </p>
+                  </div>
                 </div>
-              )}
+              </div>
 
               {/* Dynamic Fields */}
               {Object.entries(editingRecord).map(([key, value]) => {
-                if (key === 'id' || key === 'created_at' || key === 'updated_at') return null;
+                if (key === 'id' || key === 'created_at' || key === 'updated_at' || key === 'image_url' || key === 'avatar_url') return null;
                 
                 return (
                   <div key={key} className="space-y-2">
