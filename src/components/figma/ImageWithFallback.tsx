@@ -54,6 +54,8 @@ export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElemen
       alt={alt} 
       className={className} 
       style={style} 
+      loading="lazy"
+      decoding="async"
       {...rest} 
       onError={handleError} 
     />
