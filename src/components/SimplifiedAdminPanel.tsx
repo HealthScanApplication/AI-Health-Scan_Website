@@ -22,6 +22,7 @@ import {
   UtensilsCrossed
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { FloatingDebugMenu } from './FloatingDebugMenu';
 
 interface AdminRecord {
   id: string;
@@ -461,8 +462,10 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 {/* Category Filter */}
                 {uniqueCategories.length > 0 && (
                   <div className="flex gap-2 items-center">
-                    <label className="text-sm font-medium text-gray-700">Filter by Category:</label>
+                    <label htmlFor="category-filter" className="text-sm font-medium text-gray-700">Filter by Category:</label>
                     <select
+                      id="category-filter"
+                      title="Filter records by category"
                       value={categoryFilter}
                       onChange={(e) => {
                         setCategoryFilter(e.target.value);
@@ -727,6 +730,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           )}
         </DialogContent>
       </Dialog>
+      <FloatingDebugMenu accessToken={accessToken} />
     </div>
   );
 }
