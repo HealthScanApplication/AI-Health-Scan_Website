@@ -1,28 +1,40 @@
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { HeroSection } from './HeroSection'
-import { ProfilePage } from './ProfilePage'
-import { SettingsPage } from './SettingsPage'
-import { SimplifiedAdminPanel } from './SimplifiedAdminPanel'
-import { NetworkDiagnostic } from './NetworkDiagnostic'
-import { LoginDiagnostic } from './LoginDiagnostic'
-import { Blog } from './Blog'
-import { ReferralTestPage } from './ReferralTestPage'
-import { ConvertKitTestPage } from './ConvertKitTestPage'
-import { EmailCaptureDebugger } from './EmailCaptureDebugger'
-import { EmailCaptureTestPage } from './EmailCaptureTestPage'
 import { AppFeaturesSection } from './AppFeaturesSection'
 import { HowItWorksSection } from './HowItWorksSection'
 import { FeatureShowcase } from './FeatureShowcase'
 import { LaunchVideoSection } from './LaunchVideoSection'
-
 import { SocialProofSection } from './SocialProofSection'
 import { FAQSection } from './FAQSection'
 import { EmailSubscribeSection } from './EmailSubscribeSection'
 import { BlogPreviewSection } from './BlogPreviewSection'
-
 import { DiscordCommunitySection } from './DiscordCommunitySection'
 import { isAdminUser } from '../utils/adminUtils'
 import { useAdminAuth, getAccessTokenDirect } from '../contexts/AuthContext'
+
+// Lazy-loaded pages (not needed on initial landing page load)
+const ProfilePage = React.lazy(() => import('./ProfilePage').then(m => ({ default: m.ProfilePage })))
+const SettingsPage = React.lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })))
+const SimplifiedAdminPanel = React.lazy(() => import('./SimplifiedAdminPanel').then(m => ({ default: m.SimplifiedAdminPanel })))
+const NetworkDiagnostic = React.lazy(() => import('./NetworkDiagnostic').then(m => ({ default: m.NetworkDiagnostic })))
+const LoginDiagnostic = React.lazy(() => import('./LoginDiagnostic').then(m => ({ default: m.LoginDiagnostic })))
+const Blog = React.lazy(() => import('./Blog').then(m => ({ default: m.Blog })))
+const ReferralTestPage = React.lazy(() => import('./ReferralTestPage').then(m => ({ default: m.ReferralTestPage })))
+const ConvertKitTestPage = React.lazy(() => import('./ConvertKitTestPage').then(m => ({ default: m.ConvertKitTestPage })))
+const EmailCaptureDebugger = React.lazy(() => import('./EmailCaptureDebugger').then(m => ({ default: m.EmailCaptureDebugger })))
+const EmailCaptureTestPage = React.lazy(() => import('./EmailCaptureTestPage').then(m => ({ default: m.EmailCaptureTestPage })))
+
+// Loading fallback for lazy-loaded pages
+function PageLoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-10 h-10 border-3 border-[var(--healthscan-green)] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <p className="text-sm text-gray-500">Loading...</p>
+      </div>
+    </div>
+  )
+}
 
 interface PageRendererProps {
   currentPage: string
@@ -129,17 +141,21 @@ export function PageRenderer({
   switch (currentPage) {
     case 'profile':
       return (
-        <ProfilePage 
-          user={user}
-          onNavigateToSettings={() => navigateToPage('settings')}
-        />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <ProfilePage 
+            user={user}
+            onNavigateToSettings={() => navigateToPage('settings')}
+          />
+        </Suspense>
       )
 
     case 'settings':
       return (
-        <SettingsPage 
-          onNavigateBack={navigateToHome}
-        />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <SettingsPage 
+            onNavigateBack={navigateToHome}
+          />
+        </Suspense>
       )
 
     case 'admin':
@@ -220,28 +236,30 @@ export function PageRenderer({
       }
 
       return (
-        <div className="min-h-screen bg-gray-50">
-          {/* Mobile-optimized container with better padding */}
-          <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 lg:py-8">
-            <SimplifiedAdminPanel 
-              user={user}
-              accessToken={finalAccessToken}
-            />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <div className="min-h-screen bg-gray-50">
+            {/* Mobile-optimized container with better padding */}
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 lg:py-8">
+              <SimplifiedAdminPanel 
+                user={user}
+                accessToken={finalAccessToken}
+              />
+            </div>
           </div>
-        </div>
+        </Suspense>
       )
 
     case 'diagnostic':
-      return <NetworkDiagnostic />
+      return <Suspense fallback={<PageLoadingFallback />}><NetworkDiagnostic /></Suspense>
       
     case 'login-diagnostic':
-      return <LoginDiagnostic />
+      return <Suspense fallback={<PageLoadingFallback />}><LoginDiagnostic /></Suspense>
 
     case 'blog':
-      return <Blog onNavigateBack={navigateToHome} />
+      return <Suspense fallback={<PageLoadingFallback />}><Blog onNavigateBack={navigateToHome} /></Suspense>
 
     case 'referral-test':
-      return <ReferralTestPage />
+      return <Suspense fallback={<PageLoadingFallback />}><ReferralTestPage /></Suspense>
 
     case 'convertkit-test':
       // Admin-only page for testing ConvertKit integration
@@ -251,29 +269,31 @@ export function PageRenderer({
         return null
       }
       return (
-        <ConvertKitTestPage 
-          onNavigateBack={navigateToHome}
-          onNavigateToAdmin={() => navigateToPage('admin')}
-        />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <ConvertKitTestPage 
+            onNavigateBack={navigateToHome}
+            onNavigateToAdmin={() => navigateToPage('admin')}
+          />
+        </Suspense>
       )
 
     case 'email-debug':
       // Admin-only page for debugging email capture
       if (!user || !isAdminUser(user)) {
-        console.warn('🚫 Non-admin user attempted to access email debug page')
+        console.warn('Non-admin user attempted to access email debug page')
         navigateToHome()
         return null
       }
-      return <EmailCaptureDebugger />
+      return <Suspense fallback={<PageLoadingFallback />}><EmailCaptureDebugger /></Suspense>
 
     case 'email-test':
       // Admin-only page for testing email capture
       if (!user || !isAdminUser(user)) {
-        console.warn('🚫 Non-admin user attempted to access email test page')
+        console.warn('Non-admin user attempted to access email test page')
         navigateToHome()
         return null
       }
-      return <EmailCaptureTestPage />
+      return <Suspense fallback={<PageLoadingFallback />}><EmailCaptureTestPage /></Suspense>
 
     case 'home':
     default:
