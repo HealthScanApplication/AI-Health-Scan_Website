@@ -769,7 +769,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       <Card>
         <CardHeader>
           <CardTitle>Admin Panel</CardTitle>
-          <CardDescription>Manage users, waitlist, elements, ingredients, and recipes</CardDescription>
+          <CardDescription>Manage waitlist, elements, ingredients, recipes, and products</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); }} className="w-full">
