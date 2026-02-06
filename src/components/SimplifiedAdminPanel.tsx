@@ -418,6 +418,23 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         } else {
           toast.error('Bulk delete failed');
         }
+      } else if (currentTab) {
+        let deleted = 0;
+        for (const recordId of selectedRecords) {
+          const response = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/delete`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ table: currentTab.table, id: recordId })
+            }
+          );
+          if (response.ok) deleted++;
+        }
+        toast.success(`Deleted ${deleted} records`);
       }
       setSelectedRecords(new Set());
       setBulkMode(false);
@@ -452,21 +469,24 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           toast.error('Bulk update failed');
         }
       } else if (currentTab) {
+        let updated = 0;
         for (const recordId of selectedRecords) {
-          await fetch(
-            `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?id=eq.${recordId}`,
+          const record = records.find(r => r.id === recordId);
+          if (!record) continue;
+          const response = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`,
             {
-              method: 'PATCH',
+              method: 'POST',
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'apikey': publicAnonKey
+                'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ [bulkEditField]: bulkEditValue })
+              body: JSON.stringify({ table: currentTab.table, id: recordId, updates: { ...record, [bulkEditField]: bulkEditValue } })
             }
           );
+          if (response.ok) updated++;
         }
-        toast.success(`Updated ${selectedRecords.size} records`);
+        toast.success(`Updated ${updated} records`);
       }
       setSelectedRecords(new Set());
       setBulkEditField('');
