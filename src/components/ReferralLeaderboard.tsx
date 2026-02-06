@@ -207,20 +207,18 @@ export function ReferralLeaderboard() {
   };
 
   const getRewardTier = (referralCount: number) => {
-    if (referralCount >= 50) {
-      return { tier: "Premium (20 Weeks)", color: "bg-pink-100 text-pink-800" };
-    } else if (referralCount >= 40) {
-      return { tier: "Premium (16 Weeks)", color: "bg-orange-100 text-orange-800" };
-    } else if (referralCount >= 30) {
-      return { tier: "Premium (12 Weeks)", color: "bg-yellow-100 text-yellow-800" };
-    } else if (referralCount >= 20) {
-      return { tier: "Premium (8 Weeks)", color: "bg-purple-100 text-purple-800" };
+    if (referralCount >= 25) {
+      return { tier: "Founding Member", color: "bg-pink-100 text-pink-800" };
     } else if (referralCount >= 10) {
-      return { tier: "Premium (4 Weeks)", color: "bg-blue-100 text-blue-800" };
+      return { tier: "Champion", color: "bg-purple-100 text-purple-800" };
     } else if (referralCount >= 5) {
-      return { tier: "Early Access", color: "bg-green-100 text-green-800" };
+      return { tier: "Grower", color: "bg-blue-100 text-blue-800" };
+    } else if (referralCount >= 3) {
+      return { tier: "Sprout", color: "bg-green-100 text-green-800" };
+    } else if (referralCount >= 1) {
+      return { tier: "Seed", color: "bg-emerald-100 text-emerald-800" };
     } else {
-      return { tier: "Basic Access", color: "bg-gray-100 text-gray-800" };
+      return { tier: "No referrals yet", color: "bg-gray-100 text-gray-800" };
     }
   };
 
@@ -251,7 +249,7 @@ export function ReferralLeaderboard() {
         {/* Section Header */}
         <div className="text-center mb-12">
           <Badge variant="secondary" className="mb-4 bg-green-100 text-green-800">
-            🏆 Leaderboard
+            Leaderboard
           </Badge>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
             Share to Unlock Rewards
@@ -498,50 +496,42 @@ export function ReferralLeaderboard() {
               <CardContent className="space-y-3 lg:space-y-4">
                 <div className="flex items-center justify-between p-2 lg:p-3 bg-pink-50 rounded-lg border border-pink-200">
                   <div>
-                    <div className="font-medium text-pink-800 text-sm lg:text-base">50+ Referrals</div>
-                    <div className="text-xs lg:text-sm text-pink-600">Premium (20 Weeks)</div>
+                    <div className="font-medium text-pink-800 text-sm lg:text-base">25+ Referrals</div>
+                    <div className="text-xs lg:text-sm text-pink-600">Founding Member — Lifetime Beta Access</div>
                   </div>
                   <Crown className="h-5 w-5 lg:h-6 lg:w-6 text-pink-500 flex-shrink-0" />
                 </div>
                 
-                <div className="flex items-center justify-between p-2 lg:p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <div>
-                    <div className="font-medium text-orange-800 text-sm lg:text-base">40+ Referrals</div>
-                    <div className="text-xs lg:text-sm text-orange-600">Premium (16 Weeks)</div>
-                  </div>
-                  <Medal className="h-5 w-5 lg:h-6 lg:w-6 text-orange-500 flex-shrink-0" />
-                </div>
-                
-                <div className="flex items-center justify-between p-2 lg:p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <div>
-                    <div className="font-medium text-yellow-800 text-sm lg:text-base">30+ Referrals</div>
-                    <div className="text-xs lg:text-sm text-yellow-600">Premium (12 Weeks)</div>
-                  </div>
-                  <Award className="h-5 w-5 lg:h-6 lg:w-6 text-yellow-500 flex-shrink-0" />
-                </div>
-                
                 <div className="flex items-center justify-between p-2 lg:p-3 bg-purple-50 rounded-lg border border-purple-200">
                   <div>
-                    <div className="font-medium text-purple-800 text-sm lg:text-base">20+ Referrals</div>
-                    <div className="text-xs lg:text-sm text-purple-600">Premium (8 Weeks)</div>
+                    <div className="font-medium text-purple-800 text-sm lg:text-base">10+ Referrals</div>
+                    <div className="text-xs lg:text-sm text-purple-600">Champion — 4 Weeks Premium</div>
                   </div>
-                  <Star className="h-5 w-5 lg:h-6 lg:w-6 text-purple-500 flex-shrink-0" />
+                  <Medal className="h-5 w-5 lg:h-6 lg:w-6 text-purple-500 flex-shrink-0" />
                 </div>
                 
                 <div className="flex items-center justify-between p-2 lg:p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div>
-                    <div className="font-medium text-blue-800 text-sm lg:text-base">10+ Referrals</div>
-                    <div className="text-xs lg:text-sm text-blue-600">Premium (4 Weeks)</div>
+                    <div className="font-medium text-blue-800 text-sm lg:text-base">5+ Referrals</div>
+                    <div className="text-xs lg:text-sm text-blue-600">Grower — 2 Weeks Premium</div>
                   </div>
-                  <Star className="h-5 w-5 lg:h-6 lg:w-6 text-blue-500 flex-shrink-0" />
+                  <Award className="h-5 w-5 lg:h-6 lg:w-6 text-blue-500 flex-shrink-0" />
                 </div>
                 
                 <div className="flex items-center justify-between p-2 lg:p-3 bg-green-50 rounded-lg border border-green-200">
                   <div>
-                    <div className="font-medium text-green-800 text-sm lg:text-base">5+ Referrals</div>
-                    <div className="text-xs lg:text-sm text-green-600">Early Access</div>
+                    <div className="font-medium text-green-800 text-sm lg:text-base">3+ Referrals</div>
+                    <div className="text-xs lg:text-sm text-green-600">Sprout — 1 Week Premium</div>
                   </div>
                   <Star className="h-5 w-5 lg:h-6 lg:w-6 text-green-500 flex-shrink-0" />
+                </div>
+                
+                <div className="flex items-center justify-between p-2 lg:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <div>
+                    <div className="font-medium text-emerald-800 text-sm lg:text-base">1+ Referral</div>
+                    <div className="text-xs lg:text-sm text-emerald-600">Seed — Priority Access</div>
+                  </div>
+                  <Star className="h-5 w-5 lg:h-6 lg:w-6 text-emerald-500 flex-shrink-0" />
                 </div>
 
                 <div className="mt-3 lg:mt-4 p-2 lg:p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -579,7 +569,7 @@ export function ReferralLeaderboard() {
                   </p>
                 </div>
                 <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs lg:text-sm">
-                  🚀 Get your link after signup
+                  Get your link after signup
                 </Badge>
               </CardContent>
             </Card>

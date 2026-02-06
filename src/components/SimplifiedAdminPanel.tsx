@@ -88,8 +88,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       
       // Use custom endpoint for waitlist data from KV store
       if (activeTab === 'waitlist') {
-        const baseUrl = 'https://ljqlvvbktgiflkxywsld.functions.supabase.co';
-        url = `${baseUrl}/make-server-ed0fe4c2/admin/waitlist`;
+        url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist`;
         console.log(`🌐 Fetching waitlist from KV store: ${url}`);
         
         const response = await fetch(url, {
@@ -245,8 +244,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const handleResendEmail = async (recordId: string, email: string) => {
     setResendingEmail(recordId);
     try {
-      const baseUrl = 'https://ljqlvvbktgiflkxywsld.functions.supabase.co';
-      const response = await fetch(`${baseUrl}/make-server-ed0fe4c2/admin/resend-welcome-email`, {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/resend-welcome-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

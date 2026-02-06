@@ -191,7 +191,7 @@ export function UniversalWaitlist({
 
       // Enhanced success messages for existing users with email confirmation status
       if (data.isUpdate || data.alreadyExists || data.isDuplicate) {
-        toast.success(`👋 Welcome back! You're on the waitlist. 🌱`);
+        toast.success(`Welcome back! You're on the waitlist.`);
         setEmail("");
         
         // Trigger events for existing users with enhanced data
@@ -218,10 +218,10 @@ export function UniversalWaitlist({
         setSignupPosition(data.position || null);
         setEmailExistsInAuth(true); // Track that email exists in Auth
         setShowLoginForm(true);
-        toast.info(`✋ This email already has an account. Please sign in with your password.`);
+        toast.info(`This email already has an account. Please sign in with your password.`);
       } else {
         // Enhanced success messages for new signups
-        toast.success(`🎉 You're on the list! Welcome to HealthScan! 🌱`);
+        toast.success(`You're on the list! Welcome to HealthScan.`);
         
         // Show password upgrade modal for new signups
         console.log('🔐 UniversalWaitlist: Starting signup flow - Showing PasswordUpgradeModal for new signup');
@@ -234,7 +234,7 @@ export function UniversalWaitlist({
       
       // Show referral success message without position info  
       if (activeReferralCode && hasReferral && isActive) {
-        toast.success(`✨ Thanks for using a referral link! Both you and your friend will get rewards.`);
+        toast.success(`Thanks for using a referral link! Both you and your friend will get rewards.`);
       }
       
       // Only clear email and trigger events for new users (not existing users)

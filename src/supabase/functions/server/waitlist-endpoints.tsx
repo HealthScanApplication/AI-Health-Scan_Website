@@ -501,7 +501,7 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
     }
     
     // Handle referral bonus if applicable (optional)
-    if (referralCode) {
+    if (referralCode && referralCode !== userReferralCode) {
       try {
         console.log('🎁 Processing referral bonus for code:', referralCode)
         
@@ -509,7 +509,7 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         const referrerUsers = await kv.getByPrefix('waitlist_user_')
         const referrer = referrerUsers.find(user => user.referralCode === referralCode)
         
-        if (referrer) {
+        if (referrer && referrer.email !== normalizedEmail) {
           console.log('👤 Found referrer:', referrer.email)
           
           // Deterministic milestone-based boost

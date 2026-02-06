@@ -34,18 +34,21 @@ app.get('/referral-leaderboard', async (c) => {
     }
 
     // Transform users into leaderboard format
+    // Note: backend stores referral count in both 'referrals' and 'referralCount' fields
     const leaderboardUsers: LeaderboardUser[] = allUsers
       .map((user: any, index: number) => ({
         name: user.name || `User ${index + 1}`,
         email: user.email || '',
         referral_code: user.referralCode || `ref_${index + 1}`,
-        referral_count: user.referralCount || 0,
+        referral_count: user.referrals || user.referralCount || 0,
         rank: index + 1,
         position_change: user.position_change || 0,
         joinedDate: user.signupDate,
         lastReferralDate: user.lastReferralDate,
         isAnonymous: user.isAnonymous || false
       }))
+      // Filter out users with 0 referrals
+      .filter((user: LeaderboardUser) => user.referral_count > 0)
       // Sort by referral count descending
       .sort((a: LeaderboardUser, b: LeaderboardUser) => b.referral_count - a.referral_count)
       // Add ranks after sorting
@@ -117,7 +120,7 @@ app.get('/referral-stats/:referralCode', async (c) => {
         referralCode: user.referralCode || referralCode,
         email: user.email || '',
         name: user.name || 'Anonymous',
-        totalReferrals: user.referralCount ?? 0,
+        totalReferrals: user.referrals || user.referralCount || 0,
         referredUsers: referredUsers.map((u: any) => ({
           email: u?.email || '',
           name: u?.name || 'Anonymous',
@@ -139,15 +142,14 @@ app.get('/referral-stats/:referralCode', async (c) => {
   }
 })
 
-// Helper function to determine reward tier
+// Helper function to determine reward tier (matches REFERRAL_MILESTONES in waitlist-endpoints)
 function getRewardTier(referralCount: number): string {
-  if (referralCount >= 50) return 'Premium (20 Weeks)'
-  if (referralCount >= 40) return 'Premium (16 Weeks)'
-  if (referralCount >= 30) return 'Premium (12 Weeks)'
-  if (referralCount >= 20) return 'Premium (8 Weeks)'
-  if (referralCount >= 10) return 'Premium (4 Weeks)'
-  if (referralCount >= 5) return 'Early Access'
-  return 'Basic Access'
+  if (referralCount >= 25) return 'Founding Member'
+  if (referralCount >= 10) return 'Champion'
+  if (referralCount >= 5) return 'Grower'
+  if (referralCount >= 3) return 'Sprout'
+  if (referralCount >= 1) return 'Seed'
+  return 'No referrals yet'
 }
 
 export { app as referralApp }
