@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
+import { adminFieldConfig, getFieldsForView, badgeColorMap, type FieldConfig } from '../config/adminFieldConfig';
 
 interface AdminRecord {
   id: string;
@@ -1003,438 +1004,300 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </CardContent>
       </Card>
 
-      {/* Detail Modal */}
+      {/* Detail Modal - Config Driven */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {activeTab === 'waitlist' ? 'Waitlist User Details' : 'Record Details'}
+              {adminFieldConfig[activeTab]?.label || 'Record'} Details
             </DialogTitle>
-            <DialogDescription>
-              View and manage this record
-            </DialogDescription>
+            <DialogDescription>View and manage this record</DialogDescription>
           </DialogHeader>
 
-          {detailRecord && (
-            <div className="space-y-4">
-              {/* Waitlist-specific detail view */}
-              {activeTab === 'waitlist' ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 pb-3 border-b">
+          {detailRecord && (() => {
+            const detailFields = getFieldsForView(activeTab, 'detail');
+            const imageField = detailFields.find(f => f.type === 'image');
+            const hasImage = imageField && detailRecord[imageField.key];
+            
+            return (
+              <div className="space-y-4">
+                {/* Header: Image/Avatar + Name + Badges */}
+                <div className="flex items-start gap-4 pb-3 border-b">
+                  {activeTab === 'waitlist' ? (
                     <img
                       src={`https://www.gravatar.com/avatar/${detailRecord.email ? Array.from(detailRecord.email.trim().toLowerCase()).reduce((h: number, c: string) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', '') : '0'}?d=identicon&s=80`}
                       alt={detailRecord.email || ''}
-                      className="w-14 h-14 rounded-full border-2 border-gray-200"
+                      className="w-14 h-14 rounded-full border-2 border-gray-200 flex-shrink-0"
                     />
-                    <div>
-                      <div className="font-semibold text-gray-900">{detailRecord.email}</div>
-                      {detailRecord.name && (
-                        <div className="text-sm text-gray-500">{detailRecord.name}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Queue Position</div>
-                      <div className="text-lg font-semibold text-gray-900">#{detailRecord.position || 'N/A'}</div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Referrals</div>
-                      <div className="text-lg font-semibold text-gray-900">{detailRecord.referrals || 0}</div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Email Status</div>
-                      <div className="text-sm font-medium">
-                        {detailRecord.emailsSent || detailRecord.email_sent ? (
-                          <Badge className="bg-green-100 text-green-800">Sent</Badge>
-                        ) : (
-                          <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Confirmed</div>
-                      <div className="text-sm font-medium">
-                        {detailRecord.confirmed ? (
-                          <Badge className="bg-green-100 text-green-800">Yes</Badge>
-                        ) : (
-                          <Badge className="bg-gray-100 text-gray-600">No</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {detailRecord.ipAddress && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">IP Address</div>
-                      <div className="text-sm font-mono text-gray-900 mt-1">{detailRecord.ipAddress}</div>
-                    </div>
-                  )}
-
-                  {detailRecord.referralCode && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Referral Code</div>
-                      <div className="text-sm font-mono text-gray-900 mt-1">{detailRecord.referralCode}</div>
-                    </div>
-                  )}
-
-                  {detailRecord.referredBy && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Referred By</div>
-                      <div className="text-sm font-mono text-gray-900 mt-1">{detailRecord.referredBy}</div>
-                    </div>
-                  )}
-
-                  {detailRecord.source && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Source</div>
-                      <div className="text-sm text-gray-900 mt-1">{detailRecord.source}</div>
-                    </div>
-                  )}
-
-                  {detailRecord.created_at && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Joined</div>
-                      <div className="text-sm text-gray-900 mt-1">
-                        {new Date(detailRecord.created_at).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                      </div>
-                    </div>
-                  )}
-
-                  {detailRecord.lastEmailSent && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Last Email Sent</div>
-                      <div className="text-sm text-gray-900 mt-1">
-                        {new Date(detailRecord.lastEmailSent).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Image + Name Header */}
-                  <div className="flex items-start gap-4 pb-3 border-b">
+                  ) : (
                     <img
                       src={getImageUrl(detailRecord)}
                       alt={getDisplayName(detailRecord)}
                       className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 text-lg">{getDisplayName(detailRecord)}</div>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        {detailRecord.category && (
-                          <Badge className={`text-xs ${categoryColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
-                            {detailRecord.category}
-                          </Badge>
-                        )}
-                        {detailRecord.type && (
-                          <Badge className={`text-xs ${categoryColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
-                            {detailRecord.type}
-                          </Badge>
-                        )}
-                      </div>
-                      {detailRecord.brand && (
-                        <div className="text-sm text-gray-500 mt-1">{detailRecord.brand}</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 text-lg">{getDisplayName(detailRecord)}</div>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {detailRecord.category && (
+                        <Badge className={`text-xs ${badgeColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+                          {detailRecord.category}
+                        </Badge>
+                      )}
+                      {detailRecord.type && (
+                        <Badge className={`text-xs ${badgeColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
+                          {detailRecord.type}
+                        </Badge>
                       )}
                     </div>
+                    {detailRecord.brand && <div className="text-sm text-gray-500 mt-1">{detailRecord.brand}</div>}
                   </div>
-
-                  {/* Description */}
-                  {detailRecord.description && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Description</div>
-                      <div className="text-sm text-gray-900 mt-1">{detailRecord.description}</div>
-                    </div>
-                  )}
-
-                  {/* Key Fields Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {detailRecord.unit && (
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <div className="text-xs text-gray-500 font-medium uppercase">Unit</div>
-                        <div className="text-sm text-gray-900 mt-1">{detailRecord.unit}</div>
-                      </div>
-                    )}
-                    {detailRecord.rdi != null && (
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <div className="text-xs text-gray-500 font-medium uppercase">RDI</div>
-                        <div className="text-sm text-gray-900 mt-1">{detailRecord.rdi}</div>
-                      </div>
-                    )}
-                    {detailRecord.source && (
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <div className="text-xs text-gray-500 font-medium uppercase">Source</div>
-                        <div className="text-sm text-gray-900 mt-1 truncate">{detailRecord.source}</div>
-                      </div>
-                    )}
-                    {detailRecord.created_at && (
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <div className="text-xs text-gray-500 font-medium uppercase">Created</div>
-                        <div className="text-sm text-gray-900 mt-1">
-                          {new Date(detailRecord.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Remaining Fields */}
-                  {Object.entries(detailRecord)
-                    .filter(([key]) => !['id', '_displayIndex', 'name', 'name_common', 'email', 'title', 'category', 'type', 'brand', 'description', 'image_url', 'avatar_url', 'images', 'image', 'unit', 'rdi', 'source', 'created_at', 'updated_at', 'imported_at', 'api_source', 'external_id'].includes(key))
-                    .filter(([, value]) => value != null && value !== '' && value !== 'null')
-                    .map(([key, value]) => (
-                      <div key={key} className="bg-gray-50 rounded-lg p-3">
-                        <div className="text-xs text-gray-500 font-medium uppercase">{key.replace(/_/g, ' ')}</div>
-                        <div className="text-sm text-gray-900 mt-1 break-all">
-                          {Array.isArray(value) 
-                            ? value.join(', ')
-                            : typeof value === 'object' 
-                              ? JSON.stringify(value, null, 2) 
-                              : String(value)}
-                        </div>
-                      </div>
-                    ))}
                 </div>
-              )}
 
-              {/* Action Buttons */}
-              <div className="flex gap-2 justify-between pt-4 border-t">
-                <div className="flex gap-2">
-                  {activeTab === 'waitlist' && (
+                {/* Config-driven fields */}
+                <div className="grid grid-cols-2 gap-3">
+                  {detailFields
+                    .filter(f => f.type !== 'image' && f.key !== 'category' && f.key !== 'type' && f.key !== 'brand')
+                    .filter(f => {
+                      const val = detailRecord[f.key];
+                      return val != null && val !== '' && val !== 'null';
+                    })
+                    .map(field => {
+                      const val = detailRecord[field.key];
+                      const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : '';
+                      return (
+                        <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
+                          <div className="text-xs text-gray-500 font-medium uppercase">{field.label}</div>
+                          <div className="text-sm text-gray-900 mt-1 break-all">
+                            {field.type === 'boolean' ? (
+                              <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>
+                                {val ? 'Yes' : 'No'}
+                              </Badge>
+                            ) : field.type === 'date' ? (
+                              new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                            ) : field.type === 'badge' ? (
+                              <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+                                {String(val)}
+                              </Badge>
+                            ) : field.type === 'json' ? (
+                              <pre className="text-xs font-mono whitespace-pre-wrap">{typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)}</pre>
+                            ) : field.type === 'array' ? (
+                              Array.isArray(val) ? val.join(', ') : String(val)
+                            ) : field.key === 'emailsSent' || field.key === 'email_sent' ? (
+                              <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                {val ? 'Sent' : 'Pending'}
+                              </Badge>
+                            ) : (
+                              String(val)
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 justify-between pt-4 border-t">
+                  <div className="flex gap-2">
+                    {activeTab === 'waitlist' && (
+                      <Button
+                        size="sm"
+                        variant={detailRecord.confirmed ? 'outline' : 'default'}
+                        onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
+                        disabled={resendingEmail === detailRecord.id}
+                        className={`gap-1 ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
+                      >
+                        <Mail className="w-4 h-4" />
+                        {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Resend Confirmation')}
+                      </Button>
+                    )}
                     <Button
                       size="sm"
-                      variant={detailRecord.confirmed ? 'outline' : 'default'}
-                      onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
-                      disabled={resendingEmail === detailRecord.id}
-                      className={`gap-1 ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
+                      variant="outline"
+                      onClick={() => handleDelete(detailRecord)}
+                      className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                     >
-                      <Mail className="w-4 h-4" />
-                      {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Resend Confirmation')}
+                      <Trash2 className="w-4 h-4" />
+                      Delete
                     </Button>
-                  )}
+                  </div>
                   <Button
                     size="sm"
-                    variant="outline"
-                    onClick={() => handleDelete(detailRecord)}
-                    className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }}
+                    className="gap-1 bg-blue-600 hover:bg-blue-700"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
+                    <Edit className="w-4 h-4" />
+                    Edit
                   </Button>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    handleEdit(detailRecord);
-                    setShowDetailModal(false);
-                  }}
-                  className="gap-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </Button>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
-      {/* Edit Modal */}
+      {/* Edit Modal - Config Driven */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit {activeTab === 'waitlist' ? 'Waitlist User' : 'Record'}</DialogTitle>
-            <DialogDescription>
-              Update the details below and save
-            </DialogDescription>
+            <DialogTitle>Edit {adminFieldConfig[activeTab]?.label || 'Record'}</DialogTitle>
+            <DialogDescription>Update the details below and save</DialogDescription>
           </DialogHeader>
 
-          {editingRecord && (
-            <div className="space-y-4">
-              {activeTab === 'waitlist' ? (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input value={editingRecord.email || ''} disabled className="bg-gray-50" />
-                    <p className="text-xs text-gray-400">Email cannot be changed</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input
-                      value={editingRecord.name || ''}
-                      onChange={(e) => setEditingRecord({ ...editingRecord, name: e.target.value })}
-                      placeholder="User name"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Position</Label>
-                      <Input
-                        type="number"
-                        value={editingRecord.position || 0}
-                        onChange={(e) => setEditingRecord({ ...editingRecord, position: parseInt(e.target.value) || 0 })}
-                      />
+          {editingRecord && (() => {
+            const editFields = getFieldsForView(activeTab, 'edit');
+
+            const renderEditField = (field: FieldConfig) => {
+              const val = editingRecord[field.key];
+              const updateField = (newVal: any) => setEditingRecord({ ...editingRecord, [field.key]: newVal });
+
+              if (field.type === 'image') {
+                return (
+                  <div key={field.key} className="space-y-2 col-span-2">
+                    <Label>{field.label}</Label>
+                    <div className="flex gap-4 items-start">
+                      <img src={getImageUrl(editingRecord)} alt={getDisplayName(editingRecord)} className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0" />
+                      <div className="flex-1 space-y-1">
+                        <Input value={val || ''} onChange={(e) => updateField(e.target.value)} placeholder="Image URL" className="text-xs" />
+                        <Input
+                          type="file" accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setUploadingImage(true);
+                              try {
+                                const reader = new FileReader();
+                                reader.onload = (ev) => updateField(ev.target?.result as string);
+                                reader.readAsDataURL(file);
+                              } catch { toast.error('Failed to read image'); }
+                              finally { setUploadingImage(false); }
+                            }
+                          }}
+                          disabled={uploadingImage} className="text-xs"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Referrals</Label>
-                      <Input
-                        type="number"
-                        value={editingRecord.referrals || 0}
-                        onChange={(e) => setEditingRecord({ ...editingRecord, referrals: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Confirmed</Label>
+                );
+              }
+
+              if (field.type === 'readonly') {
+                return (
+                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                    <Label>{field.label}</Label>
+                    <Input value={val || ''} disabled className="bg-gray-50 text-sm" />
+                    {field.key === 'email' && <p className="text-xs text-gray-400">Email cannot be changed</p>}
+                  </div>
+                );
+              }
+
+              if (field.type === 'select') {
+                return (
+                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                    <Label>{field.label}</Label>
                     <select
-                      title="Confirmed status"
-                      value={editingRecord.confirmed ? 'true' : 'false'}
-                      onChange={(e) => setEditingRecord({ ...editingRecord, confirmed: e.target.value === 'true' })}
+                      title={field.label}
+                      value={val || ''}
+                      onChange={(e) => updateField(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select {field.label.toLowerCase()}</option>
+                      {(field.options || []).map(opt => (
+                        <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+
+              if (field.type === 'boolean') {
+                return (
+                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                    <Label>{field.label}</Label>
+                    <select
+                      title={field.label}
+                      value={val ? 'true' : 'false'}
+                      onChange={(e) => updateField(e.target.value === 'true')}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="true">Yes</option>
                       <option value="false">No</option>
                     </select>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Image Preview */}
-                  <div className="space-y-2">
-                    <Label>Image</Label>
-                    <div className="flex gap-4 items-start">
-                      <img
-                        src={getImageUrl(editingRecord)}
-                        alt={getDisplayName(editingRecord)}
-                        className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
-                      />
-                      <div className="flex-1 space-y-1">
-                        <Input
-                          value={editingRecord.image_url || ''}
-                          onChange={(e) => setEditingRecord({ ...editingRecord, image_url: e.target.value })}
-                          placeholder="Image URL"
-                          className="text-xs"
-                        />
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file && editingRecord) {
-                              setUploadingImage(true);
-                              try {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  const base64 = event.target?.result as string;
-                                  setEditingRecord({ ...editingRecord, image_url: base64 });
-                                };
-                                reader.readAsDataURL(file);
-                              } catch (error) {
-                                toast.error('Failed to read image');
-                              } finally {
-                                setUploadingImage(false);
-                              }
-                            }
+                );
+              }
+
+              if (field.type === 'number') {
+                return (
+                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                    <Label>{field.label}</Label>
+                    <Input type="number" value={val ?? 0} onChange={(e) => updateField(parseInt(e.target.value) || 0)} placeholder={field.placeholder} className="text-sm" />
+                  </div>
+                );
+              }
+
+              if (field.type === 'textarea') {
+                return (
+                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <Label>{field.label}</Label>
+                      {field.aiSuggest && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field of this ${adminFieldConfig[activeTab]?.label || 'item'}: ${getDisplayName(editingRecord)}`;
+                            toast.info(`AI Prompt: ${prompt}`, { duration: 5000 });
                           }}
-                          disabled={uploadingImage}
-                          className="text-xs"
-                        />
-                      </div>
+                          className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
+                          title="Get AI suggestion for this field"
+                        >
+                          ✨ AI Suggest
+                        </button>
+                      )}
                     </div>
+                    <Textarea value={typeof val === 'string' ? val : ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="min-h-20 text-sm" />
                   </div>
+                );
+              }
 
-                  {/* Name */}
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input
-                      value={editingRecord.name_common || editingRecord.name || editingRecord.title || ''}
-                      onChange={(e) => {
-                        const nameField = editingRecord.name_common !== undefined ? 'name_common' : editingRecord.title !== undefined ? 'title' : 'name';
-                        setEditingRecord({ ...editingRecord, [nameField]: e.target.value });
-                      }}
-                      placeholder="Display name"
-                    />
-                  </div>
-
-                  {/* Category + Type dropdowns */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <select
-                        title="Category"
-                        value={editingRecord.category || ''}
-                        onChange={(e) => setEditingRecord({ ...editingRecord, category: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              // Default: text input
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <Label>{field.label}</Label>
+                    {field.aiSuggest && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field.`;
+                          toast.info(`AI Prompt: ${prompt}`, { duration: 5000 });
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
+                        title="Get AI suggestion for this field"
                       >
-                        <option value="">Select category</option>
-                        {(categoryOptions[activeTab] || []).map(opt => (
-                          <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Type</Label>
-                      <select
-                        title="Type"
-                        value={editingRecord.type || ''}
-                        onChange={(e) => setEditingRecord({ ...editingRecord, type: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Select type</option>
-                        {(typeOptions[activeTab] || []).map(opt => (
-                          <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
-                        ))}
-                      </select>
-                    </div>
+                        ✨ AI Suggest
+                      </button>
+                    )}
                   </div>
-
-                  {/* Description */}
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea
-                      value={editingRecord.description || ''}
-                      onChange={(e) => setEditingRecord({ ...editingRecord, description: e.target.value })}
-                      placeholder="Description"
-                      className="min-h-20"
-                    />
-                  </div>
-
-                  {/* Remaining editable fields */}
-                  {Object.entries(editingRecord).map(([key, value]) => {
-                    if (['id', 'created_at', 'updated_at', 'imported_at', 'image_url', 'avatar_url', 'images', 'image', '_displayIndex', 'name', 'name_common', 'title', 'category', 'type', 'description', 'api_source', 'external_id'].includes(key)) return null;
-                    if (typeof value === 'object' && value !== null) return null;
-                    return (
-                      <div key={key} className="space-y-2">
-                        <Label className="capitalize text-xs">{key.replace(/_/g, ' ')}</Label>
-                        {key === 'health_benefits' || key === 'health_benefits_text' || key === 'food_sources' ? (
-                          <Textarea
-                            value={typeof value === 'string' ? value : ''}
-                            onChange={(e) => setEditingRecord({ ...editingRecord, [key]: e.target.value })}
-                            className="min-h-16 text-sm"
-                          />
-                        ) : (
-                          <Input
-                            value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
-                            onChange={(e) => setEditingRecord({ ...editingRecord, [key]: e.target.value })}
-                            className="text-sm"
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+                  <Input value={typeof val === 'string' || typeof val === 'number' ? String(val) : val || ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="text-sm" />
                 </div>
-              )}
+              );
+            };
 
-              <div className="flex gap-2 justify-end pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowEditModal(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={savingRecord} className="bg-blue-600 hover:bg-blue-700">
-                  {savingRecord ? 'Saving...' : 'Save Changes'}
-                </Button>
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {editFields.map(renderEditField)}
+                </div>
+                <div className="flex gap-2 justify-end pt-4 border-t">
+                  <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+                  <Button onClick={handleSave} disabled={savingRecord} className="bg-blue-600 hover:bg-blue-700">
+                    {savingRecord ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
       <FloatingDebugMenu accessToken={accessToken} />
