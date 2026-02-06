@@ -33,13 +33,25 @@ async function notifySlack(message: { text: string; blocks?: any[] }): Promise<v
   }
 }
 
-function buildWaitlistSlackMessage(data: {
+// IP geolocation via free ip-api.com (non-blocking, best-effort)
+async function getGeoFromIP(ip: string): Promise<{ country: string; city: string; region: string } | null> {
+  if (!ip || ip === 'unknown' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) return null
+  try {
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=country,city,regionName`, { signal: AbortSignal.timeout(3000) })
+    if (!res.ok) return null
+    const data = await res.json()
+    return { country: data.country || '', city: data.city || '', region: data.regionName || '' }
+  } catch { return null }
+}
+
+async function buildWaitlistSlackMessage(data: {
   email: string; name: string; firstName?: string; lastName?: string;
   position: number; source: string; referralCode: string;
   referredBy?: string | null; totalWaitlist: number;
   signupDate: string; ipAddress?: string; userAgent?: string;
   utm_source?: string; utm_medium?: string; utm_campaign?: string;
   emailSent?: boolean; optedInUpdates?: boolean;
+  referralCount?: number;
   tallySubmissionId?: string;
 }) {
   const sourceLabel = data.source === 'tally' ? 'Tally Form' : 'Website'
@@ -49,10 +61,21 @@ function buildWaitlistSlackMessage(data: {
   const utmParts = [data.utm_source, data.utm_medium, data.utm_campaign].filter(Boolean)
   const utmLine = utmParts.length > 0 ? utmParts.join(' / ') : 'None'
 
+  // Referral link (clickable URL)
+  const referralUrl = `https://healthscan.live?ref=${data.referralCode}`
+
   // Supabase KV link
   const supabaseLink = `https://supabase.com/dashboard/project/mofhvoudjxinvpplsytd/database/tables`
-  // Website admin link
   const adminLink = `https://healthscan.live/admin`
+
+  // IP geolocation
+  let locationStr = ''
+  if (data.ipAddress && data.ipAddress !== 'unknown') {
+    const geo = await getGeoFromIP(data.ipAddress)
+    if (geo && geo.city) {
+      locationStr = [geo.city, geo.region, geo.country].filter(Boolean).join(', ')
+    }
+  }
 
   const blocks: any[] = [
     {
@@ -67,68 +90,51 @@ function buildWaitlistSlackMessage(data: {
         { type: 'mrkdwn', text: `*Position:*\n#${data.position} of ${data.totalWaitlist}` },
         { type: 'mrkdwn', text: `*Source:*\n${sourceLabel}` },
         { type: 'mrkdwn', text: `*Signed Up:*\n${timestamp}` },
-        { type: 'mrkdwn', text: `*Referral Code:*\n\`${data.referralCode}\`` }
+        { type: 'mrkdwn', text: `*Referral Link:*\n<${referralUrl}|${data.referralCode}>` }
       ]
     },
     {
       type: 'section',
       fields: [
         { type: 'mrkdwn', text: `*Referred By:*\n${data.referredBy ? `\`${data.referredBy}\`` : 'Direct signup'}` },
-        { type: 'mrkdwn', text: `*UTM:*\n${utmLine}` },
+        { type: 'mrkdwn', text: `*Referrals:*\n${data.referralCount ?? 0}` },
         { type: 'mrkdwn', text: `*Email Sent:*\n${data.emailSent ? 'Yes' : 'No'}` },
-        { type: 'mrkdwn', text: `*Opted In Updates:*\n${data.optedInUpdates ? 'Yes' : '—'}` }
+        { type: 'mrkdwn', text: `*UTM:*\n${utmLine}` }
       ]
     }
   ]
 
-  // IP / User Agent / Location context
-  if (data.ipAddress || data.userAgent) {
-    const contextParts: string[] = []
-    if (data.ipAddress && data.ipAddress !== 'unknown') contextParts.push(`IP: \`${data.ipAddress}\``)
-    if (data.userAgent) {
-      const ua = data.userAgent
-      let device = 'Unknown'
-      if (ua.includes('iPhone') || ua.includes('iPad')) device = 'iOS'
-      else if (ua.includes('Android')) device = 'Android'
-      else if (ua.includes('Mac')) device = 'macOS'
-      else if (ua.includes('Windows')) device = 'Windows'
-      else if (ua.includes('Linux')) device = 'Linux'
-
-      let browser = ''
-      if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome'
-      else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari'
-      else if (ua.includes('Firefox')) browser = 'Firefox'
-      else if (ua.includes('Edg')) browser = 'Edge'
-
-      contextParts.push(`${device}${browser ? ' / ' + browser : ''}`)
-    }
-    if (contextParts.length > 0) {
-      blocks.push({
-        type: 'context',
-        elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }]
-      })
-    }
+  // Location + Device context line
+  const contextParts: string[] = []
+  if (locationStr) contextParts.push(`Location: ${locationStr}`)
+  if (data.ipAddress && data.ipAddress !== 'unknown') contextParts.push(`IP: \`${data.ipAddress}\``)
+  if (data.userAgent) {
+    const ua = data.userAgent
+    let device = 'Unknown'
+    if (ua.includes('iPhone') || ua.includes('iPad')) device = 'iOS'
+    else if (ua.includes('Android')) device = 'Android'
+    else if (ua.includes('Mac')) device = 'macOS'
+    else if (ua.includes('Windows')) device = 'Windows'
+    else if (ua.includes('Linux')) device = 'Linux'
+    let browser = ''
+    if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome'
+    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari'
+    else if (ua.includes('Firefox')) browser = 'Firefox'
+    else if (ua.includes('Edg')) browser = 'Edge'
+    contextParts.push(`${device}${browser ? ' / ' + browser : ''}`)
+  }
+  if (contextParts.length > 0) {
+    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] })
   }
 
   // Action links
   blocks.push({
     type: 'actions',
     elements: [
-      {
-        type: 'button',
-        text: { type: 'plain_text', text: 'View in Supabase', emoji: false },
-        url: supabaseLink,
-        action_id: 'view_supabase'
-      },
-      {
-        type: 'button',
-        text: { type: 'plain_text', text: 'Admin Panel', emoji: false },
-        url: adminLink,
-        action_id: 'view_admin'
-      }
+      { type: 'button', text: { type: 'plain_text', text: 'View in Supabase', emoji: false }, url: supabaseLink, action_id: 'view_supabase' },
+      { type: 'button', text: { type: 'plain_text', text: 'Admin Panel', emoji: false }, url: adminLink, action_id: 'view_admin' }
     ]
   })
-
   blocks.push({ type: 'divider' })
 
   return {
@@ -786,14 +792,15 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
     console.log(`🎉 Tally webhook: New waitlist signup #${position}: ${email}`)
 
     // Slack notification (non-blocking)
-    notifySlack(buildWaitlistSlackMessage({
+    buildWaitlistSlackMessage({
       email, name: name || email.split('@')[0],
       firstName: firstName || undefined, lastName: lastName || undefined,
       position, source: 'tally', referralCode: userReferralCode,
       referredBy: referralCode || null, totalWaitlist: position,
       signupDate: createdAt, optedInUpdates,
+      referralCount: 0,
       tallySubmissionId: submissionId
-    })).catch(() => {})
+    }).then(msg => notifySlack(msg)).catch(() => {})
 
     // Send confirmation email (optional, non-blocking)
     try {
@@ -828,6 +835,43 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
       details: error.message,
       timestamp: new Date().toISOString()
     }, 500)
+  }
+})
+
+// Admin: Send test email sequence (all 3 emails)
+app.post('/make-server-ed0fe4c2/admin/send-test-emails', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { email, position, referralCode, name } = body
+
+    if (!email) return c.json({ error: 'email required' }, 400)
+
+    const emailService = createEmailService()
+    if (!emailService) return c.json({ error: 'Email service not configured' }, 500)
+
+    const baseUrl = 'https://healthscan.live'
+    const confirmationToken = btoa(`${email}:${Date.now()}:${Math.random()}`)
+    const confirmationLink = `${baseUrl}/confirm-email?token=${confirmationToken}`
+    const referralLink = referralCode ? `${baseUrl}?ref=${referralCode}` : ''
+
+    const results: Record<string, any> = {}
+
+    // Email 1: Confirmation
+    results.confirmation = await emailService.sendWaitlistConfirmation(
+      email, position || 1, true
+    )
+
+    // Email 2: Welcome
+    if (referralCode) {
+      results.welcome = await emailService.sendWelcomeEmail(email, position || 1, referralCode)
+    }
+
+    // Email 3: How to Use
+    results.howToUse = await emailService.sendHowToUseEmail(email, name || '')
+
+    return c.json({ success: true, results })
+  } catch (err) {
+    return c.json({ error: 'Failed to send test emails', details: String(err) }, 500)
   }
 })
 
