@@ -42,7 +42,7 @@ function buildWaitlistSlackMessage(data: {
   emailSent?: boolean; optedInUpdates?: boolean;
   tallySubmissionId?: string;
 }) {
-  const sourceEmoji = data.source === 'tally' ? '📋 Tally Form' : '🌐 Website'
+  const sourceLabel = data.source === 'tally' ? 'Tally Form' : 'Website'
   const timestamp = new Date(data.signupDate).toLocaleString('en-IE', { timeZone: 'Europe/Dublin', dateStyle: 'medium', timeStyle: 'short' })
 
   // Build UTM line
@@ -57,26 +57,26 @@ function buildWaitlistSlackMessage(data: {
   const blocks: any[] = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: `🎉 New Waitlist Signup — #${data.position}`, emoji: true }
+      text: { type: 'plain_text', text: `New Waitlist Signup — #${data.position}`, emoji: false }
     },
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*📧 Email:*\n${data.email}` },
-        { type: 'mrkdwn', text: `*👤 Name:*\n${data.name || 'Not provided'}` },
-        { type: 'mrkdwn', text: `*🏷️ Position:*\n#${data.position} of ${data.totalWaitlist}` },
-        { type: 'mrkdwn', text: `*📍 Source:*\n${sourceEmoji}` },
-        { type: 'mrkdwn', text: `*🕐 Signed Up:*\n${timestamp}` },
-        { type: 'mrkdwn', text: `*🔑 Referral Code:*\n\`${data.referralCode}\`` }
+        { type: 'mrkdwn', text: `*Email:*\n${data.email}` },
+        { type: 'mrkdwn', text: `*Name:*\n${data.name || 'Not provided'}` },
+        { type: 'mrkdwn', text: `*Position:*\n#${data.position} of ${data.totalWaitlist}` },
+        { type: 'mrkdwn', text: `*Source:*\n${sourceLabel}` },
+        { type: 'mrkdwn', text: `*Signed Up:*\n${timestamp}` },
+        { type: 'mrkdwn', text: `*Referral Code:*\n\`${data.referralCode}\`` }
       ]
     },
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*🔗 Referred By:*\n${data.referredBy ? `\`${data.referredBy}\`` : 'Direct signup'}` },
-        { type: 'mrkdwn', text: `*📊 UTM:*\n${utmLine}` },
-        { type: 'mrkdwn', text: `*📬 Email Sent:*\n${data.emailSent ? '✅ Yes' : '❌ No'}` },
-        { type: 'mrkdwn', text: `*📰 Opted In Updates:*\n${data.optedInUpdates ? '✅ Yes' : '—'}` }
+        { type: 'mrkdwn', text: `*Referred By:*\n${data.referredBy ? `\`${data.referredBy}\`` : 'Direct signup'}` },
+        { type: 'mrkdwn', text: `*UTM:*\n${utmLine}` },
+        { type: 'mrkdwn', text: `*Email Sent:*\n${data.emailSent ? 'Yes' : 'No'}` },
+        { type: 'mrkdwn', text: `*Opted In Updates:*\n${data.optedInUpdates ? 'Yes' : '—'}` }
       ]
     }
   ]
@@ -84,16 +84,15 @@ function buildWaitlistSlackMessage(data: {
   // IP / User Agent / Location context
   if (data.ipAddress || data.userAgent) {
     const contextParts: string[] = []
-    if (data.ipAddress && data.ipAddress !== 'unknown') contextParts.push(`🌍 IP: \`${data.ipAddress}\``)
+    if (data.ipAddress && data.ipAddress !== 'unknown') contextParts.push(`IP: \`${data.ipAddress}\``)
     if (data.userAgent) {
-      // Extract browser/OS from user agent
       const ua = data.userAgent
       let device = 'Unknown'
-      if (ua.includes('iPhone') || ua.includes('iPad')) device = '📱 iOS'
-      else if (ua.includes('Android')) device = '📱 Android'
-      else if (ua.includes('Mac')) device = '💻 macOS'
-      else if (ua.includes('Windows')) device = '💻 Windows'
-      else if (ua.includes('Linux')) device = '💻 Linux'
+      if (ua.includes('iPhone') || ua.includes('iPad')) device = 'iOS'
+      else if (ua.includes('Android')) device = 'Android'
+      else if (ua.includes('Mac')) device = 'macOS'
+      else if (ua.includes('Windows')) device = 'Windows'
+      else if (ua.includes('Linux')) device = 'Linux'
 
       let browser = ''
       if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome'
@@ -101,7 +100,7 @@ function buildWaitlistSlackMessage(data: {
       else if (ua.includes('Firefox')) browser = 'Firefox'
       else if (ua.includes('Edg')) browser = 'Edge'
 
-      contextParts.push(`${device}${browser ? ' · ' + browser : ''}`)
+      contextParts.push(`${device}${browser ? ' / ' + browser : ''}`)
     }
     if (contextParts.length > 0) {
       blocks.push({
@@ -117,13 +116,13 @@ function buildWaitlistSlackMessage(data: {
     elements: [
       {
         type: 'button',
-        text: { type: 'plain_text', text: '🔍 View in Supabase', emoji: true },
+        text: { type: 'plain_text', text: 'View in Supabase', emoji: false },
         url: supabaseLink,
         action_id: 'view_supabase'
       },
       {
         type: 'button',
-        text: { type: 'plain_text', text: '👤 Admin Panel', emoji: true },
+        text: { type: 'plain_text', text: 'Admin Panel', emoji: false },
         url: adminLink,
         action_id: 'view_admin'
       }

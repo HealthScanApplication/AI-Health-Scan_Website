@@ -674,11 +674,11 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         let device = 'Unknown'
         let browser = ''
         if (userAgent) {
-          if (userAgent.includes('iPhone') || userAgent.includes('iPad')) device = '📱 iOS'
-          else if (userAgent.includes('Android')) device = '📱 Android'
-          else if (userAgent.includes('Mac')) device = '💻 macOS'
-          else if (userAgent.includes('Windows')) device = '💻 Windows'
-          else if (userAgent.includes('Linux')) device = '💻 Linux'
+          if (userAgent.includes('iPhone') || userAgent.includes('iPad')) device = 'iOS'
+          else if (userAgent.includes('Android')) device = 'Android'
+          else if (userAgent.includes('Mac')) device = 'macOS'
+          else if (userAgent.includes('Windows')) device = 'Windows'
+          else if (userAgent.includes('Linux')) device = 'Linux'
           if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) browser = 'Chrome'
           else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari'
           else if (userAgent.includes('Firefox')) browser = 'Firefox'
@@ -686,24 +686,24 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         }
 
         const contextParts: string[] = []
-        if (ipAddress && ipAddress !== '' && ipAddress !== 'unknown') contextParts.push(`🌍 IP: \`${ipAddress}\``)
-        if (device !== 'Unknown') contextParts.push(`${device}${browser ? ' · ' + browser : ''}`)
+        if (ipAddress && ipAddress !== '' && ipAddress !== 'unknown') contextParts.push(`IP: \`${ipAddress}\``)
+        if (device !== 'Unknown') contextParts.push(`${device}${browser ? ' / ' + browser : ''}`)
 
         const blocks: any[] = [
-          { type: 'header', text: { type: 'plain_text', text: `🎉 New Waitlist Signup — #${calculatedPosition}`, emoji: true } },
+          { type: 'header', text: { type: 'plain_text', text: `New Waitlist Signup — #${calculatedPosition}`, emoji: false } },
           { type: 'section', fields: [
-            { type: 'mrkdwn', text: `*📧 Email:*\n${normalizedEmail}` },
-            { type: 'mrkdwn', text: `*👤 Name:*\n${userName}` },
-            { type: 'mrkdwn', text: `*🏷️ Position:*\n#${calculatedPosition} of ${currentCount + 1}` },
-            { type: 'mrkdwn', text: `*📍 Source:*\n🌐 Website (${source || 'direct'})` },
-            { type: 'mrkdwn', text: `*🕐 Signed Up:*\n${timestamp}` },
-            { type: 'mrkdwn', text: `*🔑 Referral Code:*\n\`${userReferralCode}\`` }
+            { type: 'mrkdwn', text: `*Email:*\n${normalizedEmail}` },
+            { type: 'mrkdwn', text: `*Name:*\n${userName}` },
+            { type: 'mrkdwn', text: `*Position:*\n#${calculatedPosition} of ${currentCount + 1}` },
+            { type: 'mrkdwn', text: `*Source:*\nWebsite (${source || 'direct'})` },
+            { type: 'mrkdwn', text: `*Signed Up:*\n${timestamp}` },
+            { type: 'mrkdwn', text: `*Referral Code:*\n\`${userReferralCode}\`` }
           ]},
           { type: 'section', fields: [
-            { type: 'mrkdwn', text: `*🔗 Referred By:*\n${referralCode ? `\`${referralCode}\`` : 'Direct signup'}` },
-            { type: 'mrkdwn', text: `*📊 UTM:*\n${utmLine}` },
-            { type: 'mrkdwn', text: `*📬 Email Sent:*\n${emailSent ? '✅ Yes' : '❌ No'}` },
-            { type: 'mrkdwn', text: `*📰 Opted In Updates:*\n—` }
+            { type: 'mrkdwn', text: `*Referred By:*\n${referralCode ? `\`${referralCode}\`` : 'Direct signup'}` },
+            { type: 'mrkdwn', text: `*UTM:*\n${utmLine}` },
+            { type: 'mrkdwn', text: `*Email Sent:*\n${emailSent ? 'Yes' : 'No'}` },
+            { type: 'mrkdwn', text: `*Opted In Updates:*\n—` }
           ]}
         ]
 
@@ -714,8 +714,8 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         blocks.push({
           type: 'actions',
           elements: [
-            { type: 'button', text: { type: 'plain_text', text: '🔍 View in Supabase', emoji: true }, url: supabaseLink, action_id: 'view_supabase' },
-            { type: 'button', text: { type: 'plain_text', text: '👤 Admin Panel', emoji: true }, url: adminLink, action_id: 'view_admin' }
+            { type: 'button', text: { type: 'plain_text', text: 'View in Supabase', emoji: false }, url: supabaseLink, action_id: 'view_supabase' },
+            { type: 'button', text: { type: 'plain_text', text: 'Admin Panel', emoji: false }, url: adminLink, action_id: 'view_admin' }
           ]
         })
         blocks.push({ type: 'divider' })
