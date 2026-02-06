@@ -34,35 +34,107 @@ async function notifySlack(message: { text: string; blocks?: any[] }): Promise<v
 }
 
 function buildWaitlistSlackMessage(data: {
-  email: string; name: string; position: number; source: string;
-  referralCode: string; referredBy?: string | null; totalWaitlist: number;
+  email: string; name: string; firstName?: string; lastName?: string;
+  position: number; source: string; referralCode: string;
+  referredBy?: string | null; totalWaitlist: number;
+  signupDate: string; ipAddress?: string; userAgent?: string;
+  utm_source?: string; utm_medium?: string; utm_campaign?: string;
+  emailSent?: boolean; optedInUpdates?: boolean;
+  tallySubmissionId?: string;
 }) {
-  const sourceEmoji = data.source === 'tally' ? '📋' : '🌐'
-  const referralLine = data.referredBy ? `\n🔗 Referred by code: \`${data.referredBy}\`` : ''
-  return {
-    text: `New waitlist signup: ${data.email} (#${data.position})`,
-    blocks: [
-      {
-        type: 'header',
-        text: { type: 'plain_text', text: `${sourceEmoji} New Waitlist Signup!`, emoji: true }
-      },
-      {
-        type: 'section',
-        fields: [
-          { type: 'mrkdwn', text: `*Email:*\n${data.email}` },
-          { type: 'mrkdwn', text: `*Name:*\n${data.name}` },
-          { type: 'mrkdwn', text: `*Position:*\n#${data.position}` },
-          { type: 'mrkdwn', text: `*Source:*\n${data.source}` },
-          { type: 'mrkdwn', text: `*Referral Code:*\n\`${data.referralCode}\`` },
-          { type: 'mrkdwn', text: `*Total Waitlist:*\n${data.totalWaitlist}` }
-        ]
-      },
-      ...(referralLine ? [{
+  const sourceEmoji = data.source === 'tally' ? '📋 Tally Form' : '🌐 Website'
+  const timestamp = new Date(data.signupDate).toLocaleString('en-IE', { timeZone: 'Europe/Dublin', dateStyle: 'medium', timeStyle: 'short' })
+
+  // Build UTM line
+  const utmParts = [data.utm_source, data.utm_medium, data.utm_campaign].filter(Boolean)
+  const utmLine = utmParts.length > 0 ? utmParts.join(' / ') : 'None'
+
+  // Supabase KV link
+  const supabaseLink = `https://supabase.com/dashboard/project/mofhvoudjxinvpplsytd/database/tables`
+  // Website admin link
+  const adminLink = `https://healthscan.live/admin`
+
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `🎉 New Waitlist Signup — #${data.position}`, emoji: true }
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*📧 Email:*\n${data.email}` },
+        { type: 'mrkdwn', text: `*👤 Name:*\n${data.name || 'Not provided'}` },
+        { type: 'mrkdwn', text: `*🏷️ Position:*\n#${data.position} of ${data.totalWaitlist}` },
+        { type: 'mrkdwn', text: `*📍 Source:*\n${sourceEmoji}` },
+        { type: 'mrkdwn', text: `*🕐 Signed Up:*\n${timestamp}` },
+        { type: 'mrkdwn', text: `*🔑 Referral Code:*\n\`${data.referralCode}\`` }
+      ]
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*🔗 Referred By:*\n${data.referredBy ? `\`${data.referredBy}\`` : 'Direct signup'}` },
+        { type: 'mrkdwn', text: `*📊 UTM:*\n${utmLine}` },
+        { type: 'mrkdwn', text: `*📬 Email Sent:*\n${data.emailSent ? '✅ Yes' : '❌ No'}` },
+        { type: 'mrkdwn', text: `*📰 Opted In Updates:*\n${data.optedInUpdates ? '✅ Yes' : '—'}` }
+      ]
+    }
+  ]
+
+  // IP / User Agent / Location context
+  if (data.ipAddress || data.userAgent) {
+    const contextParts: string[] = []
+    if (data.ipAddress && data.ipAddress !== 'unknown') contextParts.push(`🌍 IP: \`${data.ipAddress}\``)
+    if (data.userAgent) {
+      // Extract browser/OS from user agent
+      const ua = data.userAgent
+      let device = 'Unknown'
+      if (ua.includes('iPhone') || ua.includes('iPad')) device = '📱 iOS'
+      else if (ua.includes('Android')) device = '📱 Android'
+      else if (ua.includes('Mac')) device = '💻 macOS'
+      else if (ua.includes('Windows')) device = '💻 Windows'
+      else if (ua.includes('Linux')) device = '💻 Linux'
+
+      let browser = ''
+      if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome'
+      else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari'
+      else if (ua.includes('Firefox')) browser = 'Firefox'
+      else if (ua.includes('Edg')) browser = 'Edge'
+
+      contextParts.push(`${device}${browser ? ' · ' + browser : ''}`)
+    }
+    if (contextParts.length > 0) {
+      blocks.push({
         type: 'context',
-        elements: [{ type: 'mrkdwn', text: referralLine }]
-      }] : []),
-      { type: 'divider' }
+        elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }]
+      })
+    }
+  }
+
+  // Action links
+  blocks.push({
+    type: 'actions',
+    elements: [
+      {
+        type: 'button',
+        text: { type: 'plain_text', text: '🔍 View in Supabase', emoji: true },
+        url: supabaseLink,
+        action_id: 'view_supabase'
+      },
+      {
+        type: 'button',
+        text: { type: 'plain_text', text: '👤 Admin Panel', emoji: true },
+        url: adminLink,
+        action_id: 'view_admin'
+      }
     ]
+  })
+
+  blocks.push({ type: 'divider' })
+
+  return {
+    text: `New waitlist signup: ${data.name || data.email} (#${data.position}) via ${data.source}`,
+    blocks
   }
 }
 
@@ -716,9 +788,12 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
 
     // Slack notification (non-blocking)
     notifySlack(buildWaitlistSlackMessage({
-      email, name: name || email.split('@')[0], position,
-      source: 'tally', referralCode: userReferralCode,
-      referredBy: referralCode || null, totalWaitlist: position
+      email, name: name || email.split('@')[0],
+      firstName: firstName || undefined, lastName: lastName || undefined,
+      position, source: 'tally', referralCode: userReferralCode,
+      referredBy: referralCode || null, totalWaitlist: position,
+      signupDate: createdAt, optedInUpdates,
+      tallySubmissionId: submissionId
     })).catch(() => {})
 
     // Send confirmation email (optional, non-blocking)

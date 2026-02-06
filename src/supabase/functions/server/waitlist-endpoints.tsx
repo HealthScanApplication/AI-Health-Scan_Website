@@ -659,30 +659,73 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
       console.warn('⚠️ Zapier webhook failed (non-critical):', error);
     }
 
-    // Slack notification (non-blocking)
+    // Slack notification (non-blocking, rich context)
     try {
       const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL')
       if (slackWebhookUrl) {
-        const sourceEmoji = '🌐'
-        const referralLine = referralCode ? `\n🔗 Referred by code: \`${referralCode}\`` : ''
+        const signupTime = userData.signupDate
+        const timestamp = new Date(signupTime).toLocaleString('en-IE', { timeZone: 'Europe/Dublin', dateStyle: 'medium', timeStyle: 'short' })
+        const utmParts = [utm_source, utm_medium, utm_campaign].filter(Boolean)
+        const utmLine = utmParts.length > 0 ? utmParts.join(' / ') : 'None'
+        const supabaseLink = 'https://supabase.com/dashboard/project/mofhvoudjxinvpplsytd/database/tables'
+        const adminLink = 'https://healthscan.live/admin'
+
+        // Device/browser detection from user agent
+        let device = 'Unknown'
+        let browser = ''
+        if (userAgent) {
+          if (userAgent.includes('iPhone') || userAgent.includes('iPad')) device = '📱 iOS'
+          else if (userAgent.includes('Android')) device = '📱 Android'
+          else if (userAgent.includes('Mac')) device = '💻 macOS'
+          else if (userAgent.includes('Windows')) device = '💻 Windows'
+          else if (userAgent.includes('Linux')) device = '💻 Linux'
+          if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) browser = 'Chrome'
+          else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari'
+          else if (userAgent.includes('Firefox')) browser = 'Firefox'
+          else if (userAgent.includes('Edg')) browser = 'Edge'
+        }
+
+        const contextParts: string[] = []
+        if (ipAddress && ipAddress !== '' && ipAddress !== 'unknown') contextParts.push(`🌍 IP: \`${ipAddress}\``)
+        if (device !== 'Unknown') contextParts.push(`${device}${browser ? ' · ' + browser : ''}`)
+
+        const blocks: any[] = [
+          { type: 'header', text: { type: 'plain_text', text: `🎉 New Waitlist Signup — #${calculatedPosition}`, emoji: true } },
+          { type: 'section', fields: [
+            { type: 'mrkdwn', text: `*📧 Email:*\n${normalizedEmail}` },
+            { type: 'mrkdwn', text: `*👤 Name:*\n${userName}` },
+            { type: 'mrkdwn', text: `*🏷️ Position:*\n#${calculatedPosition} of ${currentCount + 1}` },
+            { type: 'mrkdwn', text: `*📍 Source:*\n🌐 Website (${source || 'direct'})` },
+            { type: 'mrkdwn', text: `*🕐 Signed Up:*\n${timestamp}` },
+            { type: 'mrkdwn', text: `*🔑 Referral Code:*\n\`${userReferralCode}\`` }
+          ]},
+          { type: 'section', fields: [
+            { type: 'mrkdwn', text: `*🔗 Referred By:*\n${referralCode ? `\`${referralCode}\`` : 'Direct signup'}` },
+            { type: 'mrkdwn', text: `*📊 UTM:*\n${utmLine}` },
+            { type: 'mrkdwn', text: `*📬 Email Sent:*\n${emailSent ? '✅ Yes' : '❌ No'}` },
+            { type: 'mrkdwn', text: `*📰 Opted In Updates:*\n—` }
+          ]}
+        ]
+
+        if (contextParts.length > 0) {
+          blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] })
+        }
+
+        blocks.push({
+          type: 'actions',
+          elements: [
+            { type: 'button', text: { type: 'plain_text', text: '🔍 View in Supabase', emoji: true }, url: supabaseLink, action_id: 'view_supabase' },
+            { type: 'button', text: { type: 'plain_text', text: '👤 Admin Panel', emoji: true }, url: adminLink, action_id: 'view_admin' }
+          ]
+        })
+        blocks.push({ type: 'divider' })
+
         fetch(slackWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: `New waitlist signup: ${normalizedEmail} (#${calculatedPosition})`,
-            blocks: [
-              { type: 'header', text: { type: 'plain_text', text: `${sourceEmoji} New Waitlist Signup!`, emoji: true } },
-              { type: 'section', fields: [
-                { type: 'mrkdwn', text: `*Email:*\n${normalizedEmail}` },
-                { type: 'mrkdwn', text: `*Name:*\n${userName}` },
-                { type: 'mrkdwn', text: `*Position:*\n#${calculatedPosition}` },
-                { type: 'mrkdwn', text: `*Source:*\n${source || 'website'}` },
-                { type: 'mrkdwn', text: `*Referral Code:*\n\`${userReferralCode}\`` },
-                { type: 'mrkdwn', text: `*Total Waitlist:*\n${currentCount + 1}` }
-              ]},
-              ...(referralLine ? [{ type: 'context', elements: [{ type: 'mrkdwn', text: referralLine }] }] : []),
-              { type: 'divider' }
-            ]
+            text: `New waitlist signup: ${userName} (${normalizedEmail}) — #${calculatedPosition} via website`,
+            blocks
           })
         }).catch(() => {})
         console.log('✅ Slack notification queued')
