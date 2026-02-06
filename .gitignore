@@ -1,6 +1,7 @@
 # Node/Vite build artifacts
 node_modules/
 dist/
+build/
 
 # Environment & local config
 .env
