@@ -106,6 +106,7 @@ export function AppFeaturesSection() {
                 <img 
                   src={productScanScreenshot} 
                   alt="HealthScan Product Scanning Interface"
+                  loading="lazy"
                   className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:rotate-y-6 hover:rotate-x-3 hover:scale-105"
                   style={{ transformStyle: 'preserve-3d' }}
                 />
@@ -239,6 +240,7 @@ export function AppFeaturesSection() {
                 <img 
                   src={needScreenshot} 
                   alt="HealthScan Nutrition Analysis Screen"
+                  loading="lazy"
                   className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:-rotate-y-6 hover:rotate-x-2 hover:scale-105"
                   style={{ transformStyle: 'preserve-3d' }}
                 />
@@ -276,6 +278,7 @@ export function AppFeaturesSection() {
                 <img 
                   src={riskScreenshot} 
                   alt="HealthScan Risk Detection Screen"
+                  loading="lazy"
                   className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:rotate-y-4 hover:-rotate-x-2 hover:scale-105"
                   style={{ transformStyle: 'preserve-3d' }}
                 />
@@ -412,6 +415,7 @@ export function AppFeaturesSection() {
                 <img 
                   src={mealAnalysisScreenshot} 
                   alt="HealthScan Bulgar Salad Recipe Analysis with Nutritional Breakdown"
+                  loading="lazy"
                   className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:-rotate-y-6 hover:rotate-x-2 hover:scale-105"
                   style={{ transformStyle: 'preserve-3d' }}
                 />

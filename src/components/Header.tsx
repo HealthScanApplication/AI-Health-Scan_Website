@@ -346,7 +346,7 @@ export function Header({
             </div>
 
             {/* Desktop Navigation - Centered and Optimized */}
-            <nav className="hidden md:flex items-center justify-center flex-1 space-x-1">
+            <nav aria-label="Main navigation" className="hidden md:flex items-center justify-center flex-1 space-x-1">
               <button 
                 onClick={() => handleSectionScroll('features')}
                 className="px-4 py-2 rounded-lg text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 transition-all font-medium"
