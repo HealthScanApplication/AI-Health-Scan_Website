@@ -86,27 +86,38 @@ function generateConsistentReferralCode(email: string): string {
   return `hs_${code}`
 }
 
-// Calculate position with smart randomization for better UX
+// Calculate real sequential waitlist position (no fake randomization)
 function calculateWaitlistPosition(userCount: number): number {
-  const basePosition = userCount + 1
-  
-  // Apply smart randomization based on position ranges
-  if (basePosition <= 100) {
-    // Early users: minimal adjustment (-5 to +15)
-    const adjustment = Math.floor(Math.random() * 21) - 5
-    return Math.max(1, basePosition + adjustment)
-  } else if (basePosition <= 500) {
-    // Medium range: moderate adjustment (-20 to +50)
-    const adjustment = Math.floor(Math.random() * 71) - 20
-    return Math.max(1, basePosition + adjustment)
-  } else if (basePosition <= 2000) {
-    // Higher range: larger adjustment (-100 to +200)
-    const adjustment = Math.floor(Math.random() * 301) - 100
-    return Math.max(1, basePosition + adjustment)
-  } else {
-    // Very high range: significant adjustment (-500 to +1000)
-    const adjustment = Math.floor(Math.random() * 1501) - 500
-    return Math.max(1, basePosition + adjustment)
+  return userCount + 1
+}
+
+// Referral milestone tiers - deterministic rewards based on total referrals
+const REFERRAL_MILESTONES = [
+  { count: 1, boost: 5, badge: 'seed' },
+  { count: 3, boost: 15, badge: 'sprout' },
+  { count: 5, boost: 30, badge: 'grower' },
+  { count: 10, boost: 50, badge: 'champion' },
+  { count: 25, boost: 100, badge: 'founding_member' }
+]
+
+// Get the referral boost for a given total referral count (deterministic)
+function getReferralBoost(totalReferrals: number): { boost: number; badge: string; nextMilestone: number | null } {
+  let currentMilestone = REFERRAL_MILESTONES[0]
+  let nextMilestone: number | null = REFERRAL_MILESTONES[0].count
+
+  for (const milestone of REFERRAL_MILESTONES) {
+    if (totalReferrals >= milestone.count) {
+      currentMilestone = milestone
+    }
+  }
+
+  const nextIdx = REFERRAL_MILESTONES.findIndex(m => m.count > totalReferrals)
+  nextMilestone = nextIdx >= 0 ? REFERRAL_MILESTONES[nextIdx].count : null
+
+  return {
+    boost: currentMilestone.boost,
+    badge: currentMilestone.badge,
+    nextMilestone
   }
 }
 
@@ -414,13 +425,19 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
       }
     }
     
-    // Get current waitlist count for position calculation
+    // Get current waitlist count using actual user count (fixes race condition)
     let currentCount = 0
     try {
-      const countData = await kv.get('waitlist_count')
-      currentCount = countData?.count || 0
+      currentCount = await kv.countByPrefix('waitlist_user_')
+      console.log('📊 Actual waitlist user count from KV:', currentCount)
     } catch (error) {
-      console.warn('⚠️ Could not get waitlist count:', error)
+      console.warn('⚠️ Could not count waitlist users, falling back to counter:', error)
+      try {
+        const countData = await kv.get('waitlist_count')
+        currentCount = countData?.count || 0
+      } catch (fallbackError) {
+        console.warn('⚠️ Fallback counter also failed:', fallbackError)
+      }
     }
     
     // Calculate position with smart randomization
@@ -495,20 +512,24 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         if (referrer) {
           console.log('👤 Found referrer:', referrer.email)
           
-          // Give referrer a position boost (move up 3-10 positions)
-          const boost = Math.floor(Math.random() * 8) + 3
+          // Deterministic milestone-based boost
+          const totalReferrals = (referrer.referrals || 0) + 1
+          const { boost, badge, nextMilestone } = getReferralBoost(totalReferrals)
           const newReferrerPosition = Math.max(1, referrer.position - boost)
           
-          // Update referrer data
+          // Update referrer data with milestone tracking
           const updatedReferrer = {
             ...referrer,
             position: newReferrerPosition,
-            referrals: (referrer.referrals || 0) + 1,
-            lastReferralDate: new Date().toISOString()
+            referrals: totalReferrals,
+            referralBadge: badge,
+            lastReferralDate: new Date().toISOString(),
+            nextMilestone: nextMilestone,
+            totalBoostEarned: (referrer.totalBoostEarned || 0) + boost
           }
           
           await kv.set(`waitlist_user_${referrer.email}`, updatedReferrer)
-          console.log(`🚀 Referrer ${referrer.email} moved up ${boost} positions to #${newReferrerPosition}`)
+          console.log(`🚀 Referrer ${referrer.email} earned ${boost}-position boost (badge: ${badge}, total referrals: ${totalReferrals}, next milestone: ${nextMilestone || 'max'})`)
         } else {
           console.warn('⚠️ Referral code not found:', referralCode)
         }

@@ -16,6 +16,36 @@ import blogRssApp from './blog-rss-endpoints.tsx'
 // Initialize Hono app
 const app = new Hono()
 
+// Simple in-memory rate limiter for waitlist signup
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
+const RATE_LIMIT_MAX_REQUESTS = 5 // 5 signups per IP per hour
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; retryAfterSeconds: number } {
+  const now = Date.now()
+  const entry = rateLimitMap.get(ip)
+
+  // Clean up expired entries periodically (every 100 checks)
+  if (Math.random() < 0.01) {
+    for (const [key, val] of rateLimitMap.entries()) {
+      if (val.resetAt < now) rateLimitMap.delete(key)
+    }
+  }
+
+  if (!entry || entry.resetAt < now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, retryAfterSeconds: 0 }
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000)
+    return { allowed: false, remaining: 0, retryAfterSeconds: retryAfter }
+  }
+
+  entry.count++
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - entry.count, retryAfterSeconds: 0 }
+}
+
 // Configure CORS - Allow all origins for development, configure for production
 app.use('*', cors({
   origin: '*', // In production, replace with your domain
@@ -116,6 +146,7 @@ app.get('/make-server-ed0fe4c2/', (c) => {
       '/ping',
       '/stats',
       '/email-waitlist',
+      '/webhooks/tally',
       '/admin/*',
       '/blog/articles',
       '/blog/health',
@@ -282,8 +313,24 @@ app.post('/make-server-ed0fe4c2/debug-email-capture', async (c) => {
   }
 })
 
-// Email waitlist endpoint  
-app.post('/make-server-ed0fe4c2/email-waitlist', handleWaitlistSignup)
+// Email waitlist endpoint (with rate limiting)
+app.post('/make-server-ed0fe4c2/email-waitlist', async (c) => {
+  const ip = c.req.header('X-Forwarded-For') || c.req.header('X-Real-IP') || c.req.header('CF-Connecting-IP') || 'unknown'
+  const { allowed, remaining, retryAfterSeconds } = checkRateLimit(ip)
+
+  if (!allowed) {
+    console.warn(`🚫 Rate limit exceeded for IP: ${ip}`)
+    return c.json({
+      success: false,
+      error: 'Too many signup attempts. Please try again later.',
+      retryAfterSeconds
+    }, 429)
+  }
+
+  // Set rate limit headers
+  c.header('X-RateLimit-Remaining', String(remaining))
+  return handleWaitlistSignup(c)
+})
 
 // Email confirmation endpoint
 app.get('/make-server-ed0fe4c2/confirm-email', handleEmailConfirmation)
@@ -453,6 +500,182 @@ app.post('/make-server-ed0fe4c2/users/:id/send-verification', async (c) => {
     return c.json({
       success: false,
       error: 'Internal server error',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    }, 500)
+  }
+})
+
+// Tally.so webhook endpoint - syncs Tally form submissions to waitlist
+app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
+  try {
+    console.log('📋 Tally.so webhook received')
+
+    // Optional: Verify Tally signature if signing secret is configured
+    const tallySecret = Deno.env.get('TALLY_SIGNING_SECRET')
+    if (tallySecret) {
+      const receivedSignature = c.req.header('Tally-Signature')
+      if (receivedSignature) {
+        const rawBody = await c.req.text()
+        const encoder = new TextEncoder()
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(tallySecret),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        )
+        const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody))
+        const calculatedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+
+        if (receivedSignature !== calculatedSignature) {
+          console.warn('🚫 Tally webhook signature mismatch')
+          return c.json({ success: false, error: 'Invalid signature' }, 401)
+        }
+        console.log('✅ Tally webhook signature verified')
+      }
+    }
+
+    // Parse Tally webhook payload
+    let payload
+    try {
+      payload = await c.req.json()
+    } catch {
+      // If we already consumed the body for signature verification, re-parse
+      const rawBody = await c.req.text()
+      payload = JSON.parse(rawBody)
+    }
+
+    console.log('📋 Tally payload event:', payload?.eventType)
+
+    // Only process form submission events
+    if (payload?.eventType !== 'FORM_RESPONSE') {
+      return c.json({ success: true, message: 'Event type ignored', eventType: payload?.eventType })
+    }
+
+    const fields = payload?.data?.fields || []
+    const respondentId = payload?.data?.respondentId || ''
+    const submissionId = payload?.data?.submissionId || ''
+    const createdAt = payload?.data?.createdAt || new Date().toISOString()
+
+    // Extract email from Tally fields (look for email-type field or field labeled "email")
+    let email = ''
+    let name = ''
+    let referralCode = ''
+
+    for (const field of fields) {
+      const label = (field?.label || '').toLowerCase()
+      const value = field?.value || ''
+
+      if (field?.type === 'INPUT_EMAIL' || label.includes('email')) {
+        email = typeof value === 'string' ? value.trim().toLowerCase() : ''
+      } else if (label.includes('name') || field?.type === 'INPUT_TEXT') {
+        if (!name) name = typeof value === 'string' ? value.trim() : ''
+      } else if (label.includes('referral') || label.includes('code')) {
+        referralCode = typeof value === 'string' ? value.trim() : ''
+      }
+    }
+
+    if (!email) {
+      console.warn('⚠️ Tally webhook: No email found in submission fields')
+      return c.json({ success: false, error: 'No email field found in submission' }, 400)
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      console.warn('⚠️ Tally webhook: Invalid email format:', email)
+      return c.json({ success: false, error: 'Invalid email format' }, 400)
+    }
+
+    console.log('📧 Tally webhook processing signup for:', email)
+
+    // Check for duplicate
+    const existingUser = await kv.get(`waitlist_user_${email}`)
+    if (existingUser) {
+      console.log('✅ Tally webhook: User already on waitlist:', email)
+      return c.json({
+        success: true,
+        message: 'User already on waitlist',
+        alreadyExists: true,
+        position: existingUser.position,
+        referralCode: existingUser.referralCode
+      })
+    }
+
+    // Get current count for position
+    let currentCount = 0
+    try {
+      currentCount = await kv.countByPrefix('waitlist_user_')
+    } catch {
+      const countData = await kv.get('waitlist_count')
+      currentCount = countData?.count || 0
+    }
+
+    const position = currentCount + 1
+
+    // Generate referral code
+    let hash = 0
+    for (let i = 0; i < email.length; i++) {
+      const char = email.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash
+    }
+    const userReferralCode = `hs_${Math.abs(hash).toString(36).substring(0, 6).padEnd(6, '0')}`
+
+    // Store user in KV
+    const userData: Record<string, any> = {
+      email,
+      name: name || email.split('@')[0],
+      position,
+      referralCode: userReferralCode,
+      source: 'tally',
+      referredBy: referralCode || null,
+      signupDate: createdAt,
+      confirmed: false,
+      emailsSent: 0,
+      lastEmailSent: null,
+      tallySubmissionId: submissionId,
+      tallyRespondentId: respondentId
+    }
+
+    await kv.set(`waitlist_user_${email}`, userData)
+
+    // Update waitlist count
+    await kv.set('waitlist_count', { count: position, lastUpdated: new Date().toISOString() })
+
+    console.log(`🎉 Tally webhook: New waitlist signup #${position}: ${email}`)
+
+    // Send confirmation email (optional, non-blocking)
+    try {
+      const emailService = createEmailService()
+      if (emailService) {
+        const emailResult = await emailService.sendWaitlistConfirmation(email, position, true)
+        if (emailResult.success) {
+          userData.emailsSent = 1
+          userData.lastEmailSent = new Date().toISOString()
+          await kv.set(`waitlist_user_${email}`, userData)
+          console.log('✅ Tally webhook: Confirmation email sent')
+        }
+      }
+    } catch (emailErr) {
+      console.warn('⚠️ Tally webhook: Email send failed (non-critical):', emailErr)
+    }
+
+    return c.json({
+      success: true,
+      message: 'Waitlist signup processed from Tally',
+      position,
+      referralCode: userReferralCode,
+      email,
+      source: 'tally'
+    }, 201)
+
+  } catch (error) {
+    console.error('❌ Tally webhook error:', error)
+    return c.json({
+      success: false,
+      error: 'Webhook processing failed',
       details: error.message,
       timestamp: new Date().toISOString()
     }, 500)
