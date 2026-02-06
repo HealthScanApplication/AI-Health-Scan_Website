@@ -48,6 +48,10 @@ interface AdminRecord {
   position?: number;
   confirmed?: boolean;
   lastEmailSent?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  source?: string;
+  referredBy?: string;
   [key: string]: any;
 }
 
@@ -211,18 +215,21 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     try {
       if (activeTab === 'waitlist' && editingRecord.email) {
         const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/${encodeURIComponent(editingRecord.email)}`,
+          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/update`,
           {
-            method: 'PATCH',
+            method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              name: editingRecord.name,
-              referrals: editingRecord.referrals,
-              position: editingRecord.position,
-              confirmed: editingRecord.confirmed
+              email: editingRecord.email,
+              updates: {
+                name: editingRecord.name,
+                referrals: editingRecord.referrals,
+                position: editingRecord.position,
+                confirmed: editingRecord.confirmed
+              }
             })
           }
         );
@@ -271,10 +278,14 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       if (activeTab === 'waitlist' && record.email) {
         setDeletingRecord(record.id);
         const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/${encodeURIComponent(record.email)}`,
+          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/delete`,
           {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${accessToken}` }
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: record.email })
           }
         );
         if (response.ok) {
@@ -525,15 +536,16 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           </div>
         )}
 
-        {/* Image (non-waitlist) or Avatar placeholder (waitlist) */}
+        {/* Queue number + Avatar */}
         {isWaitlist ? (
-          <div
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center cursor-pointer"
-            onClick={() => handleViewDetail(record)}
-          >
-            <span className="text-blue-700 font-semibold text-sm">
-              {(record.email || '?')[0].toUpperCase()}
-            </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs font-bold text-gray-400 w-6 text-right">#{record.position || '?'}</span>
+            <img
+              src={`https://www.gravatar.com/avatar/${record.email ? Array.from(record.email.trim().toLowerCase()).reduce((h: number, c: string) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', '') : '0'}?d=identicon&s=40`}
+              alt={record.email || ''}
+              className="w-9 h-9 rounded-full cursor-pointer border border-gray-200"
+              onClick={() => handleViewDetail(record)}
+            />
           </div>
         ) : (
           <div className="flex-shrink-0">
@@ -557,9 +569,21 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               >
                 {isWaitlist ? (record.email || 'No email') : displayName}
               </div>
-              {isWaitlist && record.created_at && (
-                <div className="text-xs text-gray-500 mt-0.5">
-                  {new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+              {isWaitlist && (
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {record.created_at && (
+                    <span className="text-xs text-gray-500">
+                      {new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                    </span>
+                  )}
+                  {record.ipAddress && (
+                    <span className="text-xs text-gray-400" title={record.ipAddress}>
+                      IP: {record.ipAddress.split(',')[0].trim()}
+                    </span>
+                  )}
+                  {record.source && (
+                    <Badge className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-500">{record.source}</Badge>
+                  )}
                 </div>
               )}
               {!isWaitlist && record.category && (
@@ -888,11 +912,11 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               {activeTab === 'waitlist' ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 pb-3 border-b">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                      <span className="text-blue-700 font-bold text-lg">
-                        {(detailRecord.email || '?')[0].toUpperCase()}
-                      </span>
-                    </div>
+                    <img
+                      src={`https://www.gravatar.com/avatar/${detailRecord.email ? Array.from(detailRecord.email.trim().toLowerCase()).reduce((h: number, c: string) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', '') : '0'}?d=identicon&s=80`}
+                      alt={detailRecord.email || ''}
+                      className="w-14 h-14 rounded-full border-2 border-gray-200"
+                    />
                     <div>
                       <div className="font-semibold text-gray-900">{detailRecord.email}</div>
                       {detailRecord.name && (
@@ -903,7 +927,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">Position</div>
+                      <div className="text-xs text-gray-500 font-medium uppercase">Queue Position</div>
                       <div className="text-lg font-semibold text-gray-900">#{detailRecord.position || 'N/A'}</div>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3">
@@ -932,10 +956,31 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     </div>
                   </div>
 
+                  {detailRecord.ipAddress && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 font-medium uppercase">IP Address</div>
+                      <div className="text-sm font-mono text-gray-900 mt-1">{detailRecord.ipAddress}</div>
+                    </div>
+                  )}
+
                   {detailRecord.referralCode && (
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="text-xs text-gray-500 font-medium uppercase">Referral Code</div>
                       <div className="text-sm font-mono text-gray-900 mt-1">{detailRecord.referralCode}</div>
+                    </div>
+                  )}
+
+                  {detailRecord.referredBy && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 font-medium uppercase">Referred By</div>
+                      <div className="text-sm font-mono text-gray-900 mt-1">{detailRecord.referredBy}</div>
+                    </div>
+                  )}
+
+                  {detailRecord.source && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 font-medium uppercase">Source</div>
+                      <div className="text-sm text-gray-900 mt-1">{detailRecord.source}</div>
                     </div>
                   )}
 

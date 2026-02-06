@@ -1017,19 +1017,26 @@ app.get('/make-server-ed0fe4c2/admin/waitlist', async (c) => {
       return c.json([])
     }
 
-    // Transform KV data to admin panel format
-    const waitlistUsers = allKeys.map((user: any, index: number) => ({
-      id: user.email || `waitlist_${index}`,
-      email: user.email,
-      position: user.position || 0,
-      referralCode: user.referralCode,
-      referrals: user.referrals || 0,
-      emailsSent: user.emailsSent || 0,
-      email_sent: (user.emailsSent || 0) > 0,
-      created_at: user.signupDate || user.createdAt,
-      confirmed: user.confirmed || false,
-      lastEmailSent: user.lastEmailSent
-    }))
+    // Transform KV data to admin panel format, sorted by position
+    const waitlistUsers = allKeys
+      .sort((a: any, b: any) => (a.position || 999) - (b.position || 999))
+      .map((user: any, index: number) => ({
+        id: user.email || `waitlist_${index}`,
+        email: user.email,
+        name: user.name || null,
+        position: user.position || index + 1,
+        referralCode: user.referralCode,
+        referrals: user.referrals || 0,
+        emailsSent: user.emailsSent || 0,
+        email_sent: (user.emailsSent || 0) > 0,
+        created_at: user.signupDate || user.createdAt,
+        confirmed: user.confirmed || false,
+        lastEmailSent: user.lastEmailSent,
+        ipAddress: user.ipAddress || null,
+        userAgent: user.userAgent || null,
+        source: user.source || null,
+        referredBy: user.referredBy || null
+      }))
 
     console.log(`✅ Retrieved ${waitlistUsers.length} waitlist users from KV store`)
     
@@ -1043,8 +1050,8 @@ app.get('/make-server-ed0fe4c2/admin/waitlist', async (c) => {
   }
 })
 
-// Delete a waitlist user from KV store
-app.delete('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
+// Delete a waitlist user from KV store (POST body to avoid @ in URL)
+app.post('/make-server-ed0fe4c2/admin/waitlist/delete', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
     const adminValidation = await validateAdminAccess(accessToken)
@@ -1052,28 +1059,41 @@ app.delete('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
       return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     }
 
-    const email = decodeURIComponent(c.req.param('email')).trim().toLowerCase()
-    if (!email) {
+    const { email } = await c.req.json()
+    const normalizedEmail = (email || '').trim().toLowerCase()
+    if (!normalizedEmail) {
       return c.json({ success: false, error: 'Email is required' }, 400)
     }
 
-    const existing = await kv.get(`waitlist_user_${email}`)
+    const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
     if (!existing) {
       return c.json({ success: false, error: 'User not found' }, 404)
     }
 
-    await kv.del(`waitlist_user_${email}`)
-    console.log(`🗑️ Deleted waitlist user: ${email}`)
+    await kv.del(`waitlist_user_${normalizedEmail}`)
+    console.log(`🗑️ Deleted waitlist user: ${normalizedEmail}`)
 
-    return c.json({ success: true, message: `Deleted ${email}` })
+    // Recalculate positions for remaining users
+    const remaining = await kv.getByPrefix('waitlist_user_')
+    const sorted = remaining.sort((a: any, b: any) => (a.position || 999) - (b.position || 999))
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].position !== i + 1) {
+        sorted[i].position = i + 1
+        await kv.set(`waitlist_user_${sorted[i].email}`, sorted[i])
+      }
+    }
+    // Update count
+    await kv.set('waitlist_count', { count: sorted.length, lastUpdated: new Date().toISOString() })
+
+    return c.json({ success: true, message: `Deleted ${normalizedEmail}`, newCount: sorted.length })
   } catch (error) {
     console.error('❌ Error deleting waitlist user:', error)
     return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
   }
 })
 
-// Update a waitlist user in KV store
-app.patch('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
+// Update a waitlist user in KV store (POST body to avoid @ in URL)
+app.post('/make-server-ed0fe4c2/admin/waitlist/update', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
     const adminValidation = await validateAdminAccess(accessToken)
@@ -1081,22 +1101,22 @@ app.patch('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
       return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     }
 
-    const email = decodeURIComponent(c.req.param('email')).trim().toLowerCase()
-    if (!email) {
+    const { email, updates } = await c.req.json()
+    const normalizedEmail = (email || '').trim().toLowerCase()
+    if (!normalizedEmail) {
       return c.json({ success: false, error: 'Email is required' }, 400)
     }
 
-    const existing = await kv.get(`waitlist_user_${email}`)
+    const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
     if (!existing) {
       return c.json({ success: false, error: 'User not found' }, 404)
     }
 
-    const updates = await c.req.json()
     const updatedUser = { ...existing, ...updates, email: existing.email }
-    await kv.set(`waitlist_user_${email}`, updatedUser)
-    console.log(`✏️ Updated waitlist user: ${email}`)
+    await kv.set(`waitlist_user_${normalizedEmail}`, updatedUser)
+    console.log(`✏️ Updated waitlist user: ${normalizedEmail}`)
 
-    return c.json({ success: true, message: `Updated ${email}`, user: updatedUser })
+    return c.json({ success: true, message: `Updated ${normalizedEmail}`, user: updatedUser })
   } catch (error) {
     console.error('❌ Error updating waitlist user:', error)
     return c.json({ success: false, error: error.message || 'Internal server error' }, 500)

@@ -457,6 +457,8 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
       utm_source: utm_source || null,
       utm_medium: utm_medium || null,
       utm_campaign: utm_campaign || null,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
       signupDate: new Date().toISOString(),
       confirmed: false,
       emailsSent: 0
