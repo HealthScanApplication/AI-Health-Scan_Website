@@ -13,6 +13,59 @@ import { adminApp } from './admin-endpoints-fixed.tsx'
 import { referralApp } from './referral-endpoints.tsx'
 import blogRssApp from './blog-rss-endpoints.tsx'
 
+// Slack notification helper - sends to configured webhook (non-blocking)
+async function notifySlack(message: { text: string; blocks?: any[] }): Promise<void> {
+  const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL')
+  if (!webhookUrl) {
+    console.log('ℹ️ Slack notification skipped (SLACK_WEBHOOK_URL not set)')
+    return
+  }
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    })
+    if (!res.ok) console.warn('⚠️ Slack notification failed:', res.status)
+    else console.log('✅ Slack notification sent')
+  } catch (err) {
+    console.warn('⚠️ Slack notification error (non-critical):', err)
+  }
+}
+
+function buildWaitlistSlackMessage(data: {
+  email: string; name: string; position: number; source: string;
+  referralCode: string; referredBy?: string | null; totalWaitlist: number;
+}) {
+  const sourceEmoji = data.source === 'tally' ? '📋' : '🌐'
+  const referralLine = data.referredBy ? `\n🔗 Referred by code: \`${data.referredBy}\`` : ''
+  return {
+    text: `New waitlist signup: ${data.email} (#${data.position})`,
+    blocks: [
+      {
+        type: 'header',
+        text: { type: 'plain_text', text: `${sourceEmoji} New Waitlist Signup!`, emoji: true }
+      },
+      {
+        type: 'section',
+        fields: [
+          { type: 'mrkdwn', text: `*Email:*\n${data.email}` },
+          { type: 'mrkdwn', text: `*Name:*\n${data.name}` },
+          { type: 'mrkdwn', text: `*Position:*\n#${data.position}` },
+          { type: 'mrkdwn', text: `*Source:*\n${data.source}` },
+          { type: 'mrkdwn', text: `*Referral Code:*\n\`${data.referralCode}\`` },
+          { type: 'mrkdwn', text: `*Total Waitlist:*\n${data.totalWaitlist}` }
+        ]
+      },
+      ...(referralLine ? [{
+        type: 'context',
+        elements: [{ type: 'mrkdwn', text: referralLine }]
+      }] : []),
+      { type: 'divider' }
+    ]
+  }
+}
+
 // Initialize Hono app
 const app = new Hono()
 
@@ -660,6 +713,13 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
     await kv.set('waitlist_count', { count: position, lastUpdated: new Date().toISOString() })
 
     console.log(`🎉 Tally webhook: New waitlist signup #${position}: ${email}`)
+
+    // Slack notification (non-blocking)
+    notifySlack(buildWaitlistSlackMessage({
+      email, name: name || email.split('@')[0], position,
+      source: 'tally', referralCode: userReferralCode,
+      referredBy: referralCode || null, totalWaitlist: position
+    })).catch(() => {})
 
     // Send confirmation email (optional, non-blocking)
     try {

@@ -659,6 +659,38 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
       console.warn('⚠️ Zapier webhook failed (non-critical):', error);
     }
 
+    // Slack notification (non-blocking)
+    try {
+      const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL')
+      if (slackWebhookUrl) {
+        const sourceEmoji = '🌐'
+        const referralLine = referralCode ? `\n🔗 Referred by code: \`${referralCode}\`` : ''
+        fetch(slackWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: `New waitlist signup: ${normalizedEmail} (#${calculatedPosition})`,
+            blocks: [
+              { type: 'header', text: { type: 'plain_text', text: `${sourceEmoji} New Waitlist Signup!`, emoji: true } },
+              { type: 'section', fields: [
+                { type: 'mrkdwn', text: `*Email:*\n${normalizedEmail}` },
+                { type: 'mrkdwn', text: `*Name:*\n${userName}` },
+                { type: 'mrkdwn', text: `*Position:*\n#${calculatedPosition}` },
+                { type: 'mrkdwn', text: `*Source:*\n${source || 'website'}` },
+                { type: 'mrkdwn', text: `*Referral Code:*\n\`${userReferralCode}\`` },
+                { type: 'mrkdwn', text: `*Total Waitlist:*\n${currentCount + 1}` }
+              ]},
+              ...(referralLine ? [{ type: 'context', elements: [{ type: 'mrkdwn', text: referralLine }] }] : []),
+              { type: 'divider' }
+            ]
+          })
+        }).catch(() => {})
+        console.log('✅ Slack notification queued')
+      }
+    } catch (slackErr) {
+      console.warn('⚠️ Slack notification error (non-critical):', slackErr)
+    }
+
     // Log successful signup
     console.log('🎉 Waitlist signup completed:', {
       email: normalizedEmail,
