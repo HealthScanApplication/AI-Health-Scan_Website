@@ -25,7 +25,10 @@ import {
   X,
   Eye,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  FlaskConical,
+  Package,
+  Clock
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -71,7 +74,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [elementFilter, setElementFilter] = useState<'all' | 'beneficial' | 'hazardous'>('all');
+  const [subFilter, setSubFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -84,12 +87,39 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [savingRecord, setSavingRecord] = useState(false);
 
   const tabs = [
-    { id: 'waitlist', label: 'Waitlist', icon: '⏳', table: 'waitlist' },
-    { id: 'elements', label: 'Elements', icon: '🧪', table: 'catalog_elements' },
-    { id: 'ingredients', label: 'Ingredients', icon: '🌾', table: 'catalog_ingredients' },
-    { id: 'recipes', label: 'Recipes', icon: '🍽️', table: 'catalog_recipes' },
-    { id: 'products', label: 'Products', icon: '\ud83d\udce6', table: 'catalog_recipes' }
+    { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
+    { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
+    { id: 'ingredients', label: 'Ingredients', icon: <Leaf className="w-4 h-4" />, table: 'catalog_ingredients' },
+    { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
+    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_recipes' }
   ];
+
+  const subFilters: Record<string, { label: string; value: string; color: string }[]> = {
+    elements: [
+      { label: 'All', value: 'all', color: 'blue' },
+      { label: 'Beneficial', value: 'beneficial', color: 'green' },
+      { label: 'Hazardous', value: 'hazardous', color: 'red' },
+      { label: 'Both', value: 'both', color: 'amber' },
+    ],
+    ingredients: [
+      { label: 'All', value: 'all', color: 'blue' },
+      { label: 'Raw', value: 'raw', color: 'green' },
+      { label: 'Processed', value: 'processed', color: 'orange' },
+    ],
+    recipes: [
+      { label: 'All', value: 'all', color: 'blue' },
+      { label: 'Beverage', value: 'beverage', color: 'cyan' },
+      { label: 'Meal', value: 'meal', color: 'green' },
+      { label: 'Condiment', value: 'condiment', color: 'amber' },
+    ],
+    products: [
+      { label: 'All', value: 'all', color: 'blue' },
+      { label: 'Beverage', value: 'beverage', color: 'cyan' },
+      { label: 'Meal', value: 'meal', color: 'green' },
+      { label: 'Condiment', value: 'condiment', color: 'amber' },
+      { label: 'Supplement', value: 'supplement', color: 'purple' },
+    ],
+  };
 
   const currentTab = tabs.find(t => t.id === activeTab);
 
@@ -438,11 +468,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       (record.category?.toLowerCase().includes(searchLower))
     );
     
-    // Filter by element type if on elements tab
-    if (activeTab === 'elements' && elementFilter !== 'all') {
+    // Filter by sub-category if a sub-filter is active
+    if (subFilter !== 'all' && activeTab !== 'waitlist') {
       const category = record.category?.toLowerCase() || '';
-      if (elementFilter === 'beneficial' && !category.includes('beneficial')) return false;
-      if (elementFilter === 'hazardous' && !category.includes('hazardous')) return false;
+      const type = record.type?.toLowerCase() || '';
+      const combined = `${category} ${type}`;
+      if (!combined.includes(subFilter.toLowerCase())) return false;
     }
     
     // Filter by category if categoryFilter is set
@@ -645,7 +676,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           <CardDescription>Manage users, waitlist, elements, ingredients, and recipes</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); }} className="w-full">
+          <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); }} className="w-full">
             <TabsList className="grid w-full grid-cols-5">
               {tabs.map(tab => (
                 <TabsTrigger key={tab.id} value={tab.id} className="gap-2">
@@ -657,61 +688,34 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             {tabs.map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
-                {/* Element Filter Tabs */}
-                {tab.id === 'elements' && (
-                  <div className="flex gap-2 border-b">
-                    <button
-                      onClick={() => setElementFilter('all')}
-                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                        elementFilter === 'all'
-                          ? 'border-blue-600 text-blue-600'
-                          : 'border-transparent text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      All
-                    </button>
-                    <button
-                      onClick={() => setElementFilter('beneficial')}
-                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                        elementFilter === 'beneficial'
-                          ? 'border-green-600 text-green-600'
-                          : 'border-transparent text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      Beneficial
-                    </button>
-                    <button
-                      onClick={() => setElementFilter('hazardous')}
-                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                        elementFilter === 'hazardous'
-                          ? 'border-red-600 text-red-600'
-                          : 'border-transparent text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      Hazardous
-                    </button>
-                  </div>
-                )}
-
-                {/* Category Filter */}
-                {uniqueCategories.length > 0 && tab.id !== 'waitlist' && (
-                  <div className="flex gap-2 items-center">
-                    <label htmlFor="category-filter" className="text-sm font-medium text-gray-700">Filter by Category:</label>
-                    <select
-                      id="category-filter"
-                      title="Filter records by category"
-                      value={categoryFilter}
-                      onChange={(e) => {
-                        setCategoryFilter(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Categories</option>
-                      {uniqueCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                {/* Sub-category Filter Tabs */}
+                {subFilters[tab.id] && (
+                  <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+                    {subFilters[tab.id].map((sf) => {
+                      const isActive = subFilter === sf.value;
+                      const colorMap: Record<string, string> = {
+                        blue: 'bg-blue-600 text-white shadow-sm',
+                        green: 'bg-green-600 text-white shadow-sm',
+                        red: 'bg-red-600 text-white shadow-sm',
+                        amber: 'bg-amber-600 text-white shadow-sm',
+                        orange: 'bg-orange-600 text-white shadow-sm',
+                        cyan: 'bg-cyan-600 text-white shadow-sm',
+                        purple: 'bg-purple-600 text-white shadow-sm',
+                      };
+                      return (
+                        <button
+                          key={sf.value}
+                          onClick={() => { setSubFilter(sf.value); setCurrentPage(1); }}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                            isActive
+                              ? colorMap[sf.color] || 'bg-blue-600 text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                          }`}
+                        >
+                          {sf.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
