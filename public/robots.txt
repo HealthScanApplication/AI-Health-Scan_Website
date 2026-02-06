@@ -1,0 +1,13 @@
+# HealthScan - https://healthscan.live
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /diagnostic
+Disallow: /login-diagnostic
+Disallow: /email-debug
+Disallow: /email-test
+Disallow: /convertkit-test
+Disallow: /referral-test
+
+# Sitemap
+Sitemap: https://healthscan.live/sitemap.xml
