@@ -87,7 +87,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     { id: 'waitlist', label: 'Waitlist', icon: '⏳', table: 'waitlist' },
     { id: 'elements', label: 'Elements', icon: '🧪', table: 'catalog_elements' },
     { id: 'ingredients', label: 'Ingredients', icon: '🌾', table: 'catalog_ingredients' },
-    { id: 'recipes', label: 'Recipes', icon: '🍽️', table: 'catalog_recipes' }
+    { id: 'recipes', label: 'Recipes', icon: '🍽️', table: 'catalog_recipes' },
+    { id: 'products', label: 'Products', icon: '\ud83d\udce6', table: 'catalog_recipes' }
   ];
 
   const currentTab = tabs.find(t => t.id === activeTab);
@@ -98,9 +99,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     
     try {
       setLoading(true);
-      console.log(`📊 Fetching ${currentTab.label} from ${currentTab.table}...`);
-      console.log(`🔑 Access Token: ${accessToken ? 'Present' : 'Missing'}`);
-      console.log(`🔑 API Key: ${publicAnonKey ? 'Present' : 'Missing'}`);
+      console.log(`[Admin] Fetching ${currentTab.label} from ${currentTab.table}...`);
       
       // Build query with proper filters
       let url: string;
@@ -108,7 +107,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       // Use custom endpoint for waitlist data from KV store
       if (activeTab === 'waitlist') {
         url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist`;
-        console.log(`🌐 Fetching waitlist from KV store: ${url}`);
+        console.log(`[Admin] Fetching waitlist from KV store: ${url}`);
         
         const response = await fetch(url, {
           headers: {
@@ -119,12 +118,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         
         if (response.ok) {
           const data = await response.json();
-          console.log(`✅ Loaded ${data?.length || 0} waitlist users from KV store`);
+          console.log(`[Admin] Loaded ${data?.length || 0} waitlist users from KV store`);
           setRecords(Array.isArray(data) ? data : []);
         } else {
           const errorText = await response.text();
-          console.warn(`⚠️ Failed to fetch waitlist:`, response.status, response.statusText);
-          console.warn(`📝 Error response:`, errorText);
+          console.warn(`[Admin] Failed to fetch waitlist:`, response.status, response.statusText);
+          console.warn(`[Admin] Error response:`, errorText);
           setRecords([]);
         }
         setLoading(false);
@@ -133,15 +132,14 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       
       url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`;
       
-      // Add ordering for elements
+      // Add ordering
       if (activeTab === 'elements') {
-        url += '&order=category.asc,name.asc';
-      } else if (activeTab !== 'users') {
+        url += '&order=category.asc,name_common.asc';
+      } else {
         url += '&order=created_at.desc';
       }
 
-      console.log(`🌐 Fetching URL: ${url}`);
-      console.log(`📊 Table: ${currentTab.table}, Tab: ${activeTab}`);
+      console.log(`[Admin] Fetching URL: ${url}`);
 
       const response = await fetch(url, {
         headers: {
@@ -152,42 +150,20 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       });
 
-      console.log(`📡 Response Status: ${response.status} ${response.statusText}`);
+      console.log(`[Admin] Response: ${response.status} ${response.statusText}`);
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`✅ Loaded ${data?.length || 0} ${currentTab.label}`);
-        console.log(`📋 Sample data:`, data?.slice(0, 2));
-        
-        if (activeTab === 'elements') {
-          console.log(`🧪 Elements debug:`, data?.slice(0, 3).map((e: any) => ({
-            id: e.id,
-            name: e.name_common || e.name,
-            category: e.category,
-            created_at: e.created_at,
-            has_image: !!e.image_url
-          })));
-        }
-        
-        if (activeTab === 'recipes') {
-          console.log(`🖼️ Recipe images debug:`, data?.slice(0, 3).map((r: any) => ({
-            id: r.id,
-            name: r.name_common || r.name,
-            image_url: r.image_url,
-            created_at: r.created_at,
-            has_image: !!r.image_url
-          })));
-        }
-        
+        console.log(`[Admin] Loaded ${data?.length || 0} ${currentTab.label}`);
         setRecords(Array.isArray(data) ? data : []);
       } else {
         const errorText = await response.text();
-        console.warn(`⚠️ Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
-        console.warn(`📝 Error response:`, errorText);
+        console.warn(`[Admin] Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
+        console.warn(`[Admin] Error:`, errorText);
         setRecords([]);
       }
     } catch (error) {
-      console.error(`❌ Error fetching ${currentTab.label}:`, error);
+      console.error(`[Admin] Error fetching ${currentTab.label}:`, error);
       setRecords([]);
     } finally {
       setLoading(false);
@@ -658,7 +634,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); }} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               {tabs.map(tab => (
                 <TabsTrigger key={tab.id} value={tab.id} className="gap-2">
                   <span>{tab.icon}</span>
