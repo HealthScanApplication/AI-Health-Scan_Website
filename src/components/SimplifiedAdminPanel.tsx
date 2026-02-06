@@ -255,119 +255,140 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
     try {
       if (activeTab === 'waitlist' && editingRecord.email) {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/update`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              email: editingRecord.email,
-              updates: {
-                name: editingRecord.name,
-                referrals: editingRecord.referrals,
-                position: editingRecord.position,
-                confirmed: editingRecord.confirmed
-              }
-            })
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/update`;
+        const body = {
+          email: editingRecord.email,
+          updates: {
+            name: editingRecord.name,
+            referrals: editingRecord.referrals,
+            position: editingRecord.position,
+            confirmed: editingRecord.confirmed
           }
-        );
+        };
+        console.log('[Admin SAVE] Waitlist update:', url, body);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        const responseText = await response.text();
+        console.log('[Admin SAVE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Waitlist user updated');
           setShowEditModal(false);
           setShowDetailModal(false);
           fetchRecords();
         } else {
-          const err = await response.json();
-          toast.error(err.error || 'Failed to update user');
+          try {
+            const err = JSON.parse(responseText);
+            toast.error(err.error || `Failed to update (${response.status})`);
+          } catch {
+            toast.error(`Failed to update: ${response.status} ${responseText.slice(0, 100)}`);
+          }
         }
       } else {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              table: currentTab.table,
-              id: editingRecord.id,
-              updates: editingRecord
-            })
-          }
-        );
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
+        const body = {
+          table: currentTab.table,
+          id: editingRecord.id,
+          updates: editingRecord
+        };
+        console.log('[Admin SAVE] Catalog update:', url, body);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        const responseText = await response.text();
+        console.log('[Admin SAVE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Record updated successfully');
           setShowEditModal(false);
           fetchRecords();
         } else {
-          const err = await response.json();
-          toast.error(err.error || 'Failed to update record');
+          try {
+            const err = JSON.parse(responseText);
+            toast.error(err.error || `Failed to update (${response.status})`);
+          } catch {
+            toast.error(`Failed to update: ${response.status} ${responseText.slice(0, 100)}`);
+          }
         }
       }
     } catch (error) {
-      console.error('Error saving record:', error);
-      toast.error('Error saving record');
+      console.error('[Admin SAVE] Error:', error);
+      toast.error(`Error saving: ${error}`);
     } finally {
       setSavingRecord(false);
     }
   };
 
   const handleDelete = async (record: AdminRecord) => {
-    if (!currentTab || !confirm(`Are you sure you want to delete ${record.email || record.name || 'this record'}?`)) return;
+    if (!currentTab || !confirm(`Are you sure you want to delete ${record.email || record.name || record.name_common || 'this record'}?`)) return;
 
     try {
+      setDeletingRecord(record.id);
       if (activeTab === 'waitlist' && record.email) {
-        setDeletingRecord(record.id);
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/delete`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email: record.email })
-          }
-        );
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist/delete`;
+        const body = { email: record.email };
+        console.log('[Admin DELETE] Waitlist:', url, body);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        const responseText = await response.text();
+        console.log('[Admin DELETE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success(`Deleted ${record.email}`);
           setShowDetailModal(false);
           fetchRecords();
         } else {
-          const err = await response.json();
-          toast.error(err.error || 'Failed to delete user');
+          try {
+            const err = JSON.parse(responseText);
+            toast.error(err.error || `Delete failed (${response.status})`);
+          } catch {
+            toast.error(`Delete failed: ${response.status} ${responseText.slice(0, 100)}`);
+          }
         }
       } else {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/delete`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              table: currentTab.table,
-              id: record.id
-            })
-          }
-        );
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/delete`;
+        const body = { table: currentTab.table, id: record.id };
+        console.log('[Admin DELETE] Catalog:', url, body);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        const responseText = await response.text();
+        console.log('[Admin DELETE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Record deleted successfully');
           setShowDetailModal(false);
           fetchRecords();
         } else {
-          const err = await response.json();
-          toast.error(err.error || 'Failed to delete record');
+          try {
+            const err = JSON.parse(responseText);
+            toast.error(err.error || `Delete failed (${response.status})`);
+          } catch {
+            toast.error(`Delete failed: ${response.status} ${responseText.slice(0, 100)}`);
+          }
         }
       }
     } catch (error) {
-      console.error('Error deleting record:', error);
-      toast.error('Error deleting record');
+      console.error('[Admin DELETE] Error:', error);
+      toast.error(`Error deleting: ${error}`);
     } finally {
       setDeletingRecord(null);
     }
