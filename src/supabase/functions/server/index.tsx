@@ -1050,6 +1050,50 @@ app.get('/make-server-ed0fe4c2/admin/waitlist', async (c) => {
   }
 })
 
+// Get products data from KV store for admin panel
+app.get('/make-server-ed0fe4c2/admin/products', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    console.log('[Admin] Fetching products from KV store...')
+    const allProducts = await kv.getByPrefix('product_')
+    
+    if (!allProducts || allProducts.length === 0) {
+      console.log('[Admin] No products found in KV store')
+      return c.json([])
+    }
+
+    const products = allProducts.map((product: any, index: number) => ({
+      id: product.id || `product_${index}`,
+      name: product.name,
+      brand: product.brand || null,
+      category: product.category || null,
+      type: product.type || null,
+      barcode: product.barcode || null,
+      description: product.description || null,
+      image_url: product.image_url || null,
+      serving_size: product.serving_size || null,
+      ingredients: product.ingredients || [],
+      nutrition_facts: product.nutrition_facts || {},
+      allergens: product.allergens || [],
+      warnings: product.warnings || [],
+      certifications: product.certifications || [],
+      source: product.source || null,
+      created_at: product.imported_at || null
+    }))
+
+    console.log(`[Admin] Retrieved ${products.length} products from KV store`)
+    return c.json(products)
+  } catch (error) {
+    console.error('[Admin] Error fetching products:', error)
+    return c.json({ success: false, error: 'Internal server error' }, 500)
+  }
+})
+
 // Delete a waitlist user from KV store (POST body to avoid @ in URL)
 app.post('/make-server-ed0fe4c2/admin/waitlist/delete', async (c) => {
   try {
@@ -1197,7 +1241,7 @@ app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-delete', async (c) => {
   }
 })
 
-// Admin: Update a catalog record (elements, ingredients, recipes)
+// Admin: Update a catalog record (elements, ingredients, recipes, products)
 app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
@@ -1208,7 +1252,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c) => {
 
     const { table, id, updates } = await c.req.json()
     
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
     if (!allowedTables.includes(table)) {
       return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     }
@@ -1216,11 +1260,25 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c) => {
       return c.json({ success: false, error: 'Record ID is required' }, 400)
     }
 
+    // Products are stored in KV, not a DB table
+    if (table === 'catalog_products') {
+      const existing = await kv.get(id)
+      if (!existing) {
+        return c.json({ success: false, error: 'Product not found' }, 404)
+      }
+      const stripFields = ['_displayIndex', 'created_at']
+      const cleanUpdates = { ...existing, ...updates }
+      stripFields.forEach(f => delete cleanUpdates[f])
+      cleanUpdates.updated_at = new Date().toISOString()
+      await kv.set(id, cleanUpdates)
+      console.log(`[Admin] Updated product ${id} in KV by ${adminValidation.user.email}`)
+      return c.json({ success: true })
+    }
+
     // Strip non-DB fields from updates
     const cleanUpdates = { ...updates }
     const stripFields = ['_displayIndex', 'id', 'created_at', 'imported_at', 'api_source', 'external_id']
     stripFields.forEach(f => delete cleanUpdates[f])
-    // Remove any null/undefined values to avoid overwriting with nulls
     Object.keys(cleanUpdates).forEach(k => {
       if (cleanUpdates[k] === undefined) delete cleanUpdates[k]
     })
@@ -1245,7 +1303,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c) => {
   }
 })
 
-// Admin: Delete a catalog record (elements, ingredients, recipes)
+// Admin: Delete a catalog record (elements, ingredients, recipes, products)
 app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
@@ -1256,12 +1314,19 @@ app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c) => {
 
     const { table, id } = await c.req.json()
     
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
     if (!allowedTables.includes(table)) {
       return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     }
     if (!id) {
       return c.json({ success: false, error: 'Record ID is required' }, 400)
+    }
+
+    // Products are stored in KV, not a DB table
+    if (table === 'catalog_products') {
+      await kv.del(id)
+      console.log(`[Admin] Deleted product ${id} from KV by ${adminValidation.user.email}`)
+      return c.json({ success: true })
     }
 
     const { error } = await supabase

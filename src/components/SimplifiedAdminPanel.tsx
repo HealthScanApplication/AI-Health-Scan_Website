@@ -91,7 +91,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
     { id: 'ingredients', label: 'Ingredients', icon: <Leaf className="w-4 h-4" />, table: 'catalog_ingredients' },
     { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
-    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_recipes' }
+    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' }
   ];
 
   const subFilters: Record<string, { label: string; value: string; color: string }[]> = {
@@ -168,10 +168,11 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       // Build query with proper filters
       let url: string;
       
-      // Use custom endpoint for waitlist data from KV store
-      if (activeTab === 'waitlist') {
-        url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist`;
-        console.log(`[Admin] Fetching waitlist from KV store: ${url}`);
+      // Use custom endpoint for KV-stored data (waitlist, products)
+      if (activeTab === 'waitlist' || activeTab === 'products') {
+        const kvEndpoint = activeTab === 'waitlist' ? 'admin/waitlist' : 'admin/products';
+        url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/${kvEndpoint}`;
+        console.log(`[Admin] Fetching ${currentTab.label} from KV store: ${url}`);
         
         const response = await fetch(url, {
           headers: {
@@ -182,11 +183,11 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         
         if (response.ok) {
           const data = await response.json();
-          console.log(`[Admin] Loaded ${data?.length || 0} waitlist users from KV store`);
+          console.log(`[Admin] Loaded ${data?.length || 0} ${currentTab.label} from KV store`);
           setRecords(Array.isArray(data) ? data : []);
         } else {
           const errorText = await response.text();
-          console.warn(`[Admin] Failed to fetch waitlist:`, response.status, response.statusText);
+          console.warn(`[Admin] Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
           console.warn(`[Admin] Error response:`, errorText);
           setRecords([]);
         }
@@ -516,8 +517,29 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     if (subFilter !== 'all' && activeTab !== 'waitlist') {
       const category = record.category?.toLowerCase() || '';
       const type = record.type?.toLowerCase() || '';
-      const combined = `${category} ${type}`;
-      if (!combined.includes(subFilter.toLowerCase())) return false;
+      const filterVal = subFilter.toLowerCase();
+      
+      if (activeTab === 'elements') {
+        // Elements: filter by category column (beneficial/hazardous/both)
+        if (filterVal === 'both') {
+          if (category !== 'both') return false;
+        } else {
+          if (category !== filterVal) return false;
+        }
+      } else if (activeTab === 'ingredients') {
+        // Ingredients: raw = no processing, processed = any processing method present
+        if (filterVal === 'processed') {
+          if (type === 'raw' || type === '' || !type) return false;
+        } else if (filterVal === 'raw') {
+          if (type && type !== 'raw' && type !== 'vegetable' && type !== 'fruit' && type !== 'fish' && type !== 'whole grain') return false;
+        }
+      } else if (activeTab === 'recipes') {
+        // Recipes: filter by category column
+        if (category !== filterVal) return false;
+      } else if (activeTab === 'products') {
+        // Products: filter by category column
+        if (category !== filterVal) return false;
+      }
     }
     
     // Filter by category if categoryFilter is set
@@ -732,7 +754,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); }} className="w-full">
             <TabsList className="grid w-full grid-cols-5">
               {tabs.map(tab => (
-                <TabsTrigger key={tab.id} value={tab.id} className="gap-2">
+                <TabsTrigger key={tab.id} value={tab.id} className={`gap-2 ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-md font-semibold border border-blue-200' : ''}`}>
                   <span>{tab.icon}</span>
                   <span className="hidden sm:inline">{tab.label}</span>
                 </TabsTrigger>
@@ -743,7 +765,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                 {/* Sub-category Filter Tabs */}
                 {subFilters[tab.id] && (
-                  <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+                  <div className="flex gap-1 p-1 bg-gray-100 rounded-lg justify-center">
                     {subFilters[tab.id].map((sf) => {
                       const isActive = subFilter === sf.value;
                       const colorMap: Record<string, string> = {
@@ -754,6 +776,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                         orange: 'bg-orange-600 text-white shadow-sm',
                         cyan: 'bg-cyan-600 text-white shadow-sm',
                         purple: 'bg-purple-600 text-white shadow-sm',
+                        lime: 'bg-lime-600 text-white shadow-sm',
                       };
                       return (
                         <button
