@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { getSupabaseClient } from '../utils/supabase/client';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface UseUrlParameterHandlingProps {
   setCurrentPage: (page: string) => void;

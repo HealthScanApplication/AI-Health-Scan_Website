@@ -1,5 +1,5 @@
 import { projectId, publicAnonKey } from './supabase/info';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 // Convert array of objects to CSV string
 export const arrayToCSV = (data: any[], filename: string): string => {

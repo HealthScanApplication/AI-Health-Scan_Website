@@ -9,7 +9,7 @@ import { Switch } from './ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Zap, Plus, Settings, TestTube, Activity, Trash2, Copy, ExternalLink, CheckCircle, XCircle, Clock, AlertTriangle, BookOpen, HelpCircle } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { ZapierSetupGuide } from './ZapierSetupGuide';

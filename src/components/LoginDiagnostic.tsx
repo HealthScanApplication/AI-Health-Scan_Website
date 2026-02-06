@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient, getSupabaseClientDiagnostics, handleSupabaseError } from '../utils/supabase/client';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   User, 
   Shield, 

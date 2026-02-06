@@ -597,7 +597,6 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
             userAgent,
             signupDate: userData.signupDate,
             emailSent,
-            emailError,
             emailError: emailError || undefined
           })
 

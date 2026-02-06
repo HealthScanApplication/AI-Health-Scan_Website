@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, User, Key, TestTube, Trash2 } from 'lucide-react';
 

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Progress } from '../ui/progress'
-import { toast } from 'sonner@2.0.3'
+import { toast } from 'sonner'
 import {
   BarChart,
   Bar,
@@ -84,11 +84,11 @@ interface ReferralAnalyticsDashboardProps {
 
 export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDashboardProps) {
   // Core data state
-  const [metrics, setMetrics] = useState<ReferralMetrics | null | Record<string, any>>(null)
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | Record<string, any>[]>([])
-  const [conversionFunnel, setConversionFunnel] = useState<ConversionFunnel[] | Record<string, any>[]>([])
-  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[] | Record<string, any>[]>([])
-  const [tierAnalysis, setTierAnalysis] = useState<TierAnalysis[] | Record<string, any>[]>([])
+  const [metrics, setMetrics] = useState<ReferralMetrics | null>(null)
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [conversionFunnel, setConversionFunnel] = useState<ConversionFunnel[]>([])
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([])
+  const [tierAnalysis, setTierAnalysis] = useState<TierAnalysis[]>([])
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -122,12 +122,12 @@ export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDas
       ])
 
       if (metricsResponse.success && metricsResponse.data) {
-        setMetrics(metricsResponse.data)
+        setMetrics(metricsResponse.data as ReferralMetrics)
       }
 
       if (leaderboardResponse.success && leaderboardResponse.data) {
         const entries = (leaderboardResponse.data as any).entries || leaderboardResponse.data
-        setLeaderboard(Array.isArray(entries) ? entries : [])
+        setLeaderboard(Array.isArray(entries) ? entries as LeaderboardEntry[] : [])
       }
 
       if (conversionResponse.success && conversionResponse.data) {
@@ -267,7 +267,7 @@ export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDas
   }
 
   const getTierBadge = (tier: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       Basic: 'bg-gray-100 text-gray-800',
       Premium: 'bg-blue-100 text-blue-800',
       Pro: 'bg-purple-100 text-purple-800',

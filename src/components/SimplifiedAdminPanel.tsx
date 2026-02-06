@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   Search, 
   Edit, 

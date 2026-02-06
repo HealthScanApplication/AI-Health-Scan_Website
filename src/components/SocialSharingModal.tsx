@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Copy, Gift, Heart, Mail, MessageCircle, Send, Phone, Twitter, Facebook, Linkedin, Instagram, MessageSquare, Share2, Users, Star, Trophy } from 'lucide-react';
 import { copyToClipboard } from '../utils/copyUtils';
 

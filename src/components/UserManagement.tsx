@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu'
 import { Checkbox } from './ui/checkbox'
-import { toast } from 'sonner@2.0.3'
+import { toast } from 'sonner'
 import { Trash2, Edit, Plus, Search, Download, Eye, EyeOff, ToggleLeft, ToggleRight, Users, UserCheck, UserX, Clock, Crown, Share2, Mail, Calendar, Activity, CheckCircle, XCircle, AlertCircle, ChevronUp, ChevronDown, Copy, Send, MailX, Link, TestTube, Loader2, MoreVertical, ChevronDown as ChevronDownIcon, Zap } from 'lucide-react'
 import { projectId, publicAnonKey } from '../utils/supabase/info'
 

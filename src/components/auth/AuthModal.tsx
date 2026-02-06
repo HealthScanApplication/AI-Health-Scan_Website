@@ -9,7 +9,7 @@ import { Checkbox } from '../ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSupabaseClient } from '../../utils/supabase/client';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Loader2, Mail, Lock, User, AlertTriangle, Eye, EyeOff, Shield, Heart, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/alert';
 

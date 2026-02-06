@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fixBrokenImageUrls, checkBrokenImageStats } from '../utils/fixBrokenImages';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function ImageFixUtility() {
   const [hasChecked, setHasChecked] = useState(false);

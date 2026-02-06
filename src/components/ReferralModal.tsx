@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Copy, Share2, Users, TrendingUp, Gift } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useReferral } from '../utils/useReferral';
 
 interface ReferralModalProps {

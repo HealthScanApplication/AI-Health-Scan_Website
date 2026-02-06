@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { StandardDataView } from './StandardDataView';
 import { AIImageGenerator } from './AIImageGenerator';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { ArrowLeft, Save, RefreshCw, Wand2, Info } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 

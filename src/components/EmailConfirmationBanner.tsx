@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { X, Mail, AlertCircle, Check, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import healthScanLogo from 'figma:asset/1debfa3241af40447f297e52b30a6022740a996d.png';

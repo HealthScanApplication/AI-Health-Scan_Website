@@ -14,7 +14,7 @@ import { MealEditor } from './MealEditor';
 import { ParasiteEditor } from './ParasiteEditor';
 import { ReferralLinkTester } from './ReferralLinkTester';
 import { ThemeManager } from './ThemeManager';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   Database, 
   Users, 

@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu'
 import { Checkbox } from './ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { toast } from 'sonner@2.0.3'
+import { toast } from 'sonner'
 import { 
   Trash2, Edit, Plus, Search, Download, Eye, EyeOff, ToggleLeft, ToggleRight, 
   Users, UserCheck, UserX, Clock, Crown, Share2, Mail, Calendar, Activity, 

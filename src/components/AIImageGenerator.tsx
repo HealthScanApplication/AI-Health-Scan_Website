@@ -5,7 +5,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Card, CardContent } from './ui/card';
 import { ImageIcon, Wand2, Loader2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 interface AIImageGeneratorProps {

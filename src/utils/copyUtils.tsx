@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface CopyOptions {
   successMessage?: string;

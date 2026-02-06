@@ -20,7 +20,7 @@ import {
   Camera,
   Wand2
 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { generateRecordImage, validateImageUrl, type GeneratedImage } from '../utils/recordImageGeneration';
 
 interface RecordImageDisplayProps {

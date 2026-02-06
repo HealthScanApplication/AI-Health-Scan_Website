@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
-import { toast } from 'sonner@2.0.3'
+import { toast } from 'sonner'
 import { List, ArrowUpDown, RefreshCw } from 'lucide-react'
 import { projectId } from '../../utils/supabase/info'
 

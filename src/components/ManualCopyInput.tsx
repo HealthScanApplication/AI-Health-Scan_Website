@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy, Check } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { copyToClipboard } from '../utils/copyUtils';
 
 interface ManualCopyInputProps {

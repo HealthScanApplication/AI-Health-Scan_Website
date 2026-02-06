@@ -5,7 +5,7 @@ import { AuthModal } from './auth/AuthModal';
 import { UniversalWaitlist } from './UniversalWaitlist';
 import { SocialSharingModal } from './SocialSharingModal';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useScrollHeader } from '../hooks/useScrollHeader';
 import { 
   User, 

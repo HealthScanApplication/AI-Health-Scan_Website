@@ -7,7 +7,7 @@ import {
   type ApiResponse,
   handleAdminApiError
 } from '../utils/apiErrorHandler'
-import { toast } from 'sonner@2.0.3'
+import { toast } from 'sonner'
 
 // Base URL for all admin API calls
 const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2`

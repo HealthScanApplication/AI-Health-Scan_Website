@@ -37,7 +37,7 @@ import { ConnectionErrorBanner } from './admin/ConnectionErrorBanner'
 import { transformServerStats, getFallbackStats, getCompletionPercentage, getStatusColor, AdminStats } from '../utils/adminHelpers/statsHelpers'
 import { dataTypeCards, tabConfig } from '../constants/adminDashboardConstants'
 
-import { toast } from 'sonner@2.0.3'
+import { toast } from 'sonner'
 import { Database, Users, UserCheck, Package, Activity, ChevronRight, Heart, Zap, Leaf, Bug, Scan, Utensils, Settings, Upload, Globe, Server, RefreshCw, Wrench, ArrowUpDown, List, Trash, Menu, X, AlertTriangle, Wifi, Palette, Share2, Mail, ExternalLink } from 'lucide-react'
 import { projectId, publicAnonKey } from '../utils/supabase/info'
 

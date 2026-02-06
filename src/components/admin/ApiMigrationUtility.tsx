@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { toast } from 'sonner@2.0.3'
+import { toast } from 'sonner'
 import { 
   Database, Cloud, CheckCircle, XCircle, AlertTriangle, 
   RefreshCw, Download, Upload, Zap, Globe, ArrowRight,

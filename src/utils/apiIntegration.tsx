@@ -135,4 +135,4 @@ export class APIIntegrationOrchestrator {
 }
 
 // Export the toast utility for backward compatibility
-export { toast } from 'sonner@2.0.3';
+export { toast } from 'sonner';

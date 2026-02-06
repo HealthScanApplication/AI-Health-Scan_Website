@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Textarea } from './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   Link2, 
   TestTube2, 
