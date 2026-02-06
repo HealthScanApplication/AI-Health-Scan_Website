@@ -284,15 +284,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       } else {
         const response = await fetch(
-          `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?id=eq.${editingRecord.id}`,
+          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`,
           {
-            method: 'PATCH',
+            method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'apikey': publicAnonKey
+              'Content-Type': 'application/json'
             },
-            body: JSON.stringify(editingRecord)
+            body: JSON.stringify({
+              table: currentTab.table,
+              id: editingRecord.id,
+              updates: editingRecord
+            })
           }
         );
         if (response.ok) {
@@ -300,7 +303,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           setShowEditModal(false);
           fetchRecords();
         } else {
-          toast.error('Failed to update record');
+          const err = await response.json();
+          toast.error(err.error || 'Failed to update record');
         }
       }
     } catch (error) {
@@ -338,20 +342,26 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       } else {
         const response = await fetch(
-          `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?id=eq.${record.id}`,
+          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/delete`,
           {
-            method: 'DELETE',
+            method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
-              'apikey': publicAnonKey
-            }
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              table: currentTab.table,
+              id: record.id
+            })
           }
         );
         if (response.ok) {
           toast.success('Record deleted successfully');
+          setShowDetailModal(false);
           fetchRecords();
         } else {
-          toast.error('Failed to delete record');
+          const err = await response.json();
+          toast.error(err.error || 'Failed to delete record');
         }
       }
     } catch (error) {

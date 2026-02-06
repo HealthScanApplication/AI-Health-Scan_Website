@@ -1197,5 +1197,90 @@ app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-delete', async (c) => {
   }
 })
 
+// Admin: Update a catalog record (elements, ingredients, recipes)
+app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const { table, id, updates } = await c.req.json()
+    
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes']
+    if (!allowedTables.includes(table)) {
+      return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
+    }
+    if (!id) {
+      return c.json({ success: false, error: 'Record ID is required' }, 400)
+    }
+
+    // Strip non-DB fields from updates
+    const cleanUpdates = { ...updates }
+    const stripFields = ['_displayIndex', 'id', 'created_at', 'imported_at', 'api_source', 'external_id']
+    stripFields.forEach(f => delete cleanUpdates[f])
+    // Remove any null/undefined values to avoid overwriting with nulls
+    Object.keys(cleanUpdates).forEach(k => {
+      if (cleanUpdates[k] === undefined) delete cleanUpdates[k]
+    })
+
+    cleanUpdates.updated_at = new Date().toISOString()
+
+    const { error } = await supabase
+      .from(table)
+      .update(cleanUpdates)
+      .eq('id', id)
+
+    if (error) {
+      console.error(`[Admin] Failed to update ${table} record ${id}:`, error)
+      return c.json({ success: false, error: error.message }, 500)
+    }
+
+    console.log(`[Admin] Updated ${table} record ${id} by ${adminValidation.user.email}`)
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('[Admin] Error updating catalog record:', error)
+    return c.json({ success: false, error: 'Internal server error' }, 500)
+  }
+})
+
+// Admin: Delete a catalog record (elements, ingredients, recipes)
+app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const { table, id } = await c.req.json()
+    
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes']
+    if (!allowedTables.includes(table)) {
+      return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
+    }
+    if (!id) {
+      return c.json({ success: false, error: 'Record ID is required' }, 400)
+    }
+
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error(`[Admin] Failed to delete ${table} record ${id}:`, error)
+      return c.json({ success: false, error: error.message }, 500)
+    }
+
+    console.log(`[Admin] Deleted ${table} record ${id} by ${adminValidation.user.email}`)
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('[Admin] Error deleting catalog record:', error)
+    return c.json({ success: false, error: 'Internal server error' }, 500)
+  }
+})
+
 // Start server
 Deno.serve(app.fetch)
