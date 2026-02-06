@@ -511,12 +511,15 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
   try {
     console.log('📋 Tally.so webhook received')
 
+    // Read body once (stream can only be consumed once)
+    const rawBody = await c.req.text()
+    console.log('📋 Tally raw body length:', rawBody?.length)
+
     // Optional: Verify Tally signature if signing secret is configured
     const tallySecret = Deno.env.get('TALLY_SIGNING_SECRET')
     if (tallySecret) {
       const receivedSignature = c.req.header('Tally-Signature')
       if (receivedSignature) {
-        const rawBody = await c.req.text()
         const encoder = new TextEncoder()
         const key = await crypto.subtle.importKey(
           'raw',
@@ -536,14 +539,13 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
       }
     }
 
-    // Parse Tally webhook payload
+    // Parse the already-read body as JSON
     let payload
     try {
-      payload = await c.req.json()
-    } catch {
-      // If we already consumed the body for signature verification, re-parse
-      const rawBody = await c.req.text()
       payload = JSON.parse(rawBody)
+    } catch (parseErr) {
+      console.error('❌ Tally webhook: Failed to parse JSON body:', parseErr)
+      return c.json({ success: false, error: 'Invalid JSON payload' }, 400)
     }
 
     console.log('📋 Tally payload event:', payload?.eventType)
