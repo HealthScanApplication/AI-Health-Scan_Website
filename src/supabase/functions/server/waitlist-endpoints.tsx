@@ -310,6 +310,31 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         // Save updated activity tracking
         await kv.set(`waitlist_user_${normalizedEmail}`, existingUser)
         
+        // Resend confirmation email for returning users
+        let emailResent = false
+        try {
+          const emailService = createEmailService()
+          if (emailService) {
+            console.log('📧 Re-sending confirmation email to returning user:', normalizedEmail)
+            const emailResult = await emailService.sendWaitlistConfirmation(
+              normalizedEmail,
+              existingUser.position || 0,
+              true // Use Bitly style
+            )
+            if (emailResult.success) {
+              emailResent = true
+              existingUser.emailsSent = (existingUser.emailsSent || 0) + 1
+              existingUser.lastEmailSent = new Date().toISOString()
+              await kv.set(`waitlist_user_${normalizedEmail}`, existingUser)
+              console.log('✅ Confirmation email re-sent to returning user:', normalizedEmail)
+            } else {
+              console.warn('⚠️ Failed to resend email to returning user:', emailResult.error)
+            }
+          }
+        } catch (emailError) {
+          console.warn('⚠️ Error resending email to returning user:', emailError)
+        }
+        
         // Get current waitlist count for Google Sheets
         let currentCount = 0
         try {
@@ -349,12 +374,16 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         
         return c.json({
           success: true,
-          message: "Welcome back! You're already on the waitlist.",
+          message: emailResent 
+            ? `Welcome back! You're #${existingUser.position} on the waitlist. We've resent your confirmation email.`
+            : `Welcome back! You're #${existingUser.position} on the waitlist.`,
           position: existingUser.position,
           referralCode: existingUser.referralCode,
           totalWaitlist: Math.max(currentCount || 1, existingUser.position || 1),
           alreadyExists: true,
           isUpdate: true,
+          emailResent: emailResent,
+          confirmed: existingUser.confirmed || false,
           googleSheetsStatus: googleSheetsResult || { skipped: true },
           data: {
             email: normalizedEmail,

@@ -191,7 +191,9 @@ export function UniversalWaitlist({
 
       // Enhanced success messages for existing users with email confirmation status
       if (data.isUpdate || data.alreadyExists || data.isDuplicate) {
-        toast.success(`Welcome back! You're on the waitlist.`);
+        const posMsg = data.position ? ` You're #${data.position} on the waitlist.` : ` You're on the waitlist.`;
+        const emailMsg = data.emailResent ? ' Confirmation email resent.' : '';
+        toast.success(`Welcome back!${posMsg}${emailMsg}`);
         setEmail("");
         
         // Trigger events for existing users with enhanced data

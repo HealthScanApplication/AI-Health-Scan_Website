@@ -589,6 +589,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               )}
               {/* Action buttons */}
               <div className="flex items-center gap-1">
+                {isWaitlist && !record.confirmed && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleResendEmail(record.id, record.email || '')}
+                    disabled={resendingEmail === record.id}
+                    className="h-8 w-8 p-0 text-gray-400 hover:text-orange-600"
+                    title="Resend confirmation email"
+                  >
+                    <Mail className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -997,13 +1009,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   {activeTab === 'waitlist' && (
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant={detailRecord.confirmed ? 'outline' : 'default'}
                       onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
                       disabled={resendingEmail === detailRecord.id}
-                      className="gap-1"
+                      className={`gap-1 ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
                     >
                       <Mail className="w-4 h-4" />
-                      {resendingEmail === detailRecord.id ? 'Sending...' : 'Resend Email'}
+                      {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Resend Confirmation')}
                     </Button>
                   )}
                   <Button
