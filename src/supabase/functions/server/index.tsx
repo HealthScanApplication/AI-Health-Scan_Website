@@ -1043,5 +1043,139 @@ app.get('/make-server-ed0fe4c2/admin/waitlist', async (c) => {
   }
 })
 
+// Delete a waitlist user from KV store
+app.delete('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const email = decodeURIComponent(c.req.param('email')).trim().toLowerCase()
+    if (!email) {
+      return c.json({ success: false, error: 'Email is required' }, 400)
+    }
+
+    const existing = await kv.get(`waitlist_user_${email}`)
+    if (!existing) {
+      return c.json({ success: false, error: 'User not found' }, 404)
+    }
+
+    await kv.del(`waitlist_user_${email}`)
+    console.log(`🗑️ Deleted waitlist user: ${email}`)
+
+    return c.json({ success: true, message: `Deleted ${email}` })
+  } catch (error) {
+    console.error('❌ Error deleting waitlist user:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
+  }
+})
+
+// Update a waitlist user in KV store
+app.patch('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const email = decodeURIComponent(c.req.param('email')).trim().toLowerCase()
+    if (!email) {
+      return c.json({ success: false, error: 'Email is required' }, 400)
+    }
+
+    const existing = await kv.get(`waitlist_user_${email}`)
+    if (!existing) {
+      return c.json({ success: false, error: 'User not found' }, 404)
+    }
+
+    const updates = await c.req.json()
+    const updatedUser = { ...existing, ...updates, email: existing.email }
+    await kv.set(`waitlist_user_${email}`, updatedUser)
+    console.log(`✏️ Updated waitlist user: ${email}`)
+
+    return c.json({ success: true, message: `Updated ${email}`, user: updatedUser })
+  } catch (error) {
+    console.error('❌ Error updating waitlist user:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
+  }
+})
+
+// Bulk update waitlist users
+app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-update', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const { emails, updates } = await c.req.json()
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return c.json({ success: false, error: 'emails array is required' }, 400)
+    }
+
+    let updated = 0
+    let failed = 0
+    for (const email of emails) {
+      try {
+        const normalizedEmail = email.trim().toLowerCase()
+        const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
+        if (existing) {
+          const updatedUser = { ...existing, ...updates, email: existing.email }
+          await kv.set(`waitlist_user_${normalizedEmail}`, updatedUser)
+          updated++
+        } else {
+          failed++
+        }
+      } catch {
+        failed++
+      }
+    }
+
+    console.log(`✏️ Bulk updated ${updated} waitlist users (${failed} failed)`)
+    return c.json({ success: true, updated, failed })
+  } catch (error) {
+    console.error('❌ Error in bulk update:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
+  }
+})
+
+// Bulk delete waitlist users
+app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-delete', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const { emails } = await c.req.json()
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return c.json({ success: false, error: 'emails array is required' }, 400)
+    }
+
+    let deleted = 0
+    let failed = 0
+    for (const email of emails) {
+      try {
+        const normalizedEmail = email.trim().toLowerCase()
+        await kv.del(`waitlist_user_${normalizedEmail}`)
+        deleted++
+      } catch {
+        failed++
+      }
+    }
+
+    console.log(`🗑️ Bulk deleted ${deleted} waitlist users (${failed} failed)`)
+    return c.json({ success: true, deleted, failed })
+  } catch (error) {
+    console.error('❌ Error in bulk delete:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
+  }
+})
+
 // Start server
 Deno.serve(app.fetch)

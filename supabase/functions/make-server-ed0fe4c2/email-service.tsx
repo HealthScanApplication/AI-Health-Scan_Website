@@ -21,283 +21,302 @@ interface SendEmailOptions {
   from?: string
 }
 
-// HealthScan logo component for emails with 100% rounded edges
-const HealthScanLogo = `<img src="https://1debfa3241af40447f297e52b30a6022740a996d.png" alt="HealthScan" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.3); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);" />`
+// Shared email layout wrapper — clean, minimal, professional
+function emailLayout(content: string, preheader?: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+${preheader ? `<span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;">${preheader}</span>` : ''}
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;-webkit-font-smoothing:antialiased;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+  <!-- Header -->
+  <tr><td style="background-color:#111827;padding:32px 40px;text-align:center;">
+    <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:22px;font-weight:600;color:#ffffff;letter-spacing:-0.3px;">HealthScan</p>
+  </td></tr>
+  <!-- Body -->
+  <tr><td style="padding:40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    ${content}
+  </td></tr>
+  <!-- Footer -->
+  <tr><td style="padding:24px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+    <p style="margin:0 0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#9ca3af;">HealthScan — AI-Powered Health Scanning</p>
+    <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#9ca3af;">You received this because you signed up at healthscan.live</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`
+}
 
-// Enhanced email templates for HealthScan with improved vertical spacing and branding
+// Reusable button component
+function emailButton(text: string, href: string, color: string = '#111827'): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
+<tr><td align="center" style="background-color:${color};border-radius:6px;">
+  <a href="${href}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">${text}</a>
+</td></tr>
+</table>`
+}
+
+// Reusable info row
+function infoRow(label: string, value: string): string {
+  return `<tr>
+<td style="padding:8px 0;font-size:13px;color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;width:120px;vertical-align:top;">${label}</td>
+<td style="padding:8px 0;font-size:13px;color:#111827;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">${value}</td>
+</tr>`
+}
+
+// ─── EMAIL TEMPLATES ────────────────────────────────────────────────────────
+
 export const EMAIL_TEMPLATES = {
-  // Clean, modern waitlist confirmation email with Poppins font and vibrant gradient
-  waitlistConfirmationBitlyStyle: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => ({
-    subject: 'Welcome to HealthScan! 🌱 You\'re #' + position + ' in queue',
-    html: `
-      <div style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-        <!-- Header with vibrant gradient and logo -->
-        <div style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #3b82f6 100%); padding: 48px 20px; text-align: center;">
-          <div style="margin-bottom: 16px;">
-            <img src="https://healthscan.live/logo.png" alt="HealthScan" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; display: inline-block;">
-          </div>
-          <h1 style="color: #ffffff; font-size: 32px; font-weight: 600; margin: 0; letter-spacing: -0.8px; font-family: 'Poppins', sans-serif;">
-            HealthScan
-          </h1>
-          <p style="color: rgba(255, 255, 255, 0.9); font-size: 13px; margin: 8px 0 0 0; font-weight: 300; letter-spacing: 0.5px;">
-            AI-Powered Health Scanning
-          </p>
-        </div>
 
-        <!-- Main Content -->
-        <div style="padding: 48px 32px;">
-          <!-- Welcome Message -->
-          <h2 style="color: #1f2937; font-size: 26px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
-            Welcome to HealthScan!
-          </h2>
-          <p style="color: #6b7280; font-size: 15px; margin: 0 0 36px 0; line-height: 1.7; font-weight: 300; font-family: 'Poppins', sans-serif;">
-            You're on your way to early access to our revolutionary AI-powered health scanner.
-          </p>
+  // ── Email 1: Confirmation (sent immediately on signup) ──────────────────
+  waitlistConfirmation: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => ({
+    subject: `Confirm your spot — you're #${position} on the HealthScan waitlist`,
+    html: emailLayout(`
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Confirm your email</h1>
+      <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
+        Thanks for signing up for HealthScan. Please confirm your email address to secure your spot on the waitlist.
+      </p>
 
-          <!-- Queue Position Card -->
-          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%); border-left: 4px solid #10b981; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
-            <p style="color: #059669; font-size: 12px; margin: 0 0 10px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-family: 'Poppins', sans-serif;">
-              Queue Position
-            </p>
-            <p style="color: #10b981; font-size: 36px; font-weight: 600; margin: 0; font-family: 'Poppins', sans-serif;">
-              #${position}
-            </p>
-          </div>
+      ${emailButton('Confirm Email Address', confirmationLink, '#10b981')}
 
-          <!-- Key Info -->
-          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(6, 182, 212, 0.04) 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; border: 1px solid rgba(16, 185, 129, 0.1);">
-            <p style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              <span style="font-weight: 600; color: #1f2937;">Launch Date:</span> February 27th, 2026<br>
-              <span style="font-weight: 600; color: #1f2937;">Status:</span> Early Access Confirmed
-            </p>
-          </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:28px 0;border:1px solid #e5e7eb;border-radius:6px;">
+        <tr><td style="padding:20px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            ${infoRow('Position', `#${position}`)}
+            ${infoRow('Launch', 'February 27, 2026')}
+            ${infoRow('Status', 'Awaiting confirmation')}
+            ${referralCode ? infoRow('Your code', `<code style="background:#f4f4f5;padding:2px 6px;border-radius:3px;font-size:13px;">${referralCode}</code>`) : ''}
+          </table>
+        </td></tr>
+      </table>
 
-          <!-- CTA Button -->
-          <div style="text-align: center; margin-bottom: 32px;">
-            <a href="${confirmationLink}" 
-               style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%); color: white; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; font-family: 'Poppins', sans-serif; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); transition: transform 0.2s;">
-              Confirm your email opt-in status here 💚
-            </a>
-          </div>
-          
-          <!-- Confirmation Note -->
-          <p style="color: #6b7280; font-size: 13px; margin: 0 0 32px 0; text-align: center; font-weight: 300; font-family: 'Poppins', sans-serif;">
-            (You can unsubscribe at any time)
-          </p>
+      ${referralLink ? `
+      <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#111827;">Move up the queue</p>
+      <p style="margin:0 0 16px;font-size:14px;color:#4b5563;line-height:1.6;">
+        Share your referral link with friends. Each signup using your link moves you closer to the front.
+      </p>
+      <p style="margin:0;font-size:13px;color:#6b7280;word-break:break-all;">
+        <a href="${referralLink}" style="color:#10b981;text-decoration:underline;">${referralLink}</a>
+      </p>
+      ` : ''}
 
-          <!-- Referral Section -->
-          ${referralLink ? `
-          <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 28px; margin-bottom: 32px;">
-            <h3 style="color: #b45309; font-size: 16px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
-              Earn Early Access Faster
-            </h3>
-            <p style="color: #92400e; font-size: 14px; line-height: 1.7; margin: 0 0 18px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              Share your referral code with friends. Each person who signs up moves you up in the queue!
-            </p>
-            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 14px; border: 1px solid #fcd34d;">
-              <p style="color: #92400e; font-size: 11px; margin: 0 0 6px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Poppins', sans-serif;">Your Referral Code</p>
-              <p style="color: #b45309; font-size: 20px; font-weight: 600; margin: 0; font-family: 'Courier New', monospace; letter-spacing: 2px;">
-                ${referralCode}
-              </p>
-            </div>
-            <a href="${referralLink}" 
-               style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; font-family: 'Poppins', sans-serif;">
-              Share Link
-            </a>
-          </div>
-          ` : ''}
+      <p style="margin:28px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;">
+        If you didn't sign up for HealthScan, you can ignore this email. You can unsubscribe at any time.
+      </p>
+    `, `You're #${position} on the HealthScan waitlist. Confirm your email to secure your spot.`),
+    text: `Confirm your spot on the HealthScan waitlist
 
-          <!-- Footer -->
-          <div style="border-top: 1px solid #e5e7eb; padding-top: 28px; text-align: center;">
-            <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              Questions? Reply to this email or visit our website.
-            </p>
-            <p style="color: #9ca3af; font-size: 12px; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              © 2026 HealthScan. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </div>
-    `,
-    text: `
-Welcome to HealthScan! 🎉
-
-You're #${position} in the queue 📍
-
-You're so close to getting early access to HealthScan - our revolutionary AI-powered health scanner launching February 27th, 2026.
+You're #${position} in the queue.
 
 Confirm your email: ${confirmationLink}
 
-${referralLink ? `
-🚀 Move Up Faster!
-Share your referral link with friends. For each person who joins using your code, you'll move up in the queue!
+Launch date: February 27, 2026
+Status: Awaiting confirmation
+${referralCode ? `Your referral code: ${referralCode}` : ''}
+${referralLink ? `Share your referral link: ${referralLink}` : ''}
+
+If you didn't sign up, you can ignore this email.
+
+HealthScan — AI-Powered Health Scanning`
+  }),
+
+  // ── Email 1 (Bitly-style alias — same as above for backward compat) ─────
+  waitlistConfirmationBitlyStyle: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => {
+    return EMAIL_TEMPLATES.waitlistConfirmation(email, position, confirmationLink, referralCode, referralLink)
+  },
+
+  // ── Email 2: Welcome (sent after email confirmation or 3 days later) ────
+  welcomeEmail: (email: string, position: number, referralCode: string, referralLink: string): EmailTemplate => ({
+    subject: `Welcome to HealthScan — here's what happens next`,
+    html: emailLayout(`
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Welcome to HealthScan</h1>
+      <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
+        Your email is confirmed and your spot is secured. Here's what to expect before launch.
+      </p>
+
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px;">
+        <tr><td style="padding:20px;background-color:#f9fafb;border-radius:6px;">
+          <p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Your queue position</p>
+          <p style="margin:0;font-size:32px;font-weight:600;color:#111827;">#${position}</p>
+        </td></tr>
+      </table>
+
+      <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#111827;">What happens next</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px;">
+        <tr><td style="padding:10px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          <strong style="color:#111827;">1.</strong> We're building the final features before launch on February 27, 2026.
+        </td></tr>
+        <tr><td style="padding:10px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          <strong style="color:#111827;">2.</strong> You'll receive an email with early access instructions before the public launch.
+        </td></tr>
+        <tr><td style="padding:10px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          <strong style="color:#111827;">3.</strong> Early access users get free premium features for the first 30 days.
+        </td></tr>
+        <tr><td style="padding:10px 0;font-size:14px;color:#4b5563;line-height:1.6;">
+          <strong style="color:#111827;">4.</strong> Share your referral link to move up in the queue and unlock bonus features.
+        </td></tr>
+      </table>
+
+      <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#111827;">Your referral link</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#4b5563;line-height:1.6;">
+        Each friend who signs up using your link moves you closer to the front of the queue.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px;">
+        <tr><td style="padding:12px 16px;background-color:#f4f4f5;border-radius:6px;">
+          <p style="margin:0 0 4px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Referral code</p>
+          <p style="margin:0 0 8px;font-size:16px;font-weight:600;color:#111827;font-family:'Courier New',monospace;letter-spacing:1px;">${referralCode}</p>
+          <a href="${referralLink}" style="font-size:13px;color:#10b981;text-decoration:underline;word-break:break-all;">${referralLink}</a>
+        </td></tr>
+      </table>
+
+      ${emailButton('Visit HealthScan', 'https://healthscan.live')}
+
+      <p style="margin:0;font-size:13px;color:#9ca3af;">
+        Questions? Just reply to this email.
+      </p>
+    `, `Your spot is confirmed. Here's what happens before HealthScan launches.`),
+    text: `Welcome to HealthScan
+
+Your email is confirmed and your spot is secured.
+
+Queue position: #${position}
+Launch date: February 27, 2026
+
+What happens next:
+1. We're building the final features before launch.
+2. You'll receive early access instructions before the public launch.
+3. Early access users get free premium features for 30 days.
+4. Share your referral link to move up in the queue.
 
 Your referral code: ${referralCode}
-Share your link: ${referralLink}
-` : ''}
+Your referral link: ${referralLink}
 
-(You can unsubscribe at any time)
+Questions? Reply to this email.
 
-If you didn't sign up for HealthScan, or you're not sure why you received this email, you can delete it.
-
-HealthScan Team • Building the future of health scanning
-Launching February 27th, 2026 🚀
-    `
+HealthScan — AI-Powered Health Scanning`
   }),
 
-  // Enhanced original template with HealthScan logo and improved spacing
-  waitlistConfirmation: (email: string, position: number, confirmationLink: string): EmailTemplate => ({
-    subject: '🎉 Welcome to HealthScan - Confirm Your Spot!',
-    html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f8fdf9;">
-        <!-- Enhanced Header with Logo -->
-        <div style="text-align: center; margin-bottom: 40px;">
-          <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            ${HealthScanLogo}
-            <h1 style="color: #16a34a; font-size: 32px; margin: 0; font-weight: 600;">HealthScan</h1>
-          </div>
-          <p style="color: #6b7280; font-size: 17px; margin: 0;">Your AI-Powered Health Scanner</p>
-        </div>
-        
-        <!-- Welcome Section with Enhanced Spacing -->
-        <div style="background: linear-gradient(135deg, #f8fdf9 0%, #ecfdf5 100%); padding: 32px; border-radius: 16px; margin-bottom: 32px; border: 1px solid #d1fae5;">
-          <h2 style="color: #065f46; margin: 0 0 20px 0; font-size: 24px; font-weight: 600;">🎉 You're on the waitlist!</h2>
-          <p style="color: #374151; font-size: 17px; line-height: 1.6; margin: 0;">
-            Thank you for joining HealthScan! You're <strong>#${position}</strong> in line for early access to our revolutionary AI health scanning technology.
-          </p>
-        </div>
-        
-        <!-- Enhanced CTA Section -->
-        <div style="text-align: center; margin: 40px 0;">
-          <a href="${confirmationLink}" 
-             style="background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: white; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 17px; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.3);">
-            ✅ Confirm Your Email
-          </a>
-        </div>
-        
-        <!-- What's Next Section with Better Spacing -->
-        <div style="background: #f9fafb; padding: 28px; border-radius: 12px; margin: 32px 0; border: 1px solid #e5e7eb;">
-          <h3 style="color: #374151; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">🚀 What's Next?</h3>
-          <ul style="color: #6b7280; line-height: 1.8; margin: 0; padding-left: 20px;">
-            <li style="margin-bottom: 8px;">We'll notify you as soon as HealthScan launches on <strong>February 27th, 2026</strong></li>
-            <li style="margin-bottom: 8px;">You'll get exclusive early access before the general public</li>
-            <li style="margin-bottom: 8px;">Share your referral link to move up in the queue</li>
-            <li style="margin-bottom: 0;">Follow our progress and health tips on our blog</li>
-          </ul>
-        </div>
-        
-        <!-- Enhanced Footer -->
-        <div style="border-top: 1px solid #e5e7eb; padding-top: 24px; margin-top: 40px; text-align: center;">
-          <p style="color: #9ca3af; font-size: 14px; margin: 0 0 16px 0;">
-            This email was sent to ${email}. If you didn't sign up for HealthScan, you can safely ignore this email.
-          </p>
-          <div style="display: inline-flex; align-items: center; gap: 8px;">
-            ${HealthScanLogo.replace('36px', '18px').replace('36px', '18px')}
-            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-              HealthScan Team • Building the future of health scanning
-            </p>
-          </div>
-        </div>
-      </div>
-    `,
-    text: `
-🌱 HealthScan - Welcome to the Waitlist!
+  // ── Email 3: How to Use / Getting Started (sent 3 days after signup) ────
+  howToUseEmail: (email: string, name: string): EmailTemplate => ({
+    subject: 'Getting ready for HealthScan — what you can do now',
+    html: emailLayout(`
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Get ready for launch day</h1>
+      <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
+        Hi${name ? ` ${name}` : ''}, HealthScan launches on February 27, 2026. Here's how to get the most out of it from day one.
+      </p>
 
-Thank you for joining HealthScan! You're #${position} in line for early access.
+      <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#111827;">How HealthScan works</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px;">
+        <tr><td style="padding:12px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          <strong style="color:#111827;">Scan any food product</strong><br>
+          Point your camera at a food label, barcode, or ingredient list. HealthScan's AI reads and analyses it instantly.
+        </td></tr>
+        <tr><td style="padding:12px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          <strong style="color:#111827;">Get a health score</strong><br>
+          Every product receives a clear health score based on ingredients, nutritional content, and additives.
+        </td></tr>
+        <tr><td style="padding:12px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          <strong style="color:#111827;">Understand what's inside</strong><br>
+          See a plain-language breakdown of every ingredient — what it is, why it's there, and whether to watch out for it.
+        </td></tr>
+        <tr><td style="padding:12px 0;font-size:14px;color:#4b5563;line-height:1.6;">
+          <strong style="color:#111827;">Track your choices</strong><br>
+          Build a history of scanned products and track how your food choices improve over time.
+        </td></tr>
+      </table>
 
-Please confirm your email by clicking this link: ${confirmationLink}
+      <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#111827;">What you can do right now</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px;">
+        <tr><td style="padding:10px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          Share your referral link to move up the queue and get access sooner.
+        </td></tr>
+        <tr><td style="padding:10px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
+          Follow us on social media for launch updates and health tips.
+        </td></tr>
+        <tr><td style="padding:10px 0;font-size:14px;color:#4b5563;line-height:1.6;">
+          Start thinking about the products you want to scan first — we'll be ready.
+        </td></tr>
+      </table>
 
-What's Next:
-- We'll notify you when HealthScan launches on February 27th, 2026
-- You'll get exclusive early access
-- Share your referral link to move up in the queue
+      ${emailButton('Visit HealthScan', 'https://healthscan.live')}
 
-This email was sent to ${email}. If you didn't sign up, you can ignore this email.
-    `
+      <p style="margin:0;font-size:13px;color:#9ca3af;">
+        Questions about how it works? Just reply to this email.
+      </p>
+    `, `Here's how to get the most out of HealthScan from day one.`),
+    text: `Getting ready for HealthScan
+
+Hi${name ? ` ${name}` : ''}, HealthScan launches on February 27, 2026. Here's how to get the most out of it.
+
+How HealthScan works:
+- Scan any food product: Point your camera at a food label or barcode.
+- Get a health score: Every product receives a clear health score.
+- Understand what's inside: Plain-language breakdown of every ingredient.
+- Track your choices: Build a history and track improvements.
+
+What you can do now:
+- Share your referral link to move up the queue.
+- Follow us on social media for updates.
+- Start thinking about products you want to scan first.
+
+Visit: https://healthscan.live
+
+Questions? Reply to this email.
+
+HealthScan — AI-Powered Health Scanning`
   }),
 
-  // Enhanced email confirmed template
+  // ── Email Confirmed (sent when user clicks confirm link) ────────────────
   emailConfirmed: (email: string, position: number, referralLink: string): EmailTemplate => ({
-    subject: 'Welcome to HealthScan! You\'re #' + position + ' in queue',
-    html: `
-      <div style="font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-        <!-- Header with vibrant gradient -->
-        <div style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #3b82f6 100%); padding: 48px 20px; text-align: center;">
-          <h1 style="color: #ffffff; font-size: 32px; font-weight: 600; margin: 0; letter-spacing: -0.8px; font-family: 'Poppins', sans-serif;">
-            HealthScan
-          </h1>
-          <p style="color: rgba(255, 255, 255, 0.9); font-size: 13px; margin: 8px 0 0 0; font-weight: 300; letter-spacing: 0.5px;">
-            AI-Powered Health Scanning
-          </p>
-        </div>
+    subject: `You're confirmed — #${position} on the HealthScan waitlist`,
+    html: emailLayout(`
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Email confirmed</h1>
+      <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
+        Your email is verified and your spot on the waitlist is locked in. We'll be in touch before launch.
+      </p>
 
-        <!-- Main Content -->
-        <div style="padding: 48px 32px;">
-          <!-- Welcome Message -->
-          <h2 style="color: #1f2937; font-size: 26px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
-            Welcome to HealthScan!
-          </h2>
-          <p style="color: #6b7280; font-size: 15px; margin: 0 0 36px 0; line-height: 1.7; font-weight: 300; font-family: 'Poppins', sans-serif;">
-            You're on your way to early access to our revolutionary AI-powered health scanner.
-          </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px;">
+        <tr><td style="padding:20px;background-color:#f9fafb;border-radius:6px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            ${infoRow('Position', `#${position}`)}
+            ${infoRow('Launch', 'February 27, 2026')}
+            ${infoRow('Status', 'Confirmed')}
+          </table>
+        </td></tr>
+      </table>
 
-          <!-- Queue Position Card -->
-          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%); border-left: 4px solid #10b981; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
-            <p style="color: #059669; font-size: 12px; margin: 0 0 10px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-family: 'Poppins', sans-serif;">
-              Queue Position
-            </p>
-            <p style="color: #10b981; font-size: 36px; font-weight: 600; margin: 0; font-family: 'Poppins', sans-serif;">
-              #${position}
-            </p>
-          </div>
+      <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#111827;">Move up the queue</p>
+      <p style="margin:0 0 16px;font-size:14px;color:#4b5563;line-height:1.6;">
+        Share your referral link. Each friend who joins moves you closer to the front.
+      </p>
+      <p style="margin:0 0 28px;">
+        <a href="${referralLink}" style="font-size:13px;color:#10b981;text-decoration:underline;word-break:break-all;">${referralLink}</a>
+      </p>
 
-          <!-- Key Info -->
-          <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(6, 182, 212, 0.04) 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; border: 1px solid rgba(16, 185, 129, 0.1);">
-            <p style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              <span style="font-weight: 600; color: #1f2937;">Launch Date:</span> February 27th, 2026<br>
-              <span style="font-weight: 600; color: #1f2937;">Status:</span> Early Access Confirmed
-            </p>
-          </div>
+      ${emailButton('Visit HealthScan', 'https://healthscan.live')}
 
-          <!-- Referral Section -->
-          <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 28px; margin-bottom: 32px;">
-            <h3 style="color: #b45309; font-size: 16px; font-weight: 600; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif;">
-              Earn Early Access Faster
-            </h3>
-            <p style="color: #92400e; font-size: 14px; line-height: 1.7; margin: 0 0 18px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              Share your referral link with friends. Each person who signs up moves you up in the queue!
-            </p>
-            <a href="${referralLink}" 
-               style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; font-family: 'Poppins', sans-serif;">
-              Share Link
-            </a>
-          </div>
+      <p style="margin:0;font-size:13px;color:#9ca3af;">
+        Questions? Just reply to this email.
+      </p>
+    `, `Your email is confirmed. You're #${position} on the HealthScan waitlist.`),
+    text: `Email confirmed
 
-          <!-- Footer -->
-          <div style="border-top: 1px solid #e5e7eb; padding-top: 28px; text-align: center;">
-            <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              Questions? Reply to this email or visit our website.
-            </p>
-            <p style="color: #9ca3af; font-size: 12px; margin: 0; font-weight: 300; font-family: 'Poppins', sans-serif;">
-              © 2026 HealthScan. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </div>
-    `,
-    text: `
-🌱 HealthScan - Email Confirmed!
+Your spot on the HealthScan waitlist is locked in.
 
-✅ You're officially #${position} on the HealthScan waitlist!
-🗓️ Launch Date: February 27th, 2026
+Position: #${position}
+Launch: February 27, 2026
+Status: Confirmed
 
-🚀 Move Up Faster!
-Share HealthScan with friends: ${referralLink}
+Share your referral link to move up: ${referralLink}
 
-Questions? Reply to this email!
+Visit: https://healthscan.live
 
-HealthScan Team
-    `
+HealthScan — AI-Powered Health Scanning`
   })
 }
 
@@ -518,79 +537,63 @@ export class EmailService {
     })
   }
 
-  // Send email verification/confirmation for auth users with enhanced design
+  // Send welcome email (Email 2 — sent after confirmation or 3 days later)
+  async sendWelcomeEmail(email: string, position: number, referralCode: string): Promise<{ success: boolean; error?: string }> {
+    const baseUrl = Deno.env.get('HEALTHSCAN_BASE_URL') || 'https://healthscan.live'
+    const referralLink = `${baseUrl}?ref=${referralCode}`
+    
+    const template = EMAIL_TEMPLATES.welcomeEmail(email, position, referralCode, referralLink)
+    
+    return await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    })
+  }
+
+  // Send how-to-use email (Email 3 — sent 3 days after signup)
+  async sendHowToUseEmail(email: string, name: string): Promise<{ success: boolean; error?: string }> {
+    const template = EMAIL_TEMPLATES.howToUseEmail(email, name)
+    
+    return await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    })
+  }
+
+  // Send email verification/confirmation for auth users
   async sendEmailConfirmation(email: string, confirmationLink: string): Promise<{ success: boolean; error?: string }> {
     const emailTemplate = {
-      subject: '🔐 Verify Your HealthScan Email',
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f8fdf9;">
-          <!-- Enhanced Logo Section -->
-          <div style="text-align: center; margin-bottom: 48px;">
-            <div style="display: inline-flex; align-items: center; gap: 14px; padding: 14px 24px; background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); border-radius: 100px; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.25);">
-              ${HealthScanLogo}
-              <span style="color: white; font-weight: 600; font-size: 19px; letter-spacing: -0.5px;">HealthScan</span>
-            </div>
-          </div>
-          
-          <!-- Main Content with Enhanced Spacing -->
-          <div style="background-color: #ffffff; border-radius: 16px; padding: 56px 48px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); margin-bottom: 32px;">
-            <!-- Headline -->
-            <h1 style="font-size: 32px; font-weight: 600; color: #1a1a1a; margin: 0 0 32px 0; line-height: 1.25;">
-              Verify Your Email Address 🔐
-            </h1>
-            
-            <!-- Description with Better Spacing -->
-            <p style="font-size: 17px; color: #4a4a4a; line-height: 1.6; margin: 0 0 28px 0;">
-              Please verify your email address to continue using HealthScan and access all features.
-            </p>
-            
-            <p style="font-size: 17px; color: #4a4a4a; line-height: 1.6; margin: 0 0 40px 0;">
-              Click the button below to verify your email:
-            </p>
-            
-            <!-- Enhanced CTA Button -->
-            <div style="text-align: center; margin: 48px 0;">
-              <a href="${confirmationLink}" 
-                 style="display: inline-block; background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: white; padding: 18px 36px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 17px; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.3);">
-                Verify Email Address ✅
-              </a>
-            </div>
-            
-            <!-- Link Fallback with Better Spacing -->
-            <p style="font-size: 15px; color: #8a8a8a; text-align: center; margin: 40px 0 0 0; line-height: 1.6;">
-              If the button doesn't work, copy and paste this link into your browser:<br>
-              <span style="word-break: break-all; color: #16a34a; font-weight: 500; margin-top: 8px; display: inline-block;">${confirmationLink}</span>
-            </p>
-          </div>
-          
-          <!-- Enhanced Footer -->
-          <div style="margin-top: 40px; padding: 0 24px;">
-            <p style="font-size: 14px; color: #8a8a8a; line-height: 1.6; margin: 0 0 32px 0;">
-              If you didn't request this verification, you can safely ignore this email.
-            </p>
-            
-            <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e5e5; text-align: center;">
-              <div style="display: inline-flex; align-items: center; gap: 10px;">
-                ${HealthScanLogo.replace('36px', '20px').replace('36px', '20px')}
-                <p style="font-size: 13px; color: #b0b0b0; margin: 0; font-weight: 500;">
-                  HealthScan • Building the future of health scanning
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      `,
-      text: `
-Verify Your Email Address 🔐
+      subject: 'Verify your HealthScan email address',
+      html: emailLayout(`
+        <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Verify your email</h1>
+        <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
+          Please verify your email address to continue using HealthScan and access all features.
+        </p>
 
-Please verify your email address to continue using HealthScan and access all features.
+        ${emailButton('Verify Email Address', confirmationLink, '#10b981')}
 
-Click this link to verify your email: ${confirmationLink}
+        <p style="margin:28px 0 0;font-size:13px;color:#9ca3af;line-height:1.5;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <a href="${confirmationLink}" style="color:#10b981;word-break:break-all;text-decoration:underline;">${confirmationLink}</a>
+        </p>
 
-If you didn't request this verification, you can safely ignore this email.
+        <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">
+          If you didn't request this verification, you can safely ignore this email.
+        </p>
+      `, 'Verify your email to access HealthScan.'),
+      text: `Verify your HealthScan email address
 
-HealthScan • Building the future of health scanning
-      `
+Please verify your email address to continue using HealthScan.
+
+Click this link to verify: ${confirmationLink}
+
+If you didn't request this, you can ignore this email.
+
+HealthScan — AI-Powered Health Scanning`
     }
     
     return await this.sendEmail({

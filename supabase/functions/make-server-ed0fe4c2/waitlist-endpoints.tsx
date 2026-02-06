@@ -501,7 +501,7 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
     }
     
     // Handle referral bonus if applicable (optional)
-    if (referralCode) {
+    if (referralCode && referralCode !== userReferralCode) {
       try {
         console.log('🎁 Processing referral bonus for code:', referralCode)
         
@@ -509,7 +509,7 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
         const referrerUsers = await kv.getByPrefix('waitlist_user_')
         const referrer = referrerUsers.find(user => user.referralCode === referralCode)
         
-        if (referrer) {
+        if (referrer && referrer.email !== normalizedEmail) {
           console.log('👤 Found referrer:', referrer.email)
           
           // Deterministic milestone-based boost
@@ -657,6 +657,81 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
     } catch (error) {
       // Don't fail the signup if webhook fails
       console.warn('⚠️ Zapier webhook failed (non-critical):', error);
+    }
+
+    // Slack notification (non-blocking, rich context)
+    try {
+      const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL')
+      if (slackWebhookUrl) {
+        const signupTime = userData.signupDate
+        const timestamp = new Date(signupTime).toLocaleString('en-IE', { timeZone: 'Europe/Dublin', dateStyle: 'medium', timeStyle: 'short' })
+        const utmParts = [utm_source, utm_medium, utm_campaign].filter(Boolean)
+        const utmLine = utmParts.length > 0 ? utmParts.join(' / ') : 'None'
+        const supabaseLink = 'https://supabase.com/dashboard/project/mofhvoudjxinvpplsytd/database/tables'
+        const adminLink = 'https://healthscan.live/admin'
+
+        // Device/browser detection from user agent
+        let device = 'Unknown'
+        let browser = ''
+        if (userAgent) {
+          if (userAgent.includes('iPhone') || userAgent.includes('iPad')) device = 'iOS'
+          else if (userAgent.includes('Android')) device = 'Android'
+          else if (userAgent.includes('Mac')) device = 'macOS'
+          else if (userAgent.includes('Windows')) device = 'Windows'
+          else if (userAgent.includes('Linux')) device = 'Linux'
+          if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) browser = 'Chrome'
+          else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari'
+          else if (userAgent.includes('Firefox')) browser = 'Firefox'
+          else if (userAgent.includes('Edg')) browser = 'Edge'
+        }
+
+        const contextParts: string[] = []
+        if (ipAddress && ipAddress !== '' && ipAddress !== 'unknown') contextParts.push(`IP: \`${ipAddress}\``)
+        if (device !== 'Unknown') contextParts.push(`${device}${browser ? ' / ' + browser : ''}`)
+
+        const blocks: any[] = [
+          { type: 'header', text: { type: 'plain_text', text: `New Waitlist Signup — #${calculatedPosition}`, emoji: false } },
+          { type: 'section', fields: [
+            { type: 'mrkdwn', text: `*Email:*\n${normalizedEmail}` },
+            { type: 'mrkdwn', text: `*Name:*\n${userName}` },
+            { type: 'mrkdwn', text: `*Position:*\n#${calculatedPosition} of ${currentCount + 1}` },
+            { type: 'mrkdwn', text: `*Source:*\nWebsite (${source || 'direct'})` },
+            { type: 'mrkdwn', text: `*Signed Up:*\n${timestamp}` },
+            { type: 'mrkdwn', text: `*Referral Code:*\n\`${userReferralCode}\`` }
+          ]},
+          { type: 'section', fields: [
+            { type: 'mrkdwn', text: `*Referred By:*\n${referralCode ? `\`${referralCode}\`` : 'Direct signup'}` },
+            { type: 'mrkdwn', text: `*UTM:*\n${utmLine}` },
+            { type: 'mrkdwn', text: `*Email Sent:*\n${emailSent ? 'Yes' : 'No'}` },
+            { type: 'mrkdwn', text: `*Opted In Updates:*\n—` }
+          ]}
+        ]
+
+        if (contextParts.length > 0) {
+          blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] })
+        }
+
+        blocks.push({
+          type: 'actions',
+          elements: [
+            { type: 'button', text: { type: 'plain_text', text: 'View in Supabase', emoji: false }, url: supabaseLink, action_id: 'view_supabase' },
+            { type: 'button', text: { type: 'plain_text', text: 'Admin Panel', emoji: false }, url: adminLink, action_id: 'view_admin' }
+          ]
+        })
+        blocks.push({ type: 'divider' })
+
+        fetch(slackWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: `New waitlist signup: ${userName} (${normalizedEmail}) — #${calculatedPosition} via website`,
+            blocks
+          })
+        }).catch(() => {})
+        console.log('✅ Slack notification queued')
+      }
+    } catch (slackErr) {
+      console.warn('⚠️ Slack notification error (non-critical):', slackErr)
     }
 
     // Log successful signup

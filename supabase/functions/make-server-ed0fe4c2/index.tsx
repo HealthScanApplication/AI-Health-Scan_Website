@@ -13,6 +13,136 @@ import { adminApp } from './admin-endpoints-fixed.tsx'
 import { referralApp } from './referral-endpoints.tsx'
 import blogRssApp from './blog-rss-endpoints.tsx'
 
+// Slack notification helper - sends to configured webhook (non-blocking)
+async function notifySlack(message: { text: string; blocks?: any[] }): Promise<void> {
+  const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL')
+  if (!webhookUrl) {
+    console.log('ℹ️ Slack notification skipped (SLACK_WEBHOOK_URL not set)')
+    return
+  }
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    })
+    if (!res.ok) console.warn('⚠️ Slack notification failed:', res.status)
+    else console.log('✅ Slack notification sent')
+  } catch (err) {
+    console.warn('⚠️ Slack notification error (non-critical):', err)
+  }
+}
+
+// IP geolocation via free ip-api.com (non-blocking, best-effort)
+async function getGeoFromIP(ip: string): Promise<{ country: string; city: string; region: string } | null> {
+  if (!ip || ip === 'unknown' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) return null
+  try {
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=country,city,regionName`, { signal: AbortSignal.timeout(3000) })
+    if (!res.ok) return null
+    const data = await res.json()
+    return { country: data.country || '', city: data.city || '', region: data.regionName || '' }
+  } catch { return null }
+}
+
+async function buildWaitlistSlackMessage(data: {
+  email: string; name: string; firstName?: string; lastName?: string;
+  position: number; source: string; referralCode: string;
+  referredBy?: string | null; totalWaitlist: number;
+  signupDate: string; ipAddress?: string; userAgent?: string;
+  utm_source?: string; utm_medium?: string; utm_campaign?: string;
+  emailSent?: boolean; optedInUpdates?: boolean;
+  referralCount?: number;
+  tallySubmissionId?: string;
+}) {
+  const sourceLabel = data.source === 'tally' ? 'Tally Form' : 'Website'
+  const timestamp = new Date(data.signupDate).toLocaleString('en-IE', { timeZone: 'Europe/Dublin', dateStyle: 'medium', timeStyle: 'short' })
+
+  // Build UTM line
+  const utmParts = [data.utm_source, data.utm_medium, data.utm_campaign].filter(Boolean)
+  const utmLine = utmParts.length > 0 ? utmParts.join(' / ') : 'None'
+
+  // Referral link (clickable URL)
+  const referralUrl = `https://healthscan.live?ref=${data.referralCode}`
+
+  // Supabase KV link
+  const supabaseLink = `https://supabase.com/dashboard/project/mofhvoudjxinvpplsytd/database/tables`
+  const adminLink = `https://healthscan.live/admin`
+
+  // IP geolocation
+  let locationStr = ''
+  if (data.ipAddress && data.ipAddress !== 'unknown') {
+    const geo = await getGeoFromIP(data.ipAddress)
+    if (geo && geo.city) {
+      locationStr = [geo.city, geo.region, geo.country].filter(Boolean).join(', ')
+    }
+  }
+
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `New Waitlist Signup — #${data.position}`, emoji: false }
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Email:*\n${data.email}` },
+        { type: 'mrkdwn', text: `*Name:*\n${data.name || 'Not provided'}` },
+        { type: 'mrkdwn', text: `*Position:*\n#${data.position} of ${data.totalWaitlist}` },
+        { type: 'mrkdwn', text: `*Source:*\n${sourceLabel}` },
+        { type: 'mrkdwn', text: `*Signed Up:*\n${timestamp}` },
+        { type: 'mrkdwn', text: `*Referral Link:*\n<${referralUrl}|${data.referralCode}>` }
+      ]
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Referred By:*\n${data.referredBy ? `\`${data.referredBy}\`` : 'Direct signup'}` },
+        { type: 'mrkdwn', text: `*Referrals:*\n${data.referralCount ?? 0}` },
+        { type: 'mrkdwn', text: `*Email Sent:*\n${data.emailSent ? 'Yes' : 'No'}` },
+        { type: 'mrkdwn', text: `*UTM:*\n${utmLine}` }
+      ]
+    }
+  ]
+
+  // Location + Device context line
+  const contextParts: string[] = []
+  if (locationStr) contextParts.push(`Location: ${locationStr}`)
+  if (data.ipAddress && data.ipAddress !== 'unknown') contextParts.push(`IP: \`${data.ipAddress}\``)
+  if (data.userAgent) {
+    const ua = data.userAgent
+    let device = 'Unknown'
+    if (ua.includes('iPhone') || ua.includes('iPad')) device = 'iOS'
+    else if (ua.includes('Android')) device = 'Android'
+    else if (ua.includes('Mac')) device = 'macOS'
+    else if (ua.includes('Windows')) device = 'Windows'
+    else if (ua.includes('Linux')) device = 'Linux'
+    let browser = ''
+    if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome'
+    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari'
+    else if (ua.includes('Firefox')) browser = 'Firefox'
+    else if (ua.includes('Edg')) browser = 'Edge'
+    contextParts.push(`${device}${browser ? ' / ' + browser : ''}`)
+  }
+  if (contextParts.length > 0) {
+    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] })
+  }
+
+  // Action links
+  blocks.push({
+    type: 'actions',
+    elements: [
+      { type: 'button', text: { type: 'plain_text', text: 'View in Supabase', emoji: false }, url: supabaseLink, action_id: 'view_supabase' },
+      { type: 'button', text: { type: 'plain_text', text: 'Admin Panel', emoji: false }, url: adminLink, action_id: 'view_admin' }
+    ]
+  })
+  blocks.push({ type: 'divider' })
+
+  return {
+    text: `New waitlist signup: ${data.name || data.email} (#${data.position}) via ${data.source}`,
+    blocks
+  }
+}
+
 // Initialize Hono app
 const app = new Hono()
 
@@ -560,10 +690,12 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
     const submissionId = payload?.data?.submissionId || ''
     const createdAt = payload?.data?.createdAt || new Date().toISOString()
 
-    // Extract email from Tally fields (look for email-type field or field labeled "email")
+    // Extract fields from Tally payload
     let email = ''
-    let name = ''
+    let firstName = ''
+    let lastName = ''
     let referralCode = ''
+    let optedInUpdates = false
 
     for (const field of fields) {
       const label = (field?.label || '').toLowerCase()
@@ -571,12 +703,20 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
 
       if (field?.type === 'INPUT_EMAIL' || label.includes('email')) {
         email = typeof value === 'string' ? value.trim().toLowerCase() : ''
-      } else if (label.includes('name') || field?.type === 'INPUT_TEXT') {
-        if (!name) name = typeof value === 'string' ? value.trim() : ''
+      } else if (label === 'first' || label === 'first name' || label === 'firstname') {
+        firstName = typeof value === 'string' ? value.trim() : ''
+      } else if (label === 'last' || label === 'last name' || label === 'lastname') {
+        lastName = typeof value === 'string' ? value.trim() : ''
       } else if (label.includes('referral') || label.includes('code')) {
         referralCode = typeof value === 'string' ? value.trim() : ''
+      } else if (field?.type === 'CHECKBOXES' && label?.includes('update')) {
+        optedInUpdates = value === true || (Array.isArray(value) && value.length > 0)
       }
     }
+
+    // Combine first + last name
+    const name = [firstName, lastName].filter(Boolean).join(' ')
+    console.log('📋 Tally fields extracted:', { email: email ? 'present' : 'missing', firstName, lastName, name, referralCode, optedInUpdates })
 
     if (!email) {
       console.warn('⚠️ Tally webhook: No email found in submission fields')
@@ -629,6 +769,8 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
     const userData: Record<string, any> = {
       email,
       name: name || email.split('@')[0],
+      firstName: firstName || null,
+      lastName: lastName || null,
       position,
       referralCode: userReferralCode,
       source: 'tally',
@@ -637,6 +779,7 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
       confirmed: false,
       emailsSent: 0,
       lastEmailSent: null,
+      optedInUpdates,
       tallySubmissionId: submissionId,
       tallyRespondentId: respondentId
     }
@@ -647,6 +790,17 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
     await kv.set('waitlist_count', { count: position, lastUpdated: new Date().toISOString() })
 
     console.log(`🎉 Tally webhook: New waitlist signup #${position}: ${email}`)
+
+    // Slack notification (non-blocking)
+    buildWaitlistSlackMessage({
+      email, name: name || email.split('@')[0],
+      firstName: firstName || undefined, lastName: lastName || undefined,
+      position, source: 'tally', referralCode: userReferralCode,
+      referredBy: referralCode || null, totalWaitlist: position,
+      signupDate: createdAt, optedInUpdates,
+      referralCount: 0,
+      tallySubmissionId: submissionId
+    }).then(msg => notifySlack(msg)).catch(() => {})
 
     // Send confirmation email (optional, non-blocking)
     try {
@@ -681,6 +835,43 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
       details: error.message,
       timestamp: new Date().toISOString()
     }, 500)
+  }
+})
+
+// Admin: Send test email sequence (all 3 emails)
+app.post('/make-server-ed0fe4c2/admin/send-test-emails', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { email, position, referralCode, name } = body
+
+    if (!email) return c.json({ error: 'email required' }, 400)
+
+    const emailService = createEmailService()
+    if (!emailService) return c.json({ error: 'Email service not configured' }, 500)
+
+    const baseUrl = 'https://healthscan.live'
+    const confirmationToken = btoa(`${email}:${Date.now()}:${Math.random()}`)
+    const confirmationLink = `${baseUrl}/confirm-email?token=${confirmationToken}`
+    const referralLink = referralCode ? `${baseUrl}?ref=${referralCode}` : ''
+
+    const results: Record<string, any> = {}
+
+    // Email 1: Confirmation
+    results.confirmation = await emailService.sendWaitlistConfirmation(
+      email, position || 1, true
+    )
+
+    // Email 2: Welcome
+    if (referralCode) {
+      results.welcome = await emailService.sendWelcomeEmail(email, position || 1, referralCode)
+    }
+
+    // Email 3: How to Use
+    results.howToUse = await emailService.sendHowToUseEmail(email, name || '')
+
+    return c.json({ success: true, results })
+  } catch (err) {
+    return c.json({ error: 'Failed to send test emails', details: String(err) }, 500)
   }
 })
 
@@ -849,6 +1040,140 @@ app.get('/make-server-ed0fe4c2/admin/waitlist', async (c) => {
       success: false, 
       error: error.message || 'Internal server error'
     }, 500)
+  }
+})
+
+// Delete a waitlist user from KV store
+app.delete('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const email = decodeURIComponent(c.req.param('email')).trim().toLowerCase()
+    if (!email) {
+      return c.json({ success: false, error: 'Email is required' }, 400)
+    }
+
+    const existing = await kv.get(`waitlist_user_${email}`)
+    if (!existing) {
+      return c.json({ success: false, error: 'User not found' }, 404)
+    }
+
+    await kv.del(`waitlist_user_${email}`)
+    console.log(`🗑️ Deleted waitlist user: ${email}`)
+
+    return c.json({ success: true, message: `Deleted ${email}` })
+  } catch (error) {
+    console.error('❌ Error deleting waitlist user:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
+  }
+})
+
+// Update a waitlist user in KV store
+app.patch('/make-server-ed0fe4c2/admin/waitlist/:email', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const email = decodeURIComponent(c.req.param('email')).trim().toLowerCase()
+    if (!email) {
+      return c.json({ success: false, error: 'Email is required' }, 400)
+    }
+
+    const existing = await kv.get(`waitlist_user_${email}`)
+    if (!existing) {
+      return c.json({ success: false, error: 'User not found' }, 404)
+    }
+
+    const updates = await c.req.json()
+    const updatedUser = { ...existing, ...updates, email: existing.email }
+    await kv.set(`waitlist_user_${email}`, updatedUser)
+    console.log(`✏️ Updated waitlist user: ${email}`)
+
+    return c.json({ success: true, message: `Updated ${email}`, user: updatedUser })
+  } catch (error) {
+    console.error('❌ Error updating waitlist user:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
+  }
+})
+
+// Bulk update waitlist users
+app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-update', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const { emails, updates } = await c.req.json()
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return c.json({ success: false, error: 'emails array is required' }, 400)
+    }
+
+    let updated = 0
+    let failed = 0
+    for (const email of emails) {
+      try {
+        const normalizedEmail = email.trim().toLowerCase()
+        const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
+        if (existing) {
+          const updatedUser = { ...existing, ...updates, email: existing.email }
+          await kv.set(`waitlist_user_${normalizedEmail}`, updatedUser)
+          updated++
+        } else {
+          failed++
+        }
+      } catch {
+        failed++
+      }
+    }
+
+    console.log(`✏️ Bulk updated ${updated} waitlist users (${failed} failed)`)
+    return c.json({ success: true, updated, failed })
+  } catch (error) {
+    console.error('❌ Error in bulk update:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
+  }
+})
+
+// Bulk delete waitlist users
+app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-delete', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) {
+      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    }
+
+    const { emails } = await c.req.json()
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return c.json({ success: false, error: 'emails array is required' }, 400)
+    }
+
+    let deleted = 0
+    let failed = 0
+    for (const email of emails) {
+      try {
+        const normalizedEmail = email.trim().toLowerCase()
+        await kv.del(`waitlist_user_${normalizedEmail}`)
+        deleted++
+      } catch {
+        failed++
+      }
+    }
+
+    console.log(`🗑️ Bulk deleted ${deleted} waitlist users (${failed} failed)`)
+    return c.json({ success: true, deleted, failed })
+  } catch (error) {
+    console.error('❌ Error in bulk delete:', error)
+    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
   }
 })
 
