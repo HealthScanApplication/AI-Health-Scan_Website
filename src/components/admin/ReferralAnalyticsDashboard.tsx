@@ -84,11 +84,11 @@ interface ReferralAnalyticsDashboardProps {
 
 export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDashboardProps) {
   // Core data state
-  const [metrics, setMetrics] = useState<ReferralMetrics | null>(null)
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [conversionFunnel, setConversionFunnel] = useState<ConversionFunnel[]>([])
-  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([])
-  const [tierAnalysis, setTierAnalysis] = useState<TierAnalysis[]>([])
+  const [metrics, setMetrics] = useState<ReferralMetrics | null | Record<string, any>>(null)
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | Record<string, any>[]>([])
+  const [conversionFunnel, setConversionFunnel] = useState<ConversionFunnel[] | Record<string, any>[]>([])
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[] | Record<string, any>[]>([])
+  const [tierAnalysis, setTierAnalysis] = useState<TierAnalysis[] | Record<string, any>[]>([])
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -126,35 +126,36 @@ export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDas
       }
 
       if (leaderboardResponse.success && leaderboardResponse.data) {
-        setLeaderboard(leaderboardResponse.data.entries || [])
+        const entries = (leaderboardResponse.data as any).entries || leaderboardResponse.data
+        setLeaderboard(Array.isArray(entries) ? entries : [])
       }
 
       if (conversionResponse.success && conversionResponse.data) {
         // Transform conversion data into funnel format
-        const data = conversionResponse.data
+        const data = conversionResponse.data as any
         const funnelData: ConversionFunnel[] = [
           {
             step: 'Invites Sent',
-            count: data.invitesSent ?? 0,
+            count: data?.invitesSent ?? 0,
             conversionRate: 100,
             dropoffRate: 0
           },
           {
             step: 'Invites Opened',
-            count: data.invitesOpened ?? 0,
-            conversionRate: ((data.invitesOpened ?? 0) / (data.invitesSent ?? 1)) * 100,
+            count: data?.invitesOpened ?? 0,
+            conversionRate: ((data?.invitesOpened ?? 0) / (data?.invitesSent ?? 1)) * 100,
             dropoffRate: 0
           },
           {
             step: 'Registrations',
-            count: data.registrations ?? 0,
-            conversionRate: ((data.registrations ?? 0) / (data.invitesSent ?? 1)) * 100,
+            count: data?.registrations ?? 0,
+            conversionRate: ((data?.registrations ?? 0) / (data?.invitesSent ?? 1)) * 100,
             dropoffRate: 0
           },
           {
             step: 'Confirmations',
-            count: data.confirmations ?? 0,
-            conversionRate: ((data.confirmations ?? 0) / (data.invitesSent ?? 1)) * 100,
+            count: data?.confirmations ?? 0,
+            conversionRate: ((data?.confirmations ?? 0) / (data?.invitesSent ?? 1)) * 100,
             dropoffRate: 0
           }
         ]
@@ -163,7 +164,8 @@ export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDas
 
       if (performanceResponse.success && performanceResponse.data) {
         // Transform performance data for time series
-        const timeData = (performanceResponse.data.dailyStats || []).map((stat: any) => ({
+        const perfData = performanceResponse.data as any
+        const timeData = (perfData?.dailyStats || []).map((stat: any) => ({
           date: new Date(stat?.date || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           referrals: stat?.referrals ?? 0,
           confirmations: stat?.confirmations ?? 0,
@@ -174,38 +176,38 @@ export function ReferralAnalyticsDashboard({ accessToken }: ReferralAnalyticsDas
 
       if (engagementResponse.success && engagementResponse.data) {
         // Transform engagement data for tier analysis
-        const data = engagementResponse.data
+        const data = engagementResponse.data as any
         const tiers: TierAnalysis[] = [
           {
             tier: 'Basic',
-            users: data.basicUsers ?? 0,
-            avgReferrals: data.basicAvgReferrals ?? 0,
-            conversionRate: data.basicConversion ?? 0,
-            totalRewards: data.basicRewards ?? 0,
+            users: data?.basicUsers ?? 0,
+            avgReferrals: data?.basicAvgReferrals ?? 0,
+            conversionRate: data?.basicConversion ?? 0,
+            totalRewards: data?.basicRewards ?? 0,
             color: '#6b7280'
           },
           {
             tier: 'Premium',
-            users: data.premiumUsers ?? 0,
-            avgReferrals: data.premiumAvgReferrals ?? 0,
-            conversionRate: data.premiumConversion ?? 0,
-            totalRewards: data.premiumRewards ?? 0,
+            users: data?.premiumUsers ?? 0,
+            avgReferrals: data?.premiumAvgReferrals ?? 0,
+            conversionRate: data?.premiumConversion ?? 0,
+            totalRewards: data?.premiumRewards ?? 0,
             color: '#3b82f6'
           },
           {
             tier: 'Pro',
-            users: data.proUsers ?? 0,
-            avgReferrals: data.proAvgReferrals ?? 0,
-            conversionRate: data.proConversion ?? 0,
-            totalRewards: data.proRewards ?? 0,
+            users: data?.proUsers ?? 0,
+            avgReferrals: data?.proAvgReferrals ?? 0,
+            conversionRate: data?.proConversion ?? 0,
+            totalRewards: data?.proRewards ?? 0,
             color: '#8b5cf6'
           },
           {
             tier: 'VIP',
-            users: engagementResponse.data.vipUsers || 0,
-            avgReferrals: engagementResponse.data.vipAvgReferrals || 0,
-            conversionRate: engagementResponse.data.vipConversion || 0,
-            totalRewards: engagementResponse.data.vipRewards || 0,
+            users: data?.vipUsers || 0,
+            avgReferrals: data?.vipAvgReferrals || 0,
+            conversionRate: data?.vipConversion || 0,
+            totalRewards: data?.vipRewards || 0,
             color: '#f59e0b'
           }
         ]
