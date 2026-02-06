@@ -108,17 +108,51 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     ],
     recipes: [
       { label: 'All', value: 'all', color: 'blue' },
-      { label: 'Beverage', value: 'beverage', color: 'cyan' },
       { label: 'Meal', value: 'meal', color: 'green' },
+      { label: 'Beverage', value: 'beverage', color: 'cyan' },
       { label: 'Condiment', value: 'condiment', color: 'amber' },
     ],
     products: [
       { label: 'All', value: 'all', color: 'blue' },
-      { label: 'Beverage', value: 'beverage', color: 'cyan' },
       { label: 'Meal', value: 'meal', color: 'green' },
+      { label: 'Snack', value: 'snack', color: 'lime' },
+      { label: 'Beverage', value: 'beverage', color: 'cyan' },
       { label: 'Condiment', value: 'condiment', color: 'amber' },
       { label: 'Supplement', value: 'supplement', color: 'purple' },
     ],
+  };
+
+  // Category options for edit modal dropdowns
+  const categoryOptions: Record<string, string[]> = {
+    elements: ['beneficial', 'hazardous'],
+    ingredients: ['vegetable', 'fruit', 'grain', 'protein', 'dairy', 'oil', 'spice', 'herb', 'sweetener', 'additive'],
+    recipes: ['meal', 'beverage', 'condiment'],
+    products: ['meal', 'snack', 'beverage', 'condiment', 'supplement'],
+  };
+
+  const typeOptions: Record<string, string[]> = {
+    elements: ['vitamin', 'mineral', 'amino acid', 'fatty acid', 'antioxidant', 'heavy metal', 'pesticide', 'preservative', 'endocrine disruptor'],
+    ingredients: ['raw', 'processed'],
+    recipes: ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'appetizer', 'side dish'],
+    products: ['organic', 'conventional', 'fortified', 'dietary'],
+  };
+
+  // Color map for category badges
+  const categoryColorMap: Record<string, string> = {
+    beneficial: 'bg-green-100 text-green-800',
+    hazardous: 'bg-red-100 text-red-800',
+    meal: 'bg-green-100 text-green-800',
+    beverage: 'bg-cyan-100 text-cyan-800',
+    condiment: 'bg-amber-100 text-amber-800',
+    snack: 'bg-lime-100 text-lime-800',
+    supplement: 'bg-purple-100 text-purple-800',
+    vegetable: 'bg-green-100 text-green-800',
+    fruit: 'bg-orange-100 text-orange-800',
+    grain: 'bg-yellow-100 text-yellow-800',
+    protein: 'bg-red-100 text-red-800',
+    dairy: 'bg-blue-100 text-blue-800',
+    raw: 'bg-emerald-100 text-emerald-800',
+    processed: 'bg-orange-100 text-orange-800',
   };
 
   const currentTab = tabs.find(t => t.id === activeTab);
@@ -593,16 +627,25 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   )}
                 </div>
               )}
-              {!isWaitlist && record.category && (
-                <Badge className="text-xs mt-1 bg-blue-100 text-blue-800">{record.category}</Badge>
+              {!isWaitlist && (
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {record.category && (
+                    <Badge className={`text-[10px] px-1.5 py-0 ${categoryColorMap[record.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+                      {record.category}
+                    </Badge>
+                  )}
+                  {record.type && (
+                    <Badge className={`text-[10px] px-1.5 py-0 ${categoryColorMap[record.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
+                      {record.type}
+                    </Badge>
+                  )}
+                  {record.brand && (
+                    <span className="text-[10px] text-gray-400">{record.brand}</span>
+                  )}
+                </div>
               )}
               {!isWaitlist && record.description && (
-                <p className="text-sm text-gray-600 line-clamp-1 mt-1">{record.description}</p>
-              )}
-              {!isWaitlist && record.created_at && (
-                <div className="text-xs text-gray-500 mt-1">
-                  {new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
-                </div>
+                <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{record.description}</p>
               )}
             </div>
 
@@ -995,15 +1038,88 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   )}
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {Object.entries(detailRecord).filter(([key]) => !['_displayIndex'].includes(key)).map(([key, value]) => (
-                    <div key={key} className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500 font-medium uppercase">{key.replace(/_/g, ' ')}</div>
-                      <div className="text-sm text-gray-900 mt-1 break-all">
-                        {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '')}
+                <div className="space-y-4">
+                  {/* Image + Name Header */}
+                  <div className="flex items-start gap-4 pb-3 border-b">
+                    <img
+                      src={getImageUrl(detailRecord)}
+                      alt={getDisplayName(detailRecord)}
+                      className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-lg">{getDisplayName(detailRecord)}</div>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {detailRecord.category && (
+                          <Badge className={`text-xs ${categoryColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+                            {detailRecord.category}
+                          </Badge>
+                        )}
+                        {detailRecord.type && (
+                          <Badge className={`text-xs ${categoryColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
+                            {detailRecord.type}
+                          </Badge>
+                        )}
                       </div>
+                      {detailRecord.brand && (
+                        <div className="text-sm text-gray-500 mt-1">{detailRecord.brand}</div>
+                      )}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Description */}
+                  {detailRecord.description && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 font-medium uppercase">Description</div>
+                      <div className="text-sm text-gray-900 mt-1">{detailRecord.description}</div>
+                    </div>
+                  )}
+
+                  {/* Key Fields Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {detailRecord.unit && (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 font-medium uppercase">Unit</div>
+                        <div className="text-sm text-gray-900 mt-1">{detailRecord.unit}</div>
+                      </div>
+                    )}
+                    {detailRecord.rdi != null && (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 font-medium uppercase">RDI</div>
+                        <div className="text-sm text-gray-900 mt-1">{detailRecord.rdi}</div>
+                      </div>
+                    )}
+                    {detailRecord.source && (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 font-medium uppercase">Source</div>
+                        <div className="text-sm text-gray-900 mt-1 truncate">{detailRecord.source}</div>
+                      </div>
+                    )}
+                    {detailRecord.created_at && (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 font-medium uppercase">Created</div>
+                        <div className="text-sm text-gray-900 mt-1">
+                          {new Date(detailRecord.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Remaining Fields */}
+                  {Object.entries(detailRecord)
+                    .filter(([key]) => !['id', '_displayIndex', 'name', 'name_common', 'email', 'title', 'category', 'type', 'brand', 'description', 'image_url', 'avatar_url', 'images', 'image', 'unit', 'rdi', 'source', 'created_at', 'updated_at', 'imported_at', 'api_source', 'external_id'].includes(key))
+                    .filter(([, value]) => value != null && value !== '' && value !== 'null')
+                    .map(([key, value]) => (
+                      <div key={key} className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 font-medium uppercase">{key.replace(/_/g, ' ')}</div>
+                        <div className="text-sm text-gray-900 mt-1 break-all">
+                          {Array.isArray(value) 
+                            ? value.join(', ')
+                            : typeof value === 'object' 
+                              ? JSON.stringify(value, null, 2) 
+                              : String(value)}
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
 
@@ -1109,11 +1225,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {editingRecord.image_url && (
-                    <div className="space-y-2">
-                      <Label>Image</Label>
-                      <div className="flex gap-4 items-start">
-                        <img src={editingRecord.image_url} alt="Record" className="w-24 h-24 rounded object-cover" />
+                  {/* Image Preview */}
+                  <div className="space-y-2">
+                    <Label>Image</Label>
+                    <div className="flex gap-4 items-start">
+                      <img
+                        src={getImageUrl(editingRecord)}
+                        alt={getDisplayName(editingRecord)}
+                        className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                      />
+                      <div className="flex-1 space-y-1">
+                        <Input
+                          value={editingRecord.image_url || ''}
+                          onChange={(e) => setEditingRecord({ ...editingRecord, image_url: e.target.value })}
+                          placeholder="Image URL"
+                          className="text-xs"
+                        />
                         <Input
                           type="file"
                           accept="image/*"
@@ -1136,25 +1263,86 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                             }
                           }}
                           disabled={uploadingImage}
+                          className="text-xs"
                         />
                       </div>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Name */}
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input
+                      value={editingRecord.name_common || editingRecord.name || editingRecord.title || ''}
+                      onChange={(e) => {
+                        const nameField = editingRecord.name_common !== undefined ? 'name_common' : editingRecord.title !== undefined ? 'title' : 'name';
+                        setEditingRecord({ ...editingRecord, [nameField]: e.target.value });
+                      }}
+                      placeholder="Display name"
+                    />
+                  </div>
+
+                  {/* Category + Type dropdowns */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <select
+                        title="Category"
+                        value={editingRecord.category || ''}
+                        onChange={(e) => setEditingRecord({ ...editingRecord, category: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select category</option>
+                        {(categoryOptions[activeTab] || []).map(opt => (
+                          <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Type</Label>
+                      <select
+                        title="Type"
+                        value={editingRecord.type || ''}
+                        onChange={(e) => setEditingRecord({ ...editingRecord, type: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select type</option>
+                        {(typeOptions[activeTab] || []).map(opt => (
+                          <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={editingRecord.description || ''}
+                      onChange={(e) => setEditingRecord({ ...editingRecord, description: e.target.value })}
+                      placeholder="Description"
+                      className="min-h-20"
+                    />
+                  </div>
+
+                  {/* Remaining editable fields */}
                   {Object.entries(editingRecord).map(([key, value]) => {
-                    if (['id', 'created_at', 'updated_at', 'image_url', 'avatar_url', '_displayIndex'].includes(key)) return null;
+                    if (['id', 'created_at', 'updated_at', 'imported_at', 'image_url', 'avatar_url', 'images', 'image', '_displayIndex', 'name', 'name_common', 'title', 'category', 'type', 'description', 'api_source', 'external_id'].includes(key)) return null;
+                    if (typeof value === 'object' && value !== null) return null;
                     return (
                       <div key={key} className="space-y-2">
-                        <Label className="capitalize">{key.replace(/_/g, ' ')}</Label>
-                        {key === 'description' || key === 'health_benefits' ? (
+                        <Label className="capitalize text-xs">{key.replace(/_/g, ' ')}</Label>
+                        {key === 'health_benefits' || key === 'health_benefits_text' || key === 'food_sources' ? (
                           <Textarea
-                            value={value || ''}
+                            value={typeof value === 'string' ? value : ''}
                             onChange={(e) => setEditingRecord({ ...editingRecord, [key]: e.target.value })}
-                            className="min-h-24"
+                            className="min-h-16 text-sm"
                           />
                         ) : (
                           <Input
-                            value={value || ''}
+                            value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
                             onChange={(e) => setEditingRecord({ ...editingRecord, [key]: e.target.value })}
+                            className="text-sm"
                           />
                         )}
                       </div>
