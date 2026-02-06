@@ -560,12 +560,10 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
     const submissionId = payload?.data?.submissionId || ''
     const createdAt = payload?.data?.createdAt || new Date().toISOString()
 
-    // Extract fields from Tally payload
+    // Extract email from Tally fields (look for email-type field or field labeled "email")
     let email = ''
-    let firstName = ''
-    let lastName = ''
+    let name = ''
     let referralCode = ''
-    let optedInUpdates = false
 
     for (const field of fields) {
       const label = (field?.label || '').toLowerCase()
@@ -573,20 +571,12 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
 
       if (field?.type === 'INPUT_EMAIL' || label.includes('email')) {
         email = typeof value === 'string' ? value.trim().toLowerCase() : ''
-      } else if (label === 'first' || label === 'first name' || label === 'firstname') {
-        firstName = typeof value === 'string' ? value.trim() : ''
-      } else if (label === 'last' || label === 'last name' || label === 'lastname') {
-        lastName = typeof value === 'string' ? value.trim() : ''
+      } else if (label.includes('name') || field?.type === 'INPUT_TEXT') {
+        if (!name) name = typeof value === 'string' ? value.trim() : ''
       } else if (label.includes('referral') || label.includes('code')) {
         referralCode = typeof value === 'string' ? value.trim() : ''
-      } else if (field?.type === 'CHECKBOXES' && label?.includes('update')) {
-        optedInUpdates = value === true || (Array.isArray(value) && value.length > 0)
       }
     }
-
-    // Combine first + last name
-    const name = [firstName, lastName].filter(Boolean).join(' ')
-    console.log('📋 Tally fields extracted:', { email: email ? 'present' : 'missing', firstName, lastName, name, referralCode, optedInUpdates })
 
     if (!email) {
       console.warn('⚠️ Tally webhook: No email found in submission fields')
@@ -639,8 +629,6 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
     const userData: Record<string, any> = {
       email,
       name: name || email.split('@')[0],
-      firstName: firstName || null,
-      lastName: lastName || null,
       position,
       referralCode: userReferralCode,
       source: 'tally',
@@ -649,7 +637,6 @@ app.post('/make-server-ed0fe4c2/webhooks/tally', async (c) => {
       confirmed: false,
       emailsSent: 0,
       lastEmailSent: null,
-      optedInUpdates,
       tallySubmissionId: submissionId,
       tallyRespondentId: respondentId
     }
