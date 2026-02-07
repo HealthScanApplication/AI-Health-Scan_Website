@@ -1,12 +1,60 @@
 import { useEffect } from 'react';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { toast } from 'sonner';
+import { projectId } from '../utils/supabase/info';
 
 interface UseUrlParameterHandlingProps {
   setCurrentPage: (page: string) => void;
 }
 
 export function useUrlParameterHandling({ setCurrentPage }: UseUrlParameterHandlingProps) {
+  // Handle custom /confirm-email?token=... links from waitlist confirmation emails
+  useEffect(() => {
+    const path = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (path === '/confirm-email' && token) {
+      (async () => {
+        try {
+          toast.loading('Confirming your email...', { id: 'confirm-email' });
+          const res = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/confirm-email?token=${encodeURIComponent(token)}`
+          );
+          const data = await res.json();
+
+          if (data.success) {
+            toast.success(
+              <div className="space-y-1">
+                <p className="font-semibold">Email confirmed!</p>
+                {data.position && <p className="text-sm opacity-90">You're <strong>#{data.position}</strong> in the queue</p>}
+                <p className="text-xs opacity-75">Welcome to HealthScan</p>
+              </div>,
+              { id: 'confirm-email', duration: 8000 }
+            );
+
+            // Store confirmed state
+            if (data.data?.email) {
+              localStorage.setItem('healthscan_user_email', data.data.email);
+              localStorage.setItem('healthscan_email_confirmed', 'true');
+            }
+            if (data.data?.referralCode) {
+              localStorage.setItem('healthscan_referral_code', data.data.referralCode);
+            }
+          } else {
+            toast.error(data.error || 'Confirmation failed. Please try again.', { id: 'confirm-email' });
+          }
+        } catch {
+          toast.error('Could not confirm email. Please try again later.', { id: 'confirm-email' });
+        }
+
+        // Clean URL → home
+        window.history.replaceState({}, document.title, '/');
+        setCurrentPage('home');
+      })();
+    }
+  }, [setCurrentPage]);
+
   useEffect(() => {
     const handleEmailVerification = async () => {
       try {
