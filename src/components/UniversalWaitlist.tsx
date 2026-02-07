@@ -218,9 +218,15 @@ export function UniversalWaitlist({
 
       // Enhanced success messages for existing users with email confirmation status
       if (data.isUpdate || data.alreadyExists || data.isDuplicate) {
-        const posMsg = data.position ? ` You're #${data.position} on the waitlist.` : ` You're on the waitlist.`;
-        const emailMsg = data.emailResent ? ' Confirmation email resent.' : '';
-        toast.success(`Welcome back!${posMsg}${emailMsg}`);
+        const displayName = email.split('@')[0];
+        toast.success(
+          <div className="space-y-1">
+            <p className="font-semibold">Welcome back, {displayName}!</p>
+            {data.position && <p className="text-sm opacity-90">You're <strong>#{data.position}</strong> in the queue</p>}
+            <p className="text-xs opacity-75">Check your inbox to confirm your email and secure your spot</p>
+          </div>,
+          { duration: 8000 }
+        );
         setEmail("");
         
         // Trigger events for existing users with enhanced data
@@ -250,7 +256,15 @@ export function UniversalWaitlist({
         toast.info(`This email already has an account. Please sign in with your password.`);
       } else {
         // Enhanced success messages for new signups
-        toast.success(`You're on the list! Welcome to HealthScan.`);
+        const displayName = email.split('@')[0];
+        toast.success(
+          <div className="space-y-1">
+            <p className="font-semibold">You're in, {displayName}!</p>
+            {data.position && <p className="text-sm opacity-90">You're <strong>#{data.position}</strong> in the queue</p>}
+            <p className="text-xs opacity-75">Please check your inbox and confirm your email to secure your spot</p>
+          </div>,
+          { duration: 8000 }
+        );
         
         // Show password upgrade modal for new signups
         console.log('🔐 UniversalWaitlist: Starting signup flow - Showing PasswordUpgradeModal for new signup');
@@ -458,11 +472,10 @@ export function UniversalWaitlist({
 
       {/* Password upgrade modal */}
       <PasswordUpgradeModal
-        isOpen={showPasswordUpgrade}
-        onClose={() => handlePasswordUpgradeComplete(false)}
-        onComplete={handlePasswordUpgradeComplete}
+        open={showPasswordUpgrade}
+        onOpenChange={(isOpen) => { if (!isOpen) handlePasswordUpgradeComplete(false); }}
         email={signupEmail}
-        queuePosition={signupPosition}
+        userPosition={signupPosition}
         emailExistsInAuth={emailExistsInAuth}
       />
 
@@ -471,8 +484,7 @@ export function UniversalWaitlist({
       {/* Confetti celebration */}
       {showConfetti && (
         <ConfettiCelebration
-          type="plant"
-          autoHide={false}
+          isActive={showConfetti}
           onComplete={() => {
             // Don't auto-hide here since we manage it with timeout
           }}
