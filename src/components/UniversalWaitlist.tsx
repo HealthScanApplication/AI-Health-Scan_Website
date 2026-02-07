@@ -10,6 +10,7 @@ import { retryOperation, handleSupabaseError } from "../utils/supabase/client";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
 import { Users, Share2, Gift, Lock, Eye, EyeOff, TrendingUp, UserCheck } from "lucide-react";
+import { trackSignupStart, trackSignupSubmit, trackCtaClick } from "../utils/eventTracking";
 
 import { PasswordUpgradeModal } from "./auth/PasswordUpgradeModal";
 import { ConfettiCelebration } from "./ConfettiCelebration";
@@ -132,6 +133,7 @@ export function UniversalWaitlist({
     if (!email) return;
 
     setIsLoading(true);
+    trackCtaClick('join_waitlist');
     
     try {
       // Get the referral code from our hook or pending storage
@@ -197,6 +199,7 @@ export function UniversalWaitlist({
       const startTime = Date.now();
       confettiStateRef.current = { isActive: true, startTime };
       setShowConfetti(true);
+      trackSignupSubmit(email);
       // Clear any existing timeout
       if (confettiTimeoutRef.current) {
         clearTimeout(confettiTimeoutRef.current);
@@ -358,7 +361,7 @@ export function UniversalWaitlist({
             placeholder={hasReferral && isActive ? "Enter your email to claim referral" : placeholder}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            onFocus={() => setIsFocused(true)}
+            onFocus={() => { setIsFocused(true); trackSignupStart(); }}
             onBlur={() => setIsFocused(false)}
             className={`flex-1 h-12 px-4 bg-[var(--input-background)] border-2 rounded-xl text-gray-900 placeholder:text-gray-500 focus:border-[var(--healthscan-green)] focus:outline-none focus:ring-0 transition-colors ${
               hasReferral && isActive ? 'border-[var(--healthscan-green)] ring-2 ring-[var(--healthscan-green)]/30' : 'border-gray-200'

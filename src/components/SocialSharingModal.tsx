@@ -7,6 +7,8 @@ import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { Copy, Gift, Heart, Mail, MessageCircle, Send, Phone, Twitter, Facebook, Linkedin, Instagram, MessageSquare, Share2, Users, Star, Trophy } from 'lucide-react';
 import { copyToClipboard } from '../utils/copyUtils';
+import { trackShareClick } from '../utils/eventTracking';
+import { projectId } from '../utils/supabase/info';
 
 interface SocialSharingModalProps {
   open: boolean;
@@ -86,7 +88,45 @@ export function SocialSharingModal({
   const [viewportHeight, setViewportHeight] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<'partner' | 'friend' | 'parent' | 'sibling' | 'family' | 'colleague'>('friend');
   const [directEmail, setDirectEmail] = useState('');
-  
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const sendDirectEmail = async () => {
+    const trimmedEmail = directEmail.trim();
+    if (!trimmedEmail) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const finalMessage = ensureCorrectReferralLink(shareMessage);
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/send-referral-invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toEmail: trimmedEmail,
+          message: finalMessage,
+          senderName: userName || userEmail?.split('@')[0] || 'A HealthScan member',
+          senderEmail: userEmail,
+          referralCode: referralCode,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`💚 Invite sent to ${trimmedEmail}!`);
+        trackShareClick('direct_email');
+        setDirectEmail('');
+      } else {
+        toast.error(data.error || 'Failed to send invite');
+      }
+    } catch (err) {
+      toast.error('Failed to send invite. Please try again.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   // Default share message with proper HealthScan referral link
   const getReferralLink = () => {
     // Try prop first, then localStorage fallback
@@ -224,9 +264,9 @@ Worth exploring: ${currentReferralLink} 🌱💚`
     
     const currentReferralLink = getReferralLink();
     
-    // PRESERVE USER'S MESSAGE: Replace any existing healthscan.live links with the correct one
+    // PRESERVE USER'S MESSAGE: Replace any existing healthscan.live links (with query params, paths, etc.) with the correct one
     const updatedMessage = userMessage.replace(
-      /https:\/\/healthscan\.live(?:\/[^\s]*)?/g,
+      /https:\/\/healthscan\.live[^\s]*/g,
       currentReferralLink
     );
     
@@ -240,6 +280,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
   };
 
   const shareViaWhatsApp = () => {
+    trackShareClick('whatsapp');
     const finalMessage = ensureCorrectReferralLink(shareMessage);
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
@@ -247,6 +288,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
   };
 
   const shareViaTwitter = () => {
+    trackShareClick('twitter');
     const finalMessage = ensureCorrectReferralLink(shareMessage);
     // Add @healthscan.live handle to Twitter shares
     const twitterMessage = `${finalMessage}\n\nFollow @healthscan.live for updates! 🌱`;
@@ -256,6 +298,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
   };
 
   const shareViaFacebook = () => {
+    trackShareClick('facebook');
     const finalMessage = ensureCorrectReferralLink(shareMessage);
     const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}&quote=${encodeURIComponent(finalMessage)}`;
     window.open(facebookUrl, '_blank', 'noopener,noreferrer');
@@ -263,6 +306,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
   };
 
   const shareViaFacebookMessenger = async () => {
+    trackShareClick('messenger');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
@@ -312,6 +356,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
   };
 
   const shareViaInstagram = async () => {
+    trackShareClick('instagram');
     const finalMessage = ensureCorrectReferralLink(shareMessage);
     // Add Instagram handle
     const instagramMessage = `${finalMessage}\n\nFollow @healthscan.live for updates! 🌱`;
@@ -490,36 +535,29 @@ Worth exploring: ${currentReferralLink} 🌱💚`
                 type="email"
                 value={directEmail}
                 onChange={(e) => setDirectEmail(e.target.value)}
-                placeholder="Enter friend's email to send directly"
+                placeholder="Enter friend's email to send invite"
                 className="flex-1 h-10 sm:h-11 px-3 sm:px-4 bg-white border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:border-[var(--healthscan-green)] focus:outline-none focus:ring-0 transition-colors"
+                disabled={sendingEmail}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && directEmail.trim()) {
-                    const finalMessage = ensureCorrectReferralLink(shareMessage);
-                    const subject = encodeURIComponent('Join me in bringing transparency to our food system');
-                    const body = encodeURIComponent(finalMessage);
-                    window.open(`mailto:${encodeURIComponent(directEmail.trim())}?subject=${subject}&body=${body}`, '_blank');
-                    toast.success(`💚 Email to ${directEmail.trim()} opened!`);
-                    setDirectEmail('');
+                    sendDirectEmail();
                   }
                 }}
               />
               {directEmail.trim() && (
                 <button
-                  onClick={() => {
-                    const finalMessage = ensureCorrectReferralLink(shareMessage);
-                    const subject = encodeURIComponent('Join me in bringing transparency to our food system');
-                    const body = encodeURIComponent(finalMessage);
-                    window.open(`mailto:${encodeURIComponent(directEmail.trim())}?subject=${subject}&body=${body}`, '_blank');
-                    toast.success(`💚 Email to ${directEmail.trim()} opened!`);
-                    setDirectEmail('');
-                  }}
-                  className="h-10 sm:h-11 px-4 sm:px-5 bg-black hover:bg-gray-800 text-white font-medium rounded-xl transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap text-sm"
+                  onClick={sendDirectEmail}
+                  disabled={sendingEmail}
+                  className="h-10 sm:h-11 px-4 sm:px-5 bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-medium rounded-xl transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap text-sm"
                 >
                   <Send className="w-4 h-4" />
-                  Send
+                  {sendingEmail ? 'Sending...' : 'Send'}
                 </button>
               )}
             </div>
+            {userName && (
+              <p className="text-[10px] text-gray-400 mt-1">Sending as {userName}</p>
+            )}
           </div>
 
           {/* Social Sharing Grid - Mobile Optimized with 3-Column Layout */}

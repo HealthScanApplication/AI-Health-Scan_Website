@@ -680,6 +680,7 @@ export function Header({
         onOpenChange={setShowReferralModal}
         userEmail={user?.email}
         referralCode={user ? generateConsistentReferralCode(user.email) : undefined}
+        userName={user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || ''}
       />
     </>
   );

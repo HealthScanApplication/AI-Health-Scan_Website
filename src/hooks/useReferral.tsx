@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { trackLpView, trackReferralLinkOpen } from '../utils/eventTracking';
 
 interface ReferralData {
   referralCode: string | null;
@@ -49,6 +50,7 @@ export function useReferral(): ReferralData {
     
     if (detectedReferralCode) {
       console.log('Referral code detected from URL:', detectedReferralCode, refCode ? '(query param)' : '(path)');
+      trackReferralLinkOpen(detectedReferralCode);
       // Store in localStorage for persistence
       localStorage.setItem('healthscan_pending_referral', detectedReferralCode);
       localStorage.setItem('healthscan_referral_timestamp', Date.now().toString());

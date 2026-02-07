@@ -1052,6 +1052,187 @@ app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c: any) => {
   } catch (error: any) { return c.json({ success: false, error: 'Internal server error' }, 500) }
 })
 
+// ============ REFERRAL INVITE EMAIL ============
+
+// Send a referral invite email on behalf of a user
+app.post('/make-server-ed0fe4c2/send-referral-invite', async (c: any) => {
+  try {
+    const body = await c.req.json()
+    const { toEmail, message, senderName, senderEmail, referralCode } = body
+
+    if (!toEmail || !message) {
+      return c.json({ success: false, error: 'toEmail and message are required' }, 400)
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(toEmail.trim().toLowerCase())) {
+      return c.json({ success: false, error: 'Invalid recipient email' }, 400)
+    }
+
+    const emailService = createEmailService()
+    if (!emailService) {
+      return c.json({ success: false, error: 'Email service not configured' }, 500)
+    }
+
+    const fromName = senderName || 'A HealthScan member'
+    const referralLink = referralCode ? `https://healthscan.live?ref=${referralCode}` : 'https://healthscan.live'
+
+    // Build a clean HTML email
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;-webkit-font-smoothing:antialiased;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+  <tr><td style="background-color:#111827;padding:24px 40px;text-align:center;">
+    <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:20px;font-weight:600;color:#ffffff;">HealthScan</p>
+  </td></tr>
+  <tr><td style="padding:32px 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    <p style="margin:0 0 4px;font-size:13px;color:#6b7280;">Invited by <strong style="color:#111827;">${fromName}</strong>${senderEmail ? ` (${senderEmail})` : ''}</p>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;">
+    <div style="font-size:15px;color:#374151;line-height:1.7;white-space:pre-wrap;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
+    <tr><td align="center" style="background-color:#111827;border-radius:6px;">
+      <a href="${referralLink}" target="_blank" style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Join HealthScan</a>
+    </td></tr>
+    </table>
+    <p style="margin:0;font-size:12px;color:#9ca3af;">This email was sent on behalf of ${fromName} via HealthScan. If you didn't expect this, you can safely ignore it.</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`
+
+    const textContent = `${fromName} invited you to HealthScan!\n\n${message}\n\nJoin here: ${referralLink}`
+
+    const result = await emailService.sendEmail({
+      to: toEmail.trim().toLowerCase(),
+      subject: `${fromName} invited you to try HealthScan 🌱`,
+      html: htmlContent,
+      text: textContent,
+      from: 'invites@healthscan.live'
+    })
+
+    if (result.success) {
+      console.log(`✅ Referral invite sent from ${senderEmail || 'unknown'} to ${toEmail}`)
+      return c.json({ success: true, message: 'Invite sent!' })
+    }
+
+    return c.json({ success: false, error: result.error || 'Failed to send' }, 500)
+  } catch (error: any) {
+    console.error('❌ Referral invite error:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
+// ============ FUNNEL EVENT TRACKING ============
+
+// Public: Receive funnel events (batched)
+app.post('/make-server-ed0fe4c2/events', async (c: any) => {
+  try {
+    const { events } = await c.req.json()
+    if (!Array.isArray(events) || events.length === 0) {
+      return c.json({ success: true, stored: 0 })
+    }
+    // Store each event with a time-based key for efficient prefix queries
+    let stored = 0
+    for (const evt of events.slice(0, 100)) { // cap at 100 per batch
+      const ts = evt.timestamp || new Date().toISOString()
+      const key = `funnel_evt_${ts.replace(/[^0-9]/g, '')}_${Math.random().toString(36).substring(2, 8)}`
+      await kv.set(key, {
+        event: evt.event,
+        anonymous_id: evt.anonymous_id,
+        user_id: evt.user_id || null,
+        timestamp: ts,
+        referral_code: evt.referral_code || null,
+        utm_source: evt.utm_source || null,
+        utm_medium: evt.utm_medium || null,
+        utm_campaign: evt.utm_campaign || null,
+        metadata: evt.metadata || null
+      })
+      stored++
+    }
+    return c.json({ success: true, stored })
+  } catch (error: any) {
+    console.error('❌ Event tracking error:', error)
+    return c.json({ success: true, stored: 0 }) // fail silently for tracking
+  }
+})
+
+// Admin: Get funnel metrics (aggregated counts + raw events for time calcs)
+app.get('/make-server-ed0fe4c2/admin/funnel-metrics', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    // Get all funnel events
+    const allEvents = await kv.getByPrefix('funnel_evt_')
+
+    // Aggregate counts by event type
+    const counts: Record<string, number> = {}
+    const eventsByType: Record<string, any[]> = {}
+    const eventsByDay: Record<string, Record<string, number>> = {}
+
+    for (const evt of allEvents) {
+      const type = evt.event || 'unknown'
+      counts[type] = (counts[type] || 0) + 1
+      if (!eventsByType[type]) eventsByType[type] = []
+      eventsByType[type].push(evt)
+
+      // Group by day for trend
+      const day = (evt.timestamp || '').substring(0, 10)
+      if (day) {
+        if (!eventsByDay[day]) eventsByDay[day] = {}
+        eventsByDay[day][type] = (eventsByDay[day][type] || 0) + 1
+      }
+    }
+
+    // Compute median times between funnel steps per anonymous_id
+    const sessionEvents: Record<string, any[]> = {}
+    for (const evt of allEvents) {
+      const sid = evt.user_id || evt.anonymous_id || 'unknown'
+      if (!sessionEvents[sid]) sessionEvents[sid] = []
+      sessionEvents[sid].push(evt)
+    }
+
+    function medianDiffMinutes(fromType: string, toType: string): number | null {
+      const diffs: number[] = []
+      for (const evts of Object.values(sessionEvents)) {
+        const from = evts.filter(e => e.event === fromType).sort((a: any, b: any) => a.timestamp.localeCompare(b.timestamp))[0]
+        const to = evts.filter(e => e.event === toType).sort((a: any, b: any) => a.timestamp.localeCompare(b.timestamp))[0]
+        if (from && to) {
+          const diff = (new Date(to.timestamp).getTime() - new Date(from.timestamp).getTime()) / 60000
+          if (diff > 0 && diff < 10080) diffs.push(diff) // cap at 7 days
+        }
+      }
+      if (diffs.length === 0) return null
+      diffs.sort((a, b) => a - b)
+      return diffs[Math.floor(diffs.length / 2)]
+    }
+
+    const medianTimes = {
+      view_to_submit: medianDiffMinutes('lp_view', 'signup_submit'),
+      cta_to_submit: medianDiffMinutes('cta_click', 'signup_submit'),
+      submit_to_confirm: medianDiffMinutes('signup_submit', 'email_confirm'),
+      confirm_to_referral: medianDiffMinutes('email_confirm', 'referral_email_confirm')
+    }
+
+    return c.json({
+      success: true,
+      counts,
+      medianTimes,
+      dailyTrend: eventsByDay,
+      totalEvents: allEvents.length
+    })
+  } catch (error: any) {
+    console.error('❌ Funnel metrics error:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
 // ============ END ADMIN CRUD ROUTES ============
 
 // Mount Referral endpoints
