@@ -287,9 +287,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin SAVE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Waitlist user updated');
+          setRecords(prev => prev.map(r => r.id === editingRecord.id || r.email === editingRecord.email ? { ...r, ...editingRecord } : r));
           setShowEditModal(false);
           setShowDetailModal(false);
-          fetchRecords();
         } else {
           try {
             const err = JSON.parse(responseText);
@@ -318,8 +318,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin SAVE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Record updated successfully');
+          setRecords(prev => prev.map(r => r.id === editingRecord.id ? { ...r, ...editingRecord } : r));
           setShowEditModal(false);
-          fetchRecords();
         } else {
           try {
             const err = JSON.parse(responseText);
@@ -358,8 +358,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin DELETE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success(`Deleted ${record.email}`);
+          setRecords(prev => prev.filter(r => r.id !== record.id && r.email !== record.email));
           setShowDetailModal(false);
-          fetchRecords();
         } else {
           try {
             const err = JSON.parse(responseText);
@@ -384,8 +384,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin DELETE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Record deleted successfully');
+          setRecords(prev => prev.filter(r => r.id !== record.id));
           setShowDetailModal(false);
-          fetchRecords();
         } else {
           try {
             const err = JSON.parse(responseText);
@@ -445,9 +445,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
         toast.success(`Deleted ${deleted} records`);
       }
+      setRecords(prev => prev.filter(r => !selectedRecords.has(r.id)));
       setSelectedRecords(new Set());
       setBulkMode(false);
-      fetchRecords();
     } catch (error) {
       console.error('Bulk delete error:', error);
       toast.error('Bulk delete failed');
@@ -497,12 +497,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
         toast.success(`Updated ${updated} records`);
       }
+      setRecords(prev => prev.map(r => selectedRecords.has(r.id) ? { ...r, [bulkEditField]: bulkEditValue } : r));
       setSelectedRecords(new Set());
       setBulkEditField('');
       setBulkEditValue('');
       setBulkMode(false);
       setBulkAction(null);
-      fetchRecords();
     } catch (error) {
       console.error('Bulk update error:', error);
       toast.error('Bulk update failed');
