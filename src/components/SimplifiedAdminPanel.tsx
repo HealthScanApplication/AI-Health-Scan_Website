@@ -1416,131 +1416,115 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </Dialog>
       )}
 
-      {/* Edit Modal - Config Driven */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit {adminFieldConfig[activeTab]?.label || 'Record'}</DialogTitle>
-            <DialogDescription>Update the details below and save</DialogDescription>
-          </DialogHeader>
+      {/* Edit Modal - Config Driven (uses AdminModal) */}
+      <AdminModal
+        open={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title={`Edit ${adminFieldConfig[activeTab]?.label || 'Record'}`}
+        subtitle="Update the details below and save"
+        size="lg"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={savingRecord} className="bg-blue-600 hover:bg-blue-700">
+              {savingRecord ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        }
+      >
+        {editingRecord && (() => {
+          const editFields = getFieldsForView(activeTab, 'edit');
 
-          {editingRecord && (() => {
-            const editFields = getFieldsForView(activeTab, 'edit');
+          const renderEditField = (field: FieldConfig) => {
+            const val = editingRecord[field.key];
+            const updateField = (newVal: any) => setEditingRecord({ ...editingRecord, [field.key]: newVal });
 
-            const renderEditField = (field: FieldConfig) => {
-              const val = editingRecord[field.key];
-              const updateField = (newVal: any) => setEditingRecord({ ...editingRecord, [field.key]: newVal });
-
-              if (field.type === 'image') {
-                return (
-                  <div key={field.key} className="space-y-2 col-span-2">
-                    <Label>{field.label}</Label>
-                    <div className="flex gap-4 items-start">
-                      <img src={getImageUrl(editingRecord)} alt={getDisplayName(editingRecord)} className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0" />
-                      <div className="flex-1 space-y-1">
-                        <Input value={val || ''} onChange={(e) => updateField(e.target.value)} placeholder="Image URL" className="text-xs" />
-                        <Input
-                          type="file" accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setUploadingImage(true);
-                              try {
-                                const reader = new FileReader();
-                                reader.onload = (ev) => updateField(ev.target?.result as string);
-                                reader.readAsDataURL(file);
-                              } catch { toast.error('Failed to read image'); }
-                              finally { setUploadingImage(false); }
-                            }
-                          }}
-                          disabled={uploadingImage} className="text-xs"
-                        />
-                      </div>
+            if (field.type === 'image') {
+              return (
+                <div key={field.key} className="space-y-2 col-span-2">
+                  <Label>{field.label}</Label>
+                  <div className="flex gap-4 items-start">
+                    <img src={getImageUrl(editingRecord)} alt={getDisplayName(editingRecord)} className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0" />
+                    <div className="flex-1 space-y-1">
+                      <Input value={val || ''} onChange={(e) => updateField(e.target.value)} placeholder="Image URL" className="text-xs" />
+                      <Input
+                        type="file" accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setUploadingImage(true);
+                            try {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => updateField(ev.target?.result as string);
+                              reader.readAsDataURL(file);
+                            } catch { toast.error('Failed to read image'); }
+                            finally { setUploadingImage(false); }
+                          }
+                        }}
+                        disabled={uploadingImage} className="text-xs"
+                      />
                     </div>
                   </div>
-                );
-              }
+                </div>
+              );
+            }
 
-              if (field.type === 'readonly') {
-                return (
-                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
-                    <Label>{field.label}</Label>
-                    <Input value={val || ''} disabled className="bg-gray-50 text-sm" />
-                    {field.key === 'email' && <p className="text-xs text-gray-400">Email cannot be changed</p>}
-                  </div>
-                );
-              }
+            if (field.type === 'readonly') {
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <Label>{field.label}</Label>
+                  <Input value={val || ''} disabled className="bg-gray-50 text-sm" />
+                  {field.key === 'email' && <p className="text-xs text-gray-400">Email cannot be changed</p>}
+                </div>
+              );
+            }
 
-              if (field.type === 'select') {
-                return (
-                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
-                    <Label>{field.label}</Label>
-                    <select
-                      title={field.label}
-                      value={val || ''}
-                      onChange={(e) => updateField(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select {field.label.toLowerCase()}</option>
-                      {(field.options || []).map(opt => (
-                        <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              }
+            if (field.type === 'select') {
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <Label>{field.label}</Label>
+                  <select
+                    title={field.label}
+                    value={val || ''}
+                    onChange={(e) => updateField(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select {field.label.toLowerCase()}</option>
+                    {(field.options || []).map(opt => (
+                      <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
 
-              if (field.type === 'boolean') {
-                return (
-                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
-                    <Label>{field.label}</Label>
-                    <select
-                      title={field.label}
-                      value={val ? 'true' : 'false'}
-                      onChange={(e) => updateField(e.target.value === 'true')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </div>
-                );
-              }
+            if (field.type === 'boolean') {
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <Label>{field.label}</Label>
+                  <select
+                    title={field.label}
+                    value={val ? 'true' : 'false'}
+                    onChange={(e) => updateField(e.target.value === 'true')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              );
+            }
 
-              if (field.type === 'number') {
-                return (
-                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
-                    <Label>{field.label}</Label>
-                    <Input type="number" value={val ?? 0} onChange={(e) => updateField(parseInt(e.target.value) || 0)} placeholder={field.placeholder} className="text-sm" />
-                  </div>
-                );
-              }
+            if (field.type === 'number') {
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <Label>{field.label}</Label>
+                  <Input type="number" value={val ?? 0} onChange={(e) => updateField(parseInt(e.target.value) || 0)} placeholder={field.placeholder} className="text-sm" />
+                </div>
+              );
+            }
 
-              if (field.type === 'textarea') {
-                return (
-                  <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
-                    <div className="flex items-center justify-between">
-                      <Label>{field.label}</Label>
-                      {field.aiSuggest && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field of this ${adminFieldConfig[activeTab]?.label || 'item'}: ${getDisplayName(editingRecord)}`;
-                            toast.info(`AI Prompt: ${prompt}`, { duration: 5000 });
-                          }}
-                          className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
-                          title="Get AI suggestion for this field"
-                        >
-                          ✨ AI Suggest
-                        </button>
-                      )}
-                    </div>
-                    <Textarea value={typeof val === 'string' ? val : ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="min-h-20 text-sm" />
-                  </div>
-                );
-              }
-
-              // Default: text input
+            if (field.type === 'textarea') {
               return (
                 <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
                   <div className="flex items-center justify-between">
@@ -1549,7 +1533,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       <button
                         type="button"
                         onClick={() => {
-                          const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field.`;
+                          const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field of this ${adminFieldConfig[activeTab]?.label || 'item'}: ${getDisplayName(editingRecord)}`;
                           toast.info(`AI Prompt: ${prompt}`, { duration: 5000 });
                         }}
                         className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
@@ -1559,27 +1543,42 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       </button>
                     )}
                   </div>
-                  <Input value={typeof val === 'string' || typeof val === 'number' ? String(val) : val || ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="text-sm" />
+                  <Textarea value={typeof val === 'string' ? val : ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="min-h-20 text-sm" />
                 </div>
               );
-            };
+            }
 
+            // Default: text input
             return (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  {editFields.map(renderEditField)}
+              <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <Label>{field.label}</Label>
+                  {field.aiSuggest && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field.`;
+                        toast.info(`AI Prompt: ${prompt}`, { duration: 5000 });
+                      }}
+                      className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
+                      title="Get AI suggestion for this field"
+                    >
+                      ✨ AI Suggest
+                    </button>
+                  )}
                 </div>
-                <div className="flex gap-2 justify-end pt-4 border-t">
-                  <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                  <Button onClick={handleSave} disabled={savingRecord} className="bg-blue-600 hover:bg-blue-700">
-                    {savingRecord ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
+                <Input value={typeof val === 'string' || typeof val === 'number' ? String(val) : val || ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="text-sm" />
               </div>
             );
-          })()}
-        </DialogContent>
-      </Dialog>
+          };
+
+          return (
+            <div className="grid grid-cols-2 gap-3">
+              {editFields.map(renderEditField)}
+            </div>
+          );
+        })()}
+      </AdminModal>
       <FloatingDebugMenu accessToken={accessToken} />
     </div>
   );
