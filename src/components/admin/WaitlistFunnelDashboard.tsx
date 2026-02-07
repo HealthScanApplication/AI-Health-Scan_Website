@@ -120,11 +120,11 @@ export function WaitlistFunnelDashboard({ records, accessToken, ipGeoData }: Wai
         </div>
       </div>
       {/* ── Horizontal Funnel Cards ── */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="flex gap-2 overflow-x-auto">
         {funnel.steps.map((step) => {
           const pct = Math.min(100, Math.max(2, (step.value / step.max) * 100));
           return (
-            <div key={step.label} className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col justify-between min-h-[100px]">
+            <div key={step.label} className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col justify-between min-h-[100px] flex-1 min-w-0">
               <div>
                 <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-tight">{step.label}</p>
                 <p className="text-xl font-bold text-gray-900 mt-1 tabular-nums">{step.value.toLocaleString()}</p>
