@@ -87,13 +87,13 @@ export function WaitlistFunnelDashboard({ records, accessToken, ipGeoData }: Wai
 
     // Each step: label, value, sensible max for progress bar, color
     const steps: { label: string; value: number; max: number; color: string; sub: string }[] = [
-      { label: 'Page Views', value: lpViews, max: Math.max(lpViews, 100), color: 'bg-sky-500', sub: 'Unique visits' },
-      { label: 'CTA Clicks', value: ctaClicks, max: lpViews || 1, color: 'bg-blue-500', sub: `${lpViews > 0 ? ((ctaClicks / lpViews) * 100).toFixed(0) : 0}% of views` },
-      { label: 'Submitted', value: signupSubmits, max: ctaClicks || 1, color: 'bg-indigo-500', sub: `${ctaClicks > 0 ? ((signupSubmits / ctaClicks) * 100).toFixed(0) : 0}% of clicks` },
-      { label: 'Confirmed', value: emailConfirms, max: signupSubmits || 1, color: 'bg-emerald-500', sub: `${signupSubmits > 0 ? ((emailConfirms / signupSubmits) * 100).toFixed(0) : 0}% of submitted` },
-      { label: 'Shared', value: shareClicks, max: emailConfirms || 1, color: 'bg-violet-500', sub: `${emailConfirms > 0 ? ((shareClicks / emailConfirms) * 100).toFixed(0) : 0}% of confirmed` },
-      { label: 'Ref. Opened', value: refLinkOpens, max: shareClicks || 1, color: 'bg-purple-500', sub: `${shareClicks > 0 ? ((refLinkOpens / shareClicks) * 100).toFixed(0) : 0}% of shares` },
-      { label: 'Ref. Signups', value: refSignups, max: refLinkOpens || 1, color: 'bg-fuchsia-500', sub: `${refLinkOpens > 0 ? ((refSignups / refLinkOpens) * 100).toFixed(0) : 0}% of opens` },
+      { label: 'Visitors', value: lpViews, max: Math.max(lpViews, 100), color: 'bg-sky-500', sub: 'Landing page views' },
+      { label: 'Interested', value: ctaClicks, max: lpViews || 1, color: 'bg-blue-500', sub: `${lpViews > 0 ? ((ctaClicks / lpViews) * 100).toFixed(0) : 0}% clicked sign up` },
+      { label: 'Signed Up', value: signupSubmits, max: ctaClicks || 1, color: 'bg-indigo-500', sub: `${ctaClicks > 0 ? ((signupSubmits / ctaClicks) * 100).toFixed(0) : 0}% completed form` },
+      { label: 'Confirmed', value: emailConfirms, max: signupSubmits || 1, color: 'bg-emerald-500', sub: `${signupSubmits > 0 ? ((emailConfirms / signupSubmits) * 100).toFixed(0) : 0}% verified email` },
+      { label: 'Shared', value: shareClicks, max: emailConfirms || 1, color: 'bg-violet-500', sub: `${emailConfirms > 0 ? ((shareClicks / emailConfirms) * 100).toFixed(0) : 0}% shared link` },
+      { label: 'Ref. Visits', value: refLinkOpens, max: shareClicks || 1, color: 'bg-purple-500', sub: `${shareClicks > 0 ? ((refLinkOpens / shareClicks) * 100).toFixed(0) : 0}% links opened` },
+      { label: 'Ref. Joined', value: refSignups, max: refLinkOpens || 1, color: 'bg-fuchsia-500', sub: `${refLinkOpens > 0 ? ((refSignups / refLinkOpens) * 100).toFixed(0) : 0}% converted` },
     ];
 
     return { steps, total, confirmed, totalReferrals, usersWithReferrals };

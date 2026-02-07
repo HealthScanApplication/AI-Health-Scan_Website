@@ -613,7 +613,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     }
   };
 
-  const filteredRecords = records.filter(record => {
+  // For waitlist: filter out records without email (ghost/invalid entries)
+  const validRecords = activeTab === 'waitlist'
+    ? records.filter(r => r.email && r.email.trim() !== '')
+    : records;
+
+  const filteredRecords = validRecords.filter(record => {
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = (
       (record.name?.toLowerCase().includes(searchLower)) ||
@@ -924,8 +929,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             {tabs.map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                 {/* Waitlist Funnel Dashboard */}
-                {tab.id === 'waitlist' && records.length > 0 && (
-                  <WaitlistFunnelDashboard records={records} accessToken={accessToken} ipGeoData={ipGeoData} />
+                {tab.id === 'waitlist' && validRecords.length > 0 && (
+                  <WaitlistFunnelDashboard records={validRecords} accessToken={accessToken} ipGeoData={ipGeoData} />
                 )}
 
                 {/* Catalog Metric Cards (elements, ingredients, recipes, products) */}
