@@ -42,6 +42,8 @@ import { FloatingDebugMenu } from './FloatingDebugMenu';
 import { CollapsibleSection } from './ui/CollapsibleSection';
 import { adminFieldConfig, getFieldsForView, badgeColorMap, type FieldConfig } from '../config/adminFieldConfig';
 import { WaitlistFunnelDashboard } from './admin/WaitlistFunnelDashboard';
+import { CatalogMetricCards } from './admin/CatalogMetricCards';
+import { ScanFunnelDashboard } from './admin/ScanFunnelDashboard';
 import { AdminModal } from './ui/AdminModal';
 
 interface AdminRecord {
@@ -924,6 +926,16 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 {/* Waitlist Funnel Dashboard */}
                 {tab.id === 'waitlist' && records.length > 0 && (
                   <WaitlistFunnelDashboard records={records} accessToken={accessToken} ipGeoData={ipGeoData} />
+                )}
+
+                {/* Catalog Metric Cards (elements, ingredients, recipes, products) */}
+                {['elements', 'ingredients', 'recipes', 'products'].includes(tab.id) && records.length > 0 && (
+                  <CatalogMetricCards records={records} tabId={tab.id} />
+                )}
+
+                {/* Scan Funnel Dashboard */}
+                {tab.id === 'scans' && records.length > 0 && (
+                  <ScanFunnelDashboard records={records} />
                 )}
 
                 {/* Sub-category Filter Tabs */}
