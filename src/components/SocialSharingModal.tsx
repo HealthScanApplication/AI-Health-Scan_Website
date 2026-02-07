@@ -86,10 +86,13 @@ export function SocialSharingModal({
   const [viewportHeight, setViewportHeight] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<'partner' | 'friend' | 'parent' | 'sibling' | 'family' | 'colleague'>('friend');
   
-  // Default share message with proper HealthScan link
+  // Default share message with proper HealthScan referral link
   const getReferralLink = () => {
-    if (referralCode) {
-      return `https://healthscan.live/${referralCode}`;
+    // Try prop first, then localStorage fallback
+    const code = referralCode || 
+      (typeof window !== 'undefined' ? localStorage.getItem('healthscan_referral_code') : null) || '';
+    if (code) {
+      return `https://healthscan.live?ref=${encodeURIComponent(code)}`;
     }
     return 'https://healthscan.live';
   };
