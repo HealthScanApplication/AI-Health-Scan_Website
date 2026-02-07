@@ -66,6 +66,15 @@ interface SimplifiedAdminPanelProps {
   user: any;
 }
 
+// Country code to flag emoji
+const countryToFlag = (code: string): string => {
+  if (!code || code.length !== 2) return '';
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)));
+};
+
+// IP geolocation cache (persists across re-renders)
+const ipGeoCache: Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }> = {};
+
 export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanelProps) {
   const [activeTab, setActiveTab] = useState('waitlist');
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,6 +99,44 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [savingRecord, setSavingRecord] = useState(false);
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [ipGeoData, setIpGeoData] = useState<Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }>>({});
+
+  // Batch IP geolocation lookup
+  useEffect(() => {
+    if (activeTab !== 'waitlist') return;
+    const ips = records
+      .map(r => r.ipAddress?.split(',')[0]?.trim())
+      .filter((ip): ip is string => !!ip && !ipGeoCache[ip]);
+    const uniqueIps = [...new Set(ips)].slice(0, 50); // ip-api batch limit
+    if (uniqueIps.length === 0) {
+      // Still sync cache to state
+      const cached: Record<string, any> = {};
+      records.forEach(r => {
+        const ip = r.ipAddress?.split(',')[0]?.trim();
+        if (ip && ipGeoCache[ip]) cached[ip] = ipGeoCache[ip];
+      });
+      if (Object.keys(cached).length > 0) setIpGeoData(prev => ({ ...prev, ...cached }));
+      return;
+    }
+    fetch('http://ip-api.com/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(uniqueIps.map(ip => ({ query: ip, fields: 'query,city,country,countryCode,status' })))
+    })
+      .then(res => res.json())
+      .then((results: any[]) => {
+        const newGeo: Record<string, any> = {};
+        results.forEach((r: any) => {
+          if (r.status === 'success') {
+            const geo = { city: r.city, country: r.country, countryCode: r.countryCode, flag: countryToFlag(r.countryCode) };
+            ipGeoCache[r.query] = geo;
+            newGeo[r.query] = geo;
+          }
+        });
+        setIpGeoData(prev => ({ ...prev, ...newGeo }));
+      })
+      .catch(() => {});
+  }, [records, activeTab]);
 
   const tabs = [
     { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
@@ -731,16 +778,25 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               </div>
               {isWaitlist && (
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  {record.created_at && (
+                  {(record.signupDate || record.created_at) && (
                     <span className="text-xs text-gray-500">
-                      {new Date(record.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                      {new Date(record.signupDate || record.created_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
+                      <span className="text-gray-400">{new Date(record.signupDate || record.created_at!).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                     </span>
                   )}
-                  {record.ipAddress && (
-                    <span className="text-xs text-gray-400" title={record.ipAddress}>
-                      IP: {record.ipAddress.split(',')[0].trim()}
-                    </span>
-                  )}
+                  {record.ipAddress && (() => {
+                    const ip = record.ipAddress!.split(',')[0].trim();
+                    const geo = ipGeoData[ip];
+                    return geo ? (
+                      <span className="text-xs text-gray-500" title={`${geo.city}, ${geo.country} (${ip})`}>
+                        {geo.flag} {geo.city}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400" title={ip}>
+                        {ip}
+                      </span>
+                    );
+                  })()}
                   {record.source && (
                     <Badge className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-500">{record.source}</Badge>
                   )}
@@ -1105,7 +1161,23 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             const renderFieldValue = (field: FieldConfig, val: any) => {
               if (field.type === 'boolean') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>{val ? 'Yes' : 'No'}</Badge>;
-              if (field.type === 'date') return <span>{new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>;
+              if (field.type === 'date') {
+                const d = new Date(val);
+                return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>;
+              }
+              if (field.key === 'ipAddress' && val) {
+                const ip = String(val).split(',')[0].trim();
+                const geo = ipGeoData[ip];
+                return geo ? (
+                  <span>{geo.flag} {geo.city}, {geo.country} <span className="text-gray-400 text-xs">({ip})</span></span>
+                ) : (
+                  <span>{ip}</span>
+                );
+              }
+              if ((field.key === 'signupDate' || field.key === 'created_at' || field.key === 'lastActiveDate' || field.key === 'lastReferralDate') && val) {
+                const d = new Date(val);
+                return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></span>;
+              }
               if (field.type === 'badge') return <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{String(val)}</Badge>;
               if (field.type === 'json') {
                 if (typeof val === 'object' && val !== null) {
