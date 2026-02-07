@@ -118,7 +118,7 @@ export function ScanFunnelDashboard({ records }: ScanFunnelDashboardProps) {
       {/* Summary cards */}
       <div className="grid grid-cols-6 gap-2">
         {[
-          { label: 'Total Scans', value: metrics.total, max: Math.max(metrics.total, 10), color: 'bg-blue-500', sub: 'All time' },
+          { label: 'Total Scans', value: metrics.total, max: Math.max(metrics.total, 10), color: 'bg-blue-500', sub: range === 'all' ? 'All time' : `Last ${range}` },
           { label: 'Completed', value: metrics.completed, max: metrics.total || 1, color: 'bg-emerald-500', sub: `${metrics.total > 0 ? Math.round((metrics.completed / metrics.total) * 100) : 0}% success` },
           { label: 'Failed', value: metrics.failed, max: metrics.total || 1, color: 'bg-red-500', sub: `${metrics.total > 0 ? Math.round((metrics.failed / metrics.total) * 100) : 0}% of scans` },
           { label: 'Processing', value: metrics.processing, max: metrics.total || 1, color: 'bg-amber-500', sub: 'In progress' },

@@ -620,12 +620,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
   const filteredRecords = validRecords.filter(record => {
     const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = (
+    const matchesSearch = !searchQuery ? true : (
       (record.name?.toLowerCase().includes(searchLower)) ||
       (record.name_common?.toLowerCase().includes(searchLower)) ||
       (record.email?.toLowerCase().includes(searchLower)) ||
       (record.title?.toLowerCase().includes(searchLower)) ||
-      (record.category?.toLowerCase().includes(searchLower))
+      (record.category?.toLowerCase().includes(searchLower)) ||
+      false
     );
     
     // Filter by sub-category if a sub-filter is active
