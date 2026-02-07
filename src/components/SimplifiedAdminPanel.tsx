@@ -42,6 +42,7 @@ import { FloatingDebugMenu } from './FloatingDebugMenu';
 import { CollapsibleSection } from './ui/CollapsibleSection';
 import { adminFieldConfig, getFieldsForView, badgeColorMap, type FieldConfig } from '../config/adminFieldConfig';
 import { WaitlistFunnelDashboard } from './admin/WaitlistFunnelDashboard';
+import { AdminModal } from './ui/AdminModal';
 
 interface AdminRecord {
   id: string;
@@ -1171,295 +1172,249 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </CardContent>
       </Card>
 
-      {/* Detail Modal - Mobile App Style Layout */}
-      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto p-0">
-          {detailRecord && (() => {
-            const detailFields = getFieldsForView(activeTab, 'detail');
-            const isWaitlist = activeTab === 'waitlist';
+      {/* Detail Modal — Waitlist uses AdminModal, others use Dialog */}
+      {detailRecord && activeTab === 'waitlist' ? (
+        <AdminModal
+          open={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          title={detailRecord.email || 'User'}
+          subtitle={detailRecord.name || undefined}
+          size="md"
+          footer={
+            <div className="flex gap-2 justify-between">
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
+                  disabled={resendingEmail === detailRecord.id}
+                  className={`gap-1 text-xs ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
+                  variant={detailRecord.confirmed ? 'outline' : 'default'}
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Send Confirmation')}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </Button>
+              </div>
+              <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1 text-xs bg-blue-600 hover:bg-blue-700">
+                <Edit className="w-3.5 h-3.5" /> Edit
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-5">
+            {/* Status badges row */}
+            <div className="flex flex-wrap gap-2">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${detailRecord.confirmed ? 'bg-green-50 text-green-700 ring-1 ring-green-200' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${detailRecord.confirmed ? 'bg-green-500' : 'bg-amber-500'}`} />
+                {detailRecord.confirmed ? 'Confirmed' : 'Unconfirmed'}
+              </span>
+              {detailRecord.position && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200">
+                  #{detailRecord.position} in queue
+                </span>
+              )}
+              {(detailRecord.referrals || 0) > 0 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-purple-200">
+                  {detailRecord.referrals} referral{detailRecord.referrals !== 1 ? 's' : ''}
+                </span>
+              )}
+              {detailRecord.referredBy && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200">
+                  Referred
+                </span>
+              )}
+            </div>
 
-            const renderFieldValue = (field: FieldConfig, val: any) => {
-              if (field.type === 'boolean') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>{val ? 'Yes' : 'No'}</Badge>;
-              if (field.type === 'date') {
-                const d = new Date(val);
-                return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>;
-              }
-              if (field.key === 'ipAddress' && val) {
-                const ip = String(val).split(',')[0].trim();
-                const geo = ipGeoData[ip];
-                return geo ? (
-                  <span>{geo.flag} {geo.city}, {geo.country} <span className="text-gray-400 text-xs">({ip})</span></span>
-                ) : (
-                  <span>{ip}</span>
-                );
-              }
-              if ((field.key === 'signupDate' || field.key === 'created_at' || field.key === 'lastActiveDate' || field.key === 'lastReferralDate') && val) {
-                const d = new Date(val);
-                return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></span>;
-              }
-              if (field.type === 'badge') return <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{String(val)}</Badge>;
-              if (field.type === 'json') {
-                if (typeof val === 'object' && val !== null) {
+            {/* Key details grid */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-[10px] text-gray-400 font-medium uppercase">Email</p>
+                <p className="text-sm text-gray-900 mt-0.5 break-all">{detailRecord.email}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-[10px] text-gray-400 font-medium uppercase">Name</p>
+                <p className="text-sm text-gray-900 mt-0.5">{detailRecord.name || '—'}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-[10px] text-gray-400 font-medium uppercase">Signed Up</p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {detailRecord.signupDate ? new Date(detailRecord.signupDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-[10px] text-gray-400 font-medium uppercase">Referral Code</p>
+                <p className="text-sm text-gray-900 mt-0.5 font-mono">{detailRecord.referralCode || '—'}</p>
+              </div>
+              {detailRecord.referredBy && (
+                <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase">Referred By</p>
+                  <p className="text-sm text-gray-900 mt-0.5 font-mono">{detailRecord.referredBy}</p>
+                </div>
+              )}
+              {detailRecord.ipAddress && (
+                <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+                  <p className="text-[10px] text-gray-400 font-medium uppercase">Location</p>
+                  <p className="text-sm text-gray-900 mt-0.5">
+                    {(() => {
+                      const ip = String(detailRecord.ipAddress).split(',')[0].trim();
+                      const geo = ipGeoData[ip];
+                      return geo ? `${geo.flag} ${geo.city}, ${geo.country}` : ip;
+                    })()}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Email Activity Feed */}
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Activity</h3>
+              <div className="space-y-0 border-l-2 border-gray-200 ml-2">
+                {/* Signup event */}
+                {detailRecord.signupDate && (
+                  <div className="relative pl-5 pb-3">
+                    <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-blue-500" />
+                    <p className="text-xs font-medium text-gray-900">Joined waitlist</p>
+                    <p className="text-[10px] text-gray-400">{new Date(detailRecord.signupDate).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                )}
+                {/* Confirmation email sent */}
+                {(detailRecord.emailsSent || detailRecord.email_sent) && (
+                  <div className="relative pl-5 pb-3">
+                    <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-orange-400" />
+                    <p className="text-xs font-medium text-gray-900">Confirmation email sent</p>
+                    <p className="text-[10px] text-gray-400">
+                      {typeof detailRecord.emailsSent === 'number' && detailRecord.emailsSent > 1
+                        ? `Sent ${detailRecord.emailsSent} times`
+                        : 'Sent 1 time'}
+                      {detailRecord.lastEmailSent && ` — last ${new Date(detailRecord.lastEmailSent).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
+                  </div>
+                )}
+                {/* Email confirmed */}
+                {detailRecord.confirmed && (
+                  <div className="relative pl-5 pb-3">
+                    <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-green-500" />
+                    <p className="text-xs font-medium text-gray-900">Email confirmed</p>
+                    <p className="text-[10px] text-gray-400">
+                      {detailRecord.emailConfirmedAt
+                        ? new Date(detailRecord.emailConfirmedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : 'Confirmed'}
+                    </p>
+                  </div>
+                )}
+                {/* Referral activity */}
+                {(detailRecord.referrals || 0) > 0 && (
+                  <div className="relative pl-5 pb-3">
+                    <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-purple-500" />
+                    <p className="text-xs font-medium text-gray-900">Referred {detailRecord.referrals} user{detailRecord.referrals !== 1 ? 's' : ''}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {detailRecord.lastReferralDate
+                        ? `Last referral ${new Date(detailRecord.lastReferralDate).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                        : 'Via referral link'}
+                    </p>
+                  </div>
+                )}
+                {/* Not confirmed yet prompt */}
+                {!detailRecord.confirmed && (
+                  <div className="relative pl-5 pb-1">
+                    <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-gray-300 ring-2 ring-gray-100" />
+                    <p className="text-xs text-gray-400 italic">Awaiting email confirmation...</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </AdminModal>
+      ) : (
+        <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto p-0">
+            {detailRecord && (() => {
+              const detailFields = getFieldsForView(activeTab, 'detail');
+
+              const renderFieldValue = (field: FieldConfig, val: any) => {
+                if (field.type === 'boolean') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>{val ? 'Yes' : 'No'}</Badge>;
+                if (field.type === 'date') {
+                  const d = new Date(val);
+                  return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>;
+                }
+                if (field.key === 'ipAddress' && val) {
+                  const ip = String(val).split(',')[0].trim();
+                  const geo = ipGeoData[ip];
+                  return geo ? <span>{geo.flag} {geo.city}, {geo.country} <span className="text-gray-400 text-xs">({ip})</span></span> : <span>{ip}</span>;
+                }
+                if ((field.key === 'signupDate' || field.key === 'created_at' || field.key === 'lastActiveDate' || field.key === 'lastReferralDate') && val) {
+                  const d = new Date(val);
+                  return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></span>;
+                }
+                if (field.type === 'badge') return <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{String(val)}</Badge>;
+                if (field.type === 'json' && typeof val === 'object' && val !== null) {
                   if (Array.isArray(val)) {
-                    return (
-                      <div className="space-y-1.5">
-                        {val.map((item: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm">{typeof item === 'object' ? (item.name || item.label || JSON.stringify(item)) : String(item)}</span>
-                            </div>
-                            {typeof item === 'object' && item.amount != null && (
-                              <span className="text-sm text-gray-500 font-medium">{item.amount} {item.unit || 'g'}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    );
+                    return <div className="space-y-1.5">{val.map((item: any, i: number) => <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100"><span className="text-sm">{typeof item === 'object' ? (item.name || item.label || JSON.stringify(item)) : String(item)}</span></div>)}</div>;
                   }
                   const entries = Object.entries(val);
                   if (entries.length === 0) return <span className="text-gray-400 text-xs">Empty</span>;
-                  return (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {entries.slice(0, 9).map(([k, v]) => (
-                        <div key={k} className="bg-white rounded-lg p-2.5 border border-gray-100 text-center">
-                          <div className="text-sm font-semibold text-gray-900">{typeof v === 'number' ? v : String(v)}</div>
-                          <div className="text-[10px] text-gray-500 mt-0.5 capitalize">{k.replace(/_/g, ' ')}</div>
-                        </div>
-                      ))}
-                    </div>
-                  );
+                  return <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{entries.slice(0, 9).map(([k, v]) => <div key={k} className="bg-white rounded-lg p-2.5 border border-gray-100 text-center"><div className="text-sm font-semibold text-gray-900">{typeof v === 'number' ? v : String(v)}</div><div className="text-[10px] text-gray-500 mt-0.5 capitalize">{k.replace(/_/g, ' ')}</div></div>)}</div>;
                 }
-                return <pre className="text-xs font-mono whitespace-pre-wrap bg-white rounded p-2 border">{String(val)}</pre>;
-              }
-              if (field.type === 'array') return Array.isArray(val) ? (
-                <div className="space-y-1">{val.map((item: any, i: number) => <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-100 text-sm">{String(item)}</div>)}</div>
-              ) : <span>{String(val)}</span>;
-              if (field.key === 'emailsSent' || field.key === 'email_sent') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>{val ? 'Sent' : 'Pending'}</Badge>;
-              return <span>{String(val)}</span>;
-            };
+                if (field.type === 'array') return Array.isArray(val) ? <div className="space-y-1">{val.map((item: any, i: number) => <div key={i} className="bg-white rounded-lg px-3 py-2 border border-gray-100 text-sm">{String(item)}</div>)}</div> : <span>{String(val)}</span>;
+                return <span>{String(val)}</span>;
+              };
 
-            // Group fields by section
-            const headerFields = ['category', 'type', 'brand', 'scan_type', 'status'];
-            const descField = detailFields.find(f => f.key === 'description');
-            const sectionedFields = detailFields.filter(f => f.section);
-            const sections = [...new Set(sectionedFields.map(f => f.section!))];
-            const unsectionedFields = detailFields
-              .filter(f => f.type !== 'image' && !headerFields.includes(f.key) && f.key !== 'description' && !f.section)
-              .filter(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null'; });
+              const headerFields = ['category', 'type', 'brand', 'scan_type', 'status'];
+              const descField = detailFields.find(f => f.key === 'description');
+              const sectionedFields = detailFields.filter(f => f.section);
+              const sections = [...new Set(sectionedFields.map(f => f.section!))];
+              const unsectionedFields = detailFields
+                .filter(f => f.type !== 'image' && !headerFields.includes(f.key) && f.key !== 'description' && !f.section)
+                .filter(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null'; });
 
-            return (
-              <div className="flex flex-col">
-                {/* Hero Image */}
-                {!isWaitlist && (
+              return (
+                <div className="flex flex-col">
                   <div className="relative w-full h-48 bg-gradient-to-b from-gray-800 to-gray-600 overflow-hidden rounded-t-lg">
-                    <img
-                      src={getImageUrl(detailRecord)}
-                      alt={getDisplayName(detailRecord)}
-                      className="w-full h-full object-cover opacity-90"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
+                    <img src={getImageUrl(detailRecord)} alt={getDisplayName(detailRecord)} className="w-full h-full object-cover opacity-90" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     {detailRecord.overall_score != null && (
-                      <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-2.5 py-1 text-xs font-bold flex items-center gap-1">
-                        <span className="text-yellow-400">&#9733;</span> {detailRecord.overall_score}
-                      </div>
+                      <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-2.5 py-1 text-xs font-bold flex items-center gap-1"><span className="text-yellow-400">&#9733;</span> {detailRecord.overall_score}</div>
                     )}
-                    <button title="Close" onClick={() => setShowDetailModal(false)} className="absolute top-3 right-3 bg-black/40 hover:bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors">
-                      <X className="w-4 h-4" />
-                    </button>
+                    <button title="Close" onClick={() => setShowDetailModal(false)} className="absolute top-3 right-3 bg-black/40 hover:bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors"><X className="w-4 h-4" /></button>
                   </div>
-                )}
-
-                <div className="p-5 space-y-4">
-                  {/* Waitlist avatar header */}
-                  {isWaitlist && (
-                    <div className="flex items-center gap-3 pb-3 border-b">
-                      <img
-                        src={`https://www.gravatar.com/avatar/${detailRecord.email ? Array.from(detailRecord.email.trim().toLowerCase()).reduce((h: number, c: string) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', '') : '0'}?d=identicon&s=80`}
-                        alt={detailRecord.email || ''}
-                        className="w-14 h-14 rounded-full border-2 border-gray-200"
-                      />
-                      <div>
-                        <div className="font-semibold text-gray-900 text-lg">{detailRecord.email}</div>
-                        {detailRecord.name && <div className="text-sm text-gray-500">{detailRecord.name}</div>}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Title + Category Badges */}
-                  {!isWaitlist && (
+                  <div className="p-5 space-y-4">
                     <div className="text-center">
                       <h2 className="text-xl font-bold text-gray-900">{getDisplayName(detailRecord)}</h2>
                       <div className="flex items-center justify-center gap-2 mt-1.5">
-                        {detailRecord.category && (
-                          <Badge className={`text-xs ${badgeColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
-                            {detailRecord.category}
-                          </Badge>
-                        )}
-                        {detailRecord.type && (
-                          <span className="text-xs text-gray-400">&#183;</span>
-                        )}
-                        {detailRecord.type && (
-                          <Badge className={`text-xs ${badgeColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
-                            {detailRecord.type}
-                          </Badge>
-                        )}
-                        {detailRecord.status && (
-                          <Badge className={`text-xs ${detailRecord.status === 'completed' ? 'bg-green-100 text-green-800' : detailRecord.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-                            {detailRecord.status}
-                          </Badge>
-                        )}
+                        {detailRecord.category && <Badge className={`text-xs ${badgeColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{detailRecord.category}</Badge>}
+                        {detailRecord.type && <Badge className={`text-xs ${badgeColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>{detailRecord.type}</Badge>}
+                        {detailRecord.status && <Badge className={`text-xs ${detailRecord.status === 'completed' ? 'bg-green-100 text-green-800' : detailRecord.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{detailRecord.status}</Badge>}
                       </div>
-                      {detailRecord.brand && <div className="text-sm text-gray-500 mt-1">{detailRecord.brand}</div>}
                     </div>
-                  )}
-
-                  {/* Description */}
-                  {descField && detailRecord.description && (
-                    <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed">
-                      {detailRecord.description}
-                    </div>
-                  )}
-
-                  {/* Sectioned fields (Ingredients, Micronutrients, Macros, Hazards, etc.) */}
-                  {sections.map(section => {
-                    const sFields = sectionedFields.filter(f => f.section === section);
-                    const hasData = sFields.some(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null' && !(typeof v === 'object' && Object.keys(v).length === 0); });
-                    if (!hasData) return null;
-
-                    // Compute total items across all fields in this section
-                    const computeTotalItems = () => {
-                      let total = 0;
-                      for (const f of sFields) {
-                        const v = detailRecord[f.key];
-                        if (v == null || v === '' || v === 'null') continue;
-                        if (Array.isArray(v)) { total += v.length; }
-                        else if (typeof v === 'object') { total += Object.keys(v).length; }
-                        else { total += 1; }
-                      }
-                      return total;
-                    };
-                    const totalItems = computeTotalItems();
-                    const PREVIEW_COUNT = 4;
-
-                    return (
-                      <CollapsibleSection
-                        key={section}
-                        title={section}
-                        itemCount={totalItems}
-                        previewCount={PREVIEW_COUNT}
-                        totalItems={totalItems}
-                      >
-                        {(expanded: boolean) => {
-                          let itemIndex = 0;
-                          return sFields.map(f => {
-                            const v = detailRecord[f.key];
-                            if (v == null || v === '' || v === 'null') return null;
-                            if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) return null;
-
-                            // For arrays: slice to preview count
-                            if (Array.isArray(v)) {
-                              const startIdx = itemIndex;
-                              itemIndex += v.length;
-                              const sliced = expanded ? v : v.slice(0, Math.max(0, PREVIEW_COUNT - startIdx));
-                              if (sliced.length === 0) return null;
-                              const slicedField = { ...f };
-                              return (
-                                <div key={f.key}>
-                                  {sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}
-                                  {renderFieldValue(slicedField, expanded ? v : sliced)}
-                                </div>
-                              );
-                            }
-
-                            // For objects (key-value grids): slice entries
-                            if (typeof v === 'object' && v !== null) {
-                              const entries = Object.entries(v);
-                              const startIdx = itemIndex;
-                              itemIndex += entries.length;
-                              const sliced = expanded ? entries : entries.slice(0, Math.max(0, PREVIEW_COUNT - startIdx));
-                              if (sliced.length === 0) return null;
-                              const slicedObj = Object.fromEntries(sliced);
-                              return (
-                                <div key={f.key}>
-                                  {sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}
-                                  {renderFieldValue(f, expanded ? v : slicedObj)}
-                                </div>
-                              );
-                            }
-
-                            // Simple values: count as 1 item
-                            const myIdx = itemIndex;
-                            itemIndex += 1;
-                            if (!expanded && myIdx >= PREVIEW_COUNT) return null;
-                            return (
-                              <div key={f.key}>
-                                {sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}
-                                {renderFieldValue(f, v)}
-                              </div>
-                            );
-                          });
-                        }}
+                    {descField && detailRecord.description && <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed">{detailRecord.description}</div>}
+                    {sections.map(section => {
+                      const sFields = sectionedFields.filter(f => f.section === section);
+                      const hasData = sFields.some(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null' && !(typeof v === 'object' && Object.keys(v).length === 0); });
+                      if (!hasData) return null;
+                      const totalItems = sFields.reduce((t, f) => { const v = detailRecord[f.key]; if (v == null) return t; if (Array.isArray(v)) return t + v.length; if (typeof v === 'object') return t + Object.keys(v).length; return t + 1; }, 0);
+                      return (
+                        <CollapsibleSection key={section} title={section} itemCount={totalItems} previewCount={4} totalItems={totalItems}>
+                          {(expanded: boolean) => { let idx = 0; return sFields.map(f => { const v = detailRecord[f.key]; if (v == null || v === '') return null; if (Array.isArray(v)) { const si = idx; idx += v.length; const sl = expanded ? v : v.slice(0, Math.max(0, 4 - si)); if (!sl.length) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, expanded ? v : sl)}</div>; } if (typeof v === 'object' && v !== null) { const entries = Object.entries(v); const si = idx; idx += entries.length; const sl = expanded ? entries : entries.slice(0, Math.max(0, 4 - si)); if (!sl.length) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, expanded ? v : Object.fromEntries(sl))}</div>; } const mi = idx; idx += 1; if (!expanded && mi >= 4) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, v)}</div>; }); }}
+                        </CollapsibleSection>
+                      );
+                    })}
+                    {unsectionedFields.length > 0 && (
+                      <CollapsibleSection title="Details" itemCount={unsectionedFields.length} previewCount={6} totalItems={unsectionedFields.length}>
+                        {(expanded: boolean) => <div className="grid grid-cols-2 gap-2">{(expanded ? unsectionedFields : unsectionedFields.slice(0, 6)).map(field => { const val = detailRecord[field.key]; const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : ''; return <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}><div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div><div className="text-sm text-gray-900 mt-0.5 break-all">{renderFieldValue(field, val)}</div></div>; })}</div>}
                       </CollapsibleSection>
-                    );
-                  })}
-
-                  {/* Unsectioned fields in a grid */}
-                  {unsectionedFields.length > 0 && (
-                    <CollapsibleSection
-                      title="Details"
-                      itemCount={unsectionedFields.length}
-                      previewCount={6}
-                      totalItems={unsectionedFields.length}
-                    >
-                      {(expanded: boolean) => {
-                        const visibleFields = expanded ? unsectionedFields : unsectionedFields.slice(0, 6);
-                        return (
-                          <div className="grid grid-cols-2 gap-2">
-                            {visibleFields.map(field => {
-                              const val = detailRecord[field.key];
-                              const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : '';
-                              return (
-                                <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
-                                  <div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div>
-                                  <div className="text-sm text-gray-900 mt-0.5 break-all">{renderFieldValue(field, val)}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      }}
-                    </CollapsibleSection>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 justify-between pt-3 border-t">
-                    <div className="flex gap-2">
-                      {isWaitlist && (
-                        <Button
-                          size="sm"
-                          variant={detailRecord.confirmed ? 'outline' : 'default'}
-                          onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
-                          disabled={resendingEmail === detailRecord.id}
-                          className={`gap-1 ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
-                        >
-                          <Mail className="w-4 h-4" />
-                          {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Resend Confirmation')}
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
-                        <Trash2 className="w-4 h-4" /> Delete
-                      </Button>
+                    )}
+                    <div className="flex gap-2 justify-between pt-3 border-t">
+                      <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"><Trash2 className="w-4 h-4" /> Delete</Button>
+                      <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1 bg-blue-600 hover:bg-blue-700"><Edit className="w-4 h-4" /> Edit</Button>
                     </div>
-                    <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1 bg-blue-600 hover:bg-blue-700">
-                      <Edit className="w-4 h-4" /> Edit
-                    </Button>
                   </div>
                 </div>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Edit Modal - Config Driven */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
