@@ -29,7 +29,13 @@ import {
   FlaskConical,
   Package,
   Clock,
-  ScanLine
+  ScanLine,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Share2,
+  Zap,
+  Target
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -913,6 +919,188 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             {tabs.map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
+                {/* Waitlist Metrics Hero */}
+                {tab.id === 'waitlist' && records.length > 0 && (() => {
+                  const now = new Date();
+                  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+                  const getDate = (r: AdminRecord) => new Date(r.signupDate || r.created_at || 0);
+                  const total = records.length;
+                  const last24h = records.filter(r => getDate(r) > dayAgo).length;
+                  const last7d = records.filter(r => getDate(r) > weekAgo).length;
+                  const last30d = records.filter(r => getDate(r) > monthAgo).length;
+                  const prev7d = records.filter(r => { const d = getDate(r); return d > twoWeeksAgo && d <= weekAgo; }).length;
+
+                  const totalReferrals = records.reduce((sum, r) => sum + (r.referrals || 0), 0);
+                  const usersWithReferrals = records.filter(r => (r.referrals || 0) > 0).length;
+                  const referredUsers = records.filter(r => r.referredBy).length;
+                  const referralsLast24h = records.filter(r => getDate(r) > dayAgo && r.referredBy).length;
+                  const referralsLast7d = records.filter(r => getDate(r) > weekAgo && r.referredBy).length;
+                  const referralsLast30d = records.filter(r => getDate(r) > monthAgo && r.referredBy).length;
+
+                  const confirmedUsers = records.filter(r => r.confirmed).length;
+                  const confirmRate = total > 0 ? ((confirmedUsers / total) * 100).toFixed(1) : '0';
+                  const viralCoeff = total > 0 ? (totalReferrals / total).toFixed(2) : '0';
+                  const avgReferrals = usersWithReferrals > 0 ? (totalReferrals / usersWithReferrals).toFixed(1) : '0';
+                  const referralRate = total > 0 ? ((referredUsers / total) * 100).toFixed(1) : '0';
+                  const weekGrowthPct = prev7d > 0 ? (((last7d - prev7d) / prev7d) * 100).toFixed(0) : last7d > 0 ? '+∞' : '0';
+
+                  // Sparkline data: signups per day for last 14 days
+                  const sparkDays = 14;
+                  const sparkData: number[] = [];
+                  for (let i = sparkDays - 1; i >= 0; i--) {
+                    const dayStart = new Date(now.getTime() - (i + 1) * 24 * 60 * 60 * 1000);
+                    const dayEnd = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+                    sparkData.push(records.filter(r => { const d = getDate(r); return d > dayStart && d <= dayEnd; }).length);
+                  }
+                  const sparkMax = Math.max(...sparkData, 1);
+
+                  // Top referrers
+                  const topReferrers = [...records]
+                    .filter(r => (r.referrals || 0) > 0)
+                    .sort((a, b) => (b.referrals || 0) - (a.referrals || 0))
+                    .slice(0, 3);
+
+                  // Country distribution from geo data
+                  const countryCount: Record<string, number> = {};
+                  records.forEach(r => {
+                    const ip = r.ipAddress?.split(',')[0]?.trim();
+                    if (ip && ipGeoData[ip]?.countryCode) {
+                      const cc = ipGeoData[ip].countryCode!;
+                      countryCount[cc] = (countryCount[cc] || 0) + 1;
+                    }
+                  });
+                  const topCountries = Object.entries(countryCount)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5);
+
+                  const colorBgMap: Record<string, string> = { blue: 'bg-blue-100', green: 'bg-green-100', purple: 'bg-purple-100', amber: 'bg-amber-100' };
+                  const MetricCard = ({ icon, label, value, sub, color = 'blue' }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; color?: string }) => (
+                    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${colorBgMap[color] || 'bg-blue-100'}`}>{icon}</div>
+                        <span className="text-[10px] sm:text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</span>
+                      </div>
+                      <div className="text-xl sm:text-2xl font-bold text-gray-900">{value}</div>
+                      {sub && <div className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{sub}</div>}
+                    </div>
+                  );
+
+                  return (
+                    <div className="space-y-3">
+                      {/* Primary KPIs */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                        <MetricCard icon={<Users className="w-4 h-4 text-blue-600" />} label="Total Signups" value={total} sub={`+${last24h} today`} color="blue" />
+                        <MetricCard icon={<TrendingUp className="w-4 h-4 text-green-600" />} label="7-Day Growth" value={`+${last7d}`} sub={`${Number(weekGrowthPct) > 0 ? '+' : ''}${weekGrowthPct}% vs prev week`} color="green" />
+                        <MetricCard icon={<Share2 className="w-4 h-4 text-purple-600" />} label="Viral Coefficient" value={viralCoeff} sub={`${totalReferrals} total referrals`} color="purple" />
+                        <MetricCard icon={<Target className="w-4 h-4 text-amber-600" />} label="Confirm Rate" value={`${confirmRate}%`} sub={`${confirmedUsers}/${total} confirmed`} color="amber" />
+                      </div>
+
+                      {/* Signup Sparkline Chart */}
+                      <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <BarChart3 className="w-4 h-4 text-blue-600" />
+                            <span className="text-xs font-semibold text-gray-700">Signups (Last 14 Days)</span>
+                          </div>
+                          <div className="flex gap-3 text-[10px] text-gray-500">
+                            <span>24h: <strong className="text-gray-800">{last24h}</strong></span>
+                            <span>7d: <strong className="text-gray-800">{last7d}</strong></span>
+                            <span>30d: <strong className="text-gray-800">{last30d}</strong></span>
+                          </div>
+                        </div>
+                        <div className="flex items-end gap-[3px] h-16 sm:h-20">
+                          {sparkData.map((count, i) => {
+                            const height = Math.max(2, (count / sparkMax) * 100);
+                            const isToday = i === sparkData.length - 1;
+                            const dayLabel = new Date(now.getTime() - (sparkDays - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            return (
+                              <div key={i} className="flex-1 flex flex-col items-center gap-0.5" title={`${dayLabel}: ${count} signups`}>
+                                <div
+                                  className={`w-full rounded-t-sm transition-all ${isToday ? 'bg-blue-500' : 'bg-blue-200 hover:bg-blue-300'}`}
+                                  style={{ height: `${height}%`, minHeight: '2px' }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Secondary Metrics Row */}
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        <div className="bg-gray-50 rounded-lg p-2 text-center">
+                          <div className="text-xs text-gray-500">Referral Rate</div>
+                          <div className="text-sm font-bold text-gray-900">{referralRate}%</div>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-2 text-center">
+                          <div className="text-xs text-gray-500">Avg Refs/User</div>
+                          <div className="text-sm font-bold text-gray-900">{avgReferrals}</div>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-2 text-center">
+                          <div className="text-xs text-gray-500">Refs Today</div>
+                          <div className="text-sm font-bold text-gray-900">{referralsLast24h}</div>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-2 text-center">
+                          <div className="text-xs text-gray-500">Refs 7d</div>
+                          <div className="text-sm font-bold text-gray-900">{referralsLast7d}</div>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-2 text-center">
+                          <div className="text-xs text-gray-500">Refs 30d</div>
+                          <div className="text-sm font-bold text-gray-900">{referralsLast30d}</div>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-2 text-center">
+                          <div className="text-xs text-gray-500">Active Referrers</div>
+                          <div className="text-sm font-bold text-gray-900">{usersWithReferrals}</div>
+                        </div>
+                      </div>
+
+                      {/* Top Referrers + Top Countries */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                        {topReferrers.length > 0 && (
+                          <div className="bg-white rounded-xl border border-gray-200 p-3">
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <Zap className="w-3.5 h-3.5 text-amber-500" />
+                              <span className="text-xs font-semibold text-gray-700">Top Referrers</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {topReferrers.map((r, i) => (
+                                <div key={r.id} className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600 truncate flex-1">{['🥇','🥈','🥉'][i]} {r.email}</span>
+                                  <span className="font-bold text-gray-900 ml-2">{r.referrals}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {topCountries.length > 0 && (
+                          <div className="bg-white rounded-xl border border-gray-200 p-3">
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <span className="text-sm">🌍</span>
+                              <span className="text-xs font-semibold text-gray-700">Top Countries</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {topCountries.map(([cc, count]) => (
+                                <div key={cc} className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600">{countryToFlag(cc)} {cc}</span>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                      <div className="h-full bg-blue-400 rounded-full" style={{ width: `${(count / total) * 100}%` }} />
+                                    </div>
+                                    <span className="font-bold text-gray-900 w-6 text-right">{count}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Sub-category Filter Tabs */}
                 {subFilters[tab.id] && (
                   <div className="flex gap-1 p-1 bg-gray-100 rounded-lg justify-center">
