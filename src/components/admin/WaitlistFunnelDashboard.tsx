@@ -31,9 +31,26 @@ interface WaitlistFunnelDashboardProps {
   ipGeoData: Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }>;
 }
 
+type DateRange = 'day' | 'week' | 'month' | 'year' | 'all';
+
+function filterByDate(records: AdminRecord[], range: DateRange): AdminRecord[] {
+  if (range === 'all') return records;
+  const now = new Date();
+  const cutoff = new Date();
+  if (range === 'day') cutoff.setDate(now.getDate() - 1);
+  else if (range === 'week') cutoff.setDate(now.getDate() - 7);
+  else if (range === 'month') cutoff.setMonth(now.getMonth() - 1);
+  else if (range === 'year') cutoff.setFullYear(now.getFullYear() - 1);
+  return records.filter(r => {
+    const d = new Date(r.signupDate || r.created_at || '');
+    return !isNaN(d.getTime()) && d >= cutoff;
+  });
+}
+
 export function WaitlistFunnelDashboard({ records, accessToken, ipGeoData }: WaitlistFunnelDashboardProps) {
   const [funnelData, setFunnelData] = useState<FunnelMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<DateRange>('all');
 
   useEffect(() => {
     async function fetchMetrics() {
@@ -52,11 +69,12 @@ export function WaitlistFunnelDashboard({ records, accessToken, ipGeoData }: Wai
   }, [accessToken]);
 
   const funnel = useMemo(() => {
-    const total = records.length;
-    const confirmed = records.filter(r => r.confirmed).length;
-    const referredUsers = records.filter(r => r.referredBy).length;
-    const totalReferrals = records.reduce((s, r) => s + (r.referrals || 0), 0);
-    const usersWithReferrals = records.filter(r => (r.referrals || 0) > 0).length;
+    const filtered = filterByDate(records, range);
+    const total = filtered.length;
+    const confirmed = filtered.filter(r => r.confirmed).length;
+    const referredUsers = filtered.filter(r => r.referredBy).length;
+    const totalReferrals = filtered.reduce((s, r) => s + (r.referrals || 0), 0);
+    const usersWithReferrals = filtered.filter(r => (r.referrals || 0) > 0).length;
 
     const evt = funnelData?.counts || {};
     const lpViews = evt['lp_view'] || Math.round(total * 3.2);
@@ -79,7 +97,7 @@ export function WaitlistFunnelDashboard({ records, accessToken, ipGeoData }: Wai
     ];
 
     return { steps, total, confirmed, totalReferrals, usersWithReferrals };
-  }, [records, funnelData]);
+  }, [records, funnelData, range]);
 
   if (loading) {
     return (
@@ -90,9 +108,19 @@ export function WaitlistFunnelDashboard({ records, accessToken, ipGeoData }: Wai
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-gray-500">Funnel</p>
+        <div className="flex gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          {(['day', 'week', 'month', 'year', 'all'] as DateRange[]).map(r => (
+            <button key={r} onClick={() => setRange(r)} className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all ${range === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
       {/* ── Horizontal Funnel Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-2">
         {funnel.steps.map((step) => {
           const pct = Math.min(100, Math.max(2, (step.value / step.max) * 100));
           return (

@@ -264,7 +264,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         return;
       }
       
-      url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=100`;
+      url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=1000`;
       
       // Add ordering
       if (activeTab === 'elements') {

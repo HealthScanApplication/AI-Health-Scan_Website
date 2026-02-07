@@ -15,23 +15,40 @@ interface ScanFunnelDashboardProps {
 }
 
 type Period = 'daily' | 'weekly' | 'monthly';
+type DateRange = 'day' | 'week' | 'month' | 'year' | 'all';
+
+function filterByDate(records: AdminRecord[], range: DateRange): AdminRecord[] {
+  if (range === 'all') return records;
+  const now = new Date();
+  const cutoff = new Date();
+  if (range === 'day') cutoff.setDate(now.getDate() - 1);
+  else if (range === 'week') cutoff.setDate(now.getDate() - 7);
+  else if (range === 'month') cutoff.setMonth(now.getMonth() - 1);
+  else if (range === 'year') cutoff.setFullYear(now.getFullYear() - 1);
+  return records.filter(r => {
+    const d = new Date(r.scanned_at || r.created_at || '');
+    return !isNaN(d.getTime()) && d >= cutoff;
+  });
+}
 
 export function ScanFunnelDashboard({ records }: ScanFunnelDashboardProps) {
   const [period, setPeriod] = useState<Period>('weekly');
+  const [range, setRange] = useState<DateRange>('all');
 
   const metrics = useMemo(() => {
-    const total = records.length;
-    if (total === 0) return null;
+    const filtered = filterByDate(records, range);
+    const total = filtered.length;
+    if (records.length === 0) return null;
 
     const now = new Date();
-    const completed = records.filter(r => r.status === 'completed').length;
-    const failed = records.filter(r => r.status === 'failed').length;
-    const processing = records.filter(r => r.status === 'processing' || r.status === 'pending').length;
+    const completed = filtered.filter(r => r.status === 'completed').length;
+    const failed = filtered.filter(r => r.status === 'failed').length;
+    const processing = filtered.filter(r => r.status === 'processing' || r.status === 'pending').length;
     const avgScore = completed > 0
-      ? Math.round(records.filter(r => r.status === 'completed' && r.overall_score != null).reduce((s, r) => s + (r.overall_score || 0), 0) / completed)
+      ? Math.round(filtered.filter(r => r.status === 'completed' && r.overall_score != null).reduce((s, r) => s + (r.overall_score || 0), 0) / completed)
       : 0;
 
-    // Time-based grouping
+    // Time-based grouping (uses ALL records for timeline, not filtered)
     const getDate = (r: AdminRecord) => new Date(r.scanned_at || r.created_at || '');
     const getPeriodKey = (d: Date): string => {
       if (period === 'daily') return d.toISOString().slice(0, 10);
@@ -59,9 +76,9 @@ export function ScanFunnelDashboard({ records }: ScanFunnelDashboardProps) {
     const prevCount = prevKey ? (grouped[prevKey] || 0) : 0;
     const growth = prevCount > 0 ? Math.round(((currentCount - prevCount) / prevCount) * 100) : (currentCount > 0 ? 100 : 0);
 
-    // Scan type breakdown
+    // Scan type breakdown (from filtered)
     const types: Record<string, number> = {};
-    records.forEach(r => {
+    filtered.forEach(r => {
       const t = r.scan_type || 'unknown';
       types[t] = (types[t] || 0) + 1;
     });
@@ -77,7 +94,7 @@ export function ScanFunnelDashboard({ records }: ScanFunnelDashboardProps) {
       topType,
       timeline: timelineKeys.map(k => ({ key: k, count: grouped[k] || 0, pct: ((grouped[k] || 0) / maxInTimeline) * 100 })),
     };
-  }, [records, period]);
+  }, [records, period, range]);
 
   if (!metrics) return null;
 
@@ -87,8 +104,19 @@ export function ScanFunnelDashboard({ records }: ScanFunnelDashboardProps) {
 
   return (
     <div className="space-y-3">
+      {/* Header with date filter */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-gray-500">Scan Metrics</p>
+        <div className="flex gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          {(['day', 'week', 'month', 'year', 'all'] as DateRange[]).map(r => (
+            <button key={r} onClick={() => setRange(r)} className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all ${range === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-6 gap-2">
         {[
           { label: 'Total Scans', value: metrics.total, max: Math.max(metrics.total, 10), color: 'bg-blue-500', sub: 'All time' },
           { label: 'Completed', value: metrics.completed, max: metrics.total || 1, color: 'bg-emerald-500', sub: `${metrics.total > 0 ? Math.round((metrics.completed / metrics.total) * 100) : 0}% success` },
