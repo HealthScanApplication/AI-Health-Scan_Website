@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
+import { CollapsibleSection } from './ui/CollapsibleSection';
 import { adminFieldConfig, getFieldsForView, badgeColorMap, type FieldConfig } from '../config/adminFieldConfig';
 
 interface AdminRecord {
@@ -1154,47 +1155,110 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     const sFields = sectionedFields.filter(f => f.section === section);
                     const hasData = sFields.some(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null' && !(typeof v === 'object' && Object.keys(v).length === 0); });
                     if (!hasData) return null;
+
+                    // Compute total items across all fields in this section
+                    const computeTotalItems = () => {
+                      let total = 0;
+                      for (const f of sFields) {
+                        const v = detailRecord[f.key];
+                        if (v == null || v === '' || v === 'null') continue;
+                        if (Array.isArray(v)) { total += v.length; }
+                        else if (typeof v === 'object') { total += Object.keys(v).length; }
+                        else { total += 1; }
+                      }
+                      return total;
+                    };
+                    const totalItems = computeTotalItems();
+                    const PREVIEW_COUNT = 4;
+
                     return (
-                      <div key={section} className="border border-gray-200 rounded-xl overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-gray-800">{section}</span>
-                            {sFields.length === 1 && Array.isArray(detailRecord[sFields[0].key]) && (
-                              <span className="bg-gray-200 text-gray-600 text-[10px] font-bold rounded-full px-1.5 py-0.5">{detailRecord[sFields[0].key].length}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="p-3 space-y-2">
-                          {sFields.map(f => {
+                      <CollapsibleSection
+                        key={section}
+                        title={section}
+                        itemCount={totalItems}
+                        previewCount={PREVIEW_COUNT}
+                        totalItems={totalItems}
+                      >
+                        {(expanded: boolean) => {
+                          let itemIndex = 0;
+                          return sFields.map(f => {
                             const v = detailRecord[f.key];
                             if (v == null || v === '' || v === 'null') return null;
-                            if (typeof v === 'object' && Object.keys(v).length === 0) return null;
+                            if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) return null;
+
+                            // For arrays: slice to preview count
+                            if (Array.isArray(v)) {
+                              const startIdx = itemIndex;
+                              itemIndex += v.length;
+                              const sliced = expanded ? v : v.slice(0, Math.max(0, PREVIEW_COUNT - startIdx));
+                              if (sliced.length === 0) return null;
+                              const slicedField = { ...f };
+                              return (
+                                <div key={f.key}>
+                                  {sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}
+                                  {renderFieldValue(slicedField, expanded ? v : sliced)}
+                                </div>
+                              );
+                            }
+
+                            // For objects (key-value grids): slice entries
+                            if (typeof v === 'object' && v !== null) {
+                              const entries = Object.entries(v);
+                              const startIdx = itemIndex;
+                              itemIndex += entries.length;
+                              const sliced = expanded ? entries : entries.slice(0, Math.max(0, PREVIEW_COUNT - startIdx));
+                              if (sliced.length === 0) return null;
+                              const slicedObj = Object.fromEntries(sliced);
+                              return (
+                                <div key={f.key}>
+                                  {sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}
+                                  {renderFieldValue(f, expanded ? v : slicedObj)}
+                                </div>
+                              );
+                            }
+
+                            // Simple values: count as 1 item
+                            const myIdx = itemIndex;
+                            itemIndex += 1;
+                            if (!expanded && myIdx >= PREVIEW_COUNT) return null;
                             return (
                               <div key={f.key}>
                                 {sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}
                                 {renderFieldValue(f, v)}
                               </div>
                             );
-                          })}
-                        </div>
-                      </div>
+                          });
+                        }}
+                      </CollapsibleSection>
                     );
                   })}
 
                   {/* Unsectioned fields in a grid */}
                   {unsectionedFields.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {unsectionedFields.map(field => {
-                        const val = detailRecord[field.key];
-                        const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : '';
+                    <CollapsibleSection
+                      title="Details"
+                      itemCount={unsectionedFields.length}
+                      previewCount={6}
+                      totalItems={unsectionedFields.length}
+                    >
+                      {(expanded: boolean) => {
+                        const visibleFields = expanded ? unsectionedFields : unsectionedFields.slice(0, 6);
                         return (
-                          <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
-                            <div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div>
-                            <div className="text-sm text-gray-900 mt-0.5 break-all">{renderFieldValue(field, val)}</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {visibleFields.map(field => {
+                              const val = detailRecord[field.key];
+                              const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : '';
+                              return (
+                                <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
+                                  <div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div>
+                                  <div className="text-sm text-gray-900 mt-0.5 break-all">{renderFieldValue(field, val)}</div>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
-                      })}
-                    </div>
+                      }}
+                    </CollapsibleSection>
                   )}
 
                   {/* Action Buttons */}
