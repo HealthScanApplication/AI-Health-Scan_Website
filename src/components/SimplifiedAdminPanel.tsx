@@ -1212,98 +1212,97 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           onClose={() => setShowDetailModal(false)}
           title={detailRecord.email || 'User'}
           subtitle={detailRecord.name || undefined}
-          size="md"
+          size="lg"
           footer={
-            <div className="flex gap-2 justify-between">
-              <div className="flex gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
                   disabled={resendingEmail === detailRecord.id}
-                  className={`gap-1 text-xs ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
+                  className={`gap-1.5 text-xs ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
                   variant={detailRecord.confirmed ? 'outline' : 'default'}
                 >
                   <Mail className="w-3.5 h-3.5" />
                   {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Send Confirmation')}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
                   <Trash2 className="w-3.5 h-3.5" /> Delete
                 </Button>
               </div>
-              <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1 text-xs bg-blue-600 hover:bg-blue-700">
+              <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1.5 text-xs bg-blue-600 hover:bg-blue-700">
                 <Edit className="w-3.5 h-3.5" /> Edit
               </Button>
             </div>
           }
         >
-          <div className="space-y-5">
-            {/* Status badges row */}
-            <div className="flex flex-wrap gap-2">
-              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${detailRecord.confirmed ? 'bg-green-50 text-green-700 ring-1 ring-green-200' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${detailRecord.confirmed ? 'bg-green-500' : 'bg-amber-500'}`} />
-                {detailRecord.confirmed ? 'Confirmed' : 'Unconfirmed'}
+          {/* Status badges */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-5">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${detailRecord.confirmed ? 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${detailRecord.confirmed ? 'bg-green-500' : 'bg-amber-500'}`} />
+              {detailRecord.confirmed ? 'Confirmed' : 'Unconfirmed'}
+            </span>
+            {detailRecord.position && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                #{detailRecord.position} in queue
               </span>
-              {detailRecord.position && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200">
-                  #{detailRecord.position} in queue
-                </span>
-              )}
-              {(detailRecord.referrals || 0) > 0 && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-purple-200">
-                  {detailRecord.referrals} referral{detailRecord.referrals !== 1 ? 's' : ''}
-                </span>
-              )}
-              {detailRecord.referredBy && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200">
-                  Referred
-                </span>
-              )}
-            </div>
+            )}
+            {(detailRecord.referrals || 0) > 0 && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                {detailRecord.referrals} referral{detailRecord.referrals !== 1 ? 's' : ''}
+              </span>
+            )}
+            {detailRecord.referredBy && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-700/10">
+                Referred
+              </span>
+            )}
+          </div>
 
-            {/* Key details grid */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-gray-400 font-medium uppercase">Email</p>
-                <p className="text-sm text-gray-900 mt-0.5 break-all">{detailRecord.email}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-gray-400 font-medium uppercase">Name</p>
-                <p className="text-sm text-gray-900 mt-0.5">{detailRecord.name || '—'}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-gray-400 font-medium uppercase">Signed Up</p>
-                <p className="text-sm text-gray-900 mt-0.5">
-                  {detailRecord.signupDate ? new Date(detailRecord.signupDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-gray-400 font-medium uppercase">Referral Code</p>
-                <p className="text-sm text-gray-900 mt-0.5 font-mono">{detailRecord.referralCode || '—'}</p>
-              </div>
-              {detailRecord.referredBy && (
-                <div className="bg-gray-50 rounded-lg p-3 col-span-2">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase">Referred By</p>
-                  <p className="text-sm text-gray-900 mt-0.5 font-mono">{detailRecord.referredBy}</p>
-                </div>
-              )}
-              {detailRecord.ipAddress && (
-                <div className="bg-gray-50 rounded-lg p-3 col-span-2">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase">Location</p>
-                  <p className="text-sm text-gray-900 mt-0.5">
-                    {(() => {
-                      const ip = String(detailRecord.ipAddress).split(',')[0].trim();
-                      const geo = ipGeoData[ip];
-                      return geo ? `${geo.flag} ${geo.city}, ${geo.country}` : ip;
-                    })()}
-                  </p>
-                </div>
-              )}
+          {/* Details — description list style (Tailwind best practice) */}
+          <dl className="divide-y divide-gray-100">
+            <div className="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
+              <dt className="text-xs font-medium text-gray-500">Email</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0 break-all">{detailRecord.email}</dd>
             </div>
+            <div className="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
+              <dt className="text-xs font-medium text-gray-500">Name</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{detailRecord.name || '—'}</dd>
+            </div>
+            <div className="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
+              <dt className="text-xs font-medium text-gray-500">Signed Up</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                {detailRecord.signupDate ? new Date(detailRecord.signupDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+              </dd>
+            </div>
+            <div className="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
+              <dt className="text-xs font-medium text-gray-500">Referral Code</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0 font-mono">{detailRecord.referralCode || '—'}</dd>
+            </div>
+            {detailRecord.referredBy && (
+              <div className="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
+                <dt className="text-xs font-medium text-gray-500">Referred By</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0 font-mono">{detailRecord.referredBy}</dd>
+              </div>
+            )}
+            {detailRecord.ipAddress && (
+              <div className="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
+                <dt className="text-xs font-medium text-gray-500">Location</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  {(() => {
+                    const ip = String(detailRecord.ipAddress).split(',')[0].trim();
+                    const geo = ipGeoData[ip];
+                    return geo ? `${geo.flag} ${geo.city}, ${geo.country}` : ip;
+                  })()}
+                </dd>
+              </div>
+            )}
+          </dl>
 
-            {/* Email Activity Feed */}
-            <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Activity</h3>
-              <div className="space-y-0 border-l-2 border-gray-200 ml-2">
+          {/* Activity Timeline */}
+          <div className="mt-6">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Activity</h3>
+            <div className="space-y-0 border-l-2 border-gray-200 ml-2">
                 {/* Signup event */}
                 {detailRecord.signupDate && (
                   <div className="relative pl-5 pb-3">
@@ -1358,7 +1357,6 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 )}
               </div>
             </div>
-          </div>
         </AdminModal>
       ) : (
         <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
