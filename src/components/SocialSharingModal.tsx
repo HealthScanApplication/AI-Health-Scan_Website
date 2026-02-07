@@ -85,6 +85,7 @@ export function SocialSharingModal({
   const [shareMessage, setShareMessage] = useState('');
   const [viewportHeight, setViewportHeight] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<'partner' | 'friend' | 'parent' | 'sibling' | 'family' | 'colleague'>('friend');
+  const [directEmail, setDirectEmail] = useState('');
   
   // Default share message with proper HealthScan referral link
   const getReferralLink = () => {
@@ -479,6 +480,45 @@ Worth exploring: ${currentReferralLink} 🌱💚`
             </div>
             <div className="flex items-center justify-between mt-2">
               <span className="text-xs text-[var(--healthscan-text-muted)]">{shareMessage.length} characters</span>
+            </div>
+          </div>
+
+          {/* Direct Email Send */}
+          <div>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={directEmail}
+                onChange={(e) => setDirectEmail(e.target.value)}
+                placeholder="Enter friend's email to send directly"
+                className="flex-1 h-10 sm:h-11 px-3 sm:px-4 bg-white border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:border-[var(--healthscan-green)] focus:outline-none focus:ring-0 transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && directEmail.trim()) {
+                    const finalMessage = ensureCorrectReferralLink(shareMessage);
+                    const subject = encodeURIComponent('Join me in bringing transparency to our food system');
+                    const body = encodeURIComponent(finalMessage);
+                    window.open(`mailto:${encodeURIComponent(directEmail.trim())}?subject=${subject}&body=${body}`, '_blank');
+                    toast.success(`💚 Email to ${directEmail.trim()} opened!`);
+                    setDirectEmail('');
+                  }
+                }}
+              />
+              {directEmail.trim() && (
+                <button
+                  onClick={() => {
+                    const finalMessage = ensureCorrectReferralLink(shareMessage);
+                    const subject = encodeURIComponent('Join me in bringing transparency to our food system');
+                    const body = encodeURIComponent(finalMessage);
+                    window.open(`mailto:${encodeURIComponent(directEmail.trim())}?subject=${subject}&body=${body}`, '_blank');
+                    toast.success(`💚 Email to ${directEmail.trim()} opened!`);
+                    setDirectEmail('');
+                  }}
+                  className="h-10 sm:h-11 px-4 sm:px-5 bg-black hover:bg-gray-800 text-white font-medium rounded-xl transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap text-sm"
+                >
+                  <Send className="w-4 h-4" />
+                  Send
+                </button>
+              )}
             </div>
           </div>
 

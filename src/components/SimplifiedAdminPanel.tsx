@@ -774,7 +774,14 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 className="font-semibold text-gray-900 text-sm sm:text-base truncate hover:text-blue-600 cursor-pointer transition-colors"
                 onClick={() => handleViewDetail(record)}
               >
-                {isWaitlist ? (record.email || 'No email') : displayName}
+                {isWaitlist ? (
+                  <span>
+                    {record.email || 'No email'}
+                    {record.name && record.name !== record.email?.split('@')[0] && (
+                      <span className="text-xs font-normal text-gray-500 ml-1.5">({record.name})</span>
+                    )}
+                  </span>
+                ) : displayName}
               </div>
               {isWaitlist && (
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
