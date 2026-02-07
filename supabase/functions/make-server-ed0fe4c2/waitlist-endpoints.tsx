@@ -447,6 +447,47 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
           googleSheetsResult = { success: false, error: 'Google Sheets backup unavailable (optional)' }
         }
         
+        // Process referral bonus for existing user if they arrived via a referral link
+        // and haven't already been attributed to this referrer
+        if (referralCode && referralCode !== existingUser.referralCode && !existingUser.referredBy) {
+          try {
+            console.log('🎁 Processing referral bonus for returning user. Referral code:', referralCode)
+            
+            const referrerUsers = await kv.getByPrefix('waitlist_user_')
+            const referrer = referrerUsers.find(user => user.referralCode === referralCode)
+            
+            if (referrer && referrer.email !== normalizedEmail) {
+              console.log('👤 Found referrer for returning user:', referrer.email)
+              
+              const totalReferrals = (referrer.referrals || 0) + 1
+              const { boost, badge, nextMilestone } = getReferralBoost(totalReferrals)
+              const newReferrerPosition = Math.max(1, referrer.position - boost)
+              
+              const updatedReferrer = {
+                ...referrer,
+                position: newReferrerPosition,
+                referrals: totalReferrals,
+                referralBadge: badge,
+                lastReferralDate: new Date().toISOString(),
+                nextMilestone: nextMilestone,
+                totalBoostEarned: (referrer.totalBoostEarned || 0) + boost
+              }
+              
+              await kv.set(`waitlist_user_${referrer.email}`, updatedReferrer)
+              console.log(`🚀 Referrer ${referrer.email} earned ${boost}-position boost from returning user (badge: ${badge}, total referrals: ${totalReferrals})`)
+              
+              // Also update the existing user to track who referred them
+              existingUser.referredBy = referralCode
+              await kv.set(`waitlist_user_${normalizedEmail}`, existingUser)
+              console.log(`✅ Updated returning user ${normalizedEmail} with referredBy: ${referralCode}`)
+            } else {
+              console.warn('⚠️ Referral code not found or self-referral for returning user:', referralCode)
+            }
+          } catch (refError) {
+            console.error('❌ Error processing referral for returning user:', refError)
+          }
+        }
+
         // Slack notification for returning user (non-blocking)
         sendSlackWaitlistNotification({
           email: normalizedEmail,
