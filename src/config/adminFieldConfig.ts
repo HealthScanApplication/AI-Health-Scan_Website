@@ -36,6 +36,7 @@ export interface FieldConfig {
   aiPrompt?: string;
   colSpan?: 1 | 2;
   colorMap?: Record<string, string>;
+  section?: string;
 }
 
 export interface TabFieldConfig {
@@ -204,6 +205,36 @@ const productsFields: FieldConfig[] = [
 
 /**
  * ============================================================
+ *  SCANS TAB (User Scans from mobile app)
+ * ============================================================
+ */
+const scansFields: FieldConfig[] = [
+  { key: 'image_url',            label: 'Scan Photo',         type: 'image',     showInList: true,  showInDetail: true,  showInEdit: true },
+  { key: 'name',                 label: 'Name',               type: 'text',      showInList: true,  showInDetail: true,  showInEdit: true,  required: true, placeholder: 'e.g. Morning Breakfast Scan' },
+  { key: 'scan_type',            label: 'Scan Type',          type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,
+    options: ['meal', 'ingredient', 'product', 'barcode', 'label'] },
+  { key: 'category',             label: 'Category',           type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,
+    options: ['consumed', 'planned', 'analyzed'] },
+  { key: 'status',               label: 'Status',             type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,
+    options: ['completed', 'processing', 'failed', 'pending'] },
+  { key: 'description',          label: 'Description',        type: 'textarea',  showInDetail: true,  showInEdit: true,  colSpan: 2,
+    aiSuggest: true, aiPrompt: 'Describe what was scanned and the key findings.' },
+  { key: 'overall_score',        label: 'Health Score',       type: 'number',    showInList: true,  showInDetail: true,  showInEdit: true,  section: 'Score' },
+  { key: 'ingredients',          label: 'Ingredients',        type: 'json',      showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Ingredients' },
+  { key: 'nutrients_detected',   label: 'Micronutrients',     type: 'json',      showInDetail: true,  section: 'Micronutrients' },
+  { key: 'macro_nutrition',      label: 'Macro Nutrition',    type: 'json',      showInDetail: true,  section: 'Macro Nutrition' },
+  { key: 'hazards',              label: 'Hazards',            type: 'json',      showInDetail: true,  section: 'Hazards' },
+  { key: 'pollutants_detected',  label: 'Pollutants',         type: 'json',      showInDetail: true,  section: 'Hazards' },
+  { key: 'recommendations',      label: 'Recommendations',    type: 'array',     showInDetail: true,  section: 'Recommendations' },
+  { key: 'results',              label: 'Full Results',       type: 'json',      showInDetail: true,  colSpan: 2 },
+  { key: 'user_id',              label: 'User ID',            type: 'readonly',  showInDetail: true },
+  { key: 'scanned_at',           label: 'Scanned At',         type: 'date',      showInList: true,  showInDetail: true },
+  { key: 'source',               label: 'Source',             type: 'readonly',  showInDetail: true },
+  { key: 'created_at',           label: 'Created',            type: 'date',      showInDetail: true },
+];
+
+/**
+ * ============================================================
  *  MASTER CONFIG - exported for use in SimplifiedAdminPanel
  * ============================================================
  */
@@ -239,6 +270,12 @@ export const adminFieldConfig: Record<string, TabFieldConfig> = {
     nameField: 'name',
     secondaryField: 'brand',
     fields: productsFields,
+  },
+  scans: {
+    tabId: 'scans',
+    label: 'Scan',
+    nameField: 'name',
+    fields: scansFields,
   },
 };
 

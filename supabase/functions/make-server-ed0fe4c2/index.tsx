@@ -9,7 +9,7 @@ import { handleWaitlistSignup, getWaitlistStats } from './waitlist-endpoints.tsx
 import { handleEmailConfirmation, handleUserStatus } from './email-confirmation-endpoint.tsx'
 import { zapierApp } from './zapier-endpoints.tsx'
 import { createEmailService } from './email-service.tsx'
-import { adminApp } from './admin-endpoints-fixed.tsx'
+// admin-endpoints-fixed.tsx is no longer used as a sub-app - all admin routes are inline below
 import { referralApp } from './referral-endpoints.tsx'
 import blogRssApp from './blog-rss-endpoints.tsx'
 
@@ -243,7 +243,7 @@ app.get('/make-server-ed0fe4c2/health', (c) => {
     status: 'healthy', 
     timestamp: new Date().toISOString(),
     server: 'HealthScan Production Server',
-    version: '1.0.0'
+    version: '2.0.0-inline-admin'
   })
 })
 
@@ -875,8 +875,184 @@ app.post('/make-server-ed0fe4c2/admin/send-test-emails', async (c) => {
   }
 })
 
-// Mount admin endpoints
-app.route('/', adminApp)
+// ============ ADMIN CRUD ROUTES (inline to avoid sub-app routing issues) ============
+
+// Admin: Resend welcome email
+app.post('/make-server-ed0fe4c2/admin/resend-welcome-email', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { email } = await c.req.json()
+    if (!email || typeof email !== 'string') return c.json({ success: false, error: 'Valid email is required' }, 400)
+    const normalizedEmail = email.trim().toLowerCase()
+    const emailService = createEmailService()
+    if (!emailService) return c.json({ success: false, error: 'Email service not configured.' }, 500)
+    let position = 0, referralCode = 'unknown'
+    try { const u = await kv.get(`waitlist_user_${normalizedEmail}`); if (u) { position = u.position || 0; referralCode = u.referralCode || 'unknown' } } catch (_e) {}
+    const result = await emailService.sendEmailConfirmed(normalizedEmail, position, referralCode)
+    if (result.success) {
+      try { const u = await kv.get(`waitlist_user_${normalizedEmail}`); if (u) { u.emailsSent = (u.emailsSent || 0) + 1; u.lastEmailSent = new Date().toISOString(); await kv.set(`waitlist_user_${normalizedEmail}`, u) } } catch (_e) {}
+      return c.json({ success: true, message: 'Welcome email sent successfully', email: normalizedEmail })
+    }
+    return c.json({ success: false, error: result.error || 'Failed to send email' }, 500)
+  } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
+})
+
+// Admin: Get waitlist data from KV store
+app.get('/make-server-ed0fe4c2/admin/waitlist', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const allKeys = await kv.getByPrefix('waitlist_user_')
+    if (!allKeys || allKeys.length === 0) return c.json([])
+    const waitlistUsers = allKeys
+      .sort((a: any, b: any) => (a.position || 999) - (b.position || 999))
+      .map((user: any, index: number) => ({
+        id: user.email || `waitlist_${index}`, email: user.email, name: user.name || null,
+        position: user.position || index + 1, referralCode: user.referralCode, referrals: user.referrals || 0,
+        emailsSent: user.emailsSent || 0, email_sent: (user.emailsSent || 0) > 0,
+        created_at: user.signupDate || user.createdAt, confirmed: user.confirmed || false,
+        lastEmailSent: user.lastEmailSent, ipAddress: user.ipAddress || null,
+        userAgent: user.userAgent || null, source: user.source || null, referredBy: user.referredBy || null
+      }))
+    return c.json(waitlistUsers)
+  } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
+})
+
+// Admin: Delete waitlist user
+app.post('/make-server-ed0fe4c2/admin/waitlist/delete', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { email } = await c.req.json()
+    const normalizedEmail = (email || '').trim().toLowerCase()
+    if (!normalizedEmail) return c.json({ success: false, error: 'Email is required' }, 400)
+    const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
+    if (!existing) return c.json({ success: false, error: 'User not found' }, 404)
+    await kv.del(`waitlist_user_${normalizedEmail}`)
+    const remaining = await kv.getByPrefix('waitlist_user_')
+    const sorted = remaining.sort((a: any, b: any) => (a.position || 999) - (b.position || 999))
+    for (let i = 0; i < sorted.length; i++) { if (sorted[i].position !== i + 1) { sorted[i].position = i + 1; await kv.set(`waitlist_user_${sorted[i].email}`, sorted[i]) } }
+    await kv.set('waitlist_count', { count: sorted.length, lastUpdated: new Date().toISOString() })
+    return c.json({ success: true, message: `Deleted ${normalizedEmail}`, newCount: sorted.length })
+  } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
+})
+
+// Admin: Update waitlist user
+app.post('/make-server-ed0fe4c2/admin/waitlist/update', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { email, updates } = await c.req.json()
+    const normalizedEmail = (email || '').trim().toLowerCase()
+    if (!normalizedEmail) return c.json({ success: false, error: 'Email is required' }, 400)
+    const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
+    if (!existing) return c.json({ success: false, error: 'User not found' }, 404)
+    const updatedUser = { ...existing, ...updates, email: existing.email }
+    await kv.set(`waitlist_user_${normalizedEmail}`, updatedUser)
+    return c.json({ success: true, message: `Updated ${normalizedEmail}`, user: updatedUser })
+  } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
+})
+
+// Admin: Bulk update waitlist
+app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-update', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { emails, updates } = await c.req.json()
+    if (!Array.isArray(emails) || emails.length === 0) return c.json({ success: false, error: 'emails array is required' }, 400)
+    let updated = 0, failed = 0
+    for (const em of emails) { try { const n = em.trim().toLowerCase(); const ex = await kv.get(`waitlist_user_${n}`); if (ex) { await kv.set(`waitlist_user_${n}`, { ...ex, ...updates, email: ex.email }); updated++ } else { failed++ } } catch { failed++ } }
+    return c.json({ success: true, updated, failed })
+  } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
+})
+
+// Admin: Bulk delete waitlist
+app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-delete', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { emails } = await c.req.json()
+    if (!Array.isArray(emails) || emails.length === 0) return c.json({ success: false, error: 'emails array is required' }, 400)
+    let deleted = 0, failed = 0
+    for (const em of emails) { try { await kv.del(`waitlist_user_${em.trim().toLowerCase()}`); deleted++ } catch { failed++ } }
+    return c.json({ success: true, deleted, failed })
+  } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
+})
+
+// Admin: Get products from KV
+app.get('/make-server-ed0fe4c2/admin/products', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const allProducts = await kv.getByPrefix('product_')
+    if (!allProducts || allProducts.length === 0) return c.json([])
+    const products = allProducts.map((p: any, i: number) => ({
+      id: p.id || `product_${i}`, name: p.name, brand: p.brand || null, category: p.category || null,
+      type: p.type || null, barcode: p.barcode || null, description: p.description || null,
+      image_url: p.image_url || null, serving_size: p.serving_size || null,
+      ingredients: p.ingredients || [], nutrition_facts: p.nutrition_facts || {},
+      allergens: p.allergens || [], warnings: p.warnings || [], certifications: p.certifications || [],
+      source: p.source || null, created_at: p.imported_at || null
+    }))
+    return c.json(products)
+  } catch (error: any) { return c.json({ success: false, error: 'Internal server error' }, 500) }
+})
+
+// Admin: Update catalog record (elements, ingredients, recipes, products)
+app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { table, id, updates } = await c.req.json()
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
+    if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
+    if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
+    if (table === 'catalog_products') {
+      const existing = await kv.get(id)
+      if (!existing) return c.json({ success: false, error: 'Product not found' }, 404)
+      const kvClean = { ...existing, ...updates }
+      ;['_displayIndex', 'created_at'].forEach((f: string) => delete kvClean[f])
+      kvClean.updated_at = new Date().toISOString()
+      await kv.set(id, kvClean)
+      return c.json({ success: true })
+    }
+    const cleanUpdates = { ...updates }
+    ;['_displayIndex', 'id', 'created_at', 'imported_at', 'api_source', 'external_id'].forEach((f: string) => delete cleanUpdates[f])
+    Object.keys(cleanUpdates).forEach((k: string) => { if (cleanUpdates[k] === undefined) delete cleanUpdates[k] })
+    cleanUpdates.updated_at = new Date().toISOString()
+    const { error } = await supabase.from(table).update(cleanUpdates).eq('id', id)
+    if (error) return c.json({ success: false, error: error.message }, 500)
+    return c.json({ success: true })
+  } catch (error: any) { return c.json({ success: false, error: 'Internal server error' }, 500) }
+})
+
+// Admin: Delete catalog record
+app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { table, id } = await c.req.json()
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
+    if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
+    if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
+    if (table === 'catalog_products') { await kv.del(id); return c.json({ success: true }) }
+    const { error } = await supabase.from(table).delete().eq('id', id)
+    if (error) return c.json({ success: false, error: error.message }, 500)
+    return c.json({ success: true })
+  } catch (error: any) { return c.json({ success: false, error: 'Internal server error' }, 500) }
+})
+
+// ============ END ADMIN CRUD ROUTES ============
 
 // Mount Referral endpoints
 app.route('/make-server-ed0fe4c2', referralApp)
@@ -912,440 +1088,7 @@ app.get('/make-server-ed0fe4c2/blog/service-health', (c) => {
   })
 })
 
-// Admin endpoint to resend welcome email
-app.post('/make-server-ed0fe4c2/admin/resend-welcome-email', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    
-    // Validate admin access
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    const { email, recordId } = await c.req.json()
-
-    if (!email || typeof email !== 'string') {
-      return c.json({ success: false, error: 'Valid email is required' }, 400)
-    }
-
-    const normalizedEmail = email.trim().toLowerCase()
-
-    // Create email service
-    const emailService = createEmailService()
-    
-    if (!emailService) {
-      console.error('❌ Email service not initialized - no API key configured')
-      return c.json({ 
-        success: false, 
-        error: 'Email service not configured. Please set RESEND_API_KEY, SENDGRID_API_KEY, or POSTMARK_API_KEY environment variable.'
-      }, 500)
-    }
-
-    // Get waitlist user info to send with email
-    let position = 0
-    let referralCode = 'unknown'
-    
-    try {
-      const waitlistUser = await kv.get(`waitlist_user_${normalizedEmail}`)
-      if (waitlistUser) {
-        position = waitlistUser.position || 0
-        referralCode = waitlistUser.referralCode || 'unknown'
-      }
-    } catch (error) {
-      console.warn('⚠️ Could not retrieve waitlist user info:', error)
-    }
-
-    console.log(`📧 Attempting to send welcome email to ${normalizedEmail} (position: ${position})`)
-
-    // Send welcome email
-    const result = await emailService.sendEmailConfirmed(normalizedEmail, position, referralCode)
-
-    if (result.success) {
-      // Update email tracking in KV store
-      try {
-        const waitlistUser = await kv.get(`waitlist_user_${normalizedEmail}`)
-        if (waitlistUser) {
-          waitlistUser.emailsSent = (waitlistUser.emailsSent || 0) + 1
-          waitlistUser.lastEmailSent = new Date().toISOString()
-          await kv.set(`waitlist_user_${normalizedEmail}`, waitlistUser)
-        }
-      } catch (error) {
-        console.warn('⚠️ Could not update email tracking:', error)
-      }
-
-      console.log(`✅ Welcome email resent to ${normalizedEmail}`)
-      return c.json({ 
-        success: true, 
-        message: 'Welcome email sent successfully',
-        email: normalizedEmail
-      })
-    } else {
-      console.error(`❌ Failed to send email to ${normalizedEmail}:`, result.error)
-      return c.json({ 
-        success: false, 
-        error: result.error || 'Failed to send email'
-      }, 500)
-    }
-  } catch (error) {
-    console.error('❌ Error in resend-welcome-email endpoint:', error)
-    return c.json({ 
-      success: false, 
-      error: error.message || 'Internal server error'
-    }, 500)
-  }
-})
-
-// Get waitlist data from KV store for admin panel
-app.get('/make-server-ed0fe4c2/admin/waitlist', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    
-    // Validate admin access
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    console.log('📊 Fetching waitlist data from KV store...')
-    
-    // Get all waitlist users from KV store
-    const allKeys = await kv.getByPrefix('waitlist_user_')
-    
-    if (!allKeys || allKeys.length === 0) {
-      console.log('📭 No waitlist users found')
-      return c.json([])
-    }
-
-    // Transform KV data to admin panel format, sorted by position
-    const waitlistUsers = allKeys
-      .sort((a: any, b: any) => (a.position || 999) - (b.position || 999))
-      .map((user: any, index: number) => ({
-        id: user.email || `waitlist_${index}`,
-        email: user.email,
-        name: user.name || null,
-        position: user.position || index + 1,
-        referralCode: user.referralCode,
-        referrals: user.referrals || 0,
-        emailsSent: user.emailsSent || 0,
-        email_sent: (user.emailsSent || 0) > 0,
-        created_at: user.signupDate || user.createdAt,
-        confirmed: user.confirmed || false,
-        lastEmailSent: user.lastEmailSent,
-        ipAddress: user.ipAddress || null,
-        userAgent: user.userAgent || null,
-        source: user.source || null,
-        referredBy: user.referredBy || null
-      }))
-
-    console.log(`✅ Retrieved ${waitlistUsers.length} waitlist users from KV store`)
-    
-    return c.json(waitlistUsers)
-  } catch (error) {
-    console.error('❌ Error fetching waitlist data:', error)
-    return c.json({ 
-      success: false, 
-      error: error.message || 'Internal server error'
-    }, 500)
-  }
-})
-
-// Delete a waitlist user from KV store (POST body to avoid @ in URL)
-app.post('/make-server-ed0fe4c2/admin/waitlist/delete', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    const { email } = await c.req.json()
-    const normalizedEmail = (email || '').trim().toLowerCase()
-    if (!normalizedEmail) {
-      return c.json({ success: false, error: 'Email is required' }, 400)
-    }
-
-    const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
-    if (!existing) {
-      return c.json({ success: false, error: 'User not found' }, 404)
-    }
-
-    await kv.del(`waitlist_user_${normalizedEmail}`)
-    console.log(`🗑️ Deleted waitlist user: ${normalizedEmail}`)
-
-    // Recalculate positions for remaining users
-    const remaining = await kv.getByPrefix('waitlist_user_')
-    const sorted = remaining.sort((a: any, b: any) => (a.position || 999) - (b.position || 999))
-    for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i].position !== i + 1) {
-        sorted[i].position = i + 1
-        await kv.set(`waitlist_user_${sorted[i].email}`, sorted[i])
-      }
-    }
-    // Update count
-    await kv.set('waitlist_count', { count: sorted.length, lastUpdated: new Date().toISOString() })
-
-    return c.json({ success: true, message: `Deleted ${normalizedEmail}`, newCount: sorted.length })
-  } catch (error) {
-    console.error('❌ Error deleting waitlist user:', error)
-    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
-  }
-})
-
-// Update a waitlist user in KV store (POST body to avoid @ in URL)
-app.post('/make-server-ed0fe4c2/admin/waitlist/update', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    const { email, updates } = await c.req.json()
-    const normalizedEmail = (email || '').trim().toLowerCase()
-    if (!normalizedEmail) {
-      return c.json({ success: false, error: 'Email is required' }, 400)
-    }
-
-    const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
-    if (!existing) {
-      return c.json({ success: false, error: 'User not found' }, 404)
-    }
-
-    const updatedUser = { ...existing, ...updates, email: existing.email }
-    await kv.set(`waitlist_user_${normalizedEmail}`, updatedUser)
-    console.log(`✏️ Updated waitlist user: ${normalizedEmail}`)
-
-    return c.json({ success: true, message: `Updated ${normalizedEmail}`, user: updatedUser })
-  } catch (error) {
-    console.error('❌ Error updating waitlist user:', error)
-    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
-  }
-})
-
-// Bulk update waitlist users
-app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-update', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    const { emails, updates } = await c.req.json()
-    if (!Array.isArray(emails) || emails.length === 0) {
-      return c.json({ success: false, error: 'emails array is required' }, 400)
-    }
-
-    let updated = 0
-    let failed = 0
-    for (const email of emails) {
-      try {
-        const normalizedEmail = email.trim().toLowerCase()
-        const existing = await kv.get(`waitlist_user_${normalizedEmail}`)
-        if (existing) {
-          const updatedUser = { ...existing, ...updates, email: existing.email }
-          await kv.set(`waitlist_user_${normalizedEmail}`, updatedUser)
-          updated++
-        } else {
-          failed++
-        }
-      } catch {
-        failed++
-      }
-    }
-
-    console.log(`✏️ Bulk updated ${updated} waitlist users (${failed} failed)`)
-    return c.json({ success: true, updated, failed })
-  } catch (error) {
-    console.error('❌ Error in bulk update:', error)
-    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
-  }
-})
-
-// Bulk delete waitlist users
-app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-delete', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    const { emails } = await c.req.json()
-    if (!Array.isArray(emails) || emails.length === 0) {
-      return c.json({ success: false, error: 'emails array is required' }, 400)
-    }
-
-    let deleted = 0
-    let failed = 0
-    for (const email of emails) {
-      try {
-        const normalizedEmail = email.trim().toLowerCase()
-        await kv.del(`waitlist_user_${normalizedEmail}`)
-        deleted++
-      } catch {
-        failed++
-      }
-    }
-
-    console.log(`🗑️ Bulk deleted ${deleted} waitlist users (${failed} failed)`)
-    return c.json({ success: true, deleted, failed })
-  } catch (error) {
-    console.error('❌ Error in bulk delete:', error)
-    return c.json({ success: false, error: error.message || 'Internal server error' }, 500)
-  }
-})
-
-// Get products data from KV store for admin panel
-app.get('/make-server-ed0fe4c2/admin/products', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    console.log('[Admin] Fetching products from KV store...')
-    const allProducts = await kv.getByPrefix('product_')
-    
-    if (!allProducts || allProducts.length === 0) {
-      console.log('[Admin] No products found in KV store')
-      return c.json([])
-    }
-
-    const products = allProducts.map((product: any, index: number) => ({
-      id: product.id || `product_${index}`,
-      name: product.name,
-      brand: product.brand || null,
-      category: product.category || null,
-      type: product.type || null,
-      barcode: product.barcode || null,
-      description: product.description || null,
-      image_url: product.image_url || null,
-      serving_size: product.serving_size || null,
-      ingredients: product.ingredients || [],
-      nutrition_facts: product.nutrition_facts || {},
-      allergens: product.allergens || [],
-      warnings: product.warnings || [],
-      certifications: product.certifications || [],
-      source: product.source || null,
-      created_at: product.imported_at || null
-    }))
-
-    console.log(`[Admin] Retrieved ${products.length} products from KV store`)
-    return c.json(products)
-  } catch (error) {
-    console.error('[Admin] Error fetching products:', error)
-    return c.json({ success: false, error: 'Internal server error' }, 500)
-  }
-})
-
-// Admin: Update a catalog record (elements, ingredients, recipes, products)
-app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    const { table, id, updates } = await c.req.json()
-    
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
-    if (!allowedTables.includes(table)) {
-      return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
-    }
-    if (!id) {
-      return c.json({ success: false, error: 'Record ID is required' }, 400)
-    }
-
-    // Products are stored in KV, not a DB table
-    if (table === 'catalog_products') {
-      const existing = await kv.get(id)
-      if (!existing) {
-        return c.json({ success: false, error: 'Product not found' }, 404)
-      }
-      const kvStripFields = ['_displayIndex', 'created_at']
-      const kvCleanUpdates = { ...existing, ...updates }
-      kvStripFields.forEach(f => delete kvCleanUpdates[f])
-      kvCleanUpdates.updated_at = new Date().toISOString()
-      await kv.set(id, kvCleanUpdates)
-      console.log(`[Admin] Updated product ${id} in KV by ${adminValidation.user.email}`)
-      return c.json({ success: true })
-    }
-
-    // Strip non-DB fields from updates
-    const cleanUpdates = { ...updates }
-    const stripFields = ['_displayIndex', 'id', 'created_at', 'imported_at', 'api_source', 'external_id']
-    stripFields.forEach(f => delete cleanUpdates[f])
-    Object.keys(cleanUpdates).forEach(k => {
-      if (cleanUpdates[k] === undefined) delete cleanUpdates[k]
-    })
-
-    cleanUpdates.updated_at = new Date().toISOString()
-
-    const { error } = await supabase
-      .from(table)
-      .update(cleanUpdates)
-      .eq('id', id)
-
-    if (error) {
-      console.error(`[Admin] Failed to update ${table} record ${id}:`, error)
-      return c.json({ success: false, error: error.message }, 500)
-    }
-
-    console.log(`[Admin] Updated ${table} record ${id} by ${adminValidation.user.email}`)
-    return c.json({ success: true })
-  } catch (error) {
-    console.error('[Admin] Error updating catalog record:', error)
-    return c.json({ success: false, error: 'Internal server error' }, 500)
-  }
-})
-
-// Admin: Delete a catalog record (elements, ingredients, recipes, products)
-app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
-    const adminValidation = await validateAdminAccess(accessToken)
-    if (adminValidation.error) {
-      return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
-    }
-
-    const { table, id } = await c.req.json()
-    
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
-    if (!allowedTables.includes(table)) {
-      return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
-    }
-    if (!id) {
-      return c.json({ success: false, error: 'Record ID is required' }, 400)
-    }
-
-    // Products are stored in KV, not a DB table
-    if (table === 'catalog_products') {
-      await kv.del(id)
-      console.log(`[Admin] Deleted product ${id} from KV by ${adminValidation.user.email}`)
-      return c.json({ success: true })
-    }
-
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error(`[Admin] Failed to delete ${table} record ${id}:`, error)
-      return c.json({ success: false, error: error.message }, 500)
-    }
-
-    console.log(`[Admin] Deleted ${table} record ${id} by ${adminValidation.user.email}`)
-    return c.json({ success: true })
-  } catch (error) {
-    console.error('[Admin] Error deleting catalog record:', error)
-    return c.json({ success: false, error: 'Internal server error' }, 500)
-  }
-})
+// All admin CRUD routes are now in admin-endpoints-fixed.tsx to avoid Hono sub-app routing conflicts
 
 // Start server
 Deno.serve(app.fetch)

@@ -4,7 +4,7 @@ import { ExternalLink, Heart } from "lucide-react";
 export function LaunchVideoSection() {
   const handleDonateClick = () => {
     window.open(
-      "https://jfd.gumroad.com/coffee",
+      "https://healthscan.gumroad.com/coffee",
       "_blank",
       "noopener,noreferrer",
     );

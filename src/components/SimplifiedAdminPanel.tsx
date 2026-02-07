@@ -28,7 +28,8 @@ import {
   ChevronDown,
   FlaskConical,
   Package,
-  Clock
+  Clock,
+  ScanLine
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -92,7 +93,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
     { id: 'ingredients', label: 'Ingredients', icon: <Leaf className="w-4 h-4" />, table: 'catalog_ingredients' },
     { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
-    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' }
+    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' },
+    { id: 'scans', label: 'Scans', icon: <ScanLine className="w-4 h-4" />, table: 'scans' }
   ];
 
   const subFilters: Record<string, { label: string; value: string; color: string }[]> = {
@@ -120,6 +122,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       { label: 'Beverage', value: 'beverage', color: 'cyan' },
       { label: 'Condiment', value: 'condiment', color: 'amber' },
       { label: 'Supplement', value: 'supplement', color: 'purple' },
+    ],
+    scans: [
+      { label: 'All', value: 'all', color: 'blue' },
+      { label: 'Completed', value: 'completed', color: 'green' },
+      { label: 'Processing', value: 'processing', color: 'amber' },
+      { label: 'Failed', value: 'failed', color: 'red' },
     ],
   };
 
@@ -581,6 +589,10 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       } else if (activeTab === 'products') {
         // Products: filter by category column
         if (category !== filterVal) return false;
+      } else if (activeTab === 'scans') {
+        // Scans: filter by status
+        const status = record.status?.toLowerCase() || '';
+        if (status !== filterVal) return false;
       }
     }
     
@@ -790,11 +802,11 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       <Card>
         <CardHeader>
           <CardTitle>Admin Panel</CardTitle>
-          <CardDescription>Manage waitlist, elements, ingredients, recipes, and products</CardDescription>
+          <CardDescription>Manage waitlist, elements, ingredients, recipes, products, and scans</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); }} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               {tabs.map(tab => (
                 <TabsTrigger key={tab.id} value={tab.id} className={`gap-2 ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-md font-semibold border border-blue-200' : ''}`}>
                   <span>{tab.icon}</span>
@@ -1004,131 +1016,210 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </CardContent>
       </Card>
 
-      {/* Detail Modal - Config Driven */}
+      {/* Detail Modal - Mobile App Style Layout */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {adminFieldConfig[activeTab]?.label || 'Record'} Details
-            </DialogTitle>
-            <DialogDescription>View and manage this record</DialogDescription>
-          </DialogHeader>
-
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto p-0">
           {detailRecord && (() => {
             const detailFields = getFieldsForView(activeTab, 'detail');
-            const imageField = detailFields.find(f => f.type === 'image');
-            const hasImage = imageField && detailRecord[imageField.key];
-            
+            const isWaitlist = activeTab === 'waitlist';
+
+            const renderFieldValue = (field: FieldConfig, val: any) => {
+              if (field.type === 'boolean') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>{val ? 'Yes' : 'No'}</Badge>;
+              if (field.type === 'date') return <span>{new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>;
+              if (field.type === 'badge') return <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{String(val)}</Badge>;
+              if (field.type === 'json') {
+                if (typeof val === 'object' && val !== null) {
+                  if (Array.isArray(val)) {
+                    return (
+                      <div className="space-y-1.5">
+                        {val.map((item: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">{typeof item === 'object' ? (item.name || item.label || JSON.stringify(item)) : String(item)}</span>
+                            </div>
+                            {typeof item === 'object' && item.amount != null && (
+                              <span className="text-sm text-gray-500 font-medium">{item.amount} {item.unit || 'g'}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  const entries = Object.entries(val);
+                  if (entries.length === 0) return <span className="text-gray-400 text-xs">Empty</span>;
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {entries.slice(0, 9).map(([k, v]) => (
+                        <div key={k} className="bg-white rounded-lg p-2.5 border border-gray-100 text-center">
+                          <div className="text-sm font-semibold text-gray-900">{typeof v === 'number' ? v : String(v)}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5 capitalize">{k.replace(/_/g, ' ')}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+                return <pre className="text-xs font-mono whitespace-pre-wrap bg-white rounded p-2 border">{String(val)}</pre>;
+              }
+              if (field.type === 'array') return Array.isArray(val) ? (
+                <div className="space-y-1">{val.map((item: any, i: number) => <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-100 text-sm">{String(item)}</div>)}</div>
+              ) : <span>{String(val)}</span>;
+              if (field.key === 'emailsSent' || field.key === 'email_sent') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>{val ? 'Sent' : 'Pending'}</Badge>;
+              return <span>{String(val)}</span>;
+            };
+
+            // Group fields by section
+            const headerFields = ['category', 'type', 'brand', 'scan_type', 'status'];
+            const descField = detailFields.find(f => f.key === 'description');
+            const sectionedFields = detailFields.filter(f => f.section);
+            const sections = [...new Set(sectionedFields.map(f => f.section!))];
+            const unsectionedFields = detailFields
+              .filter(f => f.type !== 'image' && !headerFields.includes(f.key) && f.key !== 'description' && !f.section)
+              .filter(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null'; });
+
             return (
-              <div className="space-y-4">
-                {/* Header: Image/Avatar + Name + Badges */}
-                <div className="flex items-start gap-4 pb-3 border-b">
-                  {activeTab === 'waitlist' ? (
-                    <img
-                      src={`https://www.gravatar.com/avatar/${detailRecord.email ? Array.from(detailRecord.email.trim().toLowerCase()).reduce((h: number, c: string) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', '') : '0'}?d=identicon&s=80`}
-                      alt={detailRecord.email || ''}
-                      className="w-14 h-14 rounded-full border-2 border-gray-200 flex-shrink-0"
-                    />
-                  ) : (
+              <div className="flex flex-col">
+                {/* Hero Image */}
+                {!isWaitlist && (
+                  <div className="relative w-full h-48 bg-gradient-to-b from-gray-800 to-gray-600 overflow-hidden rounded-t-lg">
                     <img
                       src={getImageUrl(detailRecord)}
                       alt={getDisplayName(detailRecord)}
-                      className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                      className="w-full h-full object-cover opacity-90"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-900 text-lg">{getDisplayName(detailRecord)}</div>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      {detailRecord.category && (
-                        <Badge className={`text-xs ${badgeColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
-                          {detailRecord.category}
-                        </Badge>
-                      )}
-                      {detailRecord.type && (
-                        <Badge className={`text-xs ${badgeColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
-                          {detailRecord.type}
-                        </Badge>
-                      )}
-                    </div>
-                    {detailRecord.brand && <div className="text-sm text-gray-500 mt-1">{detailRecord.brand}</div>}
+                    {detailRecord.overall_score != null && (
+                      <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-2.5 py-1 text-xs font-bold flex items-center gap-1">
+                        <span className="text-yellow-400">&#9733;</span> {detailRecord.overall_score}
+                      </div>
+                    )}
+                    <button title="Close" onClick={() => setShowDetailModal(false)} className="absolute top-3 right-3 bg-black/40 hover:bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
+                )}
 
-                {/* Config-driven fields */}
-                <div className="grid grid-cols-2 gap-3">
-                  {detailFields
-                    .filter(f => f.type !== 'image' && f.key !== 'category' && f.key !== 'type' && f.key !== 'brand')
-                    .filter(f => {
-                      const val = detailRecord[f.key];
-                      return val != null && val !== '' && val !== 'null';
-                    })
-                    .map(field => {
-                      const val = detailRecord[field.key];
-                      const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : '';
-                      return (
-                        <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
-                          <div className="text-xs text-gray-500 font-medium uppercase">{field.label}</div>
-                          <div className="text-sm text-gray-900 mt-1 break-all">
-                            {field.type === 'boolean' ? (
-                              <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>
-                                {val ? 'Yes' : 'No'}
-                              </Badge>
-                            ) : field.type === 'date' ? (
-                              new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                            ) : field.type === 'badge' ? (
-                              <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
-                                {String(val)}
-                              </Badge>
-                            ) : field.type === 'json' ? (
-                              <pre className="text-xs font-mono whitespace-pre-wrap">{typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)}</pre>
-                            ) : field.type === 'array' ? (
-                              Array.isArray(val) ? val.join(', ') : String(val)
-                            ) : field.key === 'emailsSent' || field.key === 'email_sent' ? (
-                              <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                                {val ? 'Sent' : 'Pending'}
-                              </Badge>
-                            ) : (
-                              String(val)
+                <div className="p-5 space-y-4">
+                  {/* Waitlist avatar header */}
+                  {isWaitlist && (
+                    <div className="flex items-center gap-3 pb-3 border-b">
+                      <img
+                        src={`https://www.gravatar.com/avatar/${detailRecord.email ? Array.from(detailRecord.email.trim().toLowerCase()).reduce((h: number, c: string) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', '') : '0'}?d=identicon&s=80`}
+                        alt={detailRecord.email || ''}
+                        className="w-14 h-14 rounded-full border-2 border-gray-200"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900 text-lg">{detailRecord.email}</div>
+                        {detailRecord.name && <div className="text-sm text-gray-500">{detailRecord.name}</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Title + Category Badges */}
+                  {!isWaitlist && (
+                    <div className="text-center">
+                      <h2 className="text-xl font-bold text-gray-900">{getDisplayName(detailRecord)}</h2>
+                      <div className="flex items-center justify-center gap-2 mt-1.5">
+                        {detailRecord.category && (
+                          <Badge className={`text-xs ${badgeColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+                            {detailRecord.category}
+                          </Badge>
+                        )}
+                        {detailRecord.type && (
+                          <span className="text-xs text-gray-400">&#183;</span>
+                        )}
+                        {detailRecord.type && (
+                          <Badge className={`text-xs ${badgeColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
+                            {detailRecord.type}
+                          </Badge>
+                        )}
+                        {detailRecord.status && (
+                          <Badge className={`text-xs ${detailRecord.status === 'completed' ? 'bg-green-100 text-green-800' : detailRecord.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {detailRecord.status}
+                          </Badge>
+                        )}
+                      </div>
+                      {detailRecord.brand && <div className="text-sm text-gray-500 mt-1">{detailRecord.brand}</div>}
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {descField && detailRecord.description && (
+                    <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed">
+                      {detailRecord.description}
+                    </div>
+                  )}
+
+                  {/* Sectioned fields (Ingredients, Micronutrients, Macros, Hazards, etc.) */}
+                  {sections.map(section => {
+                    const sFields = sectionedFields.filter(f => f.section === section);
+                    const hasData = sFields.some(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null' && !(typeof v === 'object' && Object.keys(v).length === 0); });
+                    if (!hasData) return null;
+                    return (
+                      <div key={section} className="border border-gray-200 rounded-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-gray-800">{section}</span>
+                            {sFields.length === 1 && Array.isArray(detailRecord[sFields[0].key]) && (
+                              <span className="bg-gray-200 text-gray-600 text-[10px] font-bold rounded-full px-1.5 py-0.5">{detailRecord[sFields[0].key].length}</span>
                             )}
                           </div>
                         </div>
-                      );
-                    })}
-                </div>
+                        <div className="p-3 space-y-2">
+                          {sFields.map(f => {
+                            const v = detailRecord[f.key];
+                            if (v == null || v === '' || v === 'null') return null;
+                            if (typeof v === 'object' && Object.keys(v).length === 0) return null;
+                            return (
+                              <div key={f.key}>
+                                {sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}
+                                {renderFieldValue(f, v)}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 justify-between pt-4 border-t">
-                  <div className="flex gap-2">
-                    {activeTab === 'waitlist' && (
-                      <Button
-                        size="sm"
-                        variant={detailRecord.confirmed ? 'outline' : 'default'}
-                        onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
-                        disabled={resendingEmail === detailRecord.id}
-                        className={`gap-1 ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
-                      >
-                        <Mail className="w-4 h-4" />
-                        {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Resend Confirmation')}
+                  {/* Unsectioned fields in a grid */}
+                  {unsectionedFields.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {unsectionedFields.map(field => {
+                        const val = detailRecord[field.key];
+                        const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : '';
+                        return (
+                          <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
+                            <div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div>
+                            <div className="text-sm text-gray-900 mt-0.5 break-all">{renderFieldValue(field, val)}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 justify-between pt-3 border-t">
+                    <div className="flex gap-2">
+                      {isWaitlist && (
+                        <Button
+                          size="sm"
+                          variant={detailRecord.confirmed ? 'outline' : 'default'}
+                          onClick={() => handleResendEmail(detailRecord.id, detailRecord.email || '')}
+                          disabled={resendingEmail === detailRecord.id}
+                          className={`gap-1 ${!detailRecord.confirmed ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
+                        >
+                          <Mail className="w-4 h-4" />
+                          {resendingEmail === detailRecord.id ? 'Sending...' : (detailRecord.confirmed ? 'Resend Email' : 'Resend Confirmation')}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                        <Trash2 className="w-4 h-4" /> Delete
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDelete(detailRecord)}
-                      className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
+                    </div>
+                    <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1 bg-blue-600 hover:bg-blue-700">
+                      <Edit className="w-4 h-4" /> Edit
                     </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }}
-                    className="gap-1 bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </Button>
                 </div>
               </div>
             );
