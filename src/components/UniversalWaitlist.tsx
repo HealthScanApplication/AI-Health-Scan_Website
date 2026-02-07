@@ -69,6 +69,20 @@ export function UniversalWaitlist({
     console.log('🔄 UniversalWaitlist: User changed:', user?.email || 'null', 'isInSignupFlow:', isInSignupFlow);
   }, [user, isInSignupFlow]);
 
+  // Auto-scroll and focus email input when arriving via referral link
+  useEffect(() => {
+    if (hasReferral && isActive && referralCode && emailInputRef.current) {
+      console.log('🎯 Referral detected! Auto-scrolling to email input. Code:', referralCode);
+      // Small delay to let the page render
+      setTimeout(() => {
+        emailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+          emailInputRef.current?.focus();
+        }, 500);
+      }, 300);
+    }
+  }, [hasReferral, isActive, referralCode]);
+
   // Fetch queue position when user is logged in
   useEffect(() => {
     if (user?.email) {
@@ -122,6 +136,16 @@ export function UniversalWaitlist({
     try {
       // Get the referral code from our hook or pending storage
       const activeReferralCode = referralCode || ReferralUtils.getPendingReferral();
+      
+      console.log('🔗 Referral debug:', {
+        hookReferralCode: referralCode,
+        pendingReferral: ReferralUtils.getPendingReferral(),
+        activeReferralCode,
+        hasReferral,
+        isActive,
+        localStorage_pending: localStorage.getItem('healthscan_pending_referral'),
+        localStorage_timestamp: localStorage.getItem('healthscan_referral_timestamp'),
+      });
       
       const data = await retryOperation(async () => {
         const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/email-waitlist`, {
@@ -331,14 +355,14 @@ export function UniversalWaitlist({
           <Input
             ref={emailInputRef}
             type="email"
-            placeholder={placeholder}
+            placeholder={hasReferral && isActive ? "Enter your email to claim referral" : placeholder}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            className={`flex-1 h-12 px-4 bg-[var(--input-background)] border-2 border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-500 focus:border-[var(--healthscan-green)] focus:outline-none focus:ring-0 transition-colors ${
-              isShaking ? 'animate-button-shake' : ''
-            }`}
+            className={`flex-1 h-12 px-4 bg-[var(--input-background)] border-2 rounded-xl text-gray-900 placeholder:text-gray-500 focus:border-[var(--healthscan-green)] focus:outline-none focus:ring-0 transition-colors ${
+              hasReferral && isActive ? 'border-[var(--healthscan-green)] ring-2 ring-[var(--healthscan-green)]/30' : 'border-gray-200'
+            } ${isShaking ? 'animate-button-shake' : ''}`}
             disabled={isLoading}
             required
           />

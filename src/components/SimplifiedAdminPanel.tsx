@@ -88,6 +88,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [bulkAction, setBulkAction] = useState<'update' | 'delete' | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<string | null>(null);
   const [savingRecord, setSavingRecord] = useState(false);
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const tabs = [
     { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
@@ -603,12 +605,42 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     return matchesSearch;
   }).map((record, index) => ({ ...record, _displayIndex: index }));
 
+  // Sort records
+  const sortedRecords = [...filteredRecords].sort((a, b) => {
+    if (!sortField) return 0;
+    let aVal = (a as any)[sortField];
+    let bVal = (b as any)[sortField];
+    // Handle dates
+    if (sortField === 'signupDate' || sortField === 'created_at' || sortField === 'scanned_at') {
+      aVal = aVal ? new Date(aVal).getTime() : 0;
+      bVal = bVal ? new Date(bVal).getTime() : 0;
+    }
+    // Handle numbers
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+    // Handle strings
+    const aStr = String(aVal || '').toLowerCase();
+    const bStr = String(bVal || '').toLowerCase();
+    return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+  });
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1);
+  };
+
   // Get unique categories for filter dropdown
   const uniqueCategories = Array.from(new Set(records.map(r => r.category).filter(Boolean)));
   
   // Pagination
-  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
-  const paginatedRecords = filteredRecords.slice(
+  const totalPages = Math.ceil(sortedRecords.length / itemsPerPage);
+  const paginatedRecords = sortedRecords.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -892,6 +924,53 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     </Button>
                   </div>
 
+                  {/* Sort Controls */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-xs text-gray-500 mr-1">Sort:</span>
+                    {[
+                      ...(activeTab === 'waitlist' ? [
+                        { field: 'signupDate', label: 'Date' },
+                        { field: 'referrals', label: 'Referrals' },
+                        { field: 'position', label: 'Rank' },
+                        { field: 'email', label: 'Email' },
+                      ] : []),
+                      ...(activeTab === 'scans' ? [
+                        { field: 'scanned_at', label: 'Date' },
+                        { field: 'overall_score', label: 'Score' },
+                        { field: 'status', label: 'Status' },
+                      ] : []),
+                      ...(activeTab !== 'waitlist' && activeTab !== 'scans' ? [
+                        { field: 'created_at', label: 'Date' },
+                        { field: 'name_common', label: 'Name' },
+                        { field: 'category', label: 'Category' },
+                      ] : []),
+                    ].map(opt => (
+                      <button
+                        key={opt.field}
+                        onClick={() => handleSort(opt.field)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          sortField === opt.field
+                            ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
+                        }`}
+                      >
+                        {opt.label}
+                        {sortField === opt.field && (
+                          <span className="ml-0.5">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </button>
+                    ))}
+                    {sortField && (
+                      <button
+                        onClick={() => { setSortField(''); setSortDirection('desc'); }}
+                        className="px-1.5 py-1 rounded text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                        title="Clear sort"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
                   {/* Bulk Actions Bar */}
                   {bulkMode && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
@@ -972,7 +1051,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600">
-                      Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredRecords.length)} of {filteredRecords.length} records
+                      Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedRecords.length)} of {sortedRecords.length} records
                     </div>
                     <div className="flex gap-2">
                       <Button
