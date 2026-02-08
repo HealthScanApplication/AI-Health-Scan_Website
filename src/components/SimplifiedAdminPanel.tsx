@@ -12,30 +12,17 @@ import {
   Search, 
   Edit, 
   Trash2, 
-  Plus,
   Image as ImageIcon,
   Mail,
-  Calendar,
-  User,
-  Users,
   Leaf,
   UtensilsCrossed,
   CheckSquare,
-  MoreHorizontal,
-  X,
   Eye,
   RefreshCw,
-  ChevronDown,
   FlaskConical,
   Package,
   Clock,
   ScanLine,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Share2,
-  Zap,
-  Target
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -189,21 +176,6 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       { label: 'Processing', value: 'processing', color: 'amber' },
       { label: 'Failed', value: 'failed', color: 'red' },
     ],
-  };
-
-  // Category options for edit modal dropdowns
-  const categoryOptions: Record<string, string[]> = {
-    elements: ['beneficial', 'hazardous'],
-    ingredients: ['vegetable', 'fruit', 'grain', 'protein', 'dairy', 'oil', 'spice', 'herb', 'sweetener', 'additive'],
-    recipes: ['meal', 'beverage', 'condiment'],
-    products: ['meal', 'snack', 'beverage', 'condiment', 'supplement'],
-  };
-
-  const typeOptions: Record<string, string[]> = {
-    elements: ['vitamin', 'mineral', 'amino acid', 'fatty acid', 'antioxidant', 'heavy metal', 'pesticide', 'preservative', 'endocrine disruptor'],
-    ingredients: ['raw', 'processed'],
-    recipes: ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'appetizer', 'side dish'],
-    products: ['organic', 'conventional', 'fortified', 'dietary'],
   };
 
   // Color map for category badges
@@ -731,11 +703,6 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     }
     
     return imageUrl || PLACEHOLDER_IMAGE;
-  };
-
-  const renderTableHeader = () => {
-    // No header needed for card-based layout
-    return null;
   };
 
   const renderRecordRow = (record: AdminRecord & { _displayIndex?: number }) => {
