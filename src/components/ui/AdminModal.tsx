@@ -10,7 +10,8 @@ interface AdminModalProps {
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  noPadding?: boolean;
   className?: string;
 }
 
@@ -19,9 +20,10 @@ const sizeMap = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
 };
 
-export function AdminModal({ open, onClose, title, subtitle, children, footer, size = 'md', className = '' }: AdminModalProps) {
+export function AdminModal({ open, onClose, title, subtitle, children, footer, size = 'md', noPadding = false, className = '' }: AdminModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +56,7 @@ export function AdminModal({ open, onClose, title, subtitle, children, footer, s
       >
         {/* Header */}
         {(title || subtitle) && (
-          <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+          <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-100">
             <div className="min-w-0 flex-1">
               {title && <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>}
               {subtitle && <p className="text-sm text-gray-500 mt-0.5 truncate">{subtitle}</p>}
@@ -70,13 +72,13 @@ export function AdminModal({ open, onClose, title, subtitle, children, footer, s
         )}
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className={`flex-1 overflow-y-auto ${noPadding ? '' : 'px-6 py-5'}`}>
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="px-5 py-3 border-t border-gray-100 flex-shrink-0">
+          <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
             {footer}
           </div>
         )}

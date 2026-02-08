@@ -6,7 +6,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+// Dialog imports removed — all modals now use AdminModal for consistency
 import { toast } from 'sonner';
 import { 
   Search, 
@@ -1206,7 +1206,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         </CardContent>
       </Card>
 
-      {/* Detail Modal — Waitlist uses AdminModal, others use Dialog */}
+      {/* Detail Modal (Read) — All tabs use AdminModal */}
       {detailRecord && activeTab === 'waitlist' ? (
         <AdminModal
           open={showDetailModal}
@@ -1359,94 +1359,113 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               </div>
             </div>
         </AdminModal>
-      ) : (
-        <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto p-0">
-            {detailRecord && (() => {
-              const detailFields = getFieldsForView(activeTab, 'detail');
+      ) : detailRecord ? (
+        <AdminModal
+          open={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          title={getDisplayName(detailRecord)}
+          subtitle={adminFieldConfig[activeTab]?.label || 'Record'}
+          size="xl"
+          noPadding
+          footer={
+            <div className="flex items-center justify-between">
+              <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </Button>
+              <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1.5 text-xs bg-blue-600 hover:bg-blue-700">
+                <Edit className="w-3.5 h-3.5" /> Edit
+              </Button>
+            </div>
+          }
+        >
+          {(() => {
+            const detailFields = getFieldsForView(activeTab, 'detail');
 
-              const renderFieldValue = (field: FieldConfig, val: any) => {
-                if (field.type === 'boolean') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>{val ? 'Yes' : 'No'}</Badge>;
-                if (field.type === 'date') {
-                  const d = new Date(val);
-                  return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>;
+            const renderFieldValue = (field: FieldConfig, val: any) => {
+              if (field.type === 'boolean') return <Badge className={val ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>{val ? 'Yes' : 'No'}</Badge>;
+              if (field.type === 'date') {
+                const d = new Date(val);
+                return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>;
+              }
+              if (field.key === 'ipAddress' && val) {
+                const ip = String(val).split(',')[0].trim();
+                const geo = ipGeoData[ip];
+                return geo ? <span>{geo.flag} {geo.city}, {geo.country} <span className="text-gray-400 text-xs">({ip})</span></span> : <span>{ip}</span>;
+              }
+              if ((field.key === 'signupDate' || field.key === 'created_at' || field.key === 'lastActiveDate' || field.key === 'lastReferralDate') && val) {
+                const d = new Date(val);
+                return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></span>;
+              }
+              if (field.type === 'badge') return <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{String(val)}</Badge>;
+              if (field.type === 'json' && typeof val === 'object' && val !== null) {
+                if (Array.isArray(val)) {
+                  return <div className="space-y-1.5">{val.map((item: any, i: number) => <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100"><span className="text-sm">{typeof item === 'object' ? (item.name || item.label || JSON.stringify(item)) : String(item)}</span></div>)}</div>;
                 }
-                if (field.key === 'ipAddress' && val) {
-                  const ip = String(val).split(',')[0].trim();
-                  const geo = ipGeoData[ip];
-                  return geo ? <span>{geo.flag} {geo.city}, {geo.country} <span className="text-gray-400 text-xs">({ip})</span></span> : <span>{ip}</span>;
-                }
-                if ((field.key === 'signupDate' || field.key === 'created_at' || field.key === 'lastActiveDate' || field.key === 'lastReferralDate') && val) {
-                  const d = new Date(val);
-                  return <span>{d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} <span className="text-gray-400">{d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span></span>;
-                }
-                if (field.type === 'badge') return <Badge className={`text-xs ${badgeColorMap[String(val).toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{String(val)}</Badge>;
-                if (field.type === 'json' && typeof val === 'object' && val !== null) {
-                  if (Array.isArray(val)) {
-                    return <div className="space-y-1.5">{val.map((item: any, i: number) => <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100"><span className="text-sm">{typeof item === 'object' ? (item.name || item.label || JSON.stringify(item)) : String(item)}</span></div>)}</div>;
-                  }
-                  const entries = Object.entries(val);
-                  if (entries.length === 0) return <span className="text-gray-400 text-xs">Empty</span>;
-                  return <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{entries.slice(0, 9).map(([k, v]) => <div key={k} className="bg-white rounded-lg p-2.5 border border-gray-100 text-center"><div className="text-sm font-semibold text-gray-900">{typeof v === 'number' ? v : String(v)}</div><div className="text-[10px] text-gray-500 mt-0.5 capitalize">{k.replace(/_/g, ' ')}</div></div>)}</div>;
-                }
-                if (field.type === 'array') return Array.isArray(val) ? <div className="space-y-1">{val.map((item: any, i: number) => <div key={i} className="bg-white rounded-lg px-3 py-2 border border-gray-100 text-sm">{String(item)}</div>)}</div> : <span>{String(val)}</span>;
-                return <span>{String(val)}</span>;
-              };
+                const entries = Object.entries(val);
+                if (entries.length === 0) return <span className="text-gray-400 text-xs">Empty</span>;
+                return <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{entries.slice(0, 9).map(([k, v]) => <div key={k} className="bg-white rounded-lg p-2.5 border border-gray-100 text-center"><div className="text-sm font-semibold text-gray-900">{typeof v === 'number' ? v : String(v)}</div><div className="text-[10px] text-gray-500 mt-0.5 capitalize">{k.replace(/_/g, ' ')}</div></div>)}</div>;
+              }
+              if (field.type === 'array') return Array.isArray(val) ? <div className="space-y-1">{val.map((item: any, i: number) => <div key={i} className="bg-white rounded-lg px-3 py-2 border border-gray-100 text-sm">{String(item)}</div>)}</div> : <span>{String(val)}</span>;
+              return <span>{String(val)}</span>;
+            };
 
-              const headerFields = ['category', 'type', 'brand', 'scan_type', 'status'];
-              const descField = detailFields.find(f => f.key === 'description');
-              const sectionedFields = detailFields.filter(f => f.section);
-              const sections = [...new Set(sectionedFields.map(f => f.section!))];
-              const unsectionedFields = detailFields
-                .filter(f => f.type !== 'image' && !headerFields.includes(f.key) && f.key !== 'description' && !f.section)
-                .filter(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null'; });
+            const headerFields = ['category', 'type', 'brand', 'scan_type', 'status'];
+            const descField = detailFields.find(f => f.key === 'description');
+            const sectionedFields = detailFields.filter(f => f.section);
+            const sections = [...new Set(sectionedFields.map(f => f.section!))];
+            const unsectionedFields = detailFields
+              .filter(f => f.type !== 'image' && !headerFields.includes(f.key) && f.key !== 'description' && !f.section)
+              .filter(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null'; });
 
-              return (
-                <div className="flex flex-col">
-                  <div className="relative w-full h-48 bg-gradient-to-b from-gray-800 to-gray-600 overflow-hidden rounded-t-lg">
-                    <img src={getImageUrl(detailRecord)} alt={getDisplayName(detailRecord)} className="w-full h-full object-cover opacity-90" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    {detailRecord.overall_score != null && (
-                      <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-2.5 py-1 text-xs font-bold flex items-center gap-1"><span className="text-yellow-400">&#9733;</span> {detailRecord.overall_score}</div>
-                    )}
-                    <button title="Close" onClick={() => setShowDetailModal(false)} className="absolute top-3 right-3 bg-black/40 hover:bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors"><X className="w-4 h-4" /></button>
-                  </div>
-                  <div className="p-5 space-y-4">
-                    <div className="text-center">
-                      <h2 className="text-xl font-bold text-gray-900">{getDisplayName(detailRecord)}</h2>
-                      <div className="flex items-center justify-center gap-2 mt-1.5">
-                        {detailRecord.category && <Badge className={`text-xs ${badgeColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{detailRecord.category}</Badge>}
-                        {detailRecord.type && <Badge className={`text-xs ${badgeColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>{detailRecord.type}</Badge>}
-                        {detailRecord.status && <Badge className={`text-xs ${detailRecord.status === 'completed' ? 'bg-green-100 text-green-800' : detailRecord.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{detailRecord.status}</Badge>}
-                      </div>
-                    </div>
-                    {descField && detailRecord.description && <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed">{detailRecord.description}</div>}
-                    {sections.map(section => {
-                      const sFields = sectionedFields.filter(f => f.section === section);
-                      const hasData = sFields.some(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null' && !(typeof v === 'object' && Object.keys(v).length === 0); });
-                      if (!hasData) return null;
-                      const totalItems = sFields.reduce((t, f) => { const v = detailRecord[f.key]; if (v == null) return t; if (Array.isArray(v)) return t + v.length; if (typeof v === 'object') return t + Object.keys(v).length; return t + 1; }, 0);
-                      return (
-                        <CollapsibleSection key={section} title={section} itemCount={totalItems} previewCount={4} totalItems={totalItems}>
-                          {(expanded: boolean) => { let idx = 0; return sFields.map(f => { const v = detailRecord[f.key]; if (v == null || v === '') return null; if (Array.isArray(v)) { const si = idx; idx += v.length; const sl = expanded ? v : v.slice(0, Math.max(0, 4 - si)); if (!sl.length) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, expanded ? v : sl)}</div>; } if (typeof v === 'object' && v !== null) { const entries = Object.entries(v); const si = idx; idx += entries.length; const sl = expanded ? entries : entries.slice(0, Math.max(0, 4 - si)); if (!sl.length) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, expanded ? v : Object.fromEntries(sl))}</div>; } const mi = idx; idx += 1; if (!expanded && mi >= 4) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, v)}</div>; }); }}
-                        </CollapsibleSection>
-                      );
-                    })}
-                    {unsectionedFields.length > 0 && (
-                      <CollapsibleSection title="Details" itemCount={unsectionedFields.length} previewCount={6} totalItems={unsectionedFields.length}>
-                        {(expanded: boolean) => <div className="grid grid-cols-2 gap-2">{(expanded ? unsectionedFields : unsectionedFields.slice(0, 6)).map(field => { const val = detailRecord[field.key]; const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : ''; return <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}><div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div><div className="text-sm text-gray-900 mt-0.5 break-all">{renderFieldValue(field, val)}</div></div>; })}</div>}
-                      </CollapsibleSection>
-                    )}
-                    <div className="flex gap-2 justify-between pt-3 border-t">
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(detailRecord)} className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"><Trash2 className="w-4 h-4" /> Delete</Button>
-                      <Button size="sm" onClick={() => { handleEdit(detailRecord); setShowDetailModal(false); }} className="gap-1 bg-blue-600 hover:bg-blue-700"><Edit className="w-4 h-4" /> Edit</Button>
-                    </div>
-                  </div>
+            return (
+              <>
+                {/* Hero image */}
+                <div className="relative w-full h-48 bg-gradient-to-b from-gray-100 to-gray-50 overflow-hidden">
+                  <img src={getImageUrl(detailRecord)} alt={getDisplayName(detailRecord)} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  {detailRecord.overall_score != null && (
+                    <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-2.5 py-1 text-xs font-bold flex items-center gap-1"><span className="text-yellow-400">&#9733;</span> {detailRecord.overall_score}</div>
+                  )}
                 </div>
-              );
-            })()}
-          </DialogContent>
-        </Dialog>
-      )}
+
+                {/* Content with padding */}
+                <div className="px-6 py-5 space-y-4">
+                  {/* Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {detailRecord.category && <Badge className={`text-xs ${badgeColorMap[detailRecord.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>{detailRecord.category}</Badge>}
+                    {detailRecord.type && <Badge className={`text-xs ${badgeColorMap[detailRecord.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>{detailRecord.type}</Badge>}
+                    {detailRecord.status && <Badge className={`text-xs ${detailRecord.status === 'completed' ? 'bg-green-100 text-green-800' : detailRecord.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{detailRecord.status}</Badge>}
+                  </div>
+
+                  {/* Description */}
+                  {descField && detailRecord.description && (
+                    <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed">{detailRecord.description}</div>
+                  )}
+
+                  {/* Sectioned fields */}
+                  {sections.map(section => {
+                    const sFields = sectionedFields.filter(f => f.section === section);
+                    const hasData = sFields.some(f => { const v = detailRecord[f.key]; return v != null && v !== '' && v !== 'null' && !(typeof v === 'object' && Object.keys(v).length === 0); });
+                    if (!hasData) return null;
+                    const totalItems = sFields.reduce((t, f) => { const v = detailRecord[f.key]; if (v == null) return t; if (Array.isArray(v)) return t + v.length; if (typeof v === 'object') return t + Object.keys(v).length; return t + 1; }, 0);
+                    return (
+                      <CollapsibleSection key={section} title={section} itemCount={totalItems} previewCount={4} totalItems={totalItems}>
+                        {(expanded: boolean) => { let idx = 0; return sFields.map(f => { const v = detailRecord[f.key]; if (v == null || v === '') return null; if (Array.isArray(v)) { const si = idx; idx += v.length; const sl = expanded ? v : v.slice(0, Math.max(0, 4 - si)); if (!sl.length) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, expanded ? v : sl)}</div>; } if (typeof v === 'object' && v !== null) { const entries = Object.entries(v); const si = idx; idx += entries.length; const sl = expanded ? entries : entries.slice(0, Math.max(0, 4 - si)); if (!sl.length) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, expanded ? v : Object.fromEntries(sl))}</div>; } const mi = idx; idx += 1; if (!expanded && mi >= 4) return null; return <div key={f.key}>{sFields.length > 1 && <div className="text-[10px] text-gray-400 font-medium uppercase mb-1">{f.label}</div>}{renderFieldValue(f, v)}</div>; }); }}
+                      </CollapsibleSection>
+                    );
+                  })}
+
+                  {/* Unsectioned detail fields */}
+                  {unsectionedFields.length > 0 && (
+                    <CollapsibleSection title="Details" itemCount={unsectionedFields.length} previewCount={6} totalItems={unsectionedFields.length}>
+                      {(expanded: boolean) => <div className="grid grid-cols-2 gap-2">{(expanded ? unsectionedFields : unsectionedFields.slice(0, 6)).map(field => { const val = detailRecord[field.key]; const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : ''; return <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}><div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div><div className="text-sm text-gray-900 mt-0.5 break-all">{renderFieldValue(field, val)}</div></div>; })}</div>}
+                    </CollapsibleSection>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </AdminModal>
+      ) : null}
 
       {/* Edit Modal - Config Driven (uses AdminModal) */}
       <AdminModal
@@ -1454,7 +1473,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         onClose={() => setShowEditModal(false)}
         title={`Edit ${adminFieldConfig[activeTab]?.label || 'Record'}`}
         subtitle="Update the details below and save"
-        size="lg"
+        size="xl"
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
@@ -1605,7 +1624,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           };
 
           return (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
               {editFields.map(renderEditField)}
             </div>
           );
