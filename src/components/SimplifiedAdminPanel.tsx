@@ -1419,9 +1419,21 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             return (
               <>
-                {/* Hero image */}
-                <div className="relative w-full h-48 bg-gradient-to-b from-gray-100 to-gray-50 overflow-hidden">
-                  <img src={getImageUrl(detailRecord)} alt={getDisplayName(detailRecord)} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                {/* Hero image / placeholder */}
+                <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
+                  {getImageUrl(detailRecord) && getImageUrl(detailRecord) !== PLACEHOLDER_IMAGE ? (
+                    <img
+                      src={getImageUrl(detailRecord)}
+                      alt={getDisplayName(detailRecord)}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                      <ImageIcon className="w-12 h-12" />
+                      <span className="text-xs mt-1.5 text-gray-400">No image</span>
+                    </div>
+                  )}
                   {detailRecord.overall_score != null && (
                     <div className="absolute top-3 left-3 bg-black/60 text-white rounded-full px-2.5 py-1 text-xs font-bold flex items-center gap-1"><span className="text-yellow-400">&#9733;</span> {detailRecord.overall_score}</div>
                   )}

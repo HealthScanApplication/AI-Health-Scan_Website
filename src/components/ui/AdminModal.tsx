@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+/**
+ * AdminModal — Tailwind UI Dialog pattern
+ * Uses portal-free fixed overlay + centered panel.
+ * Based on https://tailwindui.com/components/application-ui/overlays/dialogs
+ */
+
+import React, { useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 
 interface AdminModalProps {
@@ -15,73 +21,99 @@ interface AdminModalProps {
   className?: string;
 }
 
-const sizeMap = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
+const sizeClasses: Record<string, string> = {
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-lg',
+  xl: 'sm:max-w-xl',
+  '2xl': 'sm:max-w-2xl',
 };
 
-export function AdminModal({ open, onClose, title, subtitle, children, footer, size = 'md', noPadding = false, className = '' }: AdminModalProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+export function AdminModal({
+  open,
+  onClose,
+  title,
+  subtitle,
+  children,
+  footer,
+  size = 'md',
+  noPadding = false,
+  className = '',
+}: AdminModalProps) {
+  const handleEsc = useCallback(
+    (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); },
+    [onClose],
+  );
 
   useEffect(() => {
     if (!open) return;
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleEsc);
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [open, handleEsc]);
 
   if (!open) return null;
 
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
-    >
+    /* Tailwind UI: fixed full-screen container */
+    <div className="relative z-50" role="dialog" aria-modal="true">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200" />
-
-      {/* Panel */}
       <div
-        ref={contentRef}
-        className={`relative w-full ${sizeMap[size]} bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200 ${className}`}
-      >
-        {/* Header */}
-        {(title || subtitle) && (
-          <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-100">
-            <div className="min-w-0 flex-1">
-              {title && <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>}
-              {subtitle && <p className="text-sm text-gray-500 mt-0.5 truncate">{subtitle}</p>}
-            </div>
-            <button
-              title="Close"
-              onClick={onClose}
-              className="ml-3 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        className="fixed inset-0 bg-gray-500/75 transition-opacity"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+
+      {/* Centering wrapper */}
+      <div className="fixed inset-0 z-50 w-screen overflow-y-auto">
+        <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+          {/* Panel */}
+          <div
+            className={`relative w-full ${sizeClasses[size] || 'sm:max-w-lg'} transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 ${className}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            {(title || subtitle) && (
+              <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
+                <div className="min-w-0">
+                  {title && (
+                    <h3 className="text-base font-semibold leading-6 text-gray-900 truncate">
+                      {title}
+                    </h3>
+                  )}
+                  {subtitle && (
+                    <p className="mt-1 text-sm text-gray-500 truncate">{subtitle}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                  <span className="sr-only">Close</span>
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
+            {/* Body */}
+            <div
+              className={`max-h-[calc(80vh-8rem)] overflow-y-auto ${noPadding ? '' : 'px-6 py-5'}`}
             >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+              {children}
+            </div>
 
-        {/* Body */}
-        <div className={`flex-1 overflow-y-auto ${noPadding ? '' : 'px-6 py-5'}`}>
-          {children}
+            {/* Footer */}
+            {footer && (
+              <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
+                {footer}
+              </div>
+            )}
+          </div>
         </div>
-
-        {/* Footer */}
-        {footer && (
-          <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
-            {footer}
-          </div>
-        )}
       </div>
     </div>
   );
