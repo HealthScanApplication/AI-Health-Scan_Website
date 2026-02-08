@@ -250,7 +250,7 @@ export function PageRenderer({
       )
 
     case 'diagnostic':
-      return <Suspense fallback={<PageLoadingFallback />}><NetworkDiagnostic /></Suspense>
+      return <Suspense fallback={<PageLoadingFallback />}><NetworkDiagnostic onClose={navigateToHome} /></Suspense>
       
     case 'login-diagnostic':
       return <Suspense fallback={<PageLoadingFallback />}><LoginDiagnostic /></Suspense>

@@ -427,8 +427,6 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
               userId: authUser?.id,
               email: authUser?.email,
               profileData: {
-                fullName: preferences.fullName,
-                profilePictureUrl: preferences.profilePictureUrl,
                 // Include all preferences for backend storage
                 ...preferences,
                 lastSyncedAt: new Date().toISOString()
@@ -742,7 +740,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                             size="sm"
                             className="w-full btn-standard cursor-pointer hover:bg-green-50 border-green-200"
                             disabled={uploadingImage}
-                            onClick={(e) => e.preventDefault()}
+                            onClick={(e: React.MouseEvent) => e.preventDefault()}
                           >
                             <Upload className="w-4 h-4 mr-2" />
                             Upload Photo
@@ -887,7 +885,6 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
               {userStats && (
                 <ReferralTierProgress 
                   referralCount={userStats.totalReferrals}
-                  showTitle={false}
                 />
               )}
             </Card>
@@ -923,11 +920,11 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                   <div className="flex items-center gap-2">
                     <Input
                       readOnly
-                      value={generateReferralUrl(authUser.email)}
+                      value={generateReferralUrl(authUser.email || '')}
                       className="text-sm bg-white border-green-300 text-green-800 font-mono"
                     />
                     <Button
-                      onClick={() => copyReferralUrl(generateReferralUrl(authUser.email))}
+                      onClick={() => copyReferralUrl(generateReferralUrl(authUser.email || ''))}
                       size="sm"
                       variant="outline"
                       className="flex-shrink-0 border-green-300 text-green-700 hover:bg-green-100"
@@ -936,7 +933,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                       <Copy className="w-4 h-4" />
                     </Button>
                     <Button
-                      onClick={() => window.open(generateReferralUrl(authUser.email), '_blank')}
+                      onClick={() => window.open(generateReferralUrl(authUser.email || ''), '_blank')}
                       size="sm"
                       variant="outline"
                       className="flex-shrink-0 border-green-300 text-green-700 hover:bg-green-100"

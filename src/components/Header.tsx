@@ -668,8 +668,7 @@ export function Header({
             Sign up for early access to HealthScan
           </DialogDescription>
           <UniversalWaitlist 
-            onSuccess={handleWaitlistSuccess}
-            showCloseButton={false}
+            onSignupSuccess={handleWaitlistSuccess}
           />
         </DialogContent>
       </Dialog>
