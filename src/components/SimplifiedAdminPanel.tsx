@@ -12,6 +12,8 @@ import {
   Search, 
   Edit, 
   Trash2, 
+  Plus,
+  X,
   Image as ImageIcon,
   Mail,
   Leaf,
@@ -97,6 +99,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [ipGeoData, setIpGeoData] = useState<Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }>>({});
+  const [showSearch, setShowSearch] = useState(false);
 
   // Batch IP geolocation lookup
   useEffect(() => {
@@ -946,18 +949,42 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 {/* Toolbar */}
                 <div className="space-y-2">
                   <div className="flex gap-2 items-center">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                      <Input
-                        placeholder={`Search ${tab.label.toLowerCase()}...`}
-                        value={searchQuery}
-                        onChange={(e) => {
-                          setSearchQuery(e.target.value);
+                    {/* Search toggle button */}
+                    <Button
+                      variant={showSearch ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setShowSearch(!showSearch);
+                        if (showSearch) {
+                          setSearchQuery('');
                           setCurrentPage(1);
-                        }}
-                        className="pl-10"
-                      />
-                    </div>
+                        }
+                      }}
+                      className="gap-1"
+                      title={showSearch ? 'Close search' : 'Search'}
+                    >
+                      {showSearch ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </Button>
+
+                    {/* Search input — only visible when toggled */}
+                    {showSearch && (
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder={`Search ${tab.label.toLowerCase()}...`}
+                          value={searchQuery}
+                          autoFocus
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="pl-10"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex-1" />
+
                     <Button
                       variant={bulkMode ? 'default' : 'outline'}
                       size="sm"
