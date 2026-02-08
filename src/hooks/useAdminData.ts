@@ -63,8 +63,9 @@ export function useAdminData(): UseAdminDataReturn {
 
       // Fetch stats if server is healthy
       const stats = await adminApiService.fetchDatabaseStats();
-      setRealTimeStats(stats);
-      return stats;
+      const merged = { ...DEFAULT_STATS, ...stats } as typeof DEFAULT_STATS;
+      setRealTimeStats(merged);
+      return merged;
     } catch (error) {
       console.error('❌ Error in fetchRealTimeStats:', error);
       setServerStatus('offline');
@@ -158,7 +159,7 @@ export function useAdminData(): UseAdminDataReturn {
     try {
       // Get current stats first
       const currentStats = await fetchRealTimeStats();
-      const totalRecords = Object.values(currentStats).reduce((sum, count) => sum + count, 0);
+      const totalRecords = Object.values(currentStats).reduce((sum: number, count: any) => sum + (typeof count === 'number' ? count : 0), 0);
       
       if (totalRecords >= AUTO_POPULATION_THRESHOLD) {
         console.log('✅ Sufficient data already exists, skipping auto-population');

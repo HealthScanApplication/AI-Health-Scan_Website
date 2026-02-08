@@ -18,15 +18,29 @@ const getAuthHeaders = (accessToken: string) => ({
   'Content-Type': 'application/json',
 })
 
+export interface AdminStatEntry {
+  total: number
+  withImages: number
+  table?: string
+  category?: string
+}
+
 export interface AdminStats {
-  nutrients: { total: number; withImages: number; table: string; category: string }
-  ingredients: { total: number; withImages: number; table: string; category: string }
-  products: { total: number; withImages: number; table: string; category: string }
-  pollutants: { total: number; withImages: number; table: string; category: string }
-  scans: { total: number; withImages: number; table: string; category: string }
-  meals: { total: number; withImages: number; table: string; category: string }
-  parasites: { total: number; withImages: number; table: string; category: string }
+  nutrients: AdminStatEntry
+  ingredients: AdminStatEntry
+  products: AdminStatEntry
+  pollutants: AdminStatEntry
+  scans: AdminStatEntry
+  meals: AdminStatEntry
+  parasites: AdminStatEntry
   users: { total: number; confirmed: number }
+}
+
+export interface PopulateOptions {
+  dataType: string
+  targetCount: number
+  includeImages?: boolean
+  includeMetadata?: boolean
 }
 
 export class AdminApiService {
@@ -315,11 +329,11 @@ export class AdminApiService {
             message: `HTTP ${response.status}`
           })
         }
-      } catch (error) {
+      } catch (error: any) {
         results.push({ 
           name: endpoint, 
           status: 'error' as const,
-          message: error.message
+          message: error?.message || 'Unknown error'
         })
       }
     }
@@ -327,5 +341,36 @@ export class AdminApiService {
     const connected = results.some(r => r.status === 'ok')
     
     return { connected, endpoints: results }
+  }
+}
+
+// Compatibility instance used by useAdminData hook
+export const adminApiService = {
+  checkServerHealth: async (): Promise<{ status: 'online' | 'offline' | 'checking'; available: boolean }> => {
+    const ok = await AdminApiService.healthCheck()
+    return { status: ok ? 'online' : 'offline', available: ok }
+  },
+  fetchDatabaseStats: async (): Promise<Record<string, number>> => {
+    return {} // Stats fetched via fetchAdminStats with token
+  },
+  fetchDetailedStats: async (): Promise<Record<string, any>> => {
+    return {}
+  },
+  populateDataType: async (options: PopulateOptions): Promise<{ success: boolean; imported: number; error?: string }> => {
+    console.warn('populateDataType not implemented in static service', options)
+    return { success: false, imported: 0, error: 'Not implemented' }
+  },
+  exportDataType: async (dataType: string): Promise<{ success: boolean; content?: string; filename?: string; error?: string }> => {
+    console.warn('exportDataType not implemented in static service', dataType)
+    return { success: false, error: 'Not implemented' }
+  },
+  downloadBlob: (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
   }
 }

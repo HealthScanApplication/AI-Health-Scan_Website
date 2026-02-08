@@ -74,6 +74,35 @@ const countryToFlag = (code: string): string => {
 // IP geolocation cache (persists across re-renders)
 const ipGeoCache: Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }> = {};
 
+// Upload a file to Supabase Storage and return the public URL
+async function uploadFileToStorage(
+  file: File,
+  bucket: string,
+  accessToken: string
+): Promise<string> {
+  const supabaseUrl = `https://${projectId}.supabase.co`;
+  const ext = file.name.split('.').pop() || 'bin';
+  const path = `admin-uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const res = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'apikey': publicAnonKey,
+      'x-upsert': 'true',
+    },
+    body: file,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Storage upload failed (${res.status}): ${errText}`);
+  }
+
+  // Return the public URL
+  return `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+}
+
 export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanelProps) {
   const [activeTab, setActiveTab] = useState('waitlist');
   const [searchQuery, setSearchQuery] = useState('');
@@ -371,10 +400,19 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       } else {
         const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
+        // Strip base64 data URLs from updates — they're too large for the API
+        const cleanedRecord = { ...editingRecord };
+        Object.keys(cleanedRecord).forEach(key => {
+          const v = cleanedRecord[key];
+          if (typeof v === 'string' && v.startsWith('data:') && v.length > 5000) {
+            console.warn(`[Admin SAVE] Stripping base64 field "${key}" (${(v.length / 1024).toFixed(0)}KB) — use file upload instead`);
+            delete cleanedRecord[key];
+          }
+        });
         const body = {
           table: currentTab.table,
           id: editingRecord.id,
-          updates: editingRecord
+          updates: cleanedRecord
         };
         console.log('[Admin SAVE] Catalog update:', url, body);
         const response = await fetch(url, {
@@ -1343,11 +1381,53 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                           if (file) {
                             setUploadingImage(true);
                             try {
-                              const reader = new FileReader();
-                              reader.onload = (ev) => updateField(ev.target?.result as string);
-                              reader.readAsDataURL(file);
-                            } catch { toast.error('Failed to read image'); }
-                            finally { setUploadingImage(false); }
+                              toast.info('Uploading image...');
+                              const publicUrl = await uploadFileToStorage(file, 'catalog-media', accessToken);
+                              updateField(publicUrl);
+                              toast.success('Image uploaded!');
+                            } catch (err: any) {
+                              console.error('[Admin] Image upload failed:', err);
+                              toast.error(`Upload failed: ${err.message?.slice(0, 80)}`);
+                            } finally { setUploadingImage(false); }
+                          }
+                        }}
+                        disabled={uploadingImage} className="text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            if (field.type === 'video') {
+              return (
+                <div key={field.key} className="space-y-2 col-span-2">
+                  <Label>{field.label}</Label>
+                  <div className="flex gap-4 items-start">
+                    {val ? (
+                      <video src={val} controls className="w-32 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0 bg-black" />
+                    ) : (
+                      <div className="w-32 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs flex-shrink-0 bg-gray-50">
+                        No video
+                      </div>
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <Input value={val || ''} onChange={(e) => updateField(e.target.value)} placeholder="Video URL" className="text-xs" />
+                      <Input
+                        type="file" accept="video/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setUploadingImage(true);
+                            try {
+                              toast.info('Uploading video...');
+                              const publicUrl = await uploadFileToStorage(file, 'catalog-media', accessToken);
+                              updateField(publicUrl);
+                              toast.success('Video uploaded!');
+                            } catch (err: any) {
+                              console.error('[Admin] Video upload failed:', err);
+                              toast.error(`Upload failed: ${err.message?.slice(0, 80)}`);
+                            } finally { setUploadingImage(false); }
                           }
                         }}
                         disabled={uploadingImage} className="text-xs"

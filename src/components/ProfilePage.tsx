@@ -1074,7 +1074,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                     </div>
                     <div>
                       <Label htmlFor="gender" className="text-sm font-medium text-gray-700">Gender</Label>
-                      <Select value={preferences.gender} onValueChange={(value) => updatePreference('gender', value)}>
+                      <Select value={preferences.gender} onValueChange={(value: string) => updatePreference('gender', value)}>
                         <SelectTrigger className="mt-1">
                           <SelectValue placeholder="Select gender" />
                         </SelectTrigger>
@@ -1265,7 +1265,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                   {/* Activity Level */}
                   <div>
                     <Label htmlFor="activityLevel" className="text-sm font-medium text-gray-700">Activity Level</Label>
-                    <Select value={preferences.activityLevel} onValueChange={(value) => updatePreference('activityLevel', value)}>
+                    <Select value={preferences.activityLevel} onValueChange={(value: string) => updatePreference('activityLevel', value)}>
                       <SelectTrigger className="mt-1">
                         <SelectValue />
                       </SelectTrigger>
@@ -1309,7 +1309,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="units" className="text-sm font-medium text-gray-700">Units</Label>
-                      <Select value={preferences.units} onValueChange={(value) => updatePreference('units', value)}>
+                      <Select value={preferences.units} onValueChange={(value: string) => updatePreference('units', value)}>
                         <SelectTrigger className="mt-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -1321,7 +1321,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                     </div>
                     <div>
                       <Label htmlFor="language" className="text-sm font-medium text-gray-700">Language</Label>
-                      <Select value={preferences.language} onValueChange={(value) => updatePreference('language', value)}>
+                      <Select value={preferences.language} onValueChange={(value: string) => updatePreference('language', value)}>
                         <SelectTrigger className="mt-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -1344,7 +1344,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                     </div>
                     <Switch
                       checked={preferences.darkMode}
-                      onCheckedChange={(checked) => updatePreference('darkMode', checked)}
+                      onCheckedChange={(checked: boolean) => updatePreference('darkMode', checked)}
                     />
                   </div>
                 </div>
@@ -1390,7 +1390,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                       </div>
                       <Switch
                         checked={preferences[setting.key as keyof UserPreferences] as boolean}
-                        onCheckedChange={(checked) => updatePreference(setting.key as keyof UserPreferences, checked)}
+                        onCheckedChange={(checked: boolean) => updatePreference(setting.key as keyof UserPreferences, checked)}
                       />
                     </div>
                   ))}
@@ -1435,7 +1435,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                       </div>
                       <Switch
                         checked={preferences[setting.key as keyof UserPreferences] as boolean}
-                        onCheckedChange={(checked) => updatePreference(setting.key as keyof UserPreferences, checked)}
+                        onCheckedChange={(checked: boolean) => updatePreference(setting.key as keyof UserPreferences, checked)}
                       />
                     </div>
                   ))}
@@ -1480,7 +1480,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                       </div>
                       <Switch
                         checked={preferences[setting.key as keyof UserPreferences] as boolean}
-                        onCheckedChange={(checked) => updatePreference(setting.key as keyof UserPreferences, checked)}
+                        onCheckedChange={(checked: boolean) => updatePreference(setting.key as keyof UserPreferences, checked)}
                       />
                     </div>
                   ))}

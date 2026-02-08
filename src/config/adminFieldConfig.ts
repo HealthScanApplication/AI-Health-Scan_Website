@@ -15,7 +15,8 @@
  *   date     - formatted date display
  *   json     - JSON object display
  *   array    - array/list display
- *   image    - image URL with preview
+ *   image    - image URL with preview + file upload
+ *   video    - video URL with preview + file upload
  * 
  * AI Suggest:
  *   Set `aiSuggest: true` on any field to show an AI suggest button in the edit modal.
@@ -25,7 +26,7 @@
 export interface FieldConfig {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'readonly' | 'badge' | 'date' | 'json' | 'array' | 'image';
+  type: 'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'readonly' | 'badge' | 'date' | 'json' | 'array' | 'image' | 'video';
   options?: string[];
   showInList?: boolean;
   showInDetail?: boolean;
@@ -172,6 +173,7 @@ const recipesFields: FieldConfig[] = [
   { key: 'ingredients',        label: 'Ingredients',       type: 'array',     showInDetail: true },
   { key: 'instructions',       label: 'Instructions',      type: 'array',     showInDetail: true },
   { key: 'nutrition_facts',    label: 'Nutrition Facts',   type: 'json',      showInDetail: true },
+  { key: 'video_url',          label: 'Video',             type: 'video',     showInDetail: true,  showInEdit: true,  colSpan: 2 },
   { key: 'source',             label: 'Data Source',       type: 'readonly',  showInDetail: true },
   { key: 'created_at',         label: 'Created',           type: 'date',      showInDetail: true },
 ];
@@ -199,6 +201,7 @@ const productsFields: FieldConfig[] = [
   { key: 'allergens',          label: 'Allergens',         type: 'array',     showInDetail: true },
   { key: 'warnings',           label: 'Warnings',          type: 'array',     showInDetail: true },
   { key: 'certifications',     label: 'Certifications',    type: 'array',     showInDetail: true },
+  { key: 'video_url',          label: 'Video',             type: 'video',     showInDetail: true,  showInEdit: true,  colSpan: 2 },
   { key: 'source',             label: 'Data Source',       type: 'readonly',  showInDetail: true },
   { key: 'created_at',         label: 'Created',           type: 'date',      showInDetail: true },
 ];
@@ -229,6 +232,7 @@ const scansFields: FieldConfig[] = [
   { key: 'results',              label: 'Full Results',       type: 'json',      showInDetail: true,  colSpan: 2 },
   { key: 'user_id',              label: 'User ID',            type: 'readonly',  showInDetail: true },
   { key: 'scanned_at',           label: 'Scanned At',         type: 'date',      showInList: true,  showInDetail: true },
+  { key: 'video_url',            label: 'Video',              type: 'video',     showInDetail: true,  showInEdit: true,  colSpan: 2 },
   { key: 'source',               label: 'Source',             type: 'readonly',  showInDetail: true },
   { key: 'created_at',           label: 'Created',            type: 'date',      showInDetail: true },
 ];

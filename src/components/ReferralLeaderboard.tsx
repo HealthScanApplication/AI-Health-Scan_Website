@@ -351,7 +351,7 @@ export function ReferralLeaderboard() {
                                 {/* User Avatar */}
                                 <Avatar className="w-10 h-10 border-2 border-white shadow-md">
                                   <AvatarImage 
-                                    src={getUserAvatarUrl(user.name, user.email, index)} 
+                                    src={getUserAvatarUrl(user.name, user.email ?? '', index)} 
                                     alt={`${user.name} avatar`}
                                     className="object-cover"
                                   />
@@ -378,10 +378,10 @@ export function ReferralLeaderboard() {
                               {/* Position Change Indicator */}
                               <div className={`
                                 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
-                                ${getPositionChangeColor(user.position_change)}
+                                ${getPositionChangeColor(user.position_change ?? 0)}
                               `}>
-                                {getPositionChangeIcon(user.position_change)}
-                                <span>{getPositionChangeText(user.position_change)}</span>
+                                {getPositionChangeIcon(user.position_change ?? 0)}
+                                <span>{getPositionChangeText(user.position_change ?? 0)}</span>
                               </div>
                             </div>
                             
@@ -417,7 +417,7 @@ export function ReferralLeaderboard() {
                                 <div className="relative">
                                   <Avatar className="w-12 h-12 border-2 border-white shadow-md">
                                     <AvatarImage 
-                                      src={getUserAvatarUrl(user.name, user.email, index)} 
+                                      src={getUserAvatarUrl(user.name, user.email ?? '', index)} 
                                       alt={`${user.name} avatar`}
                                       className="object-cover"
                                     />
@@ -441,10 +441,10 @@ export function ReferralLeaderboard() {
                                   {/* Position Change Indicator */}
                                   <div className={`
                                     flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
-                                    ${getPositionChangeColor(user.position_change)}
+                                    ${getPositionChangeColor(user.position_change ?? 0)}
                                   `}>
-                                    {getPositionChangeIcon(user.position_change)}
-                                    <span>{getPositionChangeText(user.position_change)}</span>
+                                    {getPositionChangeIcon(user.position_change ?? 0)}
+                                    <span>{getPositionChangeText(user.position_change ?? 0)}</span>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-500">
