@@ -1032,7 +1032,80 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     const { error } = await supabase.from(table).update(cleanUpdates).eq('id', id)
     if (error) return c.json({ success: false, error: error.message }, 500)
     return c.json({ success: true })
-  } catch (error: any) { return c.json({ success: false, error: 'Internal server error' }, 500) }
+  } catch (error: any) {
+    console.error('[Admin] Error updating catalog record:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
+// Admin: Ensure storage bucket exists
+app.post('/make-server-ed0fe4c2/admin/storage/ensure-bucket', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { bucket } = await c.req.json()
+    if (!bucket || typeof bucket !== 'string') return c.json({ success: false, error: 'Bucket name required' }, 400)
+    // Try to get the bucket first
+    const { data: existing } = await supabase.storage.getBucket(bucket)
+    if (existing) return c.json({ success: true, message: 'Bucket already exists' })
+    // Create it
+    const { error } = await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: 52428800 })
+    if (error) return c.json({ success: false, error: error.message }, 500)
+    console.log(`[Admin] Created storage bucket "${bucket}" by ${adminValidation.user.email}`)
+    return c.json({ success: true, message: 'Bucket created' })
+  } catch (error: any) {
+    console.error('[Admin] Error ensuring bucket:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
+// Admin: Upload file to storage (uses service role — bypasses RLS)
+app.post('/make-server-ed0fe4c2/admin/storage/upload', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File | null
+    const bucket = (formData.get('bucket') as string) || 'catalog-media'
+    if (!file) return c.json({ success: false, error: 'No file provided' }, 400)
+
+    const ext = file.name.split('.').pop() || 'bin'
+    const path = `admin-uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+    // Ensure bucket exists
+    const { data: existing } = await supabase.storage.getBucket(bucket)
+    if (!existing) {
+      const { error: createErr } = await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: 52428800 })
+      if (createErr) {
+        console.error('[Admin] Failed to create bucket:', createErr)
+        return c.json({ success: false, error: `Failed to create bucket: ${createErr.message}` }, 500)
+      }
+      console.log(`[Admin] Auto-created bucket "${bucket}"`)
+    }
+
+    // Upload using service role (bypasses RLS)
+    const arrayBuffer = await file.arrayBuffer()
+    const { error: uploadErr } = await supabase.storage
+      .from(bucket)
+      .upload(path, arrayBuffer, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: true,
+      })
+    if (uploadErr) {
+      console.error('[Admin] Upload error:', uploadErr)
+      return c.json({ success: false, error: uploadErr.message }, 500)
+    }
+
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+    console.log(`[Admin] File uploaded: ${path} by ${adminValidation.user.email}`)
+    return c.json({ success: true, publicUrl: urlData.publicUrl })
+  } catch (error: any) {
+    console.error('[Admin] Upload error:', error)
+    return c.json({ success: false, error: error?.message || 'Upload failed' }, 500)
+  }
 })
 
 // Admin: Delete catalog record

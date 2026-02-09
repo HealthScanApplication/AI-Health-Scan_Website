@@ -26,7 +26,8 @@
 export interface FieldConfig {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'readonly' | 'badge' | 'date' | 'json' | 'array' | 'image' | 'video';
+  type: 'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'readonly' | 'badge' | 'date' | 'json' | 'array' | 'image' | 'video' | 'linked_elements';
+  linkedCategory?: 'beneficial' | 'hazardous' | 'all';
   options?: string[];
   showInList?: boolean;
   showInDetail?: boolean;
@@ -131,23 +132,47 @@ const elementsFields: FieldConfig[] = [
  * ============================================================
  */
 const ingredientsFields: FieldConfig[] = [
-  { key: 'image_url',          label: 'Image',             type: 'image',     showInList: true,  showInDetail: true,  showInEdit: true },
-  { key: 'name',               label: 'Name',              type: 'text',      showInList: true,  showInDetail: true,  showInEdit: true,  required: true, placeholder: 'e.g. Organic Quinoa',
-    aiSuggest: true, aiPrompt: 'Suggest a clear name for this food ingredient.' },
-  { key: 'category',           label: 'Category',          type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,
+  // --- Basic Info ---
+  { key: 'image_url',          label: 'Image',             type: 'image',     showInList: true,  showInDetail: true,  showInEdit: true,  section: 'Basic Info' },
+  { key: 'video_url',          label: 'Video',             type: 'video',     showInDetail: true,  showInEdit: true,  section: 'Basic Info' },
+  { key: 'name',               label: 'Name',              type: 'text',      showInList: true,  showInDetail: true,  showInEdit: true,  required: true, placeholder: 'e.g. Organic Quinoa', section: 'Basic Info' },
+  { key: 'category',           label: 'Category',          type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,  section: 'Basic Info',
     options: ['vegetable', 'fruit', 'grain', 'protein', 'dairy', 'oil', 'spice', 'herb', 'sweetener', 'additive', 'legume', 'nut', 'seed'] },
-  { key: 'type',               label: 'Type',              type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,
+  { key: 'type',               label: 'Type',              type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,  section: 'Basic Info',
     options: ['raw', 'processed', 'whole grain', 'vegetable', 'fruit', 'fish', 'poultry', 'red meat', 'dairy', 'fermented'] },
-  { key: 'description',        label: 'Description',       type: 'textarea',  showInDetail: true,  showInEdit: true,  colSpan: 2,
-    aiSuggest: true, aiPrompt: 'Write a concise 2-3 sentence description of this ingredient, its nutritional profile, and common uses.' },
-  { key: 'allergens',          label: 'Allergens',         type: 'text',      showInDetail: true,  showInEdit: true,  placeholder: 'e.g. Gluten, Dairy, Nuts',
-    aiSuggest: true, aiPrompt: 'List common allergens associated with this ingredient.' },
-  { key: 'nutritional_value',  label: 'Nutritional Value', type: 'json',      showInDetail: true },
-  { key: 'uses',               label: 'Uses',              type: 'array',     showInDetail: true },
-  { key: 'benefits',           label: 'Benefits',          type: 'array',     showInDetail: true },
-  { key: 'concerns',           label: 'Concerns',          type: 'array',     showInDetail: true },
-  { key: 'source',             label: 'Data Source',       type: 'readonly',  showInDetail: true },
-  { key: 'created_at',         label: 'Created',           type: 'date',      showInDetail: true },
+  { key: 'description',        label: 'Description',       type: 'textarea',  showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Basic Info' },
+  { key: 'taste_profile',      label: 'Taste Profile',     type: 'text',      showInDetail: true,  showInEdit: true,  colSpan: 2, placeholder: 'e.g. Sweet, earthy, nutty', section: 'Basic Info' },
+  { key: 'origin',             label: 'Origin',            type: 'text',      showInDetail: true,  showInEdit: true,  placeholder: 'e.g. South America, Mediterranean', section: 'Basic Info' },
+  { key: 'season',             label: 'Season',            type: 'text',      showInDetail: true,  showInEdit: true,  placeholder: 'e.g. Summer, Year-round', section: 'Basic Info' },
+  { key: 'allergens',          label: 'Allergens',         type: 'text',      showInDetail: true,  showInEdit: true,  placeholder: 'e.g. Gluten, Dairy, Nuts', section: 'Basic Info' },
+  { key: 'processing_type',    label: 'Processing',        type: 'select',    showInDetail: true,  showInEdit: true,  section: 'Basic Info',
+    options: ['unprocessed', 'minimally processed', 'processed', 'ultra-processed'] },
+
+  // --- Macro Nutrition (per 100g) ---
+  { key: 'calories_per_100g',  label: 'Calories',          type: 'number',    showInDetail: true,  showInEdit: true,  placeholder: 'kcal', section: 'Macro Nutrition (per 100g)' },
+  { key: 'protein_g',          label: 'Protein (g)',       type: 'number',    showInDetail: true,  showInEdit: true,  section: 'Macro Nutrition (per 100g)' },
+  { key: 'carbs_g',            label: 'Carbs (g)',         type: 'number',    showInDetail: true,  showInEdit: true,  section: 'Macro Nutrition (per 100g)' },
+  { key: 'fat_g',              label: 'Fat (g)',           type: 'number',    showInDetail: true,  showInEdit: true,  section: 'Macro Nutrition (per 100g)' },
+  { key: 'fiber_g',            label: 'Fiber (g)',         type: 'number',    showInDetail: true,  showInEdit: true,  section: 'Macro Nutrition (per 100g)' },
+  { key: 'sugar_g',            label: 'Sugar (g)',         type: 'number',    showInDetail: true,  showInEdit: true,  section: 'Macro Nutrition (per 100g)' },
+  { key: 'sodium_mg',          label: 'Sodium (mg)',       type: 'number',    showInDetail: true,  showInEdit: true,  section: 'Macro Nutrition (per 100g)' },
+
+  // --- Linked Elements ---
+  { key: 'linked_nutrients',   label: 'Micronutrients',    type: 'linked_elements', showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Linked Elements', linkedCategory: 'beneficial' },
+  { key: 'linked_hazards',     label: 'Hazards',           type: 'linked_elements', showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Linked Elements', linkedCategory: 'hazardous' },
+
+  // --- Health & Scoring ---
+  { key: 'health_score',       label: 'Health Score',      type: 'number',    showInDetail: true,  showInEdit: true,  placeholder: '0-100', section: 'Health & Scoring' },
+
+  // --- Details ---
+  { key: 'nutritional_value',  label: 'Detailed Nutrition (JSON)', type: 'json', showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Details' },
+  { key: 'uses',               label: 'Uses',              type: 'array',     showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Details' },
+  { key: 'benefits',           label: 'Benefits',          type: 'array',     showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Details' },
+  { key: 'concerns',           label: 'Concerns',          type: 'array',     showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Details' },
+  { key: 'pairings',           label: 'Pairs Well With',   type: 'array',     showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Details' },
+  { key: 'storage_tips',       label: 'Storage Tips',      type: 'textarea',  showInDetail: true,  showInEdit: true,  colSpan: 2, section: 'Details' },
+  { key: 'source',             label: 'Data Source',       type: 'readonly',  showInDetail: true, section: 'Details' },
+  { key: 'created_at',         label: 'Created',           type: 'date',      showInDetail: true, section: 'Details' },
 ];
 
 /**
@@ -157,6 +182,7 @@ const ingredientsFields: FieldConfig[] = [
  */
 const recipesFields: FieldConfig[] = [
   { key: 'image_url',          label: 'Image',             type: 'image',     showInList: true,  showInDetail: true,  showInEdit: true },
+  { key: 'video_url',          label: 'Video',             type: 'video',     showInDetail: true,  showInEdit: true },
   { key: 'name',               label: 'Name',              type: 'text',      showInList: true,  showInDetail: true,  showInEdit: true,  required: true, placeholder: 'e.g. Mediterranean Salad',
     aiSuggest: true, aiPrompt: 'Suggest a catchy name for this recipe.' },
   { key: 'category',           label: 'Category',          type: 'select',    showInList: true,  showInDetail: true,  showInEdit: true,
@@ -173,7 +199,6 @@ const recipesFields: FieldConfig[] = [
   { key: 'ingredients',        label: 'Ingredients',       type: 'array',     showInDetail: true },
   { key: 'instructions',       label: 'Instructions',      type: 'array',     showInDetail: true },
   { key: 'nutrition_facts',    label: 'Nutrition Facts',   type: 'json',      showInDetail: true },
-  { key: 'video_url',          label: 'Video',             type: 'video',     showInDetail: true,  showInEdit: true,  colSpan: 2 },
   { key: 'source',             label: 'Data Source',       type: 'readonly',  showInDetail: true },
   { key: 'created_at',         label: 'Created',           type: 'date',      showInDetail: true },
 ];

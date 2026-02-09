@@ -34,6 +34,7 @@ import { ScanFunnelDashboard } from './admin/ScanFunnelDashboard';
 import { WaitlistDetailTray } from './admin/WaitlistDetailTray';
 import { CatalogDetailTray } from './admin/CatalogDetailTray';
 import { AdminModal } from './ui/AdminModal';
+import { AdminDebugPanel } from './admin/AdminDebugPanel';
 
 interface AdminRecord {
   id: string;
@@ -74,33 +75,32 @@ const countryToFlag = (code: string): string => {
 // IP geolocation cache (persists across re-renders)
 const ipGeoCache: Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }> = {};
 
-// Upload a file to Supabase Storage and return the public URL
+// Upload a file via edge function (uses service role — bypasses RLS)
 async function uploadFileToStorage(
   file: File,
   bucket: string,
   accessToken: string
 ): Promise<string> {
-  const supabaseUrl = `https://${projectId}.supabase.co`;
-  const ext = file.name.split('.').pop() || 'bin';
-  const path = `admin-uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/storage/upload`;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('bucket', bucket);
 
-  const res = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${path}`, {
+  console.log(`[Admin] Uploading ${file.name} (${(file.size / 1024).toFixed(0)}KB) to ${bucket}...`);
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'apikey': publicAnonKey,
-      'x-upsert': 'true',
-    },
-    body: file,
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+    body: formData,
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Storage upload failed (${res.status}): ${errText}`);
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || `Upload failed (${res.status})`);
   }
 
-  // Return the public URL
-  return `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+  console.log(`[Admin] Upload success: ${data.publicUrl}`);
+  return data.publicUrl;
 }
 
 export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanelProps) {
@@ -131,6 +131,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [showSearch, setShowSearch] = useState(false);
   const recordsCache = useRef<Record<string, AdminRecord[]>>({});
   const [crossTabResults, setCrossTabResults] = useState<{ tabId: string; tabLabel: string; record: AdminRecord }[]>([]);
+  const [elementsCache, setElementsCache] = useState<AdminRecord[]>([]);
+  const [elementSearchQuery, setElementSearchQuery] = useState('');
 
   // Batch IP geolocation lookup
   useEffect(() => {
@@ -168,6 +170,27 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       })
       .catch(() => {});
   }, [records, activeTab]);
+
+  // Fetch elements for linked_elements picker when editing ingredients
+  useEffect(() => {
+    if (!showEditModal || activeTab !== 'ingredients' || elementsCache.length > 0) return;
+    const fetchElements = async () => {
+      try {
+        const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=id,name,name_common,category,type&limit=500`;
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          console.log(`[Admin] Loaded ${data.length} elements for linking`);
+          setElementsCache(data);
+        }
+      } catch (err) {
+        console.error('[Admin] Failed to fetch elements for linking:', err);
+      }
+    };
+    fetchElements();
+  }, [showEditModal, activeTab, accessToken, elementsCache.length]);
 
   const tabs = [
     { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
@@ -400,19 +423,28 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       } else {
         const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
-        // Strip base64 data URLs from updates — they're too large for the API
-        const cleanedRecord = { ...editingRecord };
-        Object.keys(cleanedRecord).forEach(key => {
-          const v = cleanedRecord[key];
-          if (typeof v === 'string' && v.startsWith('data:') && v.length > 5000) {
-            console.warn(`[Admin SAVE] Stripping base64 field "${key}" (${(v.length / 1024).toFixed(0)}KB) — use file upload instead`);
-            delete cleanedRecord[key];
+        // Only send fields that are configured as editable — sending unknown columns causes DB errors
+        const tabConfig = adminFieldConfig[activeTab];
+        const editableKeys = new Set(
+          tabConfig?.fields?.filter((f: any) => f.showInEdit).map((f: any) => f.key) || []
+        );
+        const cleanedUpdates: Record<string, any> = {};
+        for (const key of editableKeys) {
+          if (key in editingRecord) {
+            const v = editingRecord[key];
+            // Strip base64 data URLs — they're too large for the API
+            if (typeof v === 'string' && v.startsWith('data:') && v.length > 5000) {
+              console.warn(`[Admin SAVE] Skipping base64 field "${key}" (${(v.length / 1024).toFixed(0)}KB)`);
+              continue;
+            }
+            cleanedUpdates[key] = v;
           }
-        });
+        }
+        console.log('[Admin SAVE] Editable fields being sent:', Object.keys(cleanedUpdates));
         const body = {
           table: currentTab.table,
           id: editingRecord.id,
-          updates: cleanedRecord
+          updates: cleanedUpdates
         };
         console.log('[Admin SAVE] Catalog update:', url, body);
         const response = await fetch(url, {
@@ -692,11 +724,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           if (category !== filterVal) return false;
         }
       } else if (activeTab === 'ingredients') {
-        // Ingredients: raw = no processing, processed = any processing method present
-        if (filterVal === 'processed') {
-          if (type === 'raw' || type === '' || !type) return false;
-        } else if (filterVal === 'raw') {
-          if (type && type !== 'raw' && type !== 'vegetable' && type !== 'fruit' && type !== 'fish' && type !== 'whole grain') return false;
+        // Ingredients: use processing_type — raw/unprocessed = Raw, anything else = Processed
+        const proc = (record.processing_type || '').toLowerCase();
+        if (filterVal === 'raw') {
+          if (proc !== 'raw' && proc !== 'unprocessed' && proc !== '') return false;
+        } else if (filterVal === 'processed') {
+          if (proc === 'raw' || proc === 'unprocessed' || proc === '') return false;
         }
       } else if (activeTab === 'recipes') {
         // Recipes: filter by category column
@@ -711,8 +744,11 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       }
     }
     
-    // Filter by category if categoryFilter is set
-    if (categoryFilter !== 'all' && record.category !== categoryFilter) return false;
+    // Filter by category if categoryFilter is set (second-level filter)
+    if (categoryFilter !== 'all') {
+      const cat = (record.category || '').toLowerCase();
+      if (cat !== categoryFilter.toLowerCase()) return false;
+    }
     
     return matchesSearch;
   }).map((record, index) => ({ ...record, _displayIndex: index }));
@@ -1006,7 +1042,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       return (
                         <button
                           key={sf.value}
-                          onClick={() => { setSubFilter(sf.value); setCurrentPage(1); }}
+                          onClick={() => { setSubFilter(sf.value); setCategoryFilter('all'); setCurrentPage(1); }}
                           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                             isActive
                               ? colorMap[sf.color] || 'bg-blue-600 text-white shadow-sm'
@@ -1019,6 +1055,32 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     })}
                   </div>
                 )}
+
+                {/* Second-level category filter for Ingredients */}
+                {tab.id === 'ingredients' && subFilter !== 'all' && (() => {
+                  const rawCategories = ['vegetable', 'fruit', 'grain', 'legume', 'nut', 'seed', 'herb', 'spice', 'protein'];
+                  const processedCategories = ['dairy', 'oil', 'sweetener', 'additive'];
+                  const cats = subFilter === 'raw' ? rawCategories : processedCategories;
+                  return (
+                    <div className="flex flex-wrap gap-1 p-1 bg-gray-50 rounded-lg justify-center">
+                      <button
+                        onClick={() => { setCategoryFilter('all'); setCurrentPage(1); }}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                          categoryFilter === 'all' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                        }`}
+                      >All</button>
+                      {cats.map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => { setCategoryFilter(cat); setCurrentPage(1); }}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${
+                            categoryFilter === cat ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                          }`}
+                        >{cat}</button>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* Toolbar */}
                 <div className="space-y-2">
@@ -1386,8 +1448,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                               updateField(publicUrl);
                               toast.success('Image uploaded!');
                             } catch (err: any) {
-                              console.error('[Admin] Image upload failed:', err);
-                              toast.error(`Upload failed: ${err.message?.slice(0, 80)}`);
+                              const errMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+                              console.error('[Admin] Image upload failed:', errMsg);
+                              toast.error(`Upload failed: ${errMsg?.slice(0, 80)}`);
                             } finally { setUploadingImage(false); }
                           }
                         }}
@@ -1425,8 +1488,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                               updateField(publicUrl);
                               toast.success('Video uploaded!');
                             } catch (err: any) {
-                              console.error('[Admin] Video upload failed:', err);
-                              toast.error(`Upload failed: ${err.message?.slice(0, 80)}`);
+                              const errMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+                              console.error('[Admin] Video upload failed:', errMsg);
+                              toast.error(`Upload failed: ${errMsg?.slice(0, 80)}`);
                             } finally { setUploadingImage(false); }
                           }
                         }}
@@ -1484,6 +1548,122 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               );
             }
 
+            if (field.type === 'linked_elements') {
+              const linkedIds: string[] = Array.isArray(val) ? val : [];
+              const categoryFilter = field.linkedCategory || 'all';
+              const filteredElements = elementsCache.filter((el: AdminRecord) => {
+                if (categoryFilter !== 'all' && el.category !== categoryFilter) return false;
+                if (!elementSearchQuery) return true;
+                const q = elementSearchQuery.toLowerCase();
+                return (el.name_common || '').toLowerCase().includes(q) || (el.name || '').toLowerCase().includes(q) || (el.type || '').toLowerCase().includes(q);
+              });
+              const linkedElements = elementsCache.filter((el: AdminRecord) => linkedIds.includes(el.id));
+              const availableElements = filteredElements.filter((el: AdminRecord) => !linkedIds.includes(el.id)).slice(0, 8);
+
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <Label>{field.label} <span className="text-xs text-gray-400 font-normal">({linkedIds.length} linked)</span></Label>
+                  {linkedElements.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {linkedElements.map((el: AdminRecord) => (
+                        <span key={el.id} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          el.category === 'beneficial' ? 'bg-green-100 text-green-800' : el.category === 'hazardous' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {el.name_common || el.name}
+                          <span className="text-[10px] text-gray-500">({el.type})</span>
+                          <button type="button" onClick={() => updateField(linkedIds.filter((id: string) => id !== el.id))}
+                            className="ml-0.5 hover:text-red-600" title="Remove">x</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <Input
+                    value={elementSearchQuery}
+                    onChange={(e) => setElementSearchQuery(e.target.value)}
+                    placeholder={`Search ${categoryFilter === 'beneficial' ? 'nutrients' : categoryFilter === 'hazardous' ? 'hazards' : 'elements'}...`}
+                    className="text-xs"
+                  />
+                  {(elementSearchQuery || linkedElements.length === 0) && availableElements.length > 0 && (
+                    <div className="border rounded-md max-h-32 overflow-y-auto">
+                      {availableElements.map((el: AdminRecord) => (
+                        <button key={el.id} type="button"
+                          onClick={() => { updateField([...linkedIds, el.id]); setElementSearchQuery(''); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 border-b last:border-b-0 flex items-center justify-between"
+                        >
+                          <span className="font-medium">{el.name_common || el.name}</span>
+                          <span className="text-gray-400">{el.type} &middot; {el.category}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {elementsCache.length === 0 && <p className="text-xs text-gray-400 italic">Loading elements...</p>}
+                </div>
+              );
+            }
+
+            if (field.type === 'json') {
+              const jsonStr = typeof val === 'string' ? val : JSON.stringify(val || {}, null, 2);
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <Label>{field.label}</Label>
+                  <Textarea
+                    value={jsonStr}
+                    onChange={(e) => {
+                      try { updateField(JSON.parse(e.target.value)); } catch { updateField(e.target.value); }
+                    }}
+                    placeholder='{"key": "value"}'
+                    className="min-h-24 text-xs font-mono"
+                  />
+                </div>
+              );
+            }
+
+            if (field.type === 'array') {
+              const items: string[] = Array.isArray(val) ? val : (typeof val === 'string' && val ? val.split(',').map((s: string) => s.trim()) : []);
+              return (
+                <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <Label>{field.label}</Label>
+                    <button
+                      type="button"
+                      onClick={() => updateField([...items, ''])}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  {items.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No items. Click + Add to start.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {items.map((item: string, idx: number) => (
+                        <div key={idx} className="flex gap-1.5">
+                          <Input
+                            value={item}
+                            onChange={(e) => {
+                              const updated = [...items];
+                              updated[idx] = e.target.value;
+                              updateField(updated);
+                            }}
+                            className="text-xs flex-1"
+                            placeholder={`${field.label} item ${idx + 1}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateField(items.filter((_: string, i: number) => i !== idx))}
+                            className="text-red-400 hover:text-red-600 px-1.5 text-xs shrink-0"
+                            title="Remove"
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             if (field.type === 'number') {
               return (
                 <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
@@ -1496,22 +1676,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             if (field.type === 'textarea') {
               return (
                 <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
-                  <div className="flex items-center justify-between">
-                    <Label>{field.label}</Label>
-                    {field.aiSuggest && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field of this ${adminFieldConfig[activeTab]?.label || 'item'}: ${getDisplayName(editingRecord)}`;
-                          toast.info(`AI Prompt: ${prompt}`, { duration: 5000 });
-                        }}
-                        className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
-                        title="Get AI suggestion for this field"
-                      >
-                        ✨ AI Suggest
-                      </button>
-                    )}
-                  </div>
+                  <Label>{field.label}</Label>
                   <Textarea value={typeof val === 'string' ? val : ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="min-h-20 text-sm" />
                 </div>
               );
@@ -1520,35 +1685,63 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             // Default: text input
             return (
               <div key={field.key} className={`space-y-2 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
-                <div className="flex items-center justify-between">
-                  <Label>{field.label}</Label>
-                  {field.aiSuggest && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const prompt = field.aiPrompt || `Suggest content for the "${field.label}" field.`;
-                        toast.info(`AI Prompt: ${prompt}`, { duration: 5000 });
-                      }}
-                      className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 transition-colors"
-                      title="Get AI suggestion for this field"
-                    >
-                      ✨ AI Suggest
-                    </button>
-                  )}
-                </div>
+                <Label>{field.label}</Label>
                 <Input value={typeof val === 'string' || typeof val === 'number' ? String(val) : val || ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className="text-sm" />
               </div>
             );
           };
 
+          // Group fields by section for smart ordering
+          const sections = new Map<string, FieldConfig[]>();
+          const unsectioned: FieldConfig[] = [];
+          // Priority fields always first: name, description
+          const priorityKeys = ['name', 'name_common', 'email'];
+          const priorityFields = editFields.filter(f => priorityKeys.includes(f.key));
+          const rest = editFields.filter(f => !priorityKeys.includes(f.key));
+
+          rest.forEach(f => {
+            if (f.section) {
+              if (!sections.has(f.section)) sections.set(f.section, []);
+              sections.get(f.section)!.push(f);
+            } else {
+              unsectioned.push(f);
+            }
+          });
+
           return (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-              {editFields.map(renderEditField)}
+            <div className="space-y-6">
+              {/* Priority fields — always at top */}
+              {priorityFields.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                  {priorityFields.map(renderEditField)}
+                </div>
+              )}
+
+              {/* Unsectioned fields */}
+              {unsectioned.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                  {unsectioned.map(renderEditField)}
+                </div>
+              )}
+
+              {/* Sectioned fields */}
+              {[...sections.entries()].map(([sectionName, fields]) => (
+                <div key={sectionName}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{sectionName}</h4>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                    {fields.map(renderEditField)}
+                  </div>
+                </div>
+              ))}
             </div>
           );
         })()}
       </AdminModal>
       <FloatingDebugMenu accessToken={accessToken} />
+      <AdminDebugPanel />
     </div>
   );
 }

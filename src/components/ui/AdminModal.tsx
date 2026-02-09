@@ -67,7 +67,7 @@ export function AdminModal({
           className={`
             relative flex flex-col
             w-full h-full
-            sm:w-[50vw] sm:h-[50vh]
+            sm:w-[50vw] sm:max-w-[720px] sm:min-w-[480px] sm:h-[80vh] sm:min-h-[500px]
             overflow-hidden rounded-xl bg-white text-left shadow-xl
             ${className}
           `}
