@@ -67,7 +67,7 @@ export function AdminModal({
           className={`
             relative flex flex-col
             w-full h-full
-            sm:w-[50vw] sm:max-w-[720px] sm:min-w-[480px] sm:h-[80vh] sm:min-h-[500px]
+            sm:w-[74vw] sm:max-w-[1100px] sm:min-w-[520px] sm:h-[85vh] sm:min-h-[500px]
             overflow-hidden rounded-xl bg-white text-left shadow-xl
             ${className}
           `}
@@ -75,7 +75,7 @@ export function AdminModal({
         >
           {/* Header */}
           {(title || subtitle) && (
-            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4 shrink-0">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-2.5 shrink-0">
               <div className="min-w-0">
                 {title && (
                   <h3 className="text-base font-semibold leading-6 text-gray-900 truncate">
@@ -83,7 +83,7 @@ export function AdminModal({
                   </h3>
                 )}
                 {subtitle && (
-                  <p className="mt-1 text-sm text-gray-500 truncate">{subtitle}</p>
+                  <p className="mt-0 text-xs text-gray-500 truncate">{subtitle}</p>
                 )}
               </div>
               <button

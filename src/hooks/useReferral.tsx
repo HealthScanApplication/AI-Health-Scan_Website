@@ -80,7 +80,7 @@ export function useReferral(): ReferralData {
         const userHasJoined = localStorage.getItem('healthscan_user_email') || 
                              localStorage.getItem('healthscan_referral_code');
         
-        const shouldShowReferral = isRecentReferral && !userHasJoined;
+        const shouldShowReferral = !!(isRecentReferral && !userHasJoined);
         
         setReferralData({
           referralCode: pendingReferral,
@@ -184,7 +184,7 @@ export const ReferralUtils = {
                              pathReferralCode.length <= 20 &&
                              /^[A-Z0-9]+$/i.test(pathReferralCode);
       
-      return hasQueryParam || hasPathReferral;
+      return hasQueryParam || !!hasPathReferral;
     } catch {
       return false;
     }

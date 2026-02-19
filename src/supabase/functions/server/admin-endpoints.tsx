@@ -1,5 +1,8 @@
+// @ts-ignore Deno edge function imports
 import { Hono } from 'npm:hono'
+// @ts-ignore Deno edge function imports
 import { cors } from 'npm:hono/cors'
+// @ts-ignore Deno edge function imports
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as kv from './kv_store.tsx'
 import { TARGET_COUNTS, NUTRIENTS_DATA, POLLUTANTS_DATA, INGREDIENTS_DATA, PRODUCTS_DATA, PARASITES_DATA } from './admin-constants.tsx'
@@ -15,10 +18,11 @@ app.use('*', cors({
 }))
 
 // Create Supabase client
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') || '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-)
+// @ts-ignore Deno global
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+// @ts-ignore Deno global
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Helper function to validate admin access
 async function validateAdminAccess(accessToken: string) {
@@ -168,14 +172,14 @@ async function getDetailedStats(): Promise<any> {
     }
     
     return { success: true, detailedStats }
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Failed to get detailed stats:', error)
     return { success: false, error: error.message }
   }
 }
 
 // Get admin statistics
-app.get('/make-server-ed0fe4c2/admin/stats', async (c) => {
+app.get('/make-server-ed0fe4c2/admin/stats', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -186,7 +190,7 @@ app.get('/make-server-ed0fe4c2/admin/stats', async (c) => {
     const stats = await getDetailedStats()
     return c.json(stats)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error in admin stats endpoint:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
@@ -195,7 +199,7 @@ app.get('/make-server-ed0fe4c2/admin/stats', async (c) => {
 // PRODUCT MANAGEMENT ENDPOINTS
 
 // Get all products
-app.get('/make-server-ed0fe4c2/admin/products', async (c) => {
+app.get('/make-server-ed0fe4c2/admin/products', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -215,14 +219,14 @@ app.get('/make-server-ed0fe4c2/admin/products', async (c) => {
       total: products.length
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error fetching products:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Get single product by ID
-app.get('/make-server-ed0fe4c2/admin/products/:id', async (c) => {
+app.get('/make-server-ed0fe4c2/admin/products/:id', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -244,14 +248,14 @@ app.get('/make-server-ed0fe4c2/admin/products/:id', async (c) => {
       product: product
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error fetching product:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Create new product
-app.post('/make-server-ed0fe4c2/admin/products', async (c) => {
+app.post('/make-server-ed0fe4c2/admin/products', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -290,14 +294,14 @@ app.post('/make-server-ed0fe4c2/admin/products', async (c) => {
       product: newProduct
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error creating product:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Update existing product
-app.put('/make-server-ed0fe4c2/admin/products/:id', async (c) => {
+app.put('/make-server-ed0fe4c2/admin/products/:id', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -335,14 +339,14 @@ app.put('/make-server-ed0fe4c2/admin/products/:id', async (c) => {
       product: updatedProduct
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error updating product:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Delete product
-app.delete('/make-server-ed0fe4c2/admin/products/:id', async (c) => {
+app.delete('/make-server-ed0fe4c2/admin/products/:id', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -370,7 +374,7 @@ app.delete('/make-server-ed0fe4c2/admin/products/:id', async (c) => {
       message: 'Product deleted successfully'
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error deleting product:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
@@ -379,7 +383,7 @@ app.delete('/make-server-ed0fe4c2/admin/products/:id', async (c) => {
 // PARASITE MANAGEMENT ENDPOINTS
 
 // Get all parasites
-app.get('/make-server-ed0fe4c2/admin/parasites', async (c) => {
+app.get('/make-server-ed0fe4c2/admin/parasites', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -399,14 +403,14 @@ app.get('/make-server-ed0fe4c2/admin/parasites', async (c) => {
       total: parasites.length
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error fetching parasites:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Get single parasite by ID
-app.get('/make-server-ed0fe4c2/admin/parasites/:id', async (c) => {
+app.get('/make-server-ed0fe4c2/admin/parasites/:id', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -428,14 +432,14 @@ app.get('/make-server-ed0fe4c2/admin/parasites/:id', async (c) => {
       parasite: parasite
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error fetching parasite:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Create new parasite
-app.post('/make-server-ed0fe4c2/admin/parasites', async (c) => {
+app.post('/make-server-ed0fe4c2/admin/parasites', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -474,14 +478,14 @@ app.post('/make-server-ed0fe4c2/admin/parasites', async (c) => {
       parasite: newParasite
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error creating parasite:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Update existing parasite
-app.put('/make-server-ed0fe4c2/admin/parasites/:id', async (c) => {
+app.put('/make-server-ed0fe4c2/admin/parasites/:id', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -519,14 +523,14 @@ app.put('/make-server-ed0fe4c2/admin/parasites/:id', async (c) => {
       parasite: updatedParasite
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error updating parasite:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Delete parasite
-app.delete('/make-server-ed0fe4c2/admin/parasites/:id', async (c) => {
+app.delete('/make-server-ed0fe4c2/admin/parasites/:id', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -554,14 +558,14 @@ app.delete('/make-server-ed0fe4c2/admin/parasites/:id', async (c) => {
       message: 'Parasite deleted successfully'
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error deleting parasite:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Populate data type endpoint
-app.post('/make-server-ed0fe4c2/admin/populate/:dataType', async (c) => {
+app.post('/make-server-ed0fe4c2/admin/populate/:dataType', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -576,14 +580,14 @@ app.post('/make-server-ed0fe4c2/admin/populate/:dataType', async (c) => {
     const result = await populateDataType(dataType, targetCount, includeImages, includeMetadata, includeRegionalRDI)
     return c.json(result)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error in populate endpoint:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
 // Export data type endpoint
-app.get('/make-server-ed0fe4c2/admin/export/:dataType', async (c) => {
+app.get('/make-server-ed0fe4c2/admin/export/:dataType', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1]
     const validation = await validateAdminAccess(accessToken)
@@ -595,7 +599,7 @@ app.get('/make-server-ed0fe4c2/admin/export/:dataType', async (c) => {
     const result = await exportDataType(dataType)
     return c.json(result)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error in export endpoint:', error)
     return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
@@ -655,7 +659,7 @@ async function populateDataType(dataType: string, targetCount: number = 100, inc
       total: currentCount + imported
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ Failed to populate ${dataType}:`, error)
     return { success: false, error: error.message, imported: 0 }
   }
@@ -695,7 +699,7 @@ async function exportDataType(dataType: string): Promise<any> {
       recordCount: records.length
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ Failed to export ${dataType}:`, error)
     return { success: false, error: error.message }
   }

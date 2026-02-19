@@ -1,0 +1,16 @@
+-- Add missing columns to catalog_recipes for full feature parity with catalog_ingredients
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS video_url text DEFAULT '';
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS category_sub jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS prep_time text DEFAULT '';
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS cook_time text DEFAULT '';
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS servings integer DEFAULT 0;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS difficulty text DEFAULT '';
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS instructions jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS linked_ingredients jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS description_technical text DEFAULT '';
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS health_benefits text DEFAULT '';
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS taste_profile jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS elements_hazardous jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS health_score numeric DEFAULT 0;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS scientific_references jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE catalog_recipes ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();

@@ -1,0 +1,1 @@
+ALTER TABLE catalog_ingredients ADD COLUMN IF NOT EXISTS processing_methods jsonb DEFAULT '[]'::jsonb;

@@ -84,7 +84,7 @@ export function FloatingDebugMenu({ accessToken }: { accessToken?: string }) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg z-50 transition-all"
+        className="fixed bottom-4 left-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg z-50 transition-all"
         title="Open debug menu"
       >
         🐛
@@ -93,7 +93,7 @@ export function FloatingDebugMenu({ accessToken }: { accessToken?: string }) {
   }
 
   return (
-    <div className={`fixed bottom-4 right-4 bg-gray-900 text-white rounded-lg shadow-2xl z-50 transition-all ${isMinimized ? 'w-64' : 'w-96'}`}>
+    <div className={`fixed bottom-4 left-4 bg-gray-900 text-white rounded-lg shadow-2xl z-50 transition-all ${isMinimized ? 'w-64' : 'w-96'}`}>
       {/* Header */}
       <div className="flex items-center justify-between bg-purple-600 p-3 rounded-t-lg">
         <h3 className="font-bold text-sm">🐛 Debug Menu</h3>
