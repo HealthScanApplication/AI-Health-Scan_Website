@@ -4417,7 +4417,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
           // Section definitions — which sections belong to which tab
           const CULINARY_SECTIONS = new Set([
-            'Media', 'Basic Info', 'Cooking Details', 'Ingredients',
+            'Media', 'Basic Info', 'Cooking Details', 'Ingredients', 'Ingredients & Steps',
             'Flavor Profile', 'Descriptions', 'Processing', 'Culinary Origin',
           ]);
           const HEALTH_SECTIONS = new Set([
