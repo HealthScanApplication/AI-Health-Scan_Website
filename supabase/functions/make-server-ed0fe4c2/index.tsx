@@ -1476,17 +1476,30 @@ Return ONLY a JSON object with the field keys and their values. No markdown, no 
         try { tp = JSON.parse(tp) } catch { tp = null }
       }
       if (tp && typeof tp === 'object' && !Array.isArray(tp)) {
-        // Ensure both taste and texture keys exist with numeric values
+        const tasteKeys = ['sweet', 'sour', 'salty', 'bitter', 'umami', 'spicy']
+        const textureKeys = ['crispy', 'crunchy', 'chewy', 'smooth', 'creamy', 'juicy']
         const ensureNumeric = (obj: any, keys: string[]) => {
           const result: Record<string, number> = {}
           for (const k of keys) result[k] = typeof obj?.[k] === 'number' ? obj[k] : 0
           return result
         }
-        validated['taste_profile'] = {
-          taste: ensureNumeric(tp.taste, ['sweet', 'sour', 'salty', 'bitter', 'umami', 'spicy']),
-          texture: ensureNumeric(tp.texture, ['crispy', 'crunchy', 'chewy', 'smooth', 'creamy', 'juicy']),
+        // Handle flat format: { sweet: 5, crispy: 3 } instead of { taste: { sweet: 5 }, texture: { crispy: 3 } }
+        const isFlat = !tp.taste && !tp.texture
+        const tasteSource = isFlat ? tp : tp.taste
+        const textureSource = isFlat ? tp : tp.texture
+        const normalized = {
+          taste: ensureNumeric(tasteSource, tasteKeys),
+          texture: ensureNumeric(textureSource, textureKeys),
         }
-        console.log(`[AI Fill] taste_profile normalized:`, JSON.stringify(validated['taste_profile']))
+        // Skip if AI returned all zeros — no useful data
+        const hasNonZero = JSON.stringify(normalized).match(/[1-9]/)
+        if (!hasNonZero) {
+          delete validated['taste_profile']
+          console.warn('[AI Fill] taste_profile all zeros, skipping save')
+        } else {
+          validated['taste_profile'] = normalized
+          console.log(`[AI Fill] taste_profile normalized:`, JSON.stringify(validated['taste_profile']))
+        }
       } else {
         delete validated['taste_profile']
         console.warn('[AI Fill] taste_profile returned invalid value, skipping')

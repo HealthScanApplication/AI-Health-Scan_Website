@@ -3517,7 +3517,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             }
 
             if (field.type === 'taste_profile') {
-              const profile = (typeof val === 'object' && val) ? val : { taste: {}, texture: {} };
+              console.log('[taste_profile] raw val:', JSON.stringify(val));
+              let profile: any = (typeof val === 'object' && val && !Array.isArray(val)) ? val : { taste: {}, texture: {} };
+              // Handle flat legacy format: { sweet: 5, sour: 3, ... } instead of { taste: { sweet: 5 }, texture: { crispy: 2 } }
+              if (profile && typeof profile === 'object' && !profile.taste && !profile.texture) {
+                const tasteFlat: any = {};
+                const textureFlat: any = {};
+                const tasteK = ['sweet', 'sour', 'salty', 'bitter', 'umami', 'spicy'];
+                const textureK = ['crispy', 'crunchy', 'chewy', 'smooth', 'creamy', 'juicy'];
+                for (const k of tasteK) if (typeof profile[k] === 'number') tasteFlat[k] = profile[k];
+                for (const k of textureK) if (typeof profile[k] === 'number') textureFlat[k] = profile[k];
+                profile = { taste: tasteFlat, texture: textureFlat };
+              }
               const taste = profile.taste || {};
               const texture = profile.texture || {};
               const tasteKeys = ['sweet', 'sour', 'salty', 'bitter', 'umami', 'spicy'];
