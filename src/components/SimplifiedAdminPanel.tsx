@@ -1190,6 +1190,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [elementSearchQuery, setElementSearchQuery] = useState('');
   const [ingredientsCache, setIngredientsCache] = useState<AdminRecord[]>([]);
   const [ingredientSearchQuery, setIngredientSearchQuery] = useState('');
+  const [autoLinkResults, setAutoLinkResults] = useState<null | Array<{
+    name: string;
+    match: AdminRecord | null;
+    score: number;
+    accepted: boolean | null; // null=pending, true=accepted, false=rejected
+    creating: boolean;
+  }>>(null);
   const [aiFillingFields, setAiFillingFields] = useState(false);
   const [aiFillingSection, setAiFillingSection] = useState<string | null>(null);
   const [aiCreating, setAiCreating] = useState(false);
@@ -4013,6 +4020,99 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               // Data: Array of {name, ingredient_id} | {group, items:[{name, ingredient_id}]}
               const rawItems: any[] = Array.isArray(val) ? val : [];
 
+              // Fuzzy score: 1.0 = exact, 0.0 = no match
+              const fuzzyScore = (a: string, b: string): number => {
+                const an = a.toLowerCase().trim();
+                const bn = b.toLowerCase().trim();
+                if (an === bn) return 1.0;
+                if (bn.includes(an) || an.includes(bn)) return 0.85;
+                const aWords = an.split(/\s+/);
+                const bWords = bn.split(/\s+/);
+                const shared = aWords.filter(w => bWords.some(bw => bw.includes(w) || w.includes(bw)));
+                if (shared.length > 0) return 0.6 + (shared.length / Math.max(aWords.length, bWords.length)) * 0.2;
+                return 0;
+              };
+
+              const findBestMatch = (name: string): { match: AdminRecord | null; score: number } => {
+                let best: AdminRecord | null = null;
+                let bestScore = 0;
+                for (const ing of ingredientsCache) {
+                  const s = fuzzyScore(name, ing.name_common || ing.name || '');
+                  if (s > bestScore) { bestScore = s; best = ing; }
+                }
+                return { match: bestScore >= 0.5 ? best : null, score: bestScore };
+              };
+
+              const runAutoLink = () => {
+                // Collect all flat ingredient names from rawItems
+                const names: string[] = [];
+                for (const entry of rawItems) {
+                  if (entry.group !== undefined) {
+                    for (const child of (entry.items || [])) {
+                      if (child.name) names.push(child.name);
+                    }
+                  } else if (entry.name) {
+                    names.push(entry.name);
+                  }
+                }
+                const unique = [...new Set(names)];
+                const results = unique.map(name => {
+                  const { match, score } = findBestMatch(name);
+                  return { name, match, score, accepted: null as boolean | null, creating: false };
+                });
+                setAutoLinkResults(results);
+              };
+
+              const acceptAutoLink = (idx: number) => {
+                if (!autoLinkResults) return;
+                const result = autoLinkResults[idx];
+                if (!result.match) return;
+                // Add to linked_ingredients on editingRecord
+                const currentLinked: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                if (!currentLinked.includes(result.match.id)) {
+                  setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: [...currentLinked, result.match!.id] }));
+                }
+                setAutoLinkResults(prev => prev ? prev.map((r, i) => i === idx ? { ...r, accepted: true } : r) : prev);
+              };
+
+              const rejectAutoLink = (idx: number) => {
+                setAutoLinkResults(prev => prev ? prev.map((r, i) => i === idx ? { ...r, accepted: false } : r) : prev);
+              };
+
+              const createSkeleton = async (idx: number) => {
+                if (!autoLinkResults) return;
+                const result = autoLinkResults[idx];
+                setAutoLinkResults(prev => prev ? prev.map((r, i) => i === idx ? { ...r, creating: true } : r) : prev);
+                try {
+                  const skeletonId = result.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                  const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/create`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table: 'catalog_ingredients', record: { id: skeletonId, name_common: result.name, category: 'unknown' } }),
+                  });
+                  if (res.ok) {
+                    const newIng: AdminRecord = { id: skeletonId, name_common: result.name, category: 'unknown' };
+                    setIngredientsCache(prev => [...prev, newIng]);
+                    const currentLinked: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                    setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: [...currentLinked, skeletonId] }));
+                    setAutoLinkResults(prev => prev ? prev.map((r, i) => i === idx ? { ...r, match: newIng, accepted: true, creating: false } : r) : prev);
+                  } else {
+                    setAutoLinkResults(prev => prev ? prev.map((r, i) => i === idx ? { ...r, creating: false } : r) : prev);
+                  }
+                } catch {
+                  setAutoLinkResults(prev => prev ? prev.map((r, i) => i === idx ? { ...r, creating: false } : r) : prev);
+                }
+              };
+
+              const acceptAll = () => {
+                if (!autoLinkResults) return;
+                const toAdd = autoLinkResults.filter(r => r.match && r.accepted === null).map(r => r.match!.id);
+                const currentLinked: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                const merged = [...new Set([...currentLinked, ...toAdd])];
+                setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: merged }));
+                setAutoLinkResults(prev => prev ? prev.map(r => r.match ? { ...r, accepted: true } : r) : prev);
+              };
+
               const resolveIngredient = (name: string): string | null => {
                 if (!name) return null;
                 const q = name.toLowerCase();
@@ -4055,17 +4155,88 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 updateItems(next);
               };
 
+              const pendingCount = autoLinkResults ? autoLinkResults.filter(r => r.accepted === null).length : 0;
+
               return (
                 <div key={field.key} className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
                     <div className="flex gap-1.5">
+                      {rawItems.length > 0 && (
+                        <button type="button" onClick={runAutoLink}
+                          className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center gap-1">
+                          🔗 Auto-Link
+                        </button>
+                      )}
                       <button type="button" onClick={addGroup}
                         className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">+ Group</button>
                       <button type="button" onClick={addItem}
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">+ Item</button>
                     </div>
                   </div>
+
+                  {/* Auto-Link Results Panel */}
+                  {autoLinkResults && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-emerald-100 border-b border-emerald-200">
+                        <span className="text-xs font-semibold text-emerald-800">🔗 Auto-Link Results — {autoLinkResults.length} ingredients</span>
+                        <div className="flex gap-1.5">
+                          {pendingCount > 0 && (
+                            <button type="button" onClick={acceptAll}
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
+                              Accept All Matches ({autoLinkResults.filter(r => r.match && r.accepted === null).length})
+                            </button>
+                          )}
+                          <button type="button" onClick={() => setAutoLinkResults(null)}
+                            className="text-[10px] text-emerald-600 hover:text-red-600 px-1.5 py-0.5 rounded bg-white border border-emerald-200 hover:border-red-200">
+                            ✕ Close
+                          </button>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-emerald-100 max-h-72 overflow-y-auto">
+                        {autoLinkResults.map((result, idx) => (
+                          <div key={idx} className={`flex items-center gap-2 px-3 py-2 text-xs ${result.accepted === true ? 'bg-green-50' : result.accepted === false ? 'bg-gray-50 opacity-50' : 'bg-white'}`}>
+                            {/* Ingredient name */}
+                            <span className="font-medium text-gray-700 w-36 truncate flex-shrink-0" title={result.name}>{result.name}</span>
+                            <span className="text-gray-300 flex-shrink-0">→</span>
+                            {/* Match result */}
+                            {result.match ? (
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                {result.match.image_url ? (
+                                  <img src={result.match.image_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                                ) : (
+                                  <div className="w-5 h-5 rounded bg-emerald-200 text-emerald-700 text-[9px] font-bold flex items-center justify-center flex-shrink-0">
+                                    {(result.match.name_common || '?')[0].toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="font-semibold text-emerald-800 truncate">{result.match.name_common}</span>
+                                <span className="text-[9px] text-gray-400 flex-shrink-0">{Math.round(result.score * 100)}%</span>
+                              </div>
+                            ) : (
+                              <span className="flex-1 text-gray-400 italic text-[10px]">No match found</span>
+                            )}
+                            {/* Actions */}
+                            {result.accepted === true && <span className="text-green-600 font-bold flex-shrink-0">✓ Linked</span>}
+                            {result.accepted === false && <span className="text-gray-400 flex-shrink-0">Skipped</span>}
+                            {result.accepted === null && (
+                              <div className="flex gap-1 flex-shrink-0">
+                                {result.match && (
+                                  <button type="button" onClick={() => acceptAutoLink(idx)}
+                                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700">✓ Link</button>
+                                )}
+                                <button type="button" onClick={() => createSkeleton(idx)} disabled={result.creating}
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50">
+                                  {result.creating ? '…' : '+ Create'}
+                                </button>
+                                <button type="button" onClick={() => rejectAutoLink(idx)}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {rawItems.length === 0 ? (
                     <p className="text-xs text-gray-400 italic">No items. Click + Item or + Group to start.</p>
                   ) : (
