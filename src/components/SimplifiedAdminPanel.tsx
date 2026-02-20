@@ -1720,7 +1720,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         if (filledCount === 0) {
           toast.info(data.message || 'All fields already have data');
         } else {
-          setEditingRecord({ ...editingRecord, ...data.filledFields });
+          setEditingRecord((prev: any) => ({ ...prev, ...data.filledFields }));
           toast.success(`AI filled ${filledCount} fields`);
         }
       } else {
@@ -1814,7 +1814,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         if (filledCount === 0) {
           toast.info(data.message || `All ${sectionName} fields already have data`);
         } else {
-          setEditingRecord({ ...editingRecord, ...data.filledFields });
+          setEditingRecord((prev: any) => ({ ...prev, ...data.filledFields }));
           toast.success(`AI filled ${filledCount} ${sectionName} fields`);
         }
       } else {
