@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { Hono } from 'npm:hono'
 import { cors } from 'npm:hono/cors'

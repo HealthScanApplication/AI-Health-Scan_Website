@@ -132,37 +132,36 @@ function screenshotUrl(url: string) {
 type CookingStep = { text: string; image_url?: string };
 
 // Common cooking tools for suggestions
-const COMMON_COOKING_TOOLS: { name: string; emoji: string; category: string }[] = [
-  { name: 'Chef\'s knife', emoji: '🔪', category: 'Cutting' },
-  { name: 'Cutting board', emoji: '🪵', category: 'Cutting' },
-  { name: 'Paring knife', emoji: '🔪', category: 'Cutting' },
-  { name: 'Grater / Zester', emoji: '🧀', category: 'Cutting' },
-  { name: 'Peeler', emoji: '🥕', category: 'Cutting' },
-  { name: 'Large skillet', emoji: '🍳', category: 'Cookware' },
-  { name: 'Wok', emoji: '🥘', category: 'Cookware' },
-  { name: 'Medium pot', emoji: '🫕', category: 'Cookware' },
-  { name: 'Large pot', emoji: '🫕', category: 'Cookware' },
-  { name: 'Saucepan', emoji: '🍲', category: 'Cookware' },
-  { name: 'Sheet pan', emoji: '🟫', category: 'Baking' },
-  { name: 'Baking dish', emoji: '🟫', category: 'Baking' },
-  { name: 'Loaf pan', emoji: '🍞', category: 'Baking' },
-  { name: 'Parchment paper', emoji: '📄', category: 'Baking' },
-  { name: 'Mixing bowl', emoji: '🥣', category: 'Prep' },
-  { name: 'Wooden spoon', emoji: '🥄', category: 'Utensils' },
-  { name: 'Spatula', emoji: '🍴', category: 'Utensils' },
-  { name: 'Whisk', emoji: '🥚', category: 'Utensils' },
-  { name: 'Tongs', emoji: '🦞', category: 'Utensils' },
-  { name: 'Ladle', emoji: '🥄', category: 'Utensils' },
-  { name: 'Measuring spoons', emoji: '🥄', category: 'Measuring' },
-  { name: 'Measuring cups', emoji: '🥛', category: 'Measuring' },
-  { name: 'Kitchen scale', emoji: '⚖️', category: 'Measuring' },
-  { name: 'Blender', emoji: '🌀', category: 'Appliances' },
-  { name: 'Immersion blender', emoji: '🌀', category: 'Appliances' },
-  { name: 'Food processor', emoji: '⚙️', category: 'Appliances' },
-  { name: 'Oven', emoji: '🔥', category: 'Appliances' },
-  { name: 'Colander / Strainer', emoji: '🫙', category: 'Prep' },
-  { name: 'Peeler', emoji: '🥕', category: 'Prep' },
-  { name: 'Garlic press', emoji: '🧄', category: 'Prep' },
+const COMMON_COOKING_TOOLS: { name: string; category: string }[] = [
+  { name: 'Chef\'s knife', category: 'Cutting' },
+  { name: 'Cutting board', category: 'Cutting' },
+  { name: 'Paring knife', category: 'Cutting' },
+  { name: 'Grater / Zester', category: 'Cutting' },
+  { name: 'Peeler', category: 'Cutting' },
+  { name: 'Large skillet', category: 'Cookware' },
+  { name: 'Wok', category: 'Cookware' },
+  { name: 'Medium pot', category: 'Cookware' },
+  { name: 'Large pot', category: 'Cookware' },
+  { name: 'Saucepan', category: 'Cookware' },
+  { name: 'Sheet pan', category: 'Baking' },
+  { name: 'Baking dish', category: 'Baking' },
+  { name: 'Loaf pan', category: 'Baking' },
+  { name: 'Parchment paper', category: 'Baking' },
+  { name: 'Mixing bowl', category: 'Prep' },
+  { name: 'Wooden spoon', category: 'Utensils' },
+  { name: 'Spatula', category: 'Utensils' },
+  { name: 'Whisk', category: 'Utensils' },
+  { name: 'Tongs', category: 'Utensils' },
+  { name: 'Ladle', category: 'Utensils' },
+  { name: 'Measuring spoons', category: 'Measuring' },
+  { name: 'Measuring cups', category: 'Measuring' },
+  { name: 'Kitchen scale', category: 'Measuring' },
+  { name: 'Blender', category: 'Appliances' },
+  { name: 'Immersion blender', category: 'Appliances' },
+  { name: 'Food processor', category: 'Appliances' },
+  { name: 'Oven', category: 'Appliances' },
+  { name: 'Colander / Strainer', category: 'Prep' },
+  { name: 'Garlic press', category: 'Prep' },
 ];
 
 // ─── CookingToolsField ─────────────────────────────────────────────────────
@@ -226,7 +225,7 @@ function CookingToolsField({ val, updateField }: { val: any; updateField: (v: an
               {filtered.filter(t => t.category === cat).map(t => (
                 <button key={t.name} type="button" onClick={() => addTool(t.name)}
                   className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700 transition-colors">
-                  {t.emoji} {t.name}
+                  {t.name}
                 </button>
               ))}
             </div>
@@ -634,7 +633,7 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
                           const toolDef = COMMON_COOKING_TOOLS.find(ct => ct.name === t);
                           return (
                             <span key={t} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 font-medium">
-                              {toolDef?.emoji || '🔧'} {t}
+                              {t}
                             </span>
                           );
                         })}
@@ -1767,14 +1766,26 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
         // Linked ingredient names from cache
         const linkedIds: string[] = Array.isArray(editingRecord.linked_ingredients) ? editingRecord.linked_ingredients : [];
+        let ingNames: string[] = [];
         if (linkedIds.length > 0) {
-          const ingNames = ingredientsCache
+          ingNames = ingredientsCache
             .filter((ing: any) => linkedIds.includes(ing.id))
             .map((ing: any) => ing.name_common || ing.name)
             .filter(Boolean);
-          if (ingNames.length > 0) parts.push(`Ingredients: ${ingNames.join(', ')}`);
         }
-        // Equipment/tools
+        // Fallback: extract names from grouped_ingredients text field
+        if (ingNames.length === 0) {
+          const textItems: any[] = Array.isArray(editingRecord.ingredients) ? editingRecord.ingredients : [];
+          for (const entry of textItems) {
+            if (entry?.group !== undefined) {
+              for (const child of (entry.items || [])) { if (child.name) ingNames.push(child.name); }
+            } else if (entry?.name) {
+              ingNames.push(entry.name);
+            }
+          }
+        }
+        if (ingNames.length > 0) parts.push(`Ingredients: ${ingNames.join(', ')}`);
+        // Equipment/tools (stored on equipment field)
         const equipment: string[] = Array.isArray(editingRecord.equipment) ? editingRecord.equipment : [];
         if (equipment.length > 0) parts.push(`Equipment: ${equipment.join(', ')}`);
         // Cuisine / difficulty

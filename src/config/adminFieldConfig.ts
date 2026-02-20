@@ -1390,15 +1390,6 @@ const recipesFields: FieldConfig[] = [
 
   // --- Cooking Details ---
   {
-    key: "equipment",
-    label: "Equipment / Tools",
-    type: "cooking_tools",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Cooking Details",
-  },
-  {
     key: "prep_time",
     label: "Prep Time",
     type: "text",
@@ -1433,17 +1424,7 @@ const recipesFields: FieldConfig[] = [
     section: "Cooking Details",
     options: ["easy", "medium", "hard"],
   },
-  {
-    key: "instructions",
-    label: "Cooking Instructions",
-    type: "cooking_steps",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Cooking Details",
-  },
-
-  // --- Ingredients ---
+  // --- Ingredients & Steps ---
   {
     key: "linked_ingredients",
     label: "Ingredients & Tools",
@@ -1451,7 +1432,7 @@ const recipesFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Ingredients",
+    section: "Ingredients & Steps",
   },
   {
     key: "ingredients",
@@ -1460,7 +1441,16 @@ const recipesFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Ingredients",
+    section: "Ingredients & Steps",
+  },
+  {
+    key: "instructions",
+    label: "Cooking Steps",
+    type: "cooking_steps",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Ingredients & Steps",
   },
 
   // --- Descriptions ---
