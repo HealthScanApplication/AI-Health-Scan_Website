@@ -1426,17 +1426,8 @@ const recipesFields: FieldConfig[] = [
   },
   // --- Ingredients & Steps ---
   {
-    key: "linked_ingredients",
-    label: "Ingredients & Tools",
-    type: "recipe_ingredients_tools",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Ingredients & Steps",
-  },
-  {
     key: "ingredients",
-    label: "Ingredients (text)",
+    label: "Ingredients",
     type: "grouped_ingredients",
     showInDetail: true,
     showInEdit: true,

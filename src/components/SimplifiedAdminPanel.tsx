@@ -4175,14 +4175,19 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               const pendingCount = autoLinkResults ? autoLinkResults.filter(r => r.accepted === null).length : 0;
 
               return (
-                <div key={field.key} className="space-y-1.5">
+                <div key={field.key} className="grid grid-cols-2 gap-4">
+                  {/* LEFT: Ingredients list */}
+                  <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      {field.label}
+                      {(() => { const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : []; return linkedIds.length > 0 ? <span className="text-gray-400 font-normal normal-case ml-1">({linkedIds.length} linked)</span> : null; })()}
+                    </Label>
                     <div className="flex gap-1.5">
                       {rawItems.length > 0 && (
                         <button type="button" onClick={runAutoLink}
-                          className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center gap-1">
-                          🔗 Auto-Link
+                          className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors">
+                          Auto-Link
                         </button>
                       )}
                       <button type="button" onClick={addGroup}
@@ -4337,6 +4342,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       })}
                     </div>
                   )}
+                  </div>{/* end left col */}
+
+                  {/* RIGHT: Tools */}
+                  <CookingToolsField
+                    val={editingRecord?.equipment}
+                    updateField={(v) => setEditingRecord((prev: any) => ({ ...prev, equipment: v }))}
+                  />
                 </div>
               );
             }
