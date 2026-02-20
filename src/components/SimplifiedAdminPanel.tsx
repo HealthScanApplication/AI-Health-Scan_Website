@@ -1285,6 +1285,11 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     fetchElements();
   }, [showEditModal, activeTab, accessToken, elementsCache.length]);
 
+  // Reset ingredientsCache when tab changes so it refetches for the new context
+  useEffect(() => {
+    setIngredientsCache([]);
+  }, [activeTab]);
+
   // Fetch ingredients for linked_ingredients picker when editing recipes, ingredients, or products
   useEffect(() => {
     if (!showEditModal || !accessToken || typeof accessToken !== 'string' || accessToken.length < 10 || ingredientsCache.length > 0) return;
@@ -1528,7 +1533,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       if (f.type === 'boolean') (blank as any)[f.key] = false;
       else if (f.type === 'number') (blank as any)[f.key] = 0;
       else if (f.type === 'array' || f.type === 'multi_tags') (blank as any)[f.key] = [];
-      else if (f.type === 'json' || f.type === 'nutrition_editor' || f.type === 'grouped_ingredients') (blank as any)[f.key] = {};
+      else if (f.type === 'json' || f.type === 'nutrition_editor') (blank as any)[f.key] = {};
+      else if (f.type === 'grouped_ingredients') (blank as any)[f.key] = [];
       else if (f.type === 'taste_profile') (blank as any)[f.key] = { taste: { sweet: 0, sour: 0, salty: 0, bitter: 0, umami: 0, spicy: 0 }, texture: { crispy: 0, crunchy: 0, chewy: 0, smooth: 0, creamy: 0, juicy: 0 } };
       else if (f.type === 'content_links') (blank as any)[f.key] = [];
       else (blank as any)[f.key] = '';
@@ -3105,7 +3111,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       {/* Edit Modal - Config Driven (uses AdminModal) */}
       <AdminModal
         open={showEditModal}
-        onClose={() => setShowEditModal(false)}
+        onClose={() => { setShowEditModal(false); setAutoLinkResults(null); }}
         title={editingRecord?.id ? `Edit ${adminFieldConfig[activeTab]?.label || 'Record'} — ${getDisplayName(editingRecord)}` : `New ${adminFieldConfig[activeTab]?.label || 'Record'}`}
         subtitle={editingRecord?.id ? `ID: ${String(editingRecord.id).slice(0, 8)}...` : 'Fill in the details below and save to create'}
         size="xl"
@@ -3119,7 +3125,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   disabled={sortedRecords.findIndex(r => r.id === editingRecord?.id) <= 0}
                   onClick={() => {
                     const idx = sortedRecords.findIndex(r => r.id === editingRecord?.id);
-                    if (idx > 0) { setEditingRecord({ ...sortedRecords[idx - 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); }
+                    if (idx > 0) { setEditingRecord({ ...sortedRecords[idx - 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); setAutoLinkResults(null); }
                   }}
                   className="h-8 px-2"
                 >
@@ -3135,7 +3141,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   disabled={sortedRecords.findIndex(r => r.id === editingRecord?.id) >= sortedRecords.length - 1}
                   onClick={() => {
                     const idx = sortedRecords.findIndex(r => r.id === editingRecord?.id);
-                    if (idx < sortedRecords.length - 1) { setEditingRecord({ ...sortedRecords[idx + 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); }
+                    if (idx < sortedRecords.length - 1) { setEditingRecord({ ...sortedRecords[idx + 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); setAutoLinkResults(null); }
                   }}
                   className="h-8 px-2"
                 >
