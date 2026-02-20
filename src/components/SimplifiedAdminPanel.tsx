@@ -128,6 +128,563 @@ function screenshotUrl(url: string) {
   return `https://image.thum.io/get/width/600/crop/400/${url}`;
 }
 
+// A single cooking step: { text: string, image_url?: string }
+type CookingStep = { text: string; image_url?: string };
+
+// Common cooking tools for suggestions
+const COMMON_COOKING_TOOLS: { name: string; emoji: string; category: string }[] = [
+  { name: 'Chef\'s knife', emoji: '🔪', category: 'Cutting' },
+  { name: 'Cutting board', emoji: '🪵', category: 'Cutting' },
+  { name: 'Paring knife', emoji: '🔪', category: 'Cutting' },
+  { name: 'Grater / Zester', emoji: '🧀', category: 'Cutting' },
+  { name: 'Peeler', emoji: '🥕', category: 'Cutting' },
+  { name: 'Large skillet', emoji: '🍳', category: 'Cookware' },
+  { name: 'Wok', emoji: '🥘', category: 'Cookware' },
+  { name: 'Medium pot', emoji: '🫕', category: 'Cookware' },
+  { name: 'Large pot', emoji: '🫕', category: 'Cookware' },
+  { name: 'Saucepan', emoji: '🍲', category: 'Cookware' },
+  { name: 'Sheet pan', emoji: '🟫', category: 'Baking' },
+  { name: 'Baking dish', emoji: '🟫', category: 'Baking' },
+  { name: 'Loaf pan', emoji: '🍞', category: 'Baking' },
+  { name: 'Parchment paper', emoji: '📄', category: 'Baking' },
+  { name: 'Mixing bowl', emoji: '🥣', category: 'Prep' },
+  { name: 'Wooden spoon', emoji: '🥄', category: 'Utensils' },
+  { name: 'Spatula', emoji: '🍴', category: 'Utensils' },
+  { name: 'Whisk', emoji: '🥚', category: 'Utensils' },
+  { name: 'Tongs', emoji: '🦞', category: 'Utensils' },
+  { name: 'Ladle', emoji: '🥄', category: 'Utensils' },
+  { name: 'Measuring spoons', emoji: '🥄', category: 'Measuring' },
+  { name: 'Measuring cups', emoji: '🥛', category: 'Measuring' },
+  { name: 'Kitchen scale', emoji: '⚖️', category: 'Measuring' },
+  { name: 'Blender', emoji: '🌀', category: 'Appliances' },
+  { name: 'Immersion blender', emoji: '🌀', category: 'Appliances' },
+  { name: 'Food processor', emoji: '⚙️', category: 'Appliances' },
+  { name: 'Oven', emoji: '🔥', category: 'Appliances' },
+  { name: 'Colander / Strainer', emoji: '🫙', category: 'Prep' },
+  { name: 'Peeler', emoji: '🥕', category: 'Prep' },
+  { name: 'Garlic press', emoji: '🧄', category: 'Prep' },
+];
+
+// ─── CookingToolsField ─────────────────────────────────────────────────────
+function CookingToolsField({ val, updateField }: { val: any; updateField: (v: any) => void }) {
+  const tools: string[] = Array.isArray(val) ? val : [];
+  const [search, setSearch] = React.useState('');
+
+  const addTool = (name: string) => {
+    if (!tools.includes(name)) updateField([...tools, name]);
+  };
+  const removeTool = (name: string) => updateField(tools.filter(t => t !== name));
+  const addCustom = () => {
+    const t = search.trim();
+    if (t && !tools.includes(t)) { updateField([...tools, t]); setSearch(''); }
+  };
+
+  const filtered = COMMON_COOKING_TOOLS.filter(t =>
+    !tools.includes(t.name) &&
+    (!search || t.name.toLowerCase().includes(search.toLowerCase()))
+  );
+  const categories = [...new Set(filtered.map(t => t.category))];
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Equipment / Tools</Label>
+      {/* Selected tools */}
+      {tools.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {tools.map(t => (
+            <span key={t} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 border border-orange-200 text-orange-800 font-medium">
+              {t}
+              <button type="button" onClick={() => removeTool(t)} className="text-orange-400 hover:text-orange-700 ml-0.5 font-bold">&times;</button>
+            </span>
+          ))}
+        </div>
+      )}
+      {/* Search / add custom */}
+      <div className="flex gap-1.5">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustom())}
+          placeholder="Search or type a tool..."
+          className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+        />
+        {search.trim() && (
+          <button type="button" onClick={addCustom}
+            className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-100 text-orange-700 hover:bg-orange-200 font-medium">
+            + Add
+          </button>
+        )}
+      </div>
+      {/* Suggestions grouped by category */}
+      <div className="border border-gray-100 rounded-lg bg-gray-50 p-2 max-h-44 overflow-y-auto space-y-2">
+        {categories.length === 0 ? (
+          <p className="text-[10px] text-gray-400 italic text-center py-1">All common tools added</p>
+        ) : categories.map(cat => (
+          <div key={cat}>
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">{cat}</p>
+            <div className="flex flex-wrap gap-1">
+              {filtered.filter(t => t.category === cat).map(t => (
+                <button key={t.name} type="button" onClick={() => addTool(t.name)}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700 transition-colors">
+                  {t.emoji} {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── RecipeIngredientsToolsField ───────────────────────────────────────────
+// 2-column: left = linked ingredients, right = tools
+function RecipeIngredientsToolsField({
+  linkedIngredientsVal, toolsVal,
+  updateLinkedIngredients, updateTools,
+  ingredientsCache, ingredientSearchQuery, setIngredientSearchQuery,
+}: {
+  linkedIngredientsVal: any;
+  toolsVal: any;
+  updateLinkedIngredients: (v: any) => void;
+  updateTools: (v: any) => void;
+  ingredientsCache: any[];
+  ingredientSearchQuery: string;
+  setIngredientSearchQuery: (v: string) => void;
+}) {
+  const linkedIds: string[] = Array.isArray(linkedIngredientsVal) ? linkedIngredientsVal : [];
+  const linkedIngredients = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
+  const filteredIngredients = ingredientsCache.filter((ing: any) => {
+    if (!ingredientSearchQuery) return true;
+    const q = ingredientSearchQuery.toLowerCase();
+    return (ing.name_common || ing.name || '').toLowerCase().includes(q) || (ing.category || '').toLowerCase().includes(q);
+  });
+  const availableIngredients = filteredIngredients.filter((ing: any) => !linkedIds.includes(ing.id)).slice(0, 8);
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {/* LEFT: Ingredients */}
+      <div className="space-y-2">
+        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          Ingredients <span className="text-gray-400 font-normal normal-case">({linkedIds.length} linked)</span>
+        </Label>
+        {linkedIngredients.length > 0 && (
+          <div className="space-y-1.5">
+            {linkedIngredients.map((ing: any) => (
+              <div key={ing.id} className="relative flex items-center gap-2 p-2 rounded-lg border bg-emerald-50 border-emerald-200">
+                {ing.image_url ? (
+                  <img src={ing.image_url} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 bg-emerald-200 text-emerald-700">
+                    {(ing.name_common || ing.name || '?')[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-gray-800 truncate">{ing.name_common || ing.name}</div>
+                  {ing.category && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-200 text-emerald-800">{ing.category}</span>}
+                </div>
+                <button type="button" onClick={() => updateLinkedIngredients(linkedIds.filter((id: string) => id !== ing.id))}
+                  className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full bg-white/80 text-gray-400 hover:text-red-600 hover:bg-red-50 text-xs">&times;</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          value={ingredientSearchQuery}
+          onChange={(e) => setIngredientSearchQuery(e.target.value)}
+          placeholder="Search ingredients to link..."
+          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        />
+        {(ingredientSearchQuery || linkedIngredients.length === 0) && availableIngredients.length > 0 && (
+          <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
+            {availableIngredients.map((ing: any) => (
+              <button key={ing.id} type="button"
+                onClick={() => { updateLinkedIngredients([...linkedIds, ing.id]); setIngredientSearchQuery(''); }}
+                className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-emerald-50 border-b border-gray-100 last:border-b-0 flex items-center gap-2"
+              >
+                {ing.image_url ? (
+                  <img src={ing.image_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0 bg-emerald-100 text-emerald-700">
+                    {(ing.name_common || ing.name || '?')[0].toUpperCase()}
+                  </div>
+                )}
+                <span className="font-medium flex-1 truncate">{ing.name_common || ing.name}</span>
+                <span className="text-[9px] text-gray-400 flex-shrink-0">{ing.category}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {ingredientsCache.length === 0 && <p className="text-xs text-gray-400 italic">Loading ingredients...</p>}
+      </div>
+
+      {/* RIGHT: Tools */}
+      <CookingToolsField val={toolsVal} updateField={updateTools} />
+    </div>
+  );
+}
+
+// All image variants stored on an ingredient record
+const INGREDIENT_IMAGE_KEYS: { key: string; label: string }[] = [
+  { key: 'image_url', label: 'Main' },
+  { key: 'image_url_raw', label: 'Raw / Whole' },
+  { key: 'image_url_cut', label: 'Cut / Sliced' },
+  { key: 'image_url_cubed', label: 'Cubed / Diced' },
+  { key: 'image_url_cooked', label: 'Cooked' },
+  { key: 'image_url_powdered', label: 'Powdered' },
+];
+
+function CookingStepsField({ val, updateField, accessToken, linkedIngredients, recordData }: {
+  val: any;
+  updateField: (v: any) => void;
+  accessToken: string;
+  linkedIngredients: any[];
+  recordData: any;
+}) {
+  const steps: CookingStep[] = React.useMemo(() => {
+    if (!val) return [];
+    if (Array.isArray(val)) {
+      return val.map((s: any) =>
+        typeof s === 'string' ? { text: s, image_url: '' } : { text: s.text || '', image_url: s.image_url || '' }
+      );
+    }
+    return [];
+  }, [val]);
+
+  const baseServings: number = Number(recordData?.servings) || 4;
+  const [previewServings, setPreviewServings] = React.useState<number>(baseServings);
+  const [uploadingIdx, setUploadingIdx] = React.useState<number | null>(null);
+  const [pickerIdx, setPickerIdx] = React.useState<number | null>(null);
+  const [generatingSteps, setGeneratingSteps] = React.useState(false);
+  const [customImageIdx, setCustomImageIdx] = React.useState<Set<number>>(new Set());
+
+  React.useEffect(() => {
+    setPreviewServings(Number(recordData?.servings) || 4);
+  }, [recordData?.servings]);
+
+  const scaleStepText = React.useCallback((text: string): string => {
+    if (!text || previewServings === baseServings) return text;
+    const ratio = previewServings / baseServings;
+    const uf: Record<string, number> = { '½':0.5,'¼':0.25,'¾':0.75,'⅓':1/3,'⅔':2/3,'⅛':0.125,'⅜':0.375,'⅝':0.625,'⅞':0.875 };
+    const fmt = (n: number): string => {
+      if (n === Math.round(n)) return String(Math.round(n));
+      const fracs: [number, string][] = [[0.5,'½'],[0.25,'¼'],[0.75,'¾'],[1/3,'⅓'],[2/3,'⅔'],[0.125,'⅛']];
+      for (const [fv, sym] of fracs) {
+        if (Math.abs(n - Math.round(n - fv) - fv) < 0.01) { const w = Math.round(n - fv); return w > 0 ? `${w}${sym}` : sym; }
+      }
+      return n < 10 ? parseFloat(n.toFixed(2)).toString() : Math.round(n).toString();
+    };
+    let r = text.replace(new RegExp(Object.keys(uf).join('|'), 'g'), (m) => fmt(uf[m] * ratio));
+    r = r.replace(/(\d+(?:\.\d+)?)\s*(ml|g|kg|l|liters?|litres?|cups?|tbsp|tsp|oz|lb|lbs|pieces?|cloves?|stalks?|heads?|medium|large|small|bunch|bunches|cans?|slices?|strips?|halves?|halved|whole|portions?)?/gi,
+      (match, num, unit) => { const n = parseFloat(num); if (n > 500) return match; const sc = fmt(n * ratio); return unit ? `${sc} ${unit}` : sc; });
+    return r;
+  }, [previewServings, baseServings]);
+
+  const getAutoImage = React.useCallback((text: string): string => {
+    if (!text || linkedIngredients.length === 0) return '';
+    const lower = text.toLowerCase();
+    const mentioned = linkedIngredients.filter((ing: any) => { const n = (ing.name_common || ing.name || '').toLowerCase(); return n.length > 2 && lower.includes(n); });
+    if (!mentioned.length) return '';
+    const f = mentioned[0];
+    if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) return f.image_url_cut;
+    if ((lower.includes('cube')||lower.includes('dice')) && f.image_url_cubed) return f.image_url_cubed;
+    if ((lower.includes('cook')||lower.includes('sauté')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) return f.image_url_cooked;
+    if (lower.includes('powder') && f.image_url_powdered) return f.image_url_powdered;
+    return f.image_url || '';
+  }, [linkedIngredients]);
+
+  const getMentionedIngredients = (text: string) => {
+    if (!text || !linkedIngredients.length) return [];
+    const lower = text.toLowerCase();
+    return linkedIngredients.filter((ing: any) => { const n = (ing.name_common || ing.name || '').toLowerCase(); return n.length > 2 && lower.includes(n); });
+  };
+
+  const getMentionedTools = (text: string): string[] => {
+    const eq: string[] = Array.isArray(recordData?.equipment) ? recordData.equipment : [];
+    if (!text || !eq.length) return [];
+    const lower = text.toLowerCase();
+    return eq.filter((t: string) => lower.includes(t.toLowerCase()));
+  };
+
+  const update = (ns: CookingStep[]) => updateField(ns);
+  const addStep = () => update([...steps, { text: '', image_url: '' }]);
+  const removeStep = (i: number) => { setCustomImageIdx(prev => { const s = new Set(prev); s.delete(i); return s; }); update(steps.filter((_, idx) => idx !== i)); };
+  const moveStep = (i: number, dir: -1 | 1) => { const nx = [...steps]; const j = i + dir; if (j < 0 || j >= nx.length) return; [nx[i], nx[j]] = [nx[j], nx[i]]; update(nx); };
+  const updateText = (i: number, text: string) => {
+    const nx = [...steps];
+    const autoImg = !customImageIdx.has(i) ? getAutoImage(text) : '';
+    nx[i] = { ...nx[i], text, image_url: autoImg || nx[i].image_url || '' };
+    update(nx);
+  };
+  const setStepImage = (i: number, image_url: string, isCustom = true) => {
+    const nx = [...steps]; nx[i] = { ...nx[i], image_url }; update(nx);
+    if (isCustom) setCustomImageIdx(prev => new Set(prev).add(i));
+    setPickerIdx(null);
+  };
+  const clearCustomImage = (i: number) => {
+    setCustomImageIdx(prev => { const s = new Set(prev); s.delete(i); return s; });
+    const nx = [...steps]; nx[i] = { ...nx[i], image_url: getAutoImage(nx[i].text) }; update(nx);
+  };
+
+  const handleFileUpload = async (i: number, file: File) => {
+    setUploadingIdx(i);
+    try {
+      toast.info('Uploading image...');
+      const url = await uploadFileToStorage(file, 'catalog-media', accessToken);
+      setStepImage(i, url, true);
+      toast.success('Image uploaded!');
+    } catch (err: any) { toast.error(`Upload failed: ${(err?.message || '').slice(0, 80)}`); }
+    finally { setUploadingIdx(null); }
+  };
+
+  const handleDrop = async (i: number, e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) await handleFileUpload(i, file);
+  };
+
+  const handleAiGenerateSteps = async () => {
+    const recipeName = recordData?.name_common || recordData?.name;
+    if (!recipeName) { toast.error('Recipe needs a name first'); return; }
+    setGeneratingSteps(true);
+    try {
+      const ingredientList = linkedIngredients.length > 0
+        ? linkedIngredients.map((ing: any) => ing.name_common || ing.name).join(', ')
+        : (recordData?.ingredients_text || '');
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-generate-steps`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipeName, servings: recordData?.servings || 4, prepTime: recordData?.prep_time || '', cookTime: recordData?.cook_time || '', difficulty: recordData?.difficulty || '', cuisine: recordData?.cuisine || '', ingredientList }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
+      const generated: CookingStep[] = (data.steps || []).map((s: any) => {
+        const t = typeof s === 'string' ? s : (s.text || s);
+        return { text: t, image_url: getAutoImage(t) };
+      });
+      setCustomImageIdx(new Set());
+      update(generated);
+      toast.success(`Generated ${generated.length} steps!`);
+    } catch (err: any) { toast.error(`AI generate failed: ${(err?.message || '').slice(0, 80)}`); }
+    finally { setGeneratingSteps(false); }
+  };
+
+  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none";
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cooking Instructions</Label>
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={handleAiGenerateSteps} disabled={generatingSteps}
+            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 text-purple-700 hover:from-purple-100 hover:to-indigo-100 disabled:opacity-50 transition-all">
+            {generatingSteps ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+            {generatingSteps ? 'Generating...' : 'AI Generate'}
+          </button>
+          <button type="button" onClick={addStep}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
+            + Add Step
+          </button>
+        </div>
+      </div>
+
+      {/* Serving scaler */}
+      <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex-wrap">
+        <span className="text-[11px] font-semibold text-amber-700 flex-shrink-0">Preview servings:</span>
+        <button type="button" onClick={() => setPreviewServings(s => Math.max(1, s - 1))}
+          className="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center hover:bg-amber-300 flex-shrink-0">−</button>
+        <span className="text-sm font-bold text-amber-800 w-6 text-center">{previewServings}</span>
+        <button type="button" onClick={() => setPreviewServings(s => s + 1)}
+          className="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center hover:bg-amber-300 flex-shrink-0">+</button>
+        <span className="text-[10px] text-amber-600 flex-1 min-w-0">
+          {previewServings === baseServings ? `Base (${baseServings} srv)` : `×${(previewServings/baseServings).toFixed(2).replace(/\.?0+$/,'')} from ${baseServings}`}
+        </span>
+        {previewServings !== baseServings && (
+          <button type="button" onClick={() => setPreviewServings(baseServings)} className="text-[10px] text-amber-600 hover:text-amber-800 underline flex-shrink-0">Reset</button>
+        )}
+        {recordData?.prep_time && <span className="text-[10px] text-gray-400 flex-shrink-0">· {recordData.prep_time} prep</span>}
+        {recordData?.cook_time && <span className="text-[10px] text-gray-400 flex-shrink-0">· {recordData.cook_time} cook</span>}
+      </div>
+
+      {steps.length === 0 && !generatingSteps && (
+        <p className="text-xs text-gray-400 italic">No steps yet. Use AI Generate or + Add Step.</p>
+      )}
+      {generatingSteps && (
+        <div className="flex items-center gap-2 py-4 justify-center text-purple-600 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Generating professional steps with quantities...
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {steps.map((step, i) => {
+          const mentioned = getMentionedIngredients(step.text);
+          const mentionedTools = getMentionedTools(step.text);
+          const isPickerOpen = pickerIdx === i;
+          const isCustomImg = customImageIdx.has(i);
+          const displayImg = step.image_url || '';
+
+          return (
+            <div key={i} className="rounded-xl border border-gray-200 bg-gray-50/60 overflow-hidden">
+              {/* Step header */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-gray-100">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                <span className="text-xs font-semibold text-gray-500 flex-1">Step {i + 1}</span>
+                {isCustomImg && (
+                  <button type="button" onClick={() => clearCustomImage(i)}
+                    className="text-[10px] text-gray-400 hover:text-amber-600 px-1.5 py-0.5 rounded bg-gray-100 hover:bg-amber-50 transition-colors" title="Reset to auto image">
+                    ↺ auto
+                  </button>
+                )}
+                <button type="button" onClick={() => moveStep(i, -1)} disabled={i === 0}
+                  className="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-0.5 rounded" title="Move up">
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" onClick={() => moveStep(i, 1)} disabled={i === steps.length - 1}
+                  className="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-0.5 rounded" title="Move down">
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" onClick={() => removeStep(i)}
+                  className="text-red-400 hover:text-red-600 p-0.5 rounded hover:bg-red-50 transition-colors text-sm font-bold">&times;</button>
+              </div>
+
+              {/* Main body: image LEFT + text RIGHT */}
+              <div className="p-3 flex gap-3">
+                {/* LEFT: step image (drag-drop zone) */}
+                <div className="flex-shrink-0 space-y-1">
+                  <div
+                    className={`relative w-24 h-24 rounded-xl border-2 border-dashed bg-white flex items-center justify-center cursor-pointer overflow-hidden transition-colors ${isPickerOpen ? 'border-blue-400' : 'border-gray-200 hover:border-blue-300'}`}
+                    onClick={() => setPickerIdx(isPickerOpen ? null : i)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleDrop(i, e)}
+                    title="Click to pick or drag an image here"
+                  >
+                    {displayImg ? (
+                      <>
+                        <img src={displayImg} alt="" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/0 hover:bg-black/25 transition-colors flex items-end justify-center pb-1">
+                          <span className="opacity-0 hover:opacity-100 text-[8px] text-white bg-black/50 px-1.5 rounded">change</span>
+                        </div>
+                        {isCustomImg && <span className="absolute top-1 right-1 w-3 h-3 rounded-full bg-blue-500 border border-white" title="Custom image" />}
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center text-gray-300 gap-0.5">
+                        <ImageIcon className="w-5 h-5" />
+                        <span className="text-[8px] text-center leading-tight">Drop or<br/>click</span>
+                      </div>
+                    )}
+                    {uploadingIdx === i && (
+                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                      </div>
+                    )}
+                  </div>
+                  <label className="block text-center text-[9px] text-blue-600 hover:text-blue-800 cursor-pointer font-medium leading-tight">
+                    Upload
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(i, f); }} />
+                  </label>
+                </div>
+
+                {/* RIGHT: textarea + scaled preview */}
+                <div className="flex-1 space-y-2 min-w-0">
+                  <textarea
+                    value={step.text}
+                    onChange={(e) => updateText(i, e.target.value)}
+                    placeholder={`Step ${i + 1}: e.g. "Heat 15 ml olive oil in a large wok over medium-high for 30–60 sec."`}
+                    rows={3}
+                    className={inputCls}
+                  />
+                  {previewServings !== baseServings && step.text && (
+                    <div className="rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1.5">
+                      <p className="text-[9px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Preview ({previewServings} servings)</p>
+                      <p className="text-xs text-amber-900 leading-relaxed">{scaleStepText(step.text)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Below text: ingredient thumbnails + tool chips */}
+              {(mentioned.length > 0 || mentionedTools.length > 0) && (
+                <div className="px-3 pb-3 space-y-2">
+                  {mentioned.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Ingredients in this step</p>
+                      <div className="flex flex-wrap gap-2">
+                        {mentioned.map((ing: any) => (
+                          <div key={ing.id} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1">
+                            {ing.image_url ? (
+                              <img src={ing.image_url} alt="" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-6 h-6 rounded-md bg-emerald-200 flex items-center justify-center text-[9px] font-bold text-emerald-700 flex-shrink-0">
+                                {(ing.name_common || ing.name || '?')[0].toUpperCase()}
+                              </div>
+                            )}
+                            <span className="text-[10px] font-semibold text-emerald-800">{ing.name_common || ing.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {mentionedTools.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Tools needed</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {mentionedTools.map((t: string) => {
+                          const toolDef = COMMON_COOKING_TOOLS.find(ct => ct.name === t);
+                          return (
+                            <span key={t} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 font-medium">
+                              {toolDef?.emoji || '🔧'} {t}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Image picker panel */}
+              {isPickerOpen && (
+                <div className="border-t border-gray-100 bg-white p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Pick from linked ingredients</p>
+                    <button type="button" onClick={() => setPickerIdx(null)} className="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
+                  </div>
+                  {linkedIngredients.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No linked ingredients — link ingredients first.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {linkedIngredients.map((ing: any) => {
+                        const images = INGREDIENT_IMAGE_KEYS.map(k => ({ label: k.label, url: ing[k.key] })).filter(x => x.url);
+                        if (!images.length) return null;
+                        return (
+                          <div key={ing.id}>
+                            <p className="text-[10px] font-semibold text-gray-500 mb-1">{ing.name_common || ing.name}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {images.map(({ label, url }) => (
+                                <button key={url} type="button" onClick={() => setStepImage(i, url, true)}
+                                  className="relative rounded-md overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all" title={label}>
+                                  <img src={url} alt={label} className="w-14 h-12 object-cover" />
+                                  <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/50 text-white py-0.5 truncate">{label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId, recordContext }: {
   fieldKey: string;
   val: any;
@@ -1183,6 +1740,38 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           return sample;
         });
 
+      // For Flavor Profile section on recipes, build rich context from steps + ingredients
+      let sectionContext = aiContext.trim() || undefined;
+      const isFlavorSection = sectionName === 'Flavor Profile';
+      const isRecipeTab = (adminFieldConfig[activeTab]?.label || activeTab).toLowerCase().includes('recipe');
+      if (isFlavorSection && isRecipeTab) {
+        const parts: string[] = [];
+        // Cooking steps
+        const steps: any[] = Array.isArray(editingRecord.instructions) ? editingRecord.instructions : [];
+        if (steps.length > 0) {
+          const stepTexts = steps.map((s: any, i: number) => `${i + 1}. ${typeof s === 'string' ? s : (s.text || '')}`).filter(Boolean);
+          if (stepTexts.length > 0) parts.push(`Cooking steps:\n${stepTexts.join('\n')}`);
+        }
+        // Linked ingredient names from cache
+        const linkedIds: string[] = Array.isArray(editingRecord.linked_ingredients) ? editingRecord.linked_ingredients : [];
+        if (linkedIds.length > 0) {
+          const ingNames = ingredientsCache
+            .filter((ing: any) => linkedIds.includes(ing.id))
+            .map((ing: any) => ing.name_common || ing.name)
+            .filter(Boolean);
+          if (ingNames.length > 0) parts.push(`Ingredients: ${ingNames.join(', ')}`);
+        }
+        // Equipment/tools
+        const equipment: string[] = Array.isArray(editingRecord.equipment) ? editingRecord.equipment : [];
+        if (equipment.length > 0) parts.push(`Equipment: ${equipment.join(', ')}`);
+        // Cuisine / difficulty
+        if (editingRecord.cuisine) parts.push(`Cuisine: ${editingRecord.cuisine}`);
+        if (parts.length > 0) {
+          const recipeContext = `Analyse the full recipe to determine the overall taste and flavour profile:\n\n${parts.join('\n\n')}`;
+          sectionContext = sectionContext ? `${sectionContext}\n\n${recipeContext}` : recipeContext;
+        }
+      }
+
       const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
       const response = await fetch(url, {
         method: 'POST',
@@ -1192,7 +1781,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           recordData: editingRecord,
           fields: sectionFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
           sampleRecords,
-          context: aiContext.trim() || undefined,
+          context: sectionContext,
         }),
       });
       const data = await response.json();
@@ -3307,6 +3896,33 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               );
             }
 
+            if (field.type === 'recipe_ingredients_tools') {
+              return (
+                <div key={field.key}>
+                  <RecipeIngredientsToolsField
+                    linkedIngredientsVal={val}
+                    toolsVal={editingRecord?.equipment}
+                    updateLinkedIngredients={updateField}
+                    updateTools={(v) => setEditingRecord((prev: any) => ({ ...prev, equipment: v }))}
+                    ingredientsCache={ingredientsCache}
+                    ingredientSearchQuery={ingredientSearchQuery}
+                    setIngredientSearchQuery={setIngredientSearchQuery}
+                  />
+                </div>
+              );
+            }
+
+            if (field.type === 'cooking_tools') {
+              return (
+                <div key={field.key}>
+                  <CookingToolsField
+                    val={val}
+                    updateField={updateField}
+                  />
+                </div>
+              );
+            }
+
             if (field.type === 'linked_ingredients') {
               const linkedIds: string[] = Array.isArray(val) ? val : [];
               const filteredIngredients = ingredientsCache.filter((ing: AdminRecord) => {
@@ -3533,6 +4149,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       })}
                     </div>
                   )}
+                </div>
+              );
+            }
+
+            if (field.type === 'cooking_steps') {
+              const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+              const linkedIngs = ingredientsCache.filter((ing: AdminRecord) => linkedIds.includes(ing.id));
+              return (
+                <div key={field.key}>
+                  <CookingStepsField
+                    val={val}
+                    updateField={updateField}
+                    accessToken={accessToken as string}
+                    linkedIngredients={linkedIngs}
+                    recordData={editingRecord}
+                  />
                 </div>
               );
             }

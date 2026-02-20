@@ -1056,7 +1056,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
       catalog_recipes: new Set([
         'name_common','name_other','name_scientific','category','category_sub','meal_slot',
         'cuisine','language','type',
-        'prep_time','cook_time','servings','difficulty','instructions','cooking_instructions',
+        'prep_time','cook_time','servings','difficulty','equipment','instructions','cooking_instructions',
         'linked_ingredients','ingredients',
         'description','description_simple','description_technical',
         'health_benefits','taste_profile','flavor_profile','texture_profile',
@@ -1074,20 +1074,22 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'processing_type','processing_methods','raw_ingredients','description_processing',
         'description_simple','description_technical','health_benefits','taste_profile',
         'elements_beneficial','elements_hazardous','health_score','scientific_references',
+        'nutrition_per_100g','nutrition_per_serving',
         'origin_country','origin_region','origin_city','culinary_history',
-        'image_url','image_url_raw','image_url_powdered','image_url_cut','video_url','images','videos',
+        'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_cubed','image_url_cooked','video_url','images','videos',
         'scientific_papers','social_content',
         'updated_at',
       ]),
       catalog_products: new Set([
-        'name_common','name','brand','category','category_sub','barcode',
+        'name_common','name','name_brand','brand','manufacturer','category','category_sub','subcategory','barcode','quantity',
         'ingredients_text','allergen_info','serving_size','serving_unit',
         'description','description_simple','description_technical',
         'health_benefits','taste_profile',
         'elements_beneficial','elements_hazardous','health_score',
+        'nutri_score','nova_group','eco_score',
         'nutrition_per_100g','nutrition_per_serving','nutrition_facts',
         'scientific_references','scientific_papers','social_content',
-        'image_url','image_url_raw','video_url','images','videos',
+        'image_url','image_url_raw','image_url_back','image_url_detail','video_url','images','videos',
         'origin_country','region','country',
         'updated_at',
       ]),
@@ -1249,15 +1251,22 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
         if (key === 'taste_profile') {
           return !JSON.stringify(val).match(/[1-9]/)
         }
+        // nutrition_per_100g / nutrition_per_serving: treat as empty if no calorie value
+        if (key === 'nutrition_per_100g' || key === 'nutrition_per_serving') {
+          return !JSON.stringify(val).match(/[1-9]/)
+        }
       }
       return false
     }
+
+    // Field types that cannot be meaningfully AI-filled
+    const SKIP_TYPES = new Set(['image', 'video', 'readonly', 'date', 'linked_elements', 'linked_ingredients', 'content_links', 'grouped_ingredients'])
 
     for (const f of fields) {
       const val = recordData[f.key]
       if (!isEffectivelyEmpty(f.key, val)) {
         existingData[f.key] = val
-      } else if (f.type !== 'image' && f.type !== 'video' && f.type !== 'readonly' && f.type !== 'date' && f.type !== 'linked_elements' && f.type !== 'linked_ingredients') {
+      } else if (!SKIP_TYPES.has(f.type)) {
         emptyFields.push({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder })
       }
     }
@@ -1280,8 +1289,23 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
     }
 
     // Build structured format hints for special field types
+    const isRecipeTab = (tabType || '').toLowerCase().includes('recipe') || (tabType || '').toLowerCase().includes('meal')
     const structuredFormats: Record<string, string> = {
-      'taste_profile': `JSON object with exact structure: {"taste":{"sweet":0-10,"sour":0-10,"salty":0-10,"bitter":0-10,"umami":0-10,"spicy":0-10},"texture":{"crispy":0-10,"crunchy":0-10,"chewy":0-10,"smooth":0-10,"creamy":0-10,"juicy":0-10}}. Use realistic values based on the ingredient.`,
+      'taste_profile': isRecipeTab
+        ? `JSON object with exact structure: {"taste":{"sweet":0-10,"sour":0-10,"salty":0-10,"bitter":0-10,"umami":0-10,"spicy":0-10},"texture":{"crispy":0-10,"crunchy":0-10,"chewy":0-10,"smooth":0-10,"creamy":0-10,"juicy":0-10}}. IMPORTANT: Read the cooking steps and full ingredient list provided in the context above. Analyse HOW the ingredients are cooked (e.g. roasting adds sweetness/bitterness, frying adds crunch, braising adds umami/richness, spices add heat) and derive the OVERALL finished-dish flavour and texture profile — not just the raw ingredients in isolation. Use realistic 0-10 values that reflect the final eating experience of this specific recipe.`
+        : `JSON object with exact structure: {"taste":{"sweet":0-10,"sour":0-10,"salty":0-10,"bitter":0-10,"umami":0-10,"spicy":0-10},"texture":{"crispy":0-10,"crunchy":0-10,"chewy":0-10,"smooth":0-10,"creamy":0-10,"juicy":0-10}}. Use realistic values based on the sensory profile of this ingredient.`,
+      'nutrition_per_100g': `JSON object with macro values per 100g: {"calories":number,"protein_g":number,"carbohydrates_g":number,"fats_g":number,"fiber_g":number,"sugar_g":number,"sodium_mg":number}. Use real USDA/nutritional database values.`,
+      'nutrition_per_serving': `JSON object with macro values per typical serving: {"calories":number,"protein_g":number,"carbohydrates_g":number,"fats_g":number,"fiber_g":number,"sugar_g":number,"sodium_mg":number,"serving_size_g":number}. Base serving size on typical portion for this ${isRecipeTab ? 'recipe/dish' : 'product/ingredient'}.`,
+      'prep_time': `String with time and unit, e.g. "15 min" or "1 hour". Realistic prep time for this recipe.`,
+      'cook_time': `String with time and unit, e.g. "30 min" or "1 hour 15 min". Realistic cooking time for this recipe.`,
+      'servings': `Integer number of servings this recipe yields, e.g. 4`,
+      'difficulty': `One of: "easy", "medium", "hard". Based on technique complexity and time required.`,
+      'meal_slot': `JSON array of applicable meal times from: ["breakfast","lunch","dinner","snack","dessert","appetizer","side dish"]. Include all that apply.`,
+      'cuisine': `String name of the cuisine origin, e.g. "Italian", "Japanese", "Mexican", "Mediterranean".`,
+      'processing_methods': `JSON array of applicable processing methods. Common values: ["raw","cooked","fermented","dried","smoked","pickled","roasted","steamed","fried","baked","freeze-dried","cold-pressed","pasteurized","homogenized","refined","extracted"]. Only include methods that actually apply.`,
+      'category_sub': isRecipeTab
+        ? `JSON array of subcategory strings relevant to this recipe's main category. E.g. for "meal": ["One-Pot","High-Protein","Gluten-Free"]. For "beverage": ["Smoothie","Cold-Pressed"].`
+        : `JSON array of subcategory strings relevant to this ingredient's main category.`,
       'elements_beneficial': `JSON object: {"serving":{"name":"e.g. 1 cup","size_g":number},"per_100g":{"calories":number,"macronutrients":{"protein_g":g,"fat_g":g,"carbohydrates_g":g,"fiber_g":g,"sugars_g":g,"water_content_g":g},"vitamins":{"vitamin_a_mcg":mcg,"vitamin_d3_mcg":mcg,"vitamin_e_mg":mg,"vitamin_k2_mcg":mcg,"vitamin_c_mg":mg,"thiamine_mg":mg,"riboflavin_mg":mg,"niacin_mg":mg,"pantothenic_acid_mg":mg,"pyridoxine_mg":mg,"biotin_mcg":mcg,"folate_mcg":mcg,"vitamin_b12_mcg":mcg},"minerals":{"calcium_mg":mg,"phosphorus_mg":mg,"magnesium_mg":mg,"sodium_mg":mg,"potassium_mg":mg,"iron_mg":mg,"zinc_mg":mg,"copper_mg":mg,"manganese_mg":mg,"selenium_mcg":mcg,"iodine_mcg":mcg,"chromium_mcg":mcg,"molybdenum_mcg":mcg},"amino_acids":{"leucine_g":g,"isoleucine_g":g,"valine_g":g,"lysine_g":g,"methionine_g":g,"phenylalanine_g":g,"threonine_g":g,"tryptophan_g":g,"histidine_g":g},"fatty_acids":{"omega_3_mg":mg,"omega_6_g":g,"saturated_g":g,"monounsaturated_g":g,"polyunsaturated_g":g},"antioxidants":{"beta_carotene_mg":mg,"lutein_mg":mg,"lycopene_mg":mg},"functional":{"choline_mg":mg,"coq10_mg":mg},"digestive":{"soluble_fiber_g":g,"insoluble_fiber_g":g}},"per_serving":{...same structure...}}. Use real USDA-level data. Only include nutrients meaningfully present (>0). ALWAYS populate macronutrients, vitamins, and minerals for any real food ingredient.`,
       'elements_hazardous': `JSON object mapping element IDs to risk objects: {"element_id": {"level": "trace|low|moderate|high", "per_100g": number_in_mg_or_mcg, "per_serving": number_in_mg_or_mcg, "likelihood": 0-100, "reason": "brief explanation"}, ...}. Only include elements with level OTHER than "none". "per_100g" is the estimated quantity of this contaminant per 100g (in mg or mcg as appropriate). "per_serving" is per typical serving. "likelihood" is the % chance this risk is present (0-100). "reason" is a brief scientific explanation of WHY this risk exists for this ingredient. You MUST use ONLY these exact element IDs:
 NATURAL FOOD COMPOUNDS (check these first for whole foods): oxalates, phytates, lectins, solanine, tannins, goitrogens, saponins, ciguatoxin, grayanotoxins, hypoglycin_a, pyrrolizidine_alkaloids, sambunigrin, saxitoxin, tetrodotoxin.
@@ -1304,8 +1328,6 @@ Be thorough — flag ALL real, evidence-based concerns with accurate quantities.
       'raw_ingredients': `JSON array of ingredient UUIDs that are the raw source ingredients for this processed ingredient. For example, garlic powder's raw ingredients would be [garlic_uuid]. Tomato sauce's raw ingredients would be [tomato_uuid, olive_oil_uuid, garlic_uuid, onion_uuid, salt_uuid]. If the ingredient is raw/unprocessed, return an empty array []. IMPORTANT: You must return actual UUIDs from the catalog_ingredients table. If you don't know the exact UUIDs, return a JSON array of ingredient name strings like ["Tomato", "Olive Oil", "Garlic"] and the system will match them.`,
       'linked_ingredients': `JSON array of ingredient UUIDs or name strings that make up this recipe/product. List ALL key ingredients. For example, a Mediterranean Salad would be ["Tomato", "Cucumber", "Red Onion", "Olive Oil", "Feta Cheese", "Kalamata Olives", "Lemon"]. Return ingredient names if UUIDs are unknown.`,
       'ingredients': `JSON array of ingredient entries. Each entry is EITHER a plain item OR a group. Plain item: {"name":"Tomatoes","ingredient_id":null}. Group (use when multiple items belong to the same category): {"group":"Fresh Herbs","items":[{"name":"Basil","ingredient_id":null},{"name":"Parsley","ingredient_id":null}]}. Rules: (1) Use groups when ingredients naturally cluster (e.g. "Fresh Herbs", "Spices", "For the Dressing", "Vegetables"). (2) Single ingredients that don't belong to a group should be plain items. (3) Always use "ingredient_id": null — the system will auto-resolve IDs. (4) Be specific with ingredient names (e.g. "Cherry Tomatoes" not "Tomatoes"). Example for Gazpacho: [{"name":"Cherry Tomatoes","ingredient_id":null},{"name":"Cucumber","ingredient_id":null},{"name":"Red Bell Pepper","ingredient_id":null},{"name":"Red Onion","ingredient_id":null},{"name":"Garlic","ingredient_id":null},{"group":"Dressing","items":[{"name":"Olive Oil","ingredient_id":null},{"name":"Red Wine Vinegar","ingredient_id":null},{"name":"Lemon Juice","ingredient_id":null}]},{"group":"Fresh Herbs","items":[{"name":"Basil","ingredient_id":null},{"name":"Parsley","ingredient_id":null}]},{"group":"Seasoning","items":[{"name":"Salt","ingredient_id":null},{"name":"Black Pepper","ingredient_id":null}]}]`,
-      'processing_methods': `JSON array of strings from the allowed processing methods list. Include all methods that apply to this ingredient.`,
-      'category_sub': `JSON array of subcategory strings relevant to this ingredient's main category.`,
       'origin_country': `The primary country of origin for this ingredient. Use the most historically significant or commonly associated country (e.g. "Japan" for miso, "Mexico" for avocado, "Ethiopia" for coffee). Return a single country name string.`,
       'origin_region': `The specific region, province, or state within the country of origin most associated with this ingredient (e.g. "Oaxaca" for mole, "Hokkaido" for king crab, "Champagne" for champagne grapes). Return a single region name string, or empty string if not region-specific.`,
       'origin_city': `A specific city, town, or locality historically associated with this ingredient if applicable (e.g. "Parma" for Parmigiano-Reggiano, "Darjeeling" for Darjeeling tea). Return a single city name string, or empty string if not city-specific.`,
@@ -1546,7 +1568,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'ai_enriched_at','ai_enrichment_version','created_at','updated_at',
       ]),
       catalog_recipes: new Set([
-        'id','name_common','name_other','name_scientific','category','category_sub','meal_slot',
+        'id','name_common','name_other','name_scientific','category','category_sub','meal_slot','equipment',
         'cuisine','language','type',
         'prep_time','cook_time','servings','difficulty','instructions','cooking_instructions',
         'linked_ingredients','ingredients',
@@ -1566,8 +1588,21 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'processing_type','processing_methods','raw_ingredients','description_processing',
         'description_simple','description_technical','health_benefits','taste_profile',
         'elements_beneficial','elements_hazardous','health_score','scientific_references',
+        'nutrition_per_100g','nutrition_per_serving','linked_ingredients',
         'origin_country','origin_region','origin_city','culinary_history',
-        'image_url','image_url_raw','image_url_powdered','image_url_cut','video_url','images','videos',
+        'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_cubed','image_url_cooked','video_url','images','videos',
+        'scientific_papers','social_content',
+        'created_at','updated_at',
+      ]),
+      catalog_products: new Set([
+        'id','name_common','name','name_brand','brand','manufacturer','category','category_sub','subcategory','barcode','quantity',
+        'ingredients_text','allergen_info','serving_size','serving_unit',
+        'description','description_simple','description_technical',
+        'health_benefits','taste_profile',
+        'elements_beneficial','elements_hazardous','health_score',
+        'nutri_score','nova_group','eco_score',
+        'nutrition_per_100g','nutrition_per_serving','nutrition_facts',
+        'image_url','image_url_back','image_url_detail','video_url',
         'scientific_papers','social_content',
         'created_at','updated_at',
       ]),
@@ -1577,7 +1612,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     const rawClean = { ...record }
     ;['_displayIndex', 'id', 'created_at', 'imported_at', 'api_source', 'external_id'].forEach((f: string) => delete rawClean[f])
 
-    // Strip unknown columns for non-product tables
+    // Strip unknown columns using per-table allowlist
     const allowedCols = INSERT_COLUMNS[table]
     const clean: Record<string, any> = {}
     if (allowedCols) {
@@ -1599,17 +1634,10 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     clean.created_at = new Date().toISOString()
     clean.updated_at = new Date().toISOString()
 
-    // Auto-generate slug from name_common if not provided (avoids unique constraint issues)
-    if (!clean.slug && clean.name_common) {
+    // Auto-generate slug from name_common if not provided — only for tables that have a slug column
+    if (table === 'catalog_elements' && !clean.slug && clean.name_common) {
       const base = String(clean.name_common).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
       clean.slug = `${base}-${clean.id.slice(0, 8)}`
-    }
-
-    if (table === 'catalog_products') {
-      const id = crypto.randomUUID()
-      await kv.set(id, { id, ...clean })
-      console.log(`[Admin] Inserted product ${id} by ${adminValidation.user.email}`)
-      return c.json({ success: true, id, record: { id, ...clean } })
     }
 
     console.log(`[Admin Insert] Table: ${table}, keys: ${Object.keys(clean).join(', ')}`)
@@ -1622,6 +1650,86 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     return c.json({ success: true, id: data.id, record: data })
   } catch (error: any) {
     console.error('[Admin] Error inserting catalog record:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
+// Admin: AI Generate Steps — generates professional cooking steps with quantities for a recipe
+app.post('/make-server-ed0fe4c2/admin/ai-generate-steps', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    const { recipeName, servings, prepTime, cookTime, difficulty, cuisine, ingredientList } = await c.req.json()
+    if (!recipeName) return c.json({ success: false, error: 'recipeName is required' }, 400)
+
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) return c.json({ success: false, error: 'OPENAI_API_KEY not configured' }, 500)
+
+    const srv = servings || 4
+    const systemPrompt = `You are a professional recipe writer for a health & nutrition app. You write clear, user-friendly cooking instructions following this exact format:
+
+RULES:
+- One step = one action block (never cram multiple actions into one step)
+- Always include: heat level + time + what "done" looks like
+- Embed exact quantities IN the step where the ingredient is used (e.g. "Heat 15 ml (1 tbsp) olive oil...")
+- Use both metric and imperial where helpful (e.g. "200 g (≈2 cups)")
+- All quantities must be scaled for ${srv} serving${srv !== 1 ? 's' : ''}
+- Steps must flow logically: prep → heat/fat → aromatics → main items → seasoning → finish → serve
+- Keep steps concise but complete — 1-2 sentences max per step
+- Return ONLY a JSON array of step strings, no markdown, no numbering (numbers are added by the UI)`
+
+    const userPrompt = `Write professional cooking instructions for: "${recipeName}"
+Servings: ${srv}${prepTime ? `\nPrep time: ${prepTime}` : ''}${cookTime ? `\nCook time: ${cookTime}` : ''}${difficulty ? `\nDifficulty: ${difficulty}` : ''}${cuisine ? `\nCuisine: ${cuisine}` : ''}${ingredientList ? `\nIngredients: ${ingredientList}` : ''}
+
+Return a JSON array of step strings. Each step should be a single action with quantities embedded. Example format:
+["Heat 15 ml (1 tbsp) olive oil in a large wok over medium-high heat for 30–60 seconds.", "Add 75 g (½ medium) thinly sliced onion and sauté for 2–3 minutes until translucent."]`
+
+    console.log(`[AI Steps] Generating steps for "${recipeName}" (${srv} servings)`)
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.4,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
+      })
+    })
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text()
+      console.error('[AI Steps] OpenAI error:', errText)
+      return c.json({ success: false, error: `OpenAI API error: ${openaiRes.status}` }, 500)
+    }
+
+    const openaiData = await openaiRes.json()
+    const content = openaiData.choices?.[0]?.message?.content
+    if (!content) return c.json({ success: false, error: 'No content from AI' }, 500)
+
+    let parsed: any
+    try { parsed = JSON.parse(content) } catch {
+      return c.json({ success: false, error: 'AI returned invalid JSON' }, 500)
+    }
+
+    // Accept either { steps: [...] } or a bare array wrapped in any key
+    const steps: string[] = Array.isArray(parsed) ? parsed
+      : Array.isArray(parsed.steps) ? parsed.steps
+      : Array.isArray(Object.values(parsed)[0]) ? Object.values(parsed)[0] as string[]
+      : []
+
+    if (steps.length === 0) return c.json({ success: false, error: 'AI returned no steps' }, 500)
+
+    console.log(`[AI Steps] Generated ${steps.length} steps for "${recipeName}"`)
+    return c.json({ success: true, steps, recipeName, servings: srv })
+  } catch (error: any) {
+    console.error('[AI Steps] Error:', error)
     return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
   }
 })

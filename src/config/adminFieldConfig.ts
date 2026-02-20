@@ -47,7 +47,10 @@ export interface FieldConfig {
     | "taste_profile"
     | "nutrition_editor"
     | "category_tree"
-    | "content_links";
+    | "content_links"
+    | "cooking_steps"
+    | "cooking_tools"
+    | "recipe_ingredients_tools";
   categoryTree?: Record<string, Record<string, string[]>>;
   linkedCategory?: "beneficial" | "hazardous" | "all";
   options?: string[];
@@ -560,6 +563,27 @@ const elementsFields: FieldConfig[] = [
     placeholder: "Practical steps to reduce exposure (for hazardous elements)",
   },
 
+  // --- Beneficial / Hazardous Elements ---
+  {
+    key: "elements_beneficial",
+    label: "Beneficial Elements",
+    type: "nutrition_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Scoring",
+  },
+  {
+    key: "elements_hazardous",
+    label: "Hazardous Elements",
+    type: "nutrition_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Scoring",
+    linkedCategory: "hazardous",
+  },
+
   // --- Scoring ---
   {
     key: "health_score",
@@ -675,6 +699,22 @@ const ingredientsFields: FieldConfig[] = [
   {
     key: "image_url_cut",
     label: "Cut / Sliced",
+    type: "image",
+    showInDetail: true,
+    showInEdit: true,
+    section: "Media",
+  },
+  {
+    key: "image_url_cubed",
+    label: "Cubed / Diced",
+    type: "image",
+    showInDetail: true,
+    showInEdit: true,
+    section: "Media",
+  },
+  {
+    key: "image_url_cooked",
+    label: "Cooked / Prepared",
     type: "image",
     showInDetail: true,
     showInEdit: true,
@@ -1065,8 +1105,18 @@ const ingredientsFields: FieldConfig[] = [
 
   // --- Nutrition Data ---
   {
+    key: "nutrition_per_100g",
+    label: "Macros per 100g",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Nutrition Data",
+    placeholder: 'JSON: { "calories": 354, "protein_g": 14, "carbohydrates_g": 64, "fats_g": 6, "fiber_g": 7, "sugar_g": 1, "sodium_mg": 7 }',
+  },
+  {
     key: "elements_beneficial",
-    label: "Nutrition Data (Beneficial)",
+    label: "Micronutrients (Beneficial)",
     type: "nutrition_editor",
     showInDetail: true,
     showInEdit: true,
@@ -1340,6 +1390,15 @@ const recipesFields: FieldConfig[] = [
 
   // --- Cooking Details ---
   {
+    key: "equipment",
+    label: "Equipment / Tools",
+    type: "cooking_tools",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Cooking Details",
+  },
+  {
     key: "prep_time",
     label: "Prep Time",
     type: "text",
@@ -1376,8 +1435,8 @@ const recipesFields: FieldConfig[] = [
   },
   {
     key: "instructions",
-    label: "Instructions",
-    type: "array",
+    label: "Cooking Instructions",
+    type: "cooking_steps",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -1387,8 +1446,8 @@ const recipesFields: FieldConfig[] = [
   // --- Ingredients ---
   {
     key: "linked_ingredients",
-    label: "Linked Ingredients",
-    type: "linked_ingredients",
+    label: "Ingredients & Tools",
+    type: "recipe_ingredients_tools",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -1457,8 +1516,28 @@ const recipesFields: FieldConfig[] = [
 
   // --- Nutrition Data ---
   {
+    key: "nutrition_per_100g",
+    label: "Macros per 100g",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Nutrition Data",
+    placeholder: 'JSON: { "calories": 250, "protein_g": 8, "carbohydrates_g": 30, "fats_g": 12, "fiber_g": 4, "sugar_g": 6, "sodium_mg": 120 }',
+  },
+  {
+    key: "nutrition_per_serving",
+    label: "Macros per Serving",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Nutrition Data",
+    placeholder: 'JSON: { "calories": 375, "protein_g": 12, "carbohydrates_g": 45, "fats_g": 18, "fiber_g": 6, "sugar_g": 9, "sodium_mg": 180 }',
+  },
+  {
     key: "elements_beneficial",
-    label: "Nutrition Data (Beneficial)",
+    label: "Micronutrients (Beneficial)",
     type: "nutrition_editor",
     showInDetail: true,
     showInEdit: true,
@@ -1780,11 +1859,22 @@ const productsFields: FieldConfig[] = [
     showInEdit: true,
     colSpan: 2,
     section: "Nutrition Data",
+    placeholder: 'JSON: { "calories": 250, "protein_g": 8, "carbohydrates_g": 30, "fats_g": 12, "fiber_g": 4, "sugar_g": 6, "sodium_mg": 120 }',
+  },
+  {
+    key: "nutrition_per_serving",
+    label: "Nutrition per Serving",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Nutrition Data",
+    placeholder: 'JSON: { "calories": 375, "protein_g": 12, "carbohydrates_g": 45, "fats_g": 18, "fiber_g": 6, "sugar_g": 9, "sodium_mg": 180 }',
   },
   {
     key: "elements_beneficial",
-    label: "Beneficial Elements",
-    type: "json",
+    label: "Micronutrients (Beneficial)",
+    type: "nutrition_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -1793,11 +1883,12 @@ const productsFields: FieldConfig[] = [
   {
     key: "elements_hazardous",
     label: "Hazardous Elements",
-    type: "json",
+    type: "nutrition_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Hazards & Risks",
+    linkedCategory: "hazardous",
   },
 
   // --- References & Meta ---
