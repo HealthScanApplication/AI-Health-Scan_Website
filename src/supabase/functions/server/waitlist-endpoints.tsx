@@ -1,3 +1,5 @@
+// @ts-nocheck
+// NOTE: Local reference copy only — deployed file is supabase/functions/make-server-ed0fe4c2/index.tsx
 import { createEmailService } from './email-service.tsx'
 import * as kv from './kv_store.tsx'
 import { googleSheetsService } from './google-sheets-service.tsx'

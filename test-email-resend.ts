@@ -2,6 +2,7 @@
  * Test script to verify email resend functionality
  * Run with: deno run --allow-net test-email-resend.ts
  */
+export {}; // make this a module to avoid global scope redeclaration errors
 
 const SUPABASE_PROJECT_ID = 'ljqlvvbktgiflkxywsld';
 const API_BASE_URL = `https://${SUPABASE_PROJECT_ID}.functions.supabase.co`;

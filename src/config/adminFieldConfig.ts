@@ -50,7 +50,19 @@ export interface FieldConfig {
     | "content_links"
     | "cooking_steps"
     | "cooking_tools"
-    | "recipe_ingredients_tools";
+    | "recipe_ingredients_tools"
+    | "drv_editor"
+    | "health_benefits_editor"
+    | "food_sources_editor"
+    | "food_strategy_editor"
+    | "thresholds_editor"
+    | "deficiency_ranges_editor"
+    | "excess_ranges_editor"
+    | "description_full_editor"
+    | "deficiency_editor"
+    | "interactions_editor"
+    | "references_editor"
+    | "element_sources_viewer";
   categoryTree?: Record<string, Record<string, string[]>>;
   linkedCategory?: "beneficial" | "hazardous" | "all";
   options?: string[];
@@ -292,14 +304,22 @@ const elementsFields: FieldConfig[] = [
       "amino acid",
       "fatty acid",
       "antioxidant",
-      "heavy metal",
-      "pesticide",
-      "preservative",
-      "endocrine disruptor",
-      "artificial_sweetener",
+      "natural toxin",
+      "antinutrient",
       "mycotoxin",
-      "processing_contaminant",
-      "solvent",
+      "heavy metal",
+      "environmental contaminant",
+      "pesticide",
+      "herbicide",
+      "insecticide",
+      "processing byproduct",
+      "food additive",
+      "preservative",
+      "artificial sweetener",
+      "veterinary drug",
+      "hormone",
+      "antibiotic",
+      "endocrine disruptor",
       "plasticizer",
     ],
   },
@@ -400,13 +420,11 @@ const elementsFields: FieldConfig[] = [
   {
     key: "health_benefits",
     label: "Health Benefits",
-    type: "json",
+    type: "health_benefits_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Functions & Benefits",
-    placeholder:
-      'JSON: { "optimal_health": [...], "beneficial_aspects": [...], "safety_considerations": [...] }',
   },
   {
     key: "risk_tags",
@@ -423,48 +441,42 @@ const elementsFields: FieldConfig[] = [
   {
     key: "thresholds",
     label: "Thresholds / Range",
-    type: "json",
+    type: "thresholds_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Thresholds & Range",
-    placeholder:
-      'JSON: { "deficient": {...}, "optimal": {...}, "excess": {...} }',
   },
   {
     key: "deficiency_ranges",
     label: "Deficiency Ranges",
-    type: "json",
+    type: "deficiency_ranges_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Thresholds & Range",
-    placeholder:
-      'JSON: { "unit": "ng/mL", "severe": { "below": 10, "label": "Severe deficiency" }, "moderate": { "below": 20 }, "mild": { "below": 30 } }',
   },
   {
     key: "excess_ranges",
     label: "Excess / Toxicity Ranges",
-    type: "json",
+    type: "excess_ranges_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Thresholds & Range",
-    placeholder:
-      'JSON: { "unit": "mg/day", "tolerable_ul": 2000, "mild_excess": { "above": 1000, "label": "Mild GI effects" }, "toxicity": { "above": 2000, "label": "Hypercalcemia risk" } }',
   },
 
   // --- DRV by Population ---
   {
     key: "drv_by_population",
     label: "DRV by Age / Gender / Pregnancy",
-    type: "json",
+    type: "drv_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "DRV by Population",
     placeholder:
-      'JSON: { "unit": "mg/day", "groups": [ { "group": "Infants 0–6 months", "age_range": "0–6m", "gender": "all", "rda": 200, "ul": null }, { "group": "Children 1–3 years", "age_range": "1–3y", "gender": "all", "rda": 700, "ul": 2500 }, { "group": "Adult male", "age_range": "19–50y", "gender": "male", "rda": 1000, "ul": 2500 }, { "group": "Adult female", "age_range": "19–50y", "gender": "female", "rda": 1000, "ul": 2500 }, { "group": "Pregnant", "age_range": "any", "gender": "female", "pregnant": true, "rda": 1300, "ul": 2500 }, { "group": "Lactating", "age_range": "any", "gender": "female", "lactating": true, "rda": 1300, "ul": 2500 }, { "group": "Elderly 70+", "age_range": "70+y", "gender": "all", "rda": 1200, "ul": 2000 } ] }'  ,
+      'JSON: { "unit": "mg/day", "groups": [ { "group": "Infants 0–6 months", "age_range": "0–6m", "gender": "all", "rda": 200, "ul": null }, { "group": "Children 1–3 years", "age_range": "1–3y", "gender": "all", "rda": 700, "ul": 2500 }, { "group": "Adult male", "age_range": "19–50y", "gender": "male", "rda": 1000, "ul": 2500 }, { "group": "Adult female", "age_range": "19–50y", "gender": "female", "rda": 1000, "ul": 2500 }, { "group": "Pregnant", "age_range": "any", "gender": "female", "pregnant": true, "rda": 1300, "ul": 2500 }, { "group": "Lactating", "age_range": "any", "gender": "female", "lactating": true, "rda": 1300, "ul": 2500 }, { "group": "Elderly 70+", "age_range": "70+y", "gender": "all", "rda": 1200, "ul": 2000 } ] }',
   },
 
   // --- Food Sources (Section A7 / B6) ---
@@ -481,24 +493,20 @@ const elementsFields: FieldConfig[] = [
   {
     key: "food_sources_detailed",
     label: "Top Food Sources",
-    type: "json",
+    type: "food_sources_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Food Sources",
-    placeholder:
-      'JSON array: [{ "name": "Beef liver", "amount": "9.00 mg / 100g" }, ...]',
   },
   {
     key: "food_strategy",
     label: "Food Strategy",
-    type: "json",
+    type: "food_strategy_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Food Sources",
-    placeholder:
-      'JSON: { "cards": [{ "title": "Animal Retinol", "subtitle": "fast-acting", "body": "..." }, ...] }',
   },
   {
     key: "reason",
@@ -516,7 +524,7 @@ const elementsFields: FieldConfig[] = [
   {
     key: "description_full",
     label: "Full Description Sections",
-    type: "json",
+    type: "description_full_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -529,7 +537,7 @@ const elementsFields: FieldConfig[] = [
   {
     key: "deficiency",
     label: "Deficiency Info",
-    type: "json",
+    type: "deficiency_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -542,7 +550,7 @@ const elementsFields: FieldConfig[] = [
   {
     key: "interactions",
     label: "Key Interactions",
-    type: "json",
+    type: "interactions_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -561,6 +569,17 @@ const elementsFields: FieldConfig[] = [
     colSpan: 2,
     section: "Detox & Exposure",
     placeholder: "Practical steps to reduce exposure (for hazardous elements)",
+  },
+
+  // --- Ingredients containing this element ---
+  {
+    key: "_element_sources",
+    label: "Ingredients Containing This Element",
+    type: "element_sources_viewer",
+    showInDetail: false,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Food Sources",
   },
 
   // --- Beneficial / Hazardous Elements ---
@@ -584,6 +603,45 @@ const elementsFields: FieldConfig[] = [
     linkedCategory: "hazardous",
   },
 
+  // --- Nutrient Key Mapping (links element to its key in elements_beneficial JSON) ---
+  {
+    key: "nutrient_key",
+    label: "Nutrient Key",
+    type: "text",
+    showInDetail: true,
+    showInEdit: true,
+    placeholder: "e.g. vitamin_c_mg, iron_mg, calcium_mg",
+    section: "Identity",
+  },
+  {
+    key: "nutrient_unit",
+    label: "Nutrient Unit",
+    type: "select",
+    showInDetail: true,
+    showInEdit: true,
+    section: "Identity",
+    options: ["mg", "mcg", "g", "IU", "nmol/L", "ppb", "ppm", "%"],
+  },
+  {
+    key: "nutrient_category",
+    label: "Nutrient Category",
+    type: "select",
+    showInDetail: true,
+    showInEdit: true,
+    section: "Identity",
+    options: [
+      "vitamins",
+      "minerals",
+      "amino acids",
+      "fatty acids",
+      "antioxidants",
+      "functional",
+      "digestive",
+      "macronutrients",
+      "hazardous",
+    ],
+  },
+
   // --- Scoring ---
   {
     key: "health_score",
@@ -599,7 +657,7 @@ const elementsFields: FieldConfig[] = [
   {
     key: "scientific_references",
     label: "Scientific References",
-    type: "json",
+    type: "references_editor",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -1105,20 +1163,29 @@ const ingredientsFields: FieldConfig[] = [
 
   // --- Nutrition Data ---
   {
-    key: "nutrition_per_100g",
-    label: "Macros per 100g",
-    type: "json",
+    key: "elements_beneficial",
+    label: "Micronutrients (Beneficial)",
+    type: "nutrition_editor",
+    linkedCategory: "beneficial",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Nutrition Data",
-    placeholder: 'JSON: { "calories": 354, "protein_g": 14, "carbohydrates_g": 64, "fats_g": 6, "fiber_g": 7, "sugar_g": 1, "sodium_mg": 7 }',
   },
   {
-    key: "elements_beneficial",
-    label: "Micronutrients (Beneficial)",
-    type: "nutrition_editor",
-    showInDetail: true,
+    key: "nutrition_per_100g",
+    label: "Nutrition per 100g (auto)",
+    type: "json",
+    showInDetail: false,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Nutrition Data",
+  },
+  {
+    key: "nutrition_per_serving",
+    label: "Nutrition per Serving (auto)",
+    type: "json",
+    showInDetail: false,
     showInEdit: true,
     colSpan: 2,
     section: "Nutrition Data",
@@ -1426,6 +1493,24 @@ const recipesFields: FieldConfig[] = [
   },
   // --- Ingredients & Steps ---
   {
+    key: "linked_ingredients",
+    label: "Linked Ingredients",
+    type: "array",
+    showInDetail: false,
+    showInEdit: false,
+    colSpan: 2,
+    section: "Ingredients & Steps",
+  },
+  {
+    key: "equipment",
+    label: "Equipment",
+    type: "cooking_tools",
+    showInDetail: false,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Ingredients & Steps",
+  },
+  {
     key: "ingredients",
     label: "Ingredients",
     type: "grouped_ingredients",
@@ -1497,30 +1582,29 @@ const recipesFields: FieldConfig[] = [
 
   // --- Nutrition Data ---
   {
-    key: "nutrition_per_100g",
-    label: "Macros per 100g",
-    type: "json",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Nutrition Data",
-    placeholder: 'JSON: { "calories": 250, "protein_g": 8, "carbohydrates_g": 30, "fats_g": 12, "fiber_g": 4, "sugar_g": 6, "sodium_mg": 120 }',
-  },
-  {
-    key: "nutrition_per_serving",
-    label: "Macros per Serving",
-    type: "json",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Nutrition Data",
-    placeholder: 'JSON: { "calories": 375, "protein_g": 12, "carbohydrates_g": 45, "fats_g": 18, "fiber_g": 6, "sugar_g": 9, "sodium_mg": 180 }',
-  },
-  {
     key: "elements_beneficial",
     label: "Micronutrients (Beneficial)",
     type: "nutrition_editor",
+    linkedCategory: "beneficial",
     showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Nutrition Data",
+  },
+  {
+    key: "nutrition_per_100g",
+    label: "Nutrition per 100g (auto)",
+    type: "json",
+    showInDetail: false,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Nutrition Data",
+  },
+  {
+    key: "nutrition_per_serving",
+    label: "Nutrition per Serving (auto)",
+    type: "json",
+    showInDetail: false,
     showInEdit: true,
     colSpan: 2,
     section: "Nutrition Data",
@@ -1607,14 +1691,6 @@ const productsFields: FieldConfig[] = [
     label: "Main Image",
     type: "image",
     showInList: true,
-    showInDetail: true,
-    showInEdit: true,
-    section: "Media",
-  },
-  {
-    key: "image_url_raw",
-    label: "Raw / Unpackaged",
-    type: "image",
     showInDetail: true,
     showInEdit: true,
     section: "Media",
@@ -1833,29 +1909,10 @@ const productsFields: FieldConfig[] = [
 
   // --- Nutrition Data ---
   {
-    key: "nutrition_per_100g",
-    label: "Nutrition per 100g",
-    type: "json",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Nutrition Data",
-    placeholder: 'JSON: { "calories": 250, "protein_g": 8, "carbohydrates_g": 30, "fats_g": 12, "fiber_g": 4, "sugar_g": 6, "sodium_mg": 120 }',
-  },
-  {
-    key: "nutrition_per_serving",
-    label: "Nutrition per Serving",
-    type: "json",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Nutrition Data",
-    placeholder: 'JSON: { "calories": 375, "protein_g": 12, "carbohydrates_g": 45, "fats_g": 18, "fiber_g": 6, "sugar_g": 9, "sodium_mg": 180 }',
-  },
-  {
     key: "elements_beneficial",
     label: "Micronutrients (Beneficial)",
     type: "nutrition_editor",
+    linkedCategory: "beneficial",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
@@ -2061,6 +2118,103 @@ const scansFields: FieldConfig[] = [
 
 /**
  * ============================================================
+ *  EQUIPMENT TAB
+ * ============================================================
+ */
+const equipmentFields: FieldConfig[] = [
+  {
+    key: "name",
+    label: "Name",
+    type: "text",
+    showInList: true,
+    showInDetail: true,
+    showInEdit: true,
+    required: true,
+    placeholder: "e.g. Chef's knife",
+    colSpan: 2,
+  },
+  {
+    key: "category",
+    label: "Category",
+    type: "select",
+    showInList: true,
+    showInDetail: true,
+    showInEdit: true,
+    options: [
+      "Cutting",
+      "Cookware",
+      "Baking",
+      "Prep",
+      "Utensils",
+      "Measuring",
+      "Appliances",
+      "Fitness",
+      "Other",
+    ],
+  },
+  {
+    key: "description",
+    label: "Description",
+    type: "textarea",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "What it is and how it's used",
+  },
+  {
+    key: "image_url",
+    label: "Image",
+    type: "image",
+    showInList: true,
+    showInDetail: true,
+    showInEdit: true,
+  },
+  {
+    key: "brand",
+    label: "Brand",
+    type: "text",
+    showInDetail: true,
+    showInEdit: true,
+    placeholder: "e.g. Victorinox",
+  },
+  {
+    key: "material",
+    label: "Material",
+    type: "text",
+    showInDetail: true,
+    showInEdit: true,
+    placeholder: "e.g. Stainless steel",
+  },
+  {
+    key: "size_notes",
+    label: "Size / Notes",
+    type: "text",
+    showInDetail: true,
+    showInEdit: true,
+    placeholder: "e.g. 8-inch blade",
+  },
+  {
+    key: "use_case",
+    label: "Use Case",
+    type: "select",
+    showInDetail: true,
+    showInEdit: true,
+    options: ["Cooking", "Baking", "Fitness", "General"],
+  },
+  {
+    key: "affiliate_url",
+    label: "Affiliate / Buy Link",
+    type: "text",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "https://...",
+  },
+  { key: "created_at", label: "Created", type: "date", showInDetail: true },
+];
+
+/**
+ * ============================================================
  *  MASTER CONFIG - exported for use in SimplifiedAdminPanel
  * ============================================================
  */
@@ -2102,6 +2256,13 @@ export const adminFieldConfig: Record<string, TabFieldConfig> = {
     label: "Scan",
     nameField: "name",
     fields: scansFields,
+  },
+  equipment: {
+    tabId: "equipment",
+    label: "Equipment",
+    nameField: "name",
+    secondaryField: "category",
+    fields: equipmentFields,
   },
 };
 

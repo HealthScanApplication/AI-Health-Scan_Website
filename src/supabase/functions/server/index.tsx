@@ -1,3 +1,5 @@
+// @ts-nocheck
+// NOTE: Local reference copy only — deployed file is supabase/functions/make-server-ed0fe4c2/index.tsx
 import { Hono } from 'npm:hono'
 import { cors } from 'npm:hono/cors'
 import { logger } from 'npm:hono/logger'

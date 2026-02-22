@@ -32,6 +32,8 @@ import {
   ImageIcon,
   Film,
   Plus,
+  Download,
+  Wrench,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -74,6 +76,49 @@ interface AdminRecord {
 interface SimplifiedAdminPanelProps {
   accessToken: string;
   user: any;
+}
+
+// Minimal MD5 implementation for Gravatar hashing
+function md5(str: string): string {
+  const rotl = (x: number, n: number) => (x << n) | (x >>> (32 - n));
+  const add = (x: number, y: number) => (x + y) | 0;
+  const F = (x: number, y: number, z: number) => (x & y) | (~x & z);
+  const G = (x: number, y: number, z: number) => (x & z) | (y & ~z);
+  const H = (x: number, y: number, z: number) => x ^ y ^ z;
+  const I = (x: number, y: number, z: number) => y ^ (x | ~z);
+  const T = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 0x100000000) | 0);
+  const S = [[7,12,17,22],[5,9,14,20],[4,11,16,23],[6,10,15,21]];
+  const bytes: number[] = [];
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    if (c < 128) bytes.push(c);
+    else if (c < 2048) { bytes.push((c >> 6) | 192); bytes.push((c & 63) | 128); }
+    else { bytes.push((c >> 12) | 224); bytes.push(((c >> 6) & 63) | 128); bytes.push((c & 63) | 128); }
+  }
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  for (let i = 0; i < 8; i++) bytes.push(i < 4 ? (bitLen >>> (i * 8)) & 0xff : 0);
+  let [a, b, c, d] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+  for (let i = 0; i < bytes.length; i += 64) {
+    const M = Array.from({ length: 16 }, (_, j) =>
+      bytes[i + j*4] | (bytes[i + j*4+1] << 8) | (bytes[i + j*4+2] << 16) | (bytes[i + j*4+3] << 24));
+    let [aa, bb, cc, dd] = [a, b, c, d];
+    for (let j = 0; j < 64; j++) {
+      let fn: number, g: number;
+      if (j < 16)      { fn = F(bb, cc, dd); g = j; }
+      else if (j < 32) { fn = G(bb, cc, dd); g = (5*j + 1) % 16; }
+      else if (j < 48) { fn = H(bb, cc, dd); g = (3*j + 5) % 16; }
+      else             { fn = I(bb, cc, dd); g = (7*j) % 16; }
+      const temp = dd; dd = cc; cc = bb;
+      bb = add(bb, rotl(add(add(aa, fn), add(M[g], T[j])), S[Math.floor(j/16)][j%4]));
+      aa = temp;
+    }
+    a = add(a, aa); b = add(b, bb); c = add(c, cc); d = add(d, dd);
+  }
+  return [a, b, c, d].map(v =>
+    Array.from({ length: 4 }, (_, i) => ((v >>> (i * 8)) & 0xff).toString(16).padStart(2, '0')).join('')
+  ).join('');
 }
 
 // Country code to flag emoji
@@ -128,8 +173,8 @@ function screenshotUrl(url: string) {
   return `https://image.thum.io/get/width/600/crop/400/${url}`;
 }
 
-// A single cooking step: { text: string, image_url?: string }
-type CookingStep = { text: string; image_url?: string };
+// A single cooking step: { text: string, image_url?: string, ingredient_ids?: string[] }
+type CookingStep = { text: string; image_url?: string; ingredient_ids?: string[] };
 
 // Common cooking tools for suggestions
 const COMMON_COOKING_TOOLS: { name: string; category: string }[] = [
@@ -164,10 +209,70 @@ const COMMON_COOKING_TOOLS: { name: string; category: string }[] = [
   { name: 'Garlic press', category: 'Prep' },
 ];
 
+// ─── Shared CatalogItemTag ─────────────────────────────────────────────────
+// Reusable image+text tag used for ingredients, equipment, and step mentions
+function CatalogItemTag({
+  name, imageUrl, fallbackColor = 'emerald', onRemove,
+}: {
+  name: string; imageUrl?: string; fallbackColor?: 'emerald' | 'orange' | 'blue';
+  onRemove?: () => void;
+}) {
+  const colors: Record<string, string> = {
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+    orange: 'bg-orange-50 border-orange-200 text-orangeald-900',
+    blue: 'bg-blue-50 border-blue-200 text-blue-900',
+  };
+  const fallbackBg: Record<string, string> = {
+    emerald: 'bg-emerald-200 text-emerald-700',
+    orange: 'bg-orange-200 text-orange-700',
+    blue: 'bg-blue-200 text-blue-700',
+  };
+  return (
+    <span className={`flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl border text-xs font-medium shadow-sm ${colors[fallbackColor]}`}>
+      {imageUrl ? (
+        <img src={imageUrl} alt="" className="w-6 h-6 rounded-lg object-cover flex-shrink-0" />
+      ) : (
+        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${fallbackBg[fallbackColor]}`}>
+          {name[0]?.toUpperCase() || '?'}
+        </span>
+      )}
+      <span className="truncate max-w-[100px]">{name}</span>
+      {onRemove && (
+        <button type="button" onClick={onRemove} className="text-gray-400 hover:text-red-600 ml-0.5 font-bold leading-none flex-shrink-0">&times;</button>
+      )}
+    </span>
+  );
+}
+
 // ─── CookingToolsField ─────────────────────────────────────────────────────
-function CookingToolsField({ val, updateField }: { val: any; updateField: (v: any) => void }) {
+type EquipmentRecord = { id: string; name: string; category?: string; image_url?: string };
+
+function CookingToolsField({ val, updateField, accessToken, onAiEnrich, enriching }: { val: any; updateField: (v: any) => void; accessToken?: string; onAiEnrich?: () => void; enriching?: boolean }) {
   const tools: string[] = Array.isArray(val) ? val : [];
   const [search, setSearch] = React.useState('');
+  const [catalogEquipment, setCatalogEquipment] = React.useState<EquipmentRecord[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = React.useState(false);
+
+  // Load catalog_equipment on mount — try edge function first, fallback to REST
+  React.useEffect(() => {
+    if (!accessToken) return;
+    setLoadingCatalog(true);
+    const metaEnv = (import.meta as any).env || {};
+    const restUrl = `${metaEnv.VITE_SUPABASE_URL || `https://${projectId}.supabase.co`}/rest/v1/catalog_equipment?select=id,name,category,image_url&limit=500&order=category,name`;
+    fetch(restUrl, {
+      headers: {
+        'apikey': metaEnv.VITE_SUPABASE_ANON_KEY || '',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d) && d.length > 0) setCatalogEquipment(d); })
+      .catch(() => {})
+      .finally(() => setLoadingCatalog(false));
+  }, [accessToken]);
+
+  // Always use catalog_equipment table — no hardcoded fallback
+  const catalogList: EquipmentRecord[] = catalogEquipment;
 
   const addTool = (name: string) => {
     if (!tools.includes(name)) updateField([...tools, name]);
@@ -178,33 +283,39 @@ function CookingToolsField({ val, updateField }: { val: any; updateField: (v: an
     if (t && !tools.includes(t)) { updateField([...tools, t]); setSearch(''); }
   };
 
-  const filtered = COMMON_COOKING_TOOLS.filter(t =>
+  const filtered = catalogList.filter(t =>
     !tools.includes(t.name) &&
-    (!search || t.name.toLowerCase().includes(search.toLowerCase()))
+    (!search || t.name.toLowerCase().includes(search.toLowerCase()) || (t.category || '').toLowerCase().includes(search.toLowerCase()))
   );
-  const categories = [...new Set(filtered.map(t => t.category))];
+  const categories = [...new Set(filtered.map(t => t.category || 'Other'))];
+
+  // Find catalog record for a tool name (for image lookup)
+  const getCatalogRecord = (name: string) => catalogList.find(e => e.name === name);
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Equipment / Tools</Label>
-      {/* Selected tools */}
-      {tools.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {tools.map(t => (
-            <span key={t} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 border border-orange-200 text-orange-800 font-medium">
-              {t}
-              <button type="button" onClick={() => removeTool(t)} className="text-orange-400 hover:text-orange-700 ml-0.5 font-bold">&times;</button>
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="flex items-center justify-between gap-1">
+        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          🔧 Equipment
+          {loadingCatalog && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-gray-400" />}
+          {tools.length > 0 && <span className="ml-1.5 text-[10px] font-light italic text-gray-400 normal-case tracking-normal">{tools.length} selected</span>}
+        </Label>
+        {onAiEnrich && (
+          <button type="button" onClick={onAiEnrich} disabled={enriching}
+            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 disabled:opacity-50 transition-colors flex-shrink-0">
+            {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {enriching ? '…' : 'AI Enrich'}
+          </button>
+        )}
+      </div>
+
       {/* Search / add custom */}
       <div className="flex gap-1.5">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustom())}
-          placeholder="Search or type a tool..."
+          placeholder="Search equipment catalog..."
           className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
         {search.trim() && (
@@ -214,24 +325,96 @@ function CookingToolsField({ val, updateField }: { val: any; updateField: (v: an
           </button>
         )}
       </div>
-      {/* Suggestions grouped by category */}
-      <div className="border border-gray-100 rounded-lg bg-gray-50 p-2 max-h-44 overflow-y-auto space-y-2">
-        {categories.length === 0 ? (
-          <p className="text-[10px] text-gray-400 italic text-center py-1">All common tools added</p>
-        ) : categories.map(cat => (
-          <div key={cat}>
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">{cat}</p>
-            <div className="flex flex-wrap gap-1">
-              {filtered.filter(t => t.category === cat).map(t => (
-                <button key={t.name} type="button" onClick={() => addTool(t.name)}
-                  className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700 transition-colors">
-                  {t.name}
-                </button>
-              ))}
-            </div>
+
+      {/* Catalog — tag cloud with images grouped by category */}
+      <div className="border border-gray-100 rounded-lg bg-white max-h-96 overflow-y-auto p-3">
+        {loadingCatalog ? (
+          <div className="flex items-center justify-center gap-2 py-3 text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-[10px]">Loading equipment catalog...</span>
           </div>
-        ))}
+        ) : catalogList.length === 0 ? (
+          <p className="text-[10px] text-gray-400 italic text-center py-2">No equipment in catalog yet. Add items to the catalog_equipment table.</p>
+        ) : (() => {
+          const visible = catalogList.filter(t => !search || t.name.toLowerCase().includes(search.toLowerCase()) || (t.category || '').toLowerCase().includes(search.toLowerCase()));
+          if (visible.length === 0) return <p className="text-[10px] text-gray-400 italic text-center py-1">No matches for "{search}"</p>;
+          const cats = [...new Set(visible.map(t => t.category || 'Other'))];
+          return (
+            <div className="space-y-4">
+              {cats.map(cat => {
+                const catItems = visible.filter(t => (t.category || 'Other') === cat);
+                if (catItems.length === 0) return null;
+                return (
+                  <div key={cat} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{cat}</p>
+                      <div className="flex-1 h-px bg-gray-200"></div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {catItems.map(t => {
+                        const isSelected = tools.includes(t.name);
+                        return (
+                          <button key={t.id} type="button"
+                            onClick={() => isSelected ? removeTool(t.name) : addTool(t.name)}
+                            className={`group relative flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all ${
+                              isSelected
+                                ? 'bg-orange-100 border-2 border-orange-400 shadow-md'
+                                : 'bg-gray-50 border border-gray-200 hover:border-orange-300 hover:shadow-sm'
+                            }`}
+                            style={{ width: '80px' }}>
+                            <div className="relative">
+                              {t.image_url ? (
+                                <img src={t.image_url} alt="" className="w-12 h-12 rounded-lg object-cover border border-gray-300" />
+                              ) : (
+                                <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center border border-orange-200">
+                                  <Wrench className="w-6 h-6 text-orange-500" />
+                                </div>
+                              )}
+                              {isSelected && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-orange-500 border-2 border-white flex items-center justify-center shadow-sm">
+                                  <span className="text-[10px] font-bold text-white">✓</span>
+                                </div>
+                              )}
+                            </div>
+                            <span className={`text-[9px] font-medium text-center leading-tight line-clamp-2 ${
+                              isSelected ? 'text-orange-900' : 'text-gray-700'
+                            }`}>{t.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
+
+      {/* Selected tools summary — image + text tags below the catalog */}
+      {tools.length > 0 && (
+        <div className="pt-1 border-t border-gray-100">
+          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Selected</p>
+          <div className="flex flex-wrap gap-2">
+            {tools.map(t => {
+              const eq = getCatalogRecord(t);
+              return (
+                <span key={t} className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl border bg-orange-50 border-orange-200 text-orange-900 text-xs font-medium shadow-sm">
+                  {eq?.image_url ? (
+                    <img src={eq.image_url} alt="" className="w-6 h-6 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <span className="w-6 h-6 rounded-lg bg-orange-200 flex items-center justify-center flex-shrink-0">
+                      <Wrench className="w-3 h-3 text-orange-600" />
+                    </span>
+                  )}
+                  {t}
+                  <button type="button" onClick={() => removeTool(t)} className="text-orange-400 hover:text-red-600 ml-0.5 font-bold leading-none">&times;</button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -242,6 +425,7 @@ function RecipeIngredientsToolsField({
   linkedIngredientsVal, toolsVal,
   updateLinkedIngredients, updateTools,
   ingredientsCache, ingredientSearchQuery, setIngredientSearchQuery,
+  accessToken,
 }: {
   linkedIngredientsVal: any;
   toolsVal: any;
@@ -250,6 +434,7 @@ function RecipeIngredientsToolsField({
   ingredientsCache: any[];
   ingredientSearchQuery: string;
   setIngredientSearchQuery: (v: string) => void;
+  accessToken?: string;
 }) {
   const linkedIds: string[] = Array.isArray(linkedIngredientsVal) ? linkedIngredientsVal : [];
   const linkedIngredients = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
@@ -291,6 +476,7 @@ function RecipeIngredientsToolsField({
         <input
           value={ingredientSearchQuery}
           onChange={(e) => setIngredientSearchQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
           placeholder="Search ingredients to link..."
           className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
         />
@@ -318,7 +504,7 @@ function RecipeIngredientsToolsField({
       </div>
 
       {/* RIGHT: Tools */}
-      <CookingToolsField val={toolsVal} updateField={updateTools} />
+      <CookingToolsField val={toolsVal} updateField={updateTools} accessToken={accessToken} />
     </div>
   );
 }
@@ -333,18 +519,22 @@ const INGREDIENT_IMAGE_KEYS: { key: string; label: string }[] = [
   { key: 'image_url_powdered', label: 'Powdered' },
 ];
 
-function CookingStepsField({ val, updateField, accessToken, linkedIngredients, recordData }: {
+function CookingStepsField({ val, updateField, accessToken, linkedIngredients, allIngredients, recordData, catalogEquipment }: {
   val: any;
   updateField: (v: any) => void;
   accessToken: string;
   linkedIngredients: any[];
+  allIngredients: any[];
   recordData: any;
+  catalogEquipment?: EquipmentRecord[];
 }) {
   const steps: CookingStep[] = React.useMemo(() => {
     if (!val) return [];
     if (Array.isArray(val)) {
       return val.map((s: any) =>
-        typeof s === 'string' ? { text: s, image_url: '' } : { text: s.text || '', image_url: s.image_url || '' }
+        typeof s === 'string'
+          ? { text: s, image_url: '', ingredient_ids: [] }
+          : { text: s.text || '', image_url: s.image_url || '', ingredient_ids: Array.isArray(s.ingredient_ids) ? s.ingredient_ids : [] }
       );
     }
     return [];
@@ -356,10 +546,25 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
   const [pickerIdx, setPickerIdx] = React.useState<number | null>(null);
   const [generatingSteps, setGeneratingSteps] = React.useState(false);
   const [customImageIdx, setCustomImageIdx] = React.useState<Set<number>>(new Set());
+  const [linkIngredientIdx, setLinkIngredientIdx] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     setPreviewServings(Number(recordData?.servings) || 4);
   }, [recordData?.servings]);
+
+  // Auto-assign images to steps that have no image when ingredients/equipment become available
+  React.useEffect(() => {
+    if (!steps.length || (allIngredients.length === 0 && linkedIngredients.length === 0 && (!catalogEquipment || catalogEquipment.length === 0))) return;
+    const hasUnimaged = steps.some((s, i) => !s.image_url && !customImageIdx.has(i) && s.text);
+    if (!hasUnimaged) return;
+    const nx = steps.map((s, i) => {
+      if (s.image_url || customImageIdx.has(i) || !s.text) return s;
+      const img = getAutoImage(s.text);
+      return img ? { ...s, image_url: img } : s;
+    });
+    const changed = nx.some((s, i) => s.image_url !== steps[i].image_url);
+    if (changed) updateField(nx);
+  }, [linkedIngredients, allIngredients, catalogEquipment]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scaleStepText = React.useCallback((text: string): string => {
     if (!text || previewServings === baseServings) return text;
@@ -380,22 +585,46 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
   }, [previewServings, baseServings]);
 
   const getAutoImage = React.useCallback((text: string): string => {
-    if (!text || linkedIngredients.length === 0) return '';
-    const lower = text.toLowerCase();
-    const mentioned = linkedIngredients.filter((ing: any) => { const n = (ing.name_common || ing.name || '').toLowerCase(); return n.length > 2 && lower.includes(n); });
-    if (!mentioned.length) return '';
-    const f = mentioned[0];
-    if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) return f.image_url_cut;
-    if ((lower.includes('cube')||lower.includes('dice')) && f.image_url_cubed) return f.image_url_cubed;
-    if ((lower.includes('cook')||lower.includes('sauté')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) return f.image_url_cooked;
-    if (lower.includes('powder') && f.image_url_powdered) return f.image_url_powdered;
-    return f.image_url || '';
-  }, [linkedIngredients]);
+    const lower = (text || '').toLowerCase();
+    // Search pool: prefer linkedIngredients, fall back to allIngredients
+    const pool = linkedIngredients.length > 0 ? linkedIngredients : allIngredients;
+    // 1. Try ingredient mentioned by name in the step text
+    if (pool.length > 0) {
+      const mentioned = pool.filter((ing: any) => { const n = (ing.name_common || ing.name || '').toLowerCase(); return n.length > 2 && lower.includes(n); });
+      if (mentioned.length > 0) {
+        const f = mentioned[0];
+        if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) return f.image_url_cut;
+        if ((lower.includes('cube')||lower.includes('dice')) && f.image_url_cubed) return f.image_url_cubed;
+        if ((lower.includes('cook')||lower.includes('sauté')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) return f.image_url_cooked;
+        if (lower.includes('powder') && f.image_url_powdered) return f.image_url_powdered;
+        if (f.image_url) return f.image_url;
+      }
+    }
+    // 2. Equipment mentioned by name in the step text
+    if (catalogEquipment && catalogEquipment.length > 0) {
+      const eq = catalogEquipment.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
+      if (eq?.image_url) return eq.image_url;
+    }
+    // 3. Fallback: first ingredient in pool with any image
+    if (pool.length > 0) {
+      const first = pool.find((ing: any) => ing.image_url);
+      if (first?.image_url) return first.image_url;
+    }
+    // 4. Fallback: first equipment item with an image
+    if (catalogEquipment && catalogEquipment.length > 0) {
+      const first = catalogEquipment.find(e => e.image_url);
+      if (first?.image_url) return first.image_url;
+    }
+    // 5. Ultimate fallback: cooking placeholder
+    return '';
+  }, [linkedIngredients, allIngredients, catalogEquipment]);
 
   const getMentionedIngredients = (text: string) => {
-    if (!text || !linkedIngredients.length) return [];
+    // Search ALL ingredients (not just linked) so steps always show matching ingredients
+    const pool = linkedIngredients.length > 0 ? linkedIngredients : allIngredients;
+    if (!text || !pool.length) return [];
     const lower = text.toLowerCase();
-    return linkedIngredients.filter((ing: any) => { const n = (ing.name_common || ing.name || '').toLowerCase(); return n.length > 2 && lower.includes(n); });
+    return pool.filter((ing: any) => { const n = (ing.name_common || ing.name || '').toLowerCase(); return n.length > 2 && lower.includes(n); });
   };
 
   const getMentionedTools = (text: string): string[] => {
@@ -413,6 +642,12 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
     const nx = [...steps];
     const autoImg = !customImageIdx.has(i) ? getAutoImage(text) : '';
     nx[i] = { ...nx[i], text, image_url: autoImg || nx[i].image_url || '' };
+    update(nx);
+  };
+  const toggleStepIngredient = (stepIdx: number, ingId: string) => {
+    const nx = [...steps];
+    const cur: string[] = nx[stepIdx].ingredient_ids || [];
+    nx[stepIdx] = { ...nx[stepIdx], ingredient_ids: cur.includes(ingId) ? cur.filter(id => id !== ingId) : [...cur, ingId] };
     update(nx);
   };
   const setStepImage = (i: number, image_url: string, isCustom = true) => {
@@ -474,12 +709,12 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
-        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cooking Instructions</Label>
+        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">🍳 Cooking Steps</Label>
         <div className="flex items-center gap-1.5">
           <button type="button" onClick={handleAiGenerateSteps} disabled={generatingSteps}
-            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 text-purple-700 hover:from-purple-100 hover:to-indigo-100 disabled:opacity-50 transition-all">
-            {generatingSteps ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-            {generatingSteps ? 'Generating...' : 'AI Generate'}
+            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 disabled:opacity-50 transition-colors">
+            {generatingSteps ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {generatingSteps ? '…' : 'AI Enrich'}
           </button>
           <button type="button" onClick={addStep}
             className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
@@ -518,21 +753,25 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
 
       <div className="space-y-3">
         {steps.map((step, i) => {
-          const mentioned = getMentionedIngredients(step.text);
+          const mentionedByText = getMentionedIngredients(step.text);
+          const pinnedIds: string[] = step.ingredient_ids || [];
+          const pinnedIngs = linkedIngredients.filter((ing: any) => pinnedIds.includes(ing.id) && !mentionedByText.find((m: any) => m.id === ing.id));
+          const mentioned = [...mentionedByText, ...pinnedIngs];
           const mentionedTools = getMentionedTools(step.text);
           const isPickerOpen = pickerIdx === i;
+          const isLinkOpen = linkIngredientIdx === i;
           const isCustomImg = customImageIdx.has(i);
-          const displayImg = step.image_url || '';
+          const displayImg = step.image_url || getAutoImage(step.text);
 
           return (
-            <div key={i} className="rounded-xl border border-gray-200 bg-gray-50/60 overflow-hidden">
-              {/* Step header */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-gray-100">
-                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
-                <span className="text-xs text-gray-700 flex-1 truncate">{step.text ? step.text.slice(0, 80) + (step.text.length > 80 ? '…' : '') : <span className="text-gray-400 italic">Step {i + 1}</span>}</span>
+            <div key={i} className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+              {/* Step controls bar */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                <span className="flex-1" />
                 {isCustomImg && (
                   <button type="button" onClick={() => clearCustomImage(i)}
-                    className="text-[10px] text-gray-400 hover:text-amber-600 px-1.5 py-0.5 rounded bg-gray-100 hover:bg-amber-50 transition-colors" title="Reset to auto image">
+                    className="text-[9px] text-gray-400 hover:text-amber-600 px-1.5 py-0.5 rounded bg-white border border-gray-200 hover:bg-amber-50 transition-colors" title="Reset to auto image">
                     ↺ auto
                   </button>
                 )}
@@ -544,100 +783,125 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-0.5 rounded" title="Move down">
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
+                <button type="button" onClick={() => setLinkIngredientIdx(isLinkOpen ? null : i)}
+                  className={`flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded border transition-colors ${isLinkOpen ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'bg-white border-gray-200 text-gray-400 hover:text-emerald-600 hover:border-emerald-300'}`}
+                  title="Link ingredients to this step">
+                  {'🥗'} {pinnedIds.length > 0 ? pinnedIds.length : '+'}
+                </button>
                 <button type="button" onClick={() => removeStep(i)}
                   className="text-red-400 hover:text-red-600 p-0.5 rounded hover:bg-red-50 transition-colors text-sm font-bold">&times;</button>
               </div>
 
-              {/* Main body: image LEFT + text RIGHT */}
-              <div className="p-3 flex gap-3">
-                {/* LEFT: step image (drag-drop zone) */}
-                <div className="flex-shrink-0 space-y-1">
-                  <div
-                    className={`relative w-24 h-24 rounded-xl border-2 border-dashed bg-white flex items-center justify-center cursor-pointer overflow-hidden transition-colors ${isPickerOpen ? 'border-blue-400' : 'border-gray-200 hover:border-blue-300'}`}
-                    onClick={() => setPickerIdx(isPickerOpen ? null : i)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => handleDrop(i, e)}
-                    title="Click to pick or drag an image here"
-                  >
-                    {displayImg ? (
-                      <>
-                        <img src={displayImg} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/0 hover:bg-black/25 transition-colors flex items-end justify-center pb-1">
-                          <span className="opacity-0 hover:opacity-100 text-[8px] text-white bg-black/50 px-1.5 rounded">change</span>
-                        </div>
-                        {isCustomImg && <span className="absolute top-1 right-1 w-3 h-3 rounded-full bg-blue-500 border border-white" title="Custom image" />}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center text-gray-300 gap-0.5">
-                        <ImageIcon className="w-5 h-5" />
-                        <span className="text-[8px] text-center leading-tight">Drop or<br/>click</span>
-                      </div>
-                    )}
-                    {uploadingIdx === i && (
-                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+              {/* Main body: instruction text LEFT | HERO IMAGE right */}
+              <div className="flex gap-0">
+                {/* LEFT column: instruction text + tags below */}
+                <div className="flex-1 min-w-0 flex flex-col">
+                  {/* Instruction textarea + scaled preview */}
+                  <div className="flex-1 p-3 space-y-2">
+                    <textarea
+                      value={step.text}
+                      onChange={(e) => updateText(i, e.target.value)}
+                      placeholder={`Step ${i + 1}: e.g. "Heat 15 ml olive oil in a large wok over medium-high for 30–60 sec."`}
+                      rows={3}
+                      className={inputCls}
+                    />
+                    {previewServings !== baseServings && step.text && (
+                      <div className="rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1.5">
+                        <p className="text-[9px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Preview ({previewServings} srv)</p>
+                        <p className="text-xs text-amber-900 leading-relaxed">{scaleStepText(step.text)}</p>
                       </div>
                     )}
                   </div>
-                  <label className="block text-center text-[9px] text-blue-600 hover:text-blue-800 cursor-pointer font-medium leading-tight">
-                    Upload
+
+                  {/* Ingredient + equipment tags — below the text, inside left column */}
+                  <div className="px-3 pb-3 pt-0 flex flex-wrap gap-1.5 border-t border-gray-100">
+                    {mentioned.length === 0 && mentionedTools.length === 0 && step.text && (
+                      <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">⚠ No ingredients detected in step text</span>
+                    )}
+                    {mentioned.map((ing: any) => (
+                      <CatalogItemTag
+                        key={ing.id}
+                        name={ing.name_common || ing.name || ''}
+                        imageUrl={ing.image_url}
+                        fallbackColor="emerald"
+                      />
+                    ))}
+                    {mentionedTools.map((t: string) => {
+                      const eqRecord = catalogEquipment?.find(e => e.name === t);
+                      return (
+                        <CatalogItemTag
+                          key={t}
+                          name={t}
+                          imageUrl={eqRecord?.image_url}
+                          fallbackColor="orange"
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* RIGHT: hero image — full height of card body */}
+                <div
+                  className={`relative flex-shrink-0 w-32 self-stretch cursor-pointer overflow-hidden ${displayImg ? 'bg-gray-50' : 'bg-gradient-to-b from-blue-50 to-blue-100 border-l-2 border-blue-200'} ${isPickerOpen ? 'ring-2 ring-inset ring-blue-400' : ''}`}
+                  style={{ minHeight: '110px' }}
+                  onClick={() => setPickerIdx(isPickerOpen ? null : i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => handleDrop(i, e)}
+                  title="Click to pick or drag an image"
+                >
+                  {displayImg ? (
+                    <>
+                      <img src={displayImg} alt="" className="w-full h-full object-cover absolute inset-0" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                      {isCustomImg && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-blue-500 border border-white" title="Custom image" />}
+                      <span className="absolute bottom-1 left-0 right-0 text-center text-[8px] text-white/80 font-medium">change</span>
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-400 gap-1.5">
+                      <ImageIcon className="w-7 h-7" />
+                      <span className="text-[9px] text-center leading-tight px-1 font-bold">Pick image</span>
+                      <span className="text-[7px] text-center text-blue-300">click or drop</span>
+                    </div>
+                  )}
+                  {uploadingIdx === i && (
+                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    </div>
+                  )}
+                  <label className="absolute bottom-0 left-0 right-0 h-5 cursor-pointer opacity-0" title="Upload image">
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(i, f); }} />
                   </label>
                 </div>
-
-                {/* RIGHT: textarea + scaled preview */}
-                <div className="flex-1 space-y-2 min-w-0">
-                  <textarea
-                    value={step.text}
-                    onChange={(e) => updateText(i, e.target.value)}
-                    placeholder={`Step ${i + 1}: e.g. "Heat 15 ml olive oil in a large wok over medium-high for 30–60 sec."`}
-                    rows={3}
-                    className={inputCls}
-                  />
-                  {previewServings !== baseServings && step.text && (
-                    <div className="rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1.5">
-                      <p className="text-[9px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Preview ({previewServings} servings)</p>
-                      <p className="text-xs text-amber-900 leading-relaxed">{scaleStepText(step.text)}</p>
-                    </div>
-                  )}
-                </div>
               </div>
 
-              {/* Below text: ingredient thumbnails + tool chips */}
-              {(mentioned.length > 0 || mentionedTools.length > 0) && (
-                <div className="px-3 pb-3 space-y-2">
-                  {mentioned.length > 0 && (
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Ingredients in this step</p>
-                      <div className="flex flex-wrap gap-2">
-                        {mentioned.map((ing: any) => (
-                          <div key={ing.id} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1">
+              {/* Ingredient link panel */}
+              {isLinkOpen && (
+                <div className="border-t border-emerald-100 bg-emerald-50/40 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">Link ingredients to this step</p>
+                    <button type="button" onClick={() => setLinkIngredientIdx(null)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+                  </div>
+                  {linkedIngredients.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No linked ingredients — link ingredients in col 2 first.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {linkedIngredients.map((ing: any) => {
+                        const isPinned = pinnedIds.includes(ing.id);
+                        return (
+                          <button key={ing.id} type="button" onClick={() => toggleStepIngredient(i, ing.id)}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${isPinned ? 'bg-emerald-100 border-emerald-400 text-emerald-800' : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-700'}`}>
                             {ing.image_url ? (
-                              <img src={ing.image_url} alt="" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
+                              <img src={ing.image_url} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
                             ) : (
-                              <div className="w-6 h-6 rounded-md bg-emerald-200 flex items-center justify-center text-[9px] font-bold text-emerald-700 flex-shrink-0">
+                              <span className="w-4 h-4 rounded bg-emerald-200 text-emerald-700 text-[8px] font-bold flex items-center justify-center flex-shrink-0">
                                 {(ing.name_common || ing.name || '?')[0].toUpperCase()}
-                              </div>
+                              </span>
                             )}
-                            <span className="text-[10px] font-semibold text-emerald-800">{ing.name_common || ing.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {mentionedTools.length > 0 && (
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Tools needed</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {mentionedTools.map((t: string) => {
-                          const toolDef = COMMON_COOKING_TOOLS.find(ct => ct.name === t);
-                          return (
-                            <span key={t} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 font-medium">
-                              {t}
-                            </span>
-                          );
-                        })}
-                      </div>
+                            {ing.name_common || ing.name}
+                            {isPinned && <span className="text-emerald-500 font-bold leading-none">✓</span>}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -647,33 +911,73 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, r
               {isPickerOpen && (
                 <div className="border-t border-gray-100 bg-white p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Pick from linked ingredients</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Pick from ingredients & equipment</p>
                     <button type="button" onClick={() => setPickerIdx(null)} className="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
                   </div>
-                  {linkedIngredients.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">No linked ingredients — link ingredients first.</p>
-                  ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {linkedIngredients.map((ing: any) => {
-                        const images = INGREDIENT_IMAGE_KEYS.map(k => ({ label: k.label, url: ing[k.key] })).filter(x => x.url);
-                        if (!images.length) return null;
-                        return (
-                          <div key={ing.id}>
-                            <p className="text-[10px] font-semibold text-gray-500 mb-1">{ing.name_common || ing.name}</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {images.map(({ label, url }) => (
-                                <button key={url} type="button" onClick={() => setStepImage(i, url, true)}
-                                  className="relative rounded-md overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all" title={label}>
-                                  <img src={url} alt={label} className="w-14 h-12 object-cover" />
-                                  <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/50 text-white py-0.5 truncate">{label}</span>
-                                </button>
-                              ))}
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {/* Mentioned ingredients (from step text) */}
+                    {(() => {
+                      const mentionedInPicker = getMentionedIngredients(step.text);
+                      const otherPool = (linkedIngredients.length > 0 ? linkedIngredients : allIngredients).filter((ing: any) => !mentionedInPicker.find((m: any) => m.id === ing.id));
+                      return (
+                        <>
+                          {mentionedInPicker.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-emerald-700 mb-1 uppercase tracking-wide">Detected in step text</p>
+                              {mentionedInPicker.map((ing: any) => {
+                                const images = INGREDIENT_IMAGE_KEYS.map(k => ({ label: k.label, url: ing[k.key] })).filter(x => x.url);
+                                if (!images.length) return null;
+                                return (
+                                  <div key={ing.id} className="mb-1.5">
+                                    <p className="text-[10px] font-medium text-emerald-600 mb-0.5">{ing.name_common || ing.name}</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {images.map(({ label, url }) => (
+                                        <button key={url} type="button" onClick={() => setStepImage(i, url, true)}
+                                          className="relative rounded-md overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all" title={label}>
+                                          <img src={url} alt={label} className="w-14 h-12 object-cover" />
+                                          <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/50 text-white py-0.5 truncate">{label}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          )}
+                          {/* Other ingredients */}
+                          {otherPool.filter((ing: any) => ing.image_url).length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wide">Other ingredients</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {otherPool.filter((ing: any) => ing.image_url).slice(0, 20).map((ing: any) => (
+                                  <button key={ing.id} type="button" onClick={() => setStepImage(i, ing.image_url, true)}
+                                    className="relative rounded-md overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all" title={ing.name_common || ing.name}>
+                                    <img src={ing.image_url} alt="" className="w-10 h-10 object-cover" />
+                                    <span className="absolute bottom-0 left-0 right-0 text-[7px] text-center bg-black/50 text-white py-0.5 truncate">{(ing.name_common || ing.name || '').slice(0, 12)}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {/* Equipment */}
+                    {catalogEquipment && catalogEquipment.filter(e => e.image_url).length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-orange-500 mb-1 uppercase tracking-wide">Equipment</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {catalogEquipment.filter(e => e.image_url).map((eq) => (
+                            <button key={eq.id} type="button" onClick={() => setStepImage(i, eq.image_url!, true)}
+                              className="relative rounded-md overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all" title={eq.name}>
+                              <img src={eq.image_url!} alt={eq.name} className="w-10 h-10 object-cover" />
+                              <span className="absolute bottom-0 left-0 right-0 text-[7px] text-center bg-black/50 text-white py-0.5 truncate">{eq.name.slice(0, 12)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -906,6 +1210,8 @@ function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId,
                   value={selectedLink.title || ''}
                   onChange={e => updateLinkField(selectedLink.id, { title: e.target.value })}
                   className="w-full px-3 py-2 text-sm font-medium border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-200 outline-none"
+                  placeholder="Title"
+                  title="Title"
                 />
               </div>
 
@@ -961,6 +1267,8 @@ function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId,
                       value={selectedLink.aiSummary}
                       onChange={e => updateLinkField(selectedLink.id, { aiSummary: e.target.value })}
                       className="w-full px-3 py-2 text-xs border border-emerald-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-200 outline-none resize-none h-24 text-gray-700 leading-relaxed"
+                      title="AI Summary"
+                      placeholder="AI-generated summary"
                     />
                     <p className="text-[9px] text-emerald-400">You can edit this summary before saving</p>
                   </div>
@@ -1047,7 +1355,7 @@ function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId,
       </div>
 
       {/* Hidden file input for image replace */}
-      <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
+      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" title="Replace image"
         onChange={e => { if (imageEditId && e.target.files?.[0]) { handleImageFileInput(imageEditId, e.target.files[0]); setImageEditId(null); e.target.value = ''; } }} />
 
       {/* Link cards */}
@@ -1182,13 +1490,19 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [ipGeoData, setIpGeoData] = useState<Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }>>({});
-  const [showSearch, setShowSearch] = useState(false);
+  const [showSearch, setShowSearch] = useState(true);
   const recordsCache = useRef<Record<string, AdminRecord[]>>({});
   const [crossTabResults, setCrossTabResults] = useState<{ tabId: string; tabLabel: string; record: AdminRecord }[]>([]);
   const [elementsCache, setElementsCache] = useState<AdminRecord[]>([]);
   const [elementSearchQuery, setElementSearchQuery] = useState('');
+  const [elementSourcesCache, setElementSourcesCache] = useState<{ elementId: string; sources: AdminRecord[] } | null>(null);
+  const [elementSourcesLoading, setElementSourcesLoading] = useState(false);
+  const [aiLinkingIngredients, setAiLinkingIngredients] = useState(false);
+  const [aiLinkResults, setAiLinkResults] = useState<{ linked: { id: string; name: string; per_100g: number; unit: string }[]; errors: string[] } | null>(null);
+  const [computingNutrition, setComputingNutrition] = useState(false);
   const [ingredientsCache, setIngredientsCache] = useState<AdminRecord[]>([]);
   const [ingredientSearchQuery, setIngredientSearchQuery] = useState('');
+  const [equipmentCache, setEquipmentCache] = useState<EquipmentRecord[]>([]);
   const [autoLinkResults, setAutoLinkResults] = useState<null | Array<{
     name: string;
     match: AdminRecord | null;
@@ -1196,15 +1510,37 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     accepted: boolean | null; // null=pending, true=accepted, false=rejected
     creating: boolean;
   }>>(null);
+  const [aiIngredientSuggestResults, setAiIngredientSuggestResults] = useState<null | Array<{
+    name: string;
+    match: AdminRecord | null;
+    score: number;
+    accepted: boolean | null;
+    creating: boolean;
+  }>>(null);
+  const [aiIngredientSuggesting, setAiIngredientSuggesting] = useState(false);
   const [aiFillingFields, setAiFillingFields] = useState(false);
   const [aiFillingSection, setAiFillingSection] = useState<string | null>(null);
   const [aiCreating, setAiCreating] = useState(false);
+  const [batchEnriching, setBatchEnriching] = useState(false);
+  const [batchMode, setBatchMode] = useState<'all' | 'sparse' | 'improve'>('all');
+  const [showBatchMenu, setShowBatchMenu] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number; total: number; name: string;
+    filled: number; skipped: number; errors: number;
+    recordResults: Array<{ id: string; name: string; status: 'done' | 'skipped' | 'error'; fieldsAdded: number }>;
+  } | null>(null);
+  const batchCancelRef = useRef(false);
   const [showAiCreatePrompt, setShowAiCreatePrompt] = useState(false);
   const [aiCreatePrompt, setAiCreatePrompt] = useState('');
   const [hazardSearch, setHazardSearch] = useState('');
   const [nutrientSearch, setNutrientSearch] = useState('');
   const [editModalTab, setEditModalTab] = useState<'culinary' | 'health' | 'content'>('culinary');
   const [aiContext, setAiContext] = useState('');
+  const [vecSearchSection, setVecSearchSection] = useState<string | null>(null);
+  const [vecSearchQuery, setVecSearchQuery] = useState('');
+  const [vecSearchResults, setVecSearchResults] = useState<AdminRecord[]>([]);
+  const [generatingMoleculeImage, setGeneratingMoleculeImage] = useState(false);
+  const [generatingRecipeEnrich, setGeneratingRecipeEnrich] = useState(false);
 
   // Reset modal tab when switching catalog types — elements has no Culinary tab
   useEffect(() => {
@@ -1263,12 +1599,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       .catch(() => {});
   }, [records, activeTab]);
 
-  // Fetch elements for linked_elements picker when editing ingredients
+  // Fetch elements cache for all catalog tabs (used for linking + element preview chips)
   useEffect(() => {
-    if (!showEditModal || activeTab !== 'ingredients' || elementsCache.length > 0) return;
+    if (!showEditModal || elementsCache.length > 0) return;
+    if (!['ingredients', 'recipes', 'products', 'elements'].includes(activeTab)) return;
     const fetchElements = async () => {
       try {
-        const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=id,name_common,category,type_label,health_role&limit=500`;
+        const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=id,name_common,category,type_label,health_role,image_url&limit=1000`;
         const res = await fetch(url, {
           headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
         });
@@ -1313,6 +1650,20 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     fetchIngredients();
   }, [showEditModal, activeTab, accessToken, ingredientsCache.length]);
 
+  // Fetch equipment catalog once for recipes tab (used for step image fallback)
+  useEffect(() => {
+    if (!showEditModal || !accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
+    if (activeTab !== 'recipes' || equipmentCache.length > 0) return;
+    const metaEnv = (import.meta as any).env || {};
+    const restUrl = `${metaEnv.VITE_SUPABASE_URL || `https://${projectId}.supabase.co`}/rest/v1/catalog_equipment?select=id,name,category,image_url&limit=500&order=category,name`;
+    fetch(restUrl, {
+      headers: { 'apikey': metaEnv.VITE_SUPABASE_ANON_KEY || '', 'Authorization': `Bearer ${accessToken}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d) && d.length > 0) setEquipmentCache(d); })
+      .catch(() => {});
+  }, [showEditModal, activeTab, accessToken, equipmentCache.length]);
+
   const tabs = [
     { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
     { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
@@ -1320,6 +1671,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
     { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' },
     { id: 'scans', label: 'Scans', icon: <ScanLine className="w-4 h-4" />, table: 'scans' },
+    { id: 'equipment', label: 'Equipment', icon: <Wrench className="w-4 h-4" />, table: 'catalog_equipment' },
     { id: 'sync', label: 'Sync', icon: <span className="text-xs">⇄</span>, table: '' },
   ];
 
@@ -1490,21 +1842,21 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     }
   }, [records, activeTab]);
 
-  // Cross-tab search: search all cached tabs when query changes
+  // Cross-tab search: search all cached tabs when query changes (min 3 chars to avoid expensive ops)
   useEffect(() => {
-    if (!showSearch || !searchQuery.trim()) {
+    if (!showSearch || !searchQuery.trim() || searchQuery.trim().length < 3) {
       setCrossTabResults([]);
       return;
     }
     const q = searchQuery.toLowerCase();
     const results: { tabId: string; tabLabel: string; record: AdminRecord }[] = [];
 
-    for (const tab of tabs) {
+    outer: for (const tab of tabs) {
       if (tab.id === activeTab) continue; // skip current tab (already shown in main list)
       const cached = recordsCache.current[tab.id];
       if (!cached) continue;
       for (const record of cached) {
-        if (results.length >= 4) break;
+        if (results.length >= 4) break outer;
         const haystack = [
           record.name, record.name_common, record.email, record.title, record.category,
         ].filter(Boolean).join(' ').toLowerCase();
@@ -1512,7 +1864,6 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           results.push({ tabId: tab.id, tabLabel: tab.label, record });
         }
       }
-      if (results.length >= 4) break;
     }
     setCrossTabResults(results);
   }, [searchQuery, showSearch, activeTab]);
@@ -1520,7 +1871,120 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const handleEdit = (record: AdminRecord) => {
     setEditingRecord({ ...record });
     setEditModalTab(activeTab === 'elements' ? 'health' : 'culinary');
+    setAutoLinkResults(null);
+    setAiIngredientSuggestResults(null);
     setShowEditModal(true);
+  };
+
+  const openElementRecord = (elementId: string) => {
+    const el = elementsCache.find(e => e.id === elementId);
+    if (!el) return;
+    setShowEditModal(false);
+    setTimeout(() => {
+      setActiveTab('elements');
+      setEditingRecord({ ...el });
+      setEditModalTab('health');
+      setAutoLinkResults(null);
+      setAiIngredientSuggestResults(null);
+      setShowEditModal(true);
+    }, 100);
+  };
+
+  const openIngredientRecord = (ingredient: AdminRecord) => {
+    setShowEditModal(false);
+    setTimeout(() => {
+      setActiveTab('ingredients');
+      setEditingRecord({ ...ingredient });
+      setEditModalTab('culinary');
+      setAutoLinkResults(null);
+      setAiIngredientSuggestResults(null);
+      setShowEditModal(true);
+    }, 100);
+  };
+
+  const handleAiLinkIngredients = async () => {
+    if (!editingRecord || activeTab !== 'elements') return;
+    setAiLinkingIngredients(true);
+    setAiLinkResults(null);
+    try {
+      const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-link-ingredients`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          elementId: editingRecord.id,
+          elementName: editingRecord.name_common || editingRecord.name,
+          elementCategory: editingRecord.category,
+          healthRole: editingRecord.health_role,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAiLinkResults({ linked: data.linked || [], errors: data.errors || [] });
+        if ((data.linked || []).length > 0) {
+          toast.success(`AI linked ${data.linked.length} ingredients to this element`);
+          // Refresh element sources cache
+          setElementSourcesCache(null);
+        } else {
+          toast.info(data.message || 'No matching ingredients found');
+        }
+      } else {
+        toast.error(data.error || 'AI link failed');
+      }
+    } catch (err: any) {
+      toast.error(`AI link error: ${err?.message || err}`);
+    } finally {
+      setAiLinkingIngredients(false);
+    }
+  };
+
+  const handleComputeNutrition = async () => {
+    if (!editingRecord || activeTab !== 'recipes') return;
+    const ingredients = editingRecord.ingredients;
+    if (!Array.isArray(ingredients) || ingredients.length === 0) {
+      toast.info('Add ingredients with quantities first');
+      return;
+    }
+    // Validate that ingredients have qty_g values
+    const hasQuantities = ingredients.some((item: any) => {
+      if (item.group !== undefined) {
+        return (item.items || []).some((child: any) => child.qty_g != null && child.ingredient_id);
+      }
+      return item.qty_g != null && item.ingredient_id;
+    });
+    if (!hasQuantities) {
+      toast.info('Add quantities (qty_g) to your ingredients first. Use AI Enrich to auto-fill.');
+      return;
+    }
+    setComputingNutrition(true);
+    try {
+      const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/compute-recipe-nutrition`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipeId: editingRecord.id,
+          ingredients,
+          servings: editingRecord.servings || 1,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setEditingRecord((prev: any) => ({
+          ...prev,
+          elements_beneficial: data.elementsBeneficial,
+          nutrition_per_100g: data.nutritionPer100g,
+          nutrition_per_serving: data.nutritionPerServing,
+        }));
+        toast.success(`Nutrition computed from ${data.ingredientsUsed} ingredients (${data.totalWeight}g total)`);
+      } else {
+        toast.error(data.error || 'Compute failed');
+      }
+    } catch (err: any) {
+      toast.error(`Compute error: ${err?.message || err}`);
+    } finally {
+      setComputingNutrition(false);
+    }
   };
 
   const handleAddNew = () => {
@@ -1703,17 +2167,29 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         });
 
       const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tabType: adminFieldConfig[activeTab]?.label || activeTab,
-          recordData: editingRecord,
-          fields: editFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
-          sampleRecords,
-          context: aiContext.trim() || undefined,
-        }),
-      });
+      const _aiFillAbort1 = new AbortController();
+      const _aiFillTimer1 = setTimeout(() => _aiFillAbort1.abort(), 120_000);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tabType: adminFieldConfig[activeTab]?.label || activeTab,
+            recordData: editingRecord,
+            fields: editFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
+            sampleRecords,
+            context: aiContext.trim() || undefined,
+          }),
+          signal: _aiFillAbort1.signal,
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(_aiFillTimer1);
+        const msg = fetchErr?.name === 'AbortError' ? 'AI request timed out (>2 min). Try fewer fields or a simpler record.' : `Network error: ${fetchErr?.message || fetchErr}`;
+        toast.error(msg);
+        setAiFillingFields(false);
+        return;
+      } finally { clearTimeout(_aiFillTimer1); }
       const data = await response.json();
       if (data.success && data.filledFields) {
         const filledCount = Object.keys(data.filledFields).length;
@@ -1731,6 +2207,171 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       toast.error(`AI fill error: ${err?.message || err}`);
     } finally {
       setAiFillingFields(false);
+    }
+  };
+
+  const handleGenerateMoleculeImage = async () => {
+    if (!editingRecord) return;
+    const name = editingRecord.name_common || editingRecord.name || '';
+    const formula = editingRecord.molecular_formula || '';
+    const symbol = editingRecord.chemical_symbol || '';
+    if (!name) { toast.error('Element needs a name first'); return; }
+    setGeneratingMoleculeImage(true);
+    try {
+      const prompt = [
+        `Scientific molecular structure illustration of ${name}`,
+        formula ? `(${formula})` : '',
+        symbol ? `[${symbol}]` : '',
+        '— clean white background, hexagonal molecular bond diagram, teal and indigo color palette, minimalist scientific style, high detail',
+      ].filter(Boolean).join(' ');
+      const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tabType: 'elements',
+          recordData: editingRecord,
+          fields: [{ key: 'image_url', label: 'Main Image', type: 'image', placeholder: '' }],
+          sampleRecords: [],
+          context: `Generate a molecule pattern image. Prompt: ${prompt}`,
+        }),
+        signal: AbortSignal.timeout(90_000),
+      });
+      const data = await res.json();
+      if (data.success && data.filledFields?.image_url) {
+        setEditingRecord((prev: any) => ({ ...prev, image_url: data.filledFields.image_url }));
+        toast.success('Molecule image generated!');
+      } else {
+        toast.error(data.error || 'Image generation failed — AI fill returned no image_url');
+      }
+    } catch (err: any) {
+      toast.error(`Image generation error: ${err?.message || err}`);
+    } finally {
+      setGeneratingMoleculeImage(false);
+    }
+  };
+
+  const handleAiEnrichRecipe = async () => {
+    if (!editingRecord) return;
+    const name = editingRecord.name_common || editingRecord.name || '';
+    if (!name) { toast.error('Recipe needs a name first'); return; }
+    setGeneratingRecipeEnrich(true);
+    try {
+      const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-enrich-recipe`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipeId: editingRecord.id,
+          recipeName: name,
+          servings: editingRecord.servings || 4,
+          portionWeightG: editingRecord.portion_weight_g || null,
+          servingSize: editingRecord.serving_size || null,
+          prepTime: editingRecord.prep_time || '',
+          cookTime: editingRecord.cook_time || '',
+          difficulty: editingRecord.difficulty || '',
+          cuisine: editingRecord.cuisine || '',
+          description: editingRecord.description_simple || editingRecord.description || '',
+          existingLinkedIds: editingRecord.linked_ingredients || [],
+        }),
+        signal: AbortSignal.timeout(120_000),
+      });
+      const data = await res.json();
+      if (!data.success) { toast.error(data.error || 'AI recipe enrichment failed'); return; }
+
+      const updates: Record<string, any> = {};
+
+      // Set linked_ingredients
+      if (data.linked_ingredient_ids?.length > 0) {
+        updates.linked_ingredients = data.linked_ingredient_ids;
+      }
+      // Set ingredients (grouped_ingredients structure with qty_g)
+      if (data.grouped_ingredients?.length > 0) {
+        console.log('[AI Enrich] Received grouped_ingredients:', data.grouped_ingredients);
+        updates.ingredients = data.grouped_ingredients;
+      }
+      // Set equipment as array of names
+      if (data.equipment_names?.length > 0) {
+        updates.equipment = data.equipment_names;
+      }
+      // Set cooking steps
+      if (data.steps?.length > 0) {
+        // Auto-assign images: search ALL ingredients in cache, not just linked
+        const linkedIds = updates.linked_ingredients || editingRecord.linked_ingredients || [];
+        const linkedIngs = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
+        const pool = linkedIngs.length > 0 ? linkedIngs : ingredientsCache;
+        const stepsWithImages = data.steps.map((step: { text: string; image_url: string }) => {
+          if (step.image_url) return step;
+          const lower = step.text.toLowerCase();
+          // Try name match from pool
+          const mentioned = pool.filter((ing: any) => {
+            const n = (ing.name_common || ing.name || '').toLowerCase();
+            return n.length > 2 && lower.includes(n);
+          });
+          if (mentioned.length > 0) {
+            const f = mentioned[0];
+            if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) return { ...step, image_url: f.image_url_cut };
+            if ((lower.includes('cook')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) return { ...step, image_url: f.image_url_cooked };
+            if (f.image_url) return { ...step, image_url: f.image_url };
+          }
+          // Try equipment
+          const eqMatch = equipmentCache.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
+          if (eqMatch?.image_url) return { ...step, image_url: eqMatch.image_url };
+          // Fallback: first ingredient with image
+          const first = pool.find((ing: any) => ing.image_url);
+          return { ...step, image_url: first?.image_url || '' };
+        });
+        updates.instructions = stepsWithImages;
+      }
+
+      setEditingRecord((prev: any) => ({ ...prev, ...updates }));
+
+      const { counts } = data;
+      const parts = [];
+      if (counts?.ingredients) parts.push(`${counts.ingredients} ingredients`);
+      if (counts?.equipment) parts.push(`${counts.equipment} equipment`);
+      if (counts?.steps) parts.push(`${counts.steps} steps`);
+      toast.success(`AI enriched: ${parts.join(', ')} — saving…`);
+
+      if (data.unmatched_ingredients?.length > 0) {
+        toast.info(`${data.unmatched_ingredients.length} not in catalog: ${data.unmatched_ingredients.map((u: any) => u.name).join(', ')}`);
+      }
+
+      // Auto-save enriched data to DB immediately
+      if (editingRecord?.id && currentTab) {
+        try {
+          const tabConfig = adminFieldConfig[activeTab];
+          const editableKeys = new Set(
+            tabConfig?.fields?.filter((f: any) => f.showInEdit).map((f: any) => f.key) || []
+          );
+          const enrichedRecord = { ...editingRecord, ...updates };
+          const cleanedUpdates: Record<string, any> = {};
+          for (const key of editableKeys) {
+            if (key in enrichedRecord) {
+              const v = enrichedRecord[key];
+              if (typeof v === 'string' && v.startsWith('data:') && v.length > 5000) continue;
+              cleanedUpdates[key] = v;
+            }
+          }
+          const saveRes = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: currentTab.table, id: editingRecord.id, updates: cleanedUpdates }),
+          });
+          if (saveRes.ok) {
+            setRecords(prev => prev.map(r => r.id === editingRecord.id ? { ...r, ...updates } : r));
+            toast.success('Saved to database ✓');
+          } else {
+            toast.error('AI enriched but save failed — click Save to retry');
+          }
+        } catch {
+          toast.error('AI enriched but save failed — click Save to retry');
+        }
+      }
+    } catch (err: any) {
+      toast.error(`Recipe enrichment error: ${err?.message || err}`);
+    } finally {
+      setGeneratingRecipeEnrich(false);
     }
   };
 
@@ -1752,9 +2393,10 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           return sample;
         });
 
-      // For Flavor Profile section on recipes, build rich context from steps + ingredients
+      // Build section context — start with any manual context
       let sectionContext = aiContext.trim() || undefined;
       const isFlavorSection = sectionName === 'Flavor Profile';
+      const isStepsSection = sectionName === 'Steps' || sectionName === 'Preparation' || sectionName === 'Instructions' || sectionName === 'Cooking';
       const isRecipeTab = (adminFieldConfig[activeTab]?.label || activeTab).toLowerCase().includes('recipe');
       if (isFlavorSection && isRecipeTab) {
         const parts: string[] = [];
@@ -1796,18 +2438,49 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       }
 
+      // For Steps/Preparation sections, inject portion-aware context
+      if ((isStepsSection || isFlavorSection) && isRecipeTab) {
+        const portionParts: string[] = [];
+        if (editingRecord.servings) portionParts.push(`Servings: ${editingRecord.servings}`);
+        if (editingRecord.serving_size) portionParts.push(`Serving size: ${editingRecord.serving_size}`);
+        if (editingRecord.portion_weight_g) portionParts.push(`Portion weight: ${editingRecord.portion_weight_g}g`);
+        if (editingRecord.prep_time) portionParts.push(`Prep time: ${editingRecord.prep_time}`);
+        if (editingRecord.cook_time) portionParts.push(`Cook time: ${editingRecord.cook_time}`);
+        if (editingRecord.difficulty) portionParts.push(`Difficulty: ${editingRecord.difficulty}`);
+        if (portionParts.length > 0) {
+          const portionContext = `Recipe portion details (use these to calibrate step quantities, timings, and serving instructions):\n${portionParts.join(' | ')}`;
+          sectionContext = sectionContext ? `${sectionContext}\n\n${portionContext}` : portionContext;
+        }
+      }
+
       const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tabType: adminFieldConfig[activeTab]?.label || activeTab,
-          recordData: editingRecord,
-          fields: sectionFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
-          sampleRecords,
-          context: sectionContext,
-        }),
-      });
+      const _aiFillAbort2 = new AbortController();
+      const _aiFillTimer2 = setTimeout(() => _aiFillAbort2.abort(), 120_000);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tabType: adminFieldConfig[activeTab]?.label || activeTab,
+            recordData: editingRecord,
+            fields: sectionFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
+            sampleRecords,
+            context: sectionContext,
+          }),
+          signal: _aiFillAbort2.signal,
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(_aiFillTimer2);
+        const msg = fetchErr?.name === 'AbortError' ? 'AI request timed out (>2 min). Try fewer fields.' : `Network error: ${fetchErr?.message || fetchErr}`;
+        toast.error(msg);
+        setAiFillingSection(null);
+        return;
+      } finally { clearTimeout(_aiFillTimer2); }
+      if (response.status === 401) {
+        toast.error('Session expired — please refresh the page and log in again');
+        return;
+      }
       const data = await response.json();
       if (data.success && data.filledFields) {
         const filledCount = Object.keys(data.filledFields).length;
@@ -1826,6 +2499,229 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     } finally {
       setAiFillingSection(null);
     }
+  };
+
+  // Count how many editable fields a record has data for (0–100 score)
+  const getRecordCompleteness = (record: AdminRecord, editFields: ReturnType<typeof getFieldsForView>): number => {
+    const SKIP_TYPES = new Set(['image', 'video', 'element_sources_viewer', 'nutrient_viewer', 'ingredient_viewer']);
+    const scoreable = editFields.filter(f => !SKIP_TYPES.has(f.type));
+    if (scoreable.length === 0) return 100;
+    const filled = scoreable.filter(f => {
+      const v = (record as any)[f.key];
+      if (v === null || v === undefined || v === '') return false;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === 'object') return Object.keys(v).length > 0;
+      return true;
+    }).length;
+    return Math.round((filled / scoreable.length) * 100);
+  };
+
+  const handleBatchAiEnrich = async (mode: 'all' | 'sparse' | 'improve' = 'all') => {
+    if (!currentTab || activeTab === 'waitlist' || activeTab === 'scans') return;
+    const editFields = getFieldsForView(activeTab, 'edit');
+
+    // Filter candidates
+    let candidates = sortedRecords.filter(r => r.name || r.name_common);
+    if (mode === 'sparse') {
+      // Only records with < 40% completeness
+      candidates = candidates.filter(r => getRecordCompleteness(r, editFields) < 40);
+    }
+    // 'improve' mode runs on all records but tells AI to overwrite+improve existing data
+    if (candidates.length === 0) {
+      toast.info(mode === 'sparse' ? 'No sparse records found (all records are ≥40% complete)' : 'No records to enrich');
+      return;
+    }
+
+    setBatchEnriching(true);
+    batchCancelRef.current = false;
+    const recordResults: Array<{ id: string; name: string; status: 'done' | 'skipped' | 'error'; fieldsAdded: number }> = [];
+    setBatchProgress({ current: 0, total: candidates.length, name: '', filled: 0, skipped: 0, errors: 0, recordResults });
+    let filled = 0; let skipped = 0; let errors = 0;
+
+    for (let i = 0; i < candidates.length; i++) {
+      if (batchCancelRef.current) break;
+      const record = candidates[i];
+      const name = record.name_common || record.name || `Record ${i + 1}`;
+      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
+      try {
+        // For recipes: also call ai-enrich-recipe to fill ingredients, equipment, and steps
+        if (activeTab === 'recipes') {
+          const enrichUrl = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-enrich-recipe`;
+          let enrichResponse: Response;
+          try {
+            enrichResponse = await fetch(enrichUrl, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                recipeId: record.id,
+                recipeName: name,
+                servings: record.servings || 4,
+                portionWeightG: record.portion_weight_g || null,
+                prepTime: record.prep_time || '',
+                cookTime: record.cook_time || '',
+                difficulty: record.difficulty || '',
+                cuisine: record.cuisine || '',
+                description: (record as any).description_simple || (record as any).description || '',
+              }),
+              signal: AbortSignal.timeout(120_000),
+            });
+          } catch (fetchErr: any) {
+            if (fetchErr?.name === 'AbortError') { errors++; recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 }); continue; }
+            throw fetchErr;
+          }
+          if (enrichResponse.status === 401) { setBatchEnriching(false); setBatchProgress(null); toast.error('Session expired'); return; }
+          const enrichData = await enrichResponse.json();
+          if (enrichData.success) {
+            const recipeUpdates: Record<string, any> = {};
+            if (enrichData.linked_ingredient_ids?.length > 0) recipeUpdates.linked_ingredients = enrichData.linked_ingredient_ids;
+            if (enrichData.grouped_ingredients?.length > 0) recipeUpdates.ingredients = enrichData.grouped_ingredients;
+            if (enrichData.equipment_names?.length > 0) recipeUpdates.equipment = enrichData.equipment_names;
+            if (enrichData.steps?.length > 0) recipeUpdates.instructions = enrichData.steps;
+            if (Object.keys(recipeUpdates).length > 0) {
+              const saveUrl = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
+              await fetch(saveUrl, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ table: currentTab.table, id: record.id, updates: recipeUpdates }) });
+              setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...recipeUpdates } : r));
+              const cnt = enrichData.counts;
+              filled += (cnt?.ingredients || 0) + (cnt?.equipment ? 1 : 0) + (cnt?.steps ? 1 : 0);
+              recordResults.push({ id: record.id, name, status: 'done', fieldsAdded: Object.keys(recipeUpdates).length });
+            } else {
+              skipped++;
+              recordResults.push({ id: record.id, name, status: 'skipped', fieldsAdded: 0 });
+            }
+          } else {
+            errors++;
+            recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 });
+          }
+          setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
+          if (i < candidates.length - 1 && !batchCancelRef.current) await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
+
+        const sampleRecords = candidates
+          .filter(r => r.id !== record.id)
+          .slice(0, 2)
+          .map(r => {
+            const sample: Record<string, any> = {};
+            editFields.forEach(f => { const v = (r as any)[f.key]; if (v !== null && v !== undefined && v !== '') sample[f.key] = v; });
+            return sample;
+          });
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
+        const _aiFillAbort3 = new AbortController();
+        const _aiFillTimer3 = setTimeout(() => _aiFillAbort3.abort(), 120_000);
+        let response: Response;
+        try {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tabType: adminFieldConfig[activeTab]?.label || activeTab,
+              recordData: record,
+              fields: editFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
+              sampleRecords,
+              mode: mode === 'improve' ? 'improve' : 'fill',
+            }),
+            signal: _aiFillAbort3.signal,
+          });
+        } catch (fetchErr: any) {
+          clearTimeout(_aiFillTimer3);
+          if (fetchErr?.name === 'AbortError') {
+            errors++;
+            console.warn(`[Batch AI] Record timed out: ${record.name || record.name_common}`);
+            continue;
+          }
+          throw fetchErr;
+        } finally { clearTimeout(_aiFillTimer3); }
+        if (response.status === 401) {
+          setBatchEnriching(false);
+          setBatchProgress(null);
+          toast.error('Session expired — please refresh the page and log in again to continue batch enrichment');
+          return;
+        }
+        if (response.status === 429) {
+          await new Promise(r => setTimeout(r, 5000));
+          errors++;
+          recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 });
+          setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
+          continue;
+        }
+        const data = await response.json();
+        if (data.success && data.filledFields && Object.keys(data.filledFields).length > 0) {
+          const filledCount = Object.keys(data.filledFields).length;
+          const saveUrl = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
+          const tabConfig = adminFieldConfig[activeTab];
+          const editableKeys = new Set(tabConfig?.fields?.filter((f: any) => f.showInEdit).map((f: any) => f.key) || []);
+          const cleanUpdates: Record<string, any> = {};
+          for (const key of Object.keys(data.filledFields)) {
+            if (editableKeys.has(key)) cleanUpdates[key] = data.filledFields[key];
+          }
+          if (Object.keys(cleanUpdates).length > 0) {
+            const saveRes = await fetch(saveUrl, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ table: currentTab.table, id: record.id, updates: cleanUpdates }),
+            });
+            if (saveRes.status === 401) {
+              setBatchEnriching(false);
+              setBatchProgress(null);
+              toast.error('Session expired — please refresh and log in again');
+              return;
+            }
+            if (saveRes.ok) {
+              setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...cleanUpdates } : r));
+            }
+          }
+          filled += filledCount;
+          recordResults.push({ id: record.id, name, status: 'done', fieldsAdded: filledCount });
+        } else {
+          skipped++;
+          recordResults.push({ id: record.id, name, status: 'skipped', fieldsAdded: 0 });
+        }
+      } catch {
+        errors++;
+        recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 });
+      }
+      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
+      if (i < candidates.length - 1 && !batchCancelRef.current) await new Promise(r => setTimeout(r, 300));
+    }
+    setBatchEnriching(false);
+    const wasCancelled = batchCancelRef.current;
+    setBatchProgress(null);
+    if (wasCancelled) {
+      toast.info(`Batch enrichment cancelled — ${filled} fields filled across ${recordResults.length} records`);
+    } else {
+      toast.success(`Batch ${mode === 'improve' ? 'improvement' : 'enrichment'} complete — ${filled} fields updated, ${skipped} skipped, ${errors} errors`);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (!sortedRecords.length) { toast.info('No records to export'); return; }
+    const editFields = getFieldsForView(activeTab, 'edit');
+    const SKIP_TYPES = new Set(['image', 'video', 'element_sources_viewer', 'nutrient_viewer', 'ingredient_viewer']);
+    const cols = editFields.filter(f => !SKIP_TYPES.has(f.type));
+    const headers = cols.map(f => f.label);
+    const rows = sortedRecords.map(record =>
+      cols.map(f => {
+        const val = (record as any)[f.key];
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'object') {
+          const s = JSON.stringify(val).replace(/"/g, '""');
+          return s.match(/^[=+\-@\t]/) ? `'${s}` : s;
+        }
+        const s = String(val).replace(/"/g, '""');
+        return s.match(/^[=+\-@\t]/) ? `'${s}` : s;
+      })
+    );
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${adminFieldConfig[activeTab]?.label || activeTab}_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${sortedRecords.length} records to CSV`);
   };
 
   const handleAiCreate = async (prompt?: string) => {
@@ -2028,7 +2924,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ table: currentTab.table, id: recordId, updates: { ...record, [bulkEditField]: bulkEditValue } })
+              body: JSON.stringify({ table: currentTab.table, id: recordId, updates: { [bulkEditField]: bulkEditValue } })
             }
           );
           if (response.ok) updated++;
@@ -2101,9 +2997,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     const matchesSearch = !searchQuery ? true : (
       (record.name?.toLowerCase().includes(searchLower)) ||
       (record.name_common?.toLowerCase().includes(searchLower)) ||
+      (record.name_other?.toLowerCase().includes(searchLower)) ||
+      (record.name_scientific?.toLowerCase().includes(searchLower)) ||
       (record.email?.toLowerCase().includes(searchLower)) ||
       (record.title?.toLowerCase().includes(searchLower)) ||
       (record.category?.toLowerCase().includes(searchLower)) ||
+      (String(record.id || '').toLowerCase().includes(searchLower)) ||
       false
     );
     
@@ -2262,7 +3161,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-xs font-bold text-gray-400 w-6 text-right">#{record.position || '?'}</span>
             <img
-              src={`https://www.gravatar.com/avatar/${record.email ? Array.from(record.email.trim().toLowerCase()).reduce((h: number, c: string) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', '') : '0'}?d=identicon&s=40`}
+              src={`https://www.gravatar.com/avatar/${record.email ? md5(record.email.trim().toLowerCase()) : '0'}?d=identicon&s=40`}
               alt={record.email || ''}
               className="w-9 h-9 rounded-full cursor-pointer border border-gray-200"
               onClick={() => handleEdit(record)}
@@ -2666,17 +3565,17 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             {tabs.filter(tab => tab.id !== 'sync').map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                 {/* Waitlist Funnel Dashboard */}
-                {tab.id === 'waitlist' && validRecords.length > 0 && (
+                {tab.id === 'waitlist' && validRecords.length > 0 && !showSearch && (
                   <WaitlistFunnelDashboard records={validRecords} accessToken={accessToken} ipGeoData={ipGeoData} />
                 )}
 
                 {/* Catalog Metric Cards (elements, ingredients, recipes, products) */}
-                {['elements', 'ingredients', 'recipes', 'products'].includes(tab.id) && records.length > 0 && (
+                {['elements', 'ingredients', 'recipes', 'products'].includes(tab.id) && records.length > 0 && !showSearch && (
                   <CatalogMetricCards records={records} tabId={tab.id} />
                 )}
 
                 {/* Scan Funnel Dashboard */}
-                {tab.id === 'scans' && records.length > 0 && (
+                {tab.id === 'scans' && records.length > 0 && !showSearch && (
                   <ScanFunnelDashboard records={records} />
                 )}
 
@@ -2770,42 +3669,81 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   </div>
                 )}
 
+                {/* Batch Enrich Progress Banner */}
+                {batchProgress && (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                        <span className="text-sm font-semibold text-amber-800">Batch AI Enrichment</span>
+                        <span className="text-xs text-amber-600 font-mono">{batchProgress.current} / {batchProgress.total}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-green-700 font-semibold">+{batchProgress.filled} fields</span>
+                        <span className="text-gray-400">{batchProgress.skipped} skipped</span>
+                        {batchProgress.errors > 0 && <span className="text-red-600 font-medium">{batchProgress.errors} errors</span>}
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="w-full bg-amber-100 rounded-full h-2">
+                      <div
+                        className="bg-amber-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.round((batchProgress.current / batchProgress.total) * 100)}%` }}
+                      />
+                    </div>
+                    {/* Currently processing */}
+                    {batchProgress.name && (
+                      <p className="text-xs text-amber-600 truncate">
+                        Processing: <span className="font-medium">{batchProgress.name}</span>
+                        <span className="ml-2 text-amber-400">{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
+                      </p>
+                    )}
+                    {/* Per-record results log */}
+                    {batchProgress.recordResults.length > 0 && (
+                      <div className="max-h-36 overflow-y-auto rounded-lg border border-amber-100 bg-white divide-y divide-gray-50">
+                        {[...batchProgress.recordResults].reverse().map((r, idx) => (
+                          <div key={`${r.id}-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 text-xs">
+                            {r.status === 'done' && <span className="text-green-500 flex-shrink-0">✓</span>}
+                            {r.status === 'skipped' && <span className="text-gray-300 flex-shrink-0">–</span>}
+                            {r.status === 'error' && <span className="text-red-400 flex-shrink-0">✕</span>}
+                            <span className="flex-1 truncate text-gray-700 font-medium">{r.name}</span>
+                            {r.status === 'done' && (
+                              <span className="flex-shrink-0 text-[10px] font-semibold text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">
+                                +{r.fieldsAdded} fields
+                              </span>
+                            )}
+                            {r.status === 'skipped' && (
+                              <span className="flex-shrink-0 text-[10px] text-gray-400">complete</span>
+                            )}
+                            {r.status === 'error' && (
+                              <span className="flex-shrink-0 text-[10px] text-red-400">error</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Toolbar */}
                 <div className="space-y-2">
                   <div className="flex gap-2 items-center">
-                    {/* Search toggle button */}
-                    <Button
-                      variant={showSearch ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setShowSearch(!showSearch);
-                        if (showSearch) {
-                          setSearchQuery('');
+                    {/* Search input — always visible */}
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                      <Input
+                        placeholder={`Search all records...`}
+                        value={searchQuery}
+                        autoFocus
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
                           setCurrentPage(1);
-                        }
-                      }}
-                      className="gap-1"
-                      title={showSearch ? 'Close search' : 'Search'}
-                    >
-                      {showSearch ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </Button>
-
-                    {/* Search input — only visible when toggled */}
-                    {showSearch && (
-                      <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                        <Input
-                          placeholder={`Search all records...`}
-                          value={searchQuery}
-                          autoFocus
-                          onChange={(e) => {
-                            setSearchQuery(e.target.value);
-                            setCurrentPage(1);
-                          }}
-                          className="pl-10"
-                        />
-                      </div>
-                    )}
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                        className="pl-10"
+                      />
+                    </div>
 
                     <div className="flex-1" />
 
@@ -2847,8 +3785,87 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                           {aiCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                           <span className="hidden sm:inline">{aiCreating ? 'Creating...' : 'AI Create'}</span>
                         </Button>
+                        {batchEnriching ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { batchCancelRef.current = true; }}
+                            className="gap-1 whitespace-nowrap text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="hidden sm:inline">Cancel</span>
+                          </Button>
+                        ) : (
+                          <div className="relative flex">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleBatchAiEnrich(batchMode)}
+                              className="gap-1 whitespace-nowrap text-amber-700 border-amber-200 hover:bg-amber-50 rounded-r-none border-r-0"
+                              title={batchMode === 'sparse' ? 'Enrich records with <40% data completeness' : batchMode === 'improve' ? 'Improve all records — rewrites existing data with more scientific & culinary depth' : 'Enrich all records — fills missing fields only'}
+                            >
+                              <Sparkles className="w-4 h-4" />
+                              <span className="hidden sm:inline">{batchMode === 'sparse' ? 'Enrich Sparse' : batchMode === 'improve' ? 'Improve All' : 'Batch Enrich'}</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowBatchMenu(v => !v)}
+                              className="px-1.5 text-amber-700 border-amber-200 hover:bg-amber-50 rounded-l-none"
+                              title="Choose batch mode"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </Button>
+                            {showBatchMenu && (
+                              <div className="absolute top-full right-0 mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]"
+                                onMouseLeave={() => setShowBatchMenu(false)}>
+                                <button
+                                  className={`w-full text-left px-3 py-2 text-xs hover:bg-amber-50 flex items-center gap-2 ${batchMode === 'all' ? 'font-semibold text-amber-700' : 'text-gray-700'}`}
+                                  onClick={() => { setBatchMode('all'); setShowBatchMenu(false); handleBatchAiEnrich('all'); }}
+                                >
+                                  <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                                  <div>
+                                    <div className="font-medium">All Records</div>
+                                    <div className="text-[10px] text-gray-400">Fill empty fields in every record</div>
+                                  </div>
+                                </button>
+                                <button
+                                  className={`w-full text-left px-3 py-2 text-xs hover:bg-amber-50 flex items-center gap-2 ${batchMode === 'sparse' ? 'font-semibold text-amber-700' : 'text-gray-700'}`}
+                                  onClick={() => { setBatchMode('sparse'); setShowBatchMenu(false); handleBatchAiEnrich('sparse'); }}
+                                >
+                                  <span className="text-amber-500 flex-shrink-0 text-sm">⚡</span>
+                                  <div>
+                                    <div className="font-medium">Sparse Only</div>
+                                    <div className="text-[10px] text-gray-400">Only records with &lt;40% data</div>
+                                  </div>
+                                </button>
+                                <button
+                                  className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 ${batchMode === 'improve' ? 'font-semibold text-blue-700' : 'text-gray-700'}`}
+                                  onClick={() => { setBatchMode('improve'); setShowBatchMenu(false); handleBatchAiEnrich('improve'); }}
+                                >
+                                  <span className="text-blue-500 flex-shrink-0 text-sm">✦</span>
+                                  <div>
+                                    <div className="font-medium">Improve All</div>
+                                    <div className="text-[10px] text-gray-400">Rewrite existing data — more scientific &amp; culinary depth</div>
+                                  </div>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportCsv}
+                      disabled={!sortedRecords.length}
+                      className="gap-1 text-teal-700 border-teal-200 hover:bg-teal-50"
+                      title={`Export ${sortedRecords.length} records to CSV`}
+                    >
+                      <Download className="w-4 h-4" />
+                      <span className="hidden sm:inline">CSV</span>
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -3122,7 +4139,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       {/* Edit Modal - Config Driven (uses AdminModal) */}
       <AdminModal
         open={showEditModal}
-        onClose={() => { setShowEditModal(false); setAutoLinkResults(null); }}
+        onClose={() => { setShowEditModal(false); setEditingRecord(null); setAutoLinkResults(null); setAiIngredientSuggestResults(null); }}
         title={editingRecord?.id ? `Edit ${adminFieldConfig[activeTab]?.label || 'Record'} — ${getDisplayName(editingRecord)}` : `New ${adminFieldConfig[activeTab]?.label || 'Record'}`}
         subtitle={editingRecord?.id ? `ID: ${String(editingRecord.id).slice(0, 8)}...` : 'Fill in the details below and save to create'}
         size="xl"
@@ -3136,7 +4153,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   disabled={sortedRecords.findIndex(r => r.id === editingRecord?.id) <= 0}
                   onClick={() => {
                     const idx = sortedRecords.findIndex(r => r.id === editingRecord?.id);
-                    if (idx > 0) { setEditingRecord({ ...sortedRecords[idx - 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); setAutoLinkResults(null); }
+                    if (idx > 0) { setEditingRecord({ ...sortedRecords[idx - 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); setAutoLinkResults(null); setAiIngredientSuggestResults(null); }
                   }}
                   className="h-8 px-2"
                 >
@@ -3152,7 +4169,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   disabled={sortedRecords.findIndex(r => r.id === editingRecord?.id) >= sortedRecords.length - 1}
                   onClick={() => {
                     const idx = sortedRecords.findIndex(r => r.id === editingRecord?.id);
-                    if (idx < sortedRecords.length - 1) { setEditingRecord({ ...sortedRecords[idx + 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); setAutoLinkResults(null); }
+                    if (idx < sortedRecords.length - 1) { setEditingRecord({ ...sortedRecords[idx + 1] }); setElementSearchQuery(''); setIngredientSearchQuery(''); setAutoLinkResults(null); setAiIngredientSuggestResults(null); }
                   }}
                   className="h-8 px-2"
                 >
@@ -3177,12 +4194,51 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   disabled={aiFillingFields || (!editingRecord?.name && !editingRecord?.name_common)}
                   className="h-8 px-3 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-indigo-100"
                 >
-                  {aiFillingFields ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Wand2 className="w-3.5 h-3.5 mr-1" />}
-                  <span className="text-xs">{aiFillingFields ? 'Filling...' : 'AI Fill'}</span>
+                  {aiFillingFields ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
+                  <span className="text-xs">{aiFillingFields ? 'Enriching...' : 'AI Enrich'}</span>
                 </Button>
+                {activeTab === 'elements' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAiLinkIngredients}
+                    disabled={aiLinkingIngredients || (!editingRecord?.name && !editingRecord?.name_common)}
+                    className="h-8 px-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-emerald-700 hover:from-emerald-100 hover:to-teal-100"
+                    title="AI scans all ingredients in the DB and links those that contain this element"
+                  >
+                    {aiLinkingIngredients ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <span className="mr-1 text-sm">🔗</span>}
+                    <span className="text-xs">{aiLinkingIngredients ? 'Linking...' : 'AI Link Ingredients'}</span>
+                  </Button>
+                )}
+                {activeTab === 'elements' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateMoleculeImage}
+                    disabled={generatingMoleculeImage || (!editingRecord?.name && !editingRecord?.name_common)}
+                    className="h-8 px-3 bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200 text-violet-700 hover:from-violet-100 hover:to-purple-100"
+                    title="Generate a molecular pattern image for this element using AI"
+                  >
+                    {generatingMoleculeImage ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <span className="mr-1 text-sm">⚗️</span>}
+                    <span className="text-xs">{generatingMoleculeImage ? 'Generating...' : 'Molecule Image'}</span>
+                  </Button>
+                )}
+                {activeTab === 'recipes' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleComputeNutrition}
+                    disabled={computingNutrition}
+                    className="h-8 px-3 bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 text-blue-700 hover:from-blue-100 hover:to-cyan-100"
+                    title="Compute nutrition by summing elements_beneficial × qty_g across all linked ingredients"
+                  >
+                    {computingNutrition ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <span className="mr-1 text-sm">∑</span>}
+                    <span className="text-xs">{computingNutrition ? 'Computing...' : 'Compute Nutrition'}</span>
+                  </Button>
+                )}
               </>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => { setShowEditModal(false); setEditingRecord(null); }}>Cancel</Button>
             <Button size="sm" onClick={handleSave} disabled={savingRecord} className="bg-blue-600 hover:bg-blue-700 text-white">
               {savingRecord ? 'Saving...' : editingRecord?.id ? 'Save' : 'Create'}
             </Button>
@@ -3326,9 +4382,10 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
                   <select title={field.label} value={val || ''} onChange={(e) => updateField(e.target.value)} className={selectCls}>
                     <option value="">Select {field.label.toLowerCase()}</option>
-                    {(field.options || []).map(opt => (
-                      <option key={opt} value={opt}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</option>
-                    ))}
+                    {(field.options || []).map(opt => {
+                      const label = opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                      return <option key={opt} value={opt}>{label}</option>;
+                    })}
                   </select>
                 </div>
               );
@@ -3457,7 +4514,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                               : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
                           }`}
                         >
-                          {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                          {opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                         </button>
                       );
                     })}
@@ -3506,7 +4563,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                                 : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
                             }`}
                           >
-                            {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                            {opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                           </button>
                         );
                       })}
@@ -3601,6 +4658,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     {totalFlagged > 0 && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">{totalFlagged} flagged</Badge>}
                   </div>
                   <input value={hazardSearch} onChange={(e) => setHazardSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                     placeholder="Search risks..." title="Search risks" className="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-orange-400" />
 
                   {/* Column headers */}
@@ -3639,12 +4697,24 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                               {filteredEls.map(el => {
                                 const d = data[el.id] || { ...defaultRisk };
                                 const isActive = d.level !== 'none' || d.per_100g > 0 || d.per_serving > 0;
+                                const cachedEl = elementsCache.find(e => e.id === el.id);
                                 return (
                                   <div key={el.id} className={`rounded px-1 ${isActive ? 'bg-orange-50/40' : ''}`}>
                                     <div className="flex items-center gap-1 py-0.5">
-                                      <span className="text-[10px] text-gray-600 flex-1 truncate" title={`${el.name_common} (${el.category})`}>
-                                        {el.name_common}
-                                      </span>
+                                      <button type="button" onClick={() => cachedEl && openElementRecord(el.id)}
+                                        className={`flex items-center gap-1 flex-1 min-w-0 text-left group ${cachedEl ? 'cursor-pointer' : 'cursor-default'}`}
+                                        title={cachedEl ? `Open ${el.name_common} record` : el.name_common}>
+                                        {cachedEl?.image_url ? (
+                                          <img src={cachedEl.image_url} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0 opacity-80 group-hover:opacity-100" />
+                                        ) : (
+                                          <span className="w-4 h-4 rounded bg-orange-100 text-orange-600 text-[8px] font-bold flex items-center justify-center flex-shrink-0">
+                                            {el.name_common[0].toUpperCase()}
+                                          </span>
+                                        )}
+                                        <span className={`text-[10px] truncate ${cachedEl ? 'text-orange-700 group-hover:text-orange-900 group-hover:underline' : 'text-gray-600'}`}>
+                                          {el.name_common}
+                                        </span>
+                                      </button>
                                       <input type="number" step="any" min={0} value={d.per_100g || ''} placeholder="0"
                                         onChange={(e) => updateRisk(el.id, { per_100g: parseFloat(e.target.value) || 0 })}
                                         title={`${el.name_common} per 100g`}
@@ -3771,13 +4841,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   </div>
 
                   <input value={nutrientSearch} onChange={(e) => setNutrientSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                     placeholder="Search nutrients..." title="Search nutrients" className="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-green-400" />
 
-                  {/* Column headers */}
+                  {/* Column headers - per_serving is single source of truth */}
                   <div className="flex items-center gap-1 px-2 text-[8px] text-gray-400 uppercase tracking-wider">
                     <span className="flex-1">Nutrient</span>
-                    <span className="w-[72px] text-right">/ 100g</span>
-                    <span className="w-[72px] text-right">/ serv</span>
+                    <span className="w-[72px] text-right">/ serving</span>
                     <span className="w-12 text-right">% RDI</span>
                     <span className="w-6"></span>
                   </div>
@@ -3814,19 +4884,27 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                                 const rdiNum = el.rdi ? parseFloat(el.rdi) : 0;
                                 const pctRdi = rdiNum > 0 && v100 > 0 ? Math.round((v100 / rdiNum) * 100) : 0;
                                 const hasSomething = v100 > 0 || vServ > 0;
+                                const cachedEl = elementsCache.find(e => e.id === el.id);
                                 return (
                                   <div key={el.id} className={`flex items-center gap-1 py-0.5 rounded px-1 ${hasSomething ? 'bg-green-50/40' : ''}`}>
-                                    <span className="text-[10px] text-gray-600 flex-1 truncate" title={el.rdi ? `RDI: ${el.rdi} ${el.unit}` : el.name}>
-                                      {el.name}
-                                    </span>
-                                    <input type="number" step="any" value={v100 || ''} placeholder="0"
-                                      onChange={(e) => updateNutrition(p100, parseFloat(e.target.value) || 0)}
-                                      title={`${el.name} per 100g`}
-                                      className={`w-[72px] h-6 px-1.5 text-[10px] border rounded text-right bg-white focus:ring-1 focus:ring-green-400 ${v100 > 0 ? 'border-green-300 text-green-800' : 'border-gray-200 text-gray-400'}`} />
+                                    <button type="button" onClick={() => cachedEl && openElementRecord(el.id)}
+                                      className={`flex items-center gap-1 flex-1 min-w-0 text-left group ${cachedEl ? 'cursor-pointer' : 'cursor-default'}`}
+                                      title={cachedEl ? `Open ${el.name} record` : (el.rdi ? `RDI: ${el.rdi} ${el.unit}` : el.name)}>
+                                      {cachedEl?.image_url ? (
+                                        <img src={cachedEl.image_url} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0 opacity-80 group-hover:opacity-100" />
+                                      ) : (
+                                        <span className="w-4 h-4 rounded bg-green-100 text-green-700 text-[8px] font-bold flex items-center justify-center flex-shrink-0">
+                                          {el.name[0].toUpperCase()}
+                                        </span>
+                                      )}
+                                      <span className={`text-[10px] truncate ${cachedEl ? 'text-green-700 group-hover:text-green-900 group-hover:underline' : 'text-gray-600'}`}>
+                                        {el.name}
+                                      </span>
+                                    </button>
                                     <input type="number" step="any" value={vServ || ''} placeholder="0"
                                       onChange={(e) => updateNutrition(pServ, parseFloat(e.target.value) || 0)}
-                                      title={`${el.name} per serving (auto-calculated from serving size)`}
-                                      className={`w-[72px] h-6 px-1.5 text-[10px] border rounded text-right bg-gray-50 focus:ring-1 focus:ring-green-400 ${vServ > 0 ? 'border-green-300 text-green-800' : 'border-gray-200 text-gray-400'}`} />
+                                      title={`${el.name} per serving`}
+                                      className={`w-[72px] h-6 px-1.5 text-[10px] border rounded text-right bg-white focus:ring-1 focus:ring-green-400 ${vServ > 0 ? 'border-green-300 text-green-800' : 'border-gray-200 text-gray-400'}`} />
                                     <span className={`w-12 text-[9px] text-right font-medium ${pctRdi >= 100 ? 'text-green-700' : pctRdi >= 50 ? 'text-green-600' : pctRdi > 0 ? 'text-gray-500' : 'text-gray-300'}`}>
                                       {pctRdi > 0 ? `${pctRdi}%` : '—'}
                                     </span>
@@ -3903,6 +4981,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   <input
                     value={elementSearchQuery}
                     onChange={(e) => setElementSearchQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                     placeholder={`Search ${catFilter === 'beneficial' ? 'nutrients' : catFilter === 'hazardous' ? 'hazards' : 'elements'}...`}
                     className={inputCls}
                   />
@@ -3942,20 +5021,14 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     ingredientsCache={ingredientsCache}
                     ingredientSearchQuery={ingredientSearchQuery}
                     setIngredientSearchQuery={setIngredientSearchQuery}
+                    accessToken={accessToken}
                   />
                 </div>
               );
             }
 
             if (field.type === 'cooking_tools') {
-              return (
-                <div key={field.key}>
-                  <CookingToolsField
-                    val={val}
-                    updateField={updateField}
-                  />
-                </div>
-              );
+              return null; // rendered inside grouped_ingredients 3-col layout
             }
 
             if (field.type === 'linked_ingredients') {
@@ -3968,10 +5041,187 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               const linkedIngredients = ingredientsCache.filter((ing: AdminRecord) => linkedIds.includes(ing.id));
               const availableIngredients = filteredIngredients.filter((ing: AdminRecord) => !linkedIds.includes(ing.id)).slice(0, 8);
 
+              // Fuzzy match helper (shared with grouped_ingredients auto-link)
+              const fuzzySuggestScore = (a: string, b: string): number => {
+                const an = a.toLowerCase().trim(); const bn = b.toLowerCase().trim();
+                if (an === bn) return 1.0;
+                if (bn.includes(an) || an.includes(bn)) return 0.85;
+                const aW = an.split(/\s+/); const bW = bn.split(/\s+/);
+                const shared = aW.filter(w => bW.some(bw => bw.includes(w) || w.includes(bw)));
+                if (shared.length > 0) return 0.6 + (shared.length / Math.max(aW.length, bW.length)) * 0.2;
+                return 0;
+              };
+              const findSuggestMatch = (name: string): AdminRecord | null => {
+                let best: AdminRecord | null = null; let bestScore = 0;
+                for (const ing of ingredientsCache) {
+                  const s = fuzzySuggestScore(name, ing.name_common || ing.name || '');
+                  if (s > bestScore) { bestScore = s; best = ing; }
+                }
+                return bestScore >= 0.5 ? best : null;
+              };
+
+              const runAiIngredientSuggest = async () => {
+                if (aiIngredientSuggesting) return;
+                setAiIngredientSuggesting(true);
+                setAiIngredientSuggestResults(null);
+                try {
+                  // Build context from record fields
+                  const rec = editingRecord || {};
+                  const contextParts: string[] = [];
+                  if (rec.description_simple) contextParts.push(`Description: ${rec.description_simple}`);
+                  if (rec.description) contextParts.push(`Description: ${rec.description}`);
+                  if (rec.description_processing) contextParts.push(`Processing: ${rec.description_processing}`);
+                  if (rec.health_benefits) contextParts.push(`Health benefits: ${typeof rec.health_benefits === 'string' ? rec.health_benefits : JSON.stringify(rec.health_benefits)}`);
+                  if (rec.cooking_steps && Array.isArray(rec.cooking_steps)) {
+                    const stepTexts = rec.cooking_steps.map((s: any) => typeof s === 'string' ? s : s.text).filter(Boolean).slice(0, 5);
+                    if (stepTexts.length) contextParts.push(`Cooking steps: ${stepTexts.join(' | ')}`);
+                  }
+                  const context = contextParts.join('\n');
+                  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
+                  const abort = new AbortController();
+                  const timer = setTimeout(() => abort.abort(), 60_000);
+                  let res: Response;
+                  try {
+                    res = await fetch(url, {
+                      method: 'POST',
+                      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        tabType: adminFieldConfig[activeTab]?.label || activeTab,
+                        recordData: { ...rec, linked_ingredients: [] }, // clear so AI fills it
+                        fields: [{ key: 'linked_ingredients', label: 'Linked Ingredients', type: 'linked_ingredients' }],
+                        context,
+                      }),
+                      signal: abort.signal,
+                    });
+                  } catch (e: any) {
+                    clearTimeout(timer);
+                    toast.error(e?.name === 'AbortError' ? 'AI timed out. Try again.' : `Network error: ${e?.message}`);
+                    setAiIngredientSuggesting(false);
+                    return;
+                  } finally { clearTimeout(timer); }
+                  const data = await res.json();
+                  const raw: any[] = data?.filledFields?.linked_ingredients || [];
+                  // raw may be array of strings (names) or UUIDs
+                  const names: string[] = raw.map((r: any) => (typeof r === 'string' ? r : r.name || r.name_common || String(r))).filter(Boolean);
+                  if (names.length === 0) { toast.info('AI found no ingredients to suggest'); setAiIngredientSuggesting(false); return; }
+                  const results = names.map(name => ({ name, match: findSuggestMatch(name), score: 0, accepted: null as boolean | null, creating: false }));
+                  setAiIngredientSuggestResults(results);
+                } catch (e: any) {
+                  toast.error(`AI suggest failed: ${e?.message || e}`);
+                } finally {
+                  setAiIngredientSuggesting(false);
+                }
+              };
+
+              const acceptSuggest = (idx: number) => {
+                if (!aiIngredientSuggestResults) return;
+                const r = aiIngredientSuggestResults[idx];
+                if (!r.match) return;
+                if (!linkedIds.includes(r.match.id)) updateField([...linkedIds, r.match.id]);
+                setAiIngredientSuggestResults(prev => prev ? prev.map((x, i) => i === idx ? { ...x, accepted: true } : x) : prev);
+              };
+              const rejectSuggest = (idx: number) => setAiIngredientSuggestResults(prev => prev ? prev.map((x, i) => i === idx ? { ...x, accepted: false } : x) : prev);
+              const acceptAllSuggests = () => {
+                if (!aiIngredientSuggestResults) return;
+                const toAdd = aiIngredientSuggestResults.filter(r => r.match && r.accepted === null).map(r => r.match!.id);
+                updateField([...new Set([...linkedIds, ...toAdd])]);
+                setAiIngredientSuggestResults(prev => prev ? prev.map(r => r.match ? { ...r, accepted: true } : r) : prev);
+              };
+              const createSuggestSkeleton = async (idx: number) => {
+                if (!aiIngredientSuggestResults) return;
+                const r = aiIngredientSuggestResults[idx];
+                setAiIngredientSuggestResults(prev => prev ? prev.map((x, i) => i === idx ? { ...x, creating: true } : x) : prev);
+                try {
+                  const skeletonId = r.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                  const res2 = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/create`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table: 'catalog_ingredients', record: { id: skeletonId, name_common: r.name, category: 'unknown' } }),
+                  });
+                  if (res2.ok) {
+                    const newIng: AdminRecord = { id: skeletonId, name_common: r.name, category: 'unknown' };
+                    setIngredientsCache(prev => [...prev, newIng]);
+                    updateField([...new Set([...linkedIds, skeletonId])]);
+                    setAiIngredientSuggestResults(prev => prev ? prev.map((x, i) => i === idx ? { ...x, match: newIng, accepted: true, creating: false } : x) : prev);
+                  } else {
+                    setAiIngredientSuggestResults(prev => prev ? prev.map((x, i) => i === idx ? { ...x, creating: false } : x) : prev);
+                  }
+                } catch { setAiIngredientSuggestResults(prev => prev ? prev.map((x, i) => i === idx ? { ...x, creating: false } : x) : prev); }
+              };
+
+              const suggestPendingCount = aiIngredientSuggestResults ? aiIngredientSuggestResults.filter(r => r.accepted === null).length : 0;
+
               return (
                 <div key={field.key} className="space-y-1.5">
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label} <span className="text-gray-400 font-normal normal-case">({linkedIds.length} linked)</span></Label>
-                  {field.placeholder && linkedIds.length === 0 && (
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label} <span className="text-gray-400 font-normal normal-case">({linkedIds.length} linked)</span></Label>
+                    <button type="button" onClick={runAiIngredientSuggest} disabled={aiIngredientSuggesting || ingredientsCache.length === 0}
+                      className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 disabled:opacity-50 transition-colors">
+                      {aiIngredientSuggesting ? <><Loader2 className="w-3 h-3 animate-spin" /> Suggesting…</> : <><Sparkles className="w-3 h-3" /> AI Suggest</>}
+                    </button>
+                  </div>
+
+                  {/* AI Suggest Results Panel */}
+                  {aiIngredientSuggestResults && (
+                    <div className="rounded-xl border border-violet-200 bg-violet-50/60 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-violet-100 border-b border-violet-200">
+                        <span className="text-xs font-semibold text-violet-800">✨ AI Suggested Ingredients — {aiIngredientSuggestResults.length} found</span>
+                        <div className="flex gap-1.5">
+                          {suggestPendingCount > 0 && (
+                            <button type="button" onClick={acceptAllSuggests}
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+                              Accept All ({suggestPendingCount})
+                            </button>
+                          )}
+                          <button type="button" onClick={() => setAiIngredientSuggestResults(null)}
+                            className="text-[10px] text-violet-600 hover:text-red-600 px-1.5 py-0.5 rounded bg-white border border-violet-200 hover:border-red-200">✕ Close</button>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-violet-100 max-h-72 overflow-y-auto">
+                        {aiIngredientSuggestResults.map((result, idx) => (
+                          <div key={idx} className={`flex items-center gap-2 px-3 py-2 text-xs ${result.accepted === true ? 'bg-green-50' : result.accepted === false ? 'bg-gray-50 opacity-50' : 'bg-white'}`}>
+                            <span className="font-medium text-gray-700 w-36 truncate flex-shrink-0" title={result.name}>{result.name}</span>
+                            <span className="text-gray-300 flex-shrink-0">→</span>
+                            {result.match ? (
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                {result.match.image_url ? (
+                                  <img src={result.match.image_url} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0 border border-gray-100" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0 bg-emerald-100 text-emerald-700">
+                                    {(result.match.name_common || result.match.name || '?')[0].toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-gray-800 truncate">{result.match.name_common || result.match.name}</div>
+                                  {result.match.category && <span className="text-[9px] text-gray-400">{result.match.category}</span>}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="flex-1 text-gray-400 italic text-[10px]">No match in catalog</span>
+                            )}
+                            {result.accepted === true && <span className="text-green-600 font-bold flex-shrink-0">✓ Linked</span>}
+                            {result.accepted === false && <span className="text-gray-400 flex-shrink-0">Skipped</span>}
+                            {result.accepted === null && (
+                              <div className="flex gap-1 flex-shrink-0">
+                                {result.match && (
+                                  <button type="button" onClick={() => acceptSuggest(idx)}
+                                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-violet-600 text-white hover:bg-violet-700">✓ Link</button>
+                                )}
+                                <button type="button" onClick={() => createSuggestSkeleton(idx)} disabled={result.creating}
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50">
+                                  {result.creating ? '…' : '+ Create'}
+                                </button>
+                                <button type="button" onClick={() => rejectSuggest(idx)}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {field.placeholder && linkedIds.length === 0 && !aiIngredientSuggestResults && (
                     <p className="text-[11px] text-gray-400 italic">{field.placeholder}</p>
                   )}
                   {linkedIngredients.length > 0 && (
@@ -3986,10 +5236,28 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-gray-800 truncate">{ing.name_common || ing.name}</div>
-                            <div className="flex items-center gap-1 mt-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <div className="text-xs font-semibold text-gray-800 truncate flex-1">{ing.name_common || ing.name}</div>
+                              {ing.health_score != null && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                                  ing.health_score >= 75 ? 'bg-green-100 text-green-700' :
+                                  ing.health_score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>{ing.health_score}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center flex-wrap gap-1 mt-0.5">
                               {ing.category && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-200 text-emerald-800">{ing.category}</span>}
-                              {ing.processing_type && <span className="text-[9px] text-gray-400">{ing.processing_type}</span>}
+                              {(() => {
+                                const elems: string[] = Array.isArray(ing.elements_beneficial)
+                                  ? ing.elements_beneficial.slice(0, 3)
+                                  : typeof ing.elements_beneficial === 'string' && ing.elements_beneficial
+                                    ? String(ing.elements_beneficial).split(',').map((s: string) => s.trim()).slice(0, 3)
+                                    : [];
+                                return elems.map((el: string) => (
+                                  <span key={el} className="text-[9px] px-1 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium">{el}</span>
+                                ));
+                              })()}
                             </div>
                           </div>
                           <button type="button" onClick={() => updateField(linkedIds.filter((id: string) => id !== ing.id))}
@@ -4001,6 +5269,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   <input
                     value={ingredientSearchQuery}
                     onChange={(e) => setIngredientSearchQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                     placeholder={field.placeholder || 'Search ingredients to link...'}
                     className={inputCls}
                   />
@@ -4029,6 +5298,99 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               );
             }
 
+            // ── Element Sources Viewer ────────────────────────────────────────
+            if (field.type === 'element_sources_viewer') {
+              const elementId = editingRecord?.id as string | undefined;
+              const isLoaded = elementSourcesCache?.elementId === elementId;
+              const sources = isLoaded ? elementSourcesCache!.sources : [];
+              const fetchSources = async () => {
+                if (!elementId || elementSourcesLoading) return;
+                setElementSourcesLoading(true);
+                try {
+                  const metaEnv = (import.meta as any).env || {};
+                  const url = `${metaEnv.VITE_SUPABASE_URL}/rest/v1/catalog_ingredients?select=id,name_common,image_url,elements_beneficial,elements_hazardous&limit=1000`;
+                  const res = await fetch(url, { headers: { 'apikey': metaEnv.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken || metaEnv.VITE_SUPABASE_ANON_KEY}` } });
+                  if (res.ok) {
+                    const all: any[] = await res.json();
+                    const matching = all.filter(ing => {
+                      const ben = ing.elements_beneficial;
+                      const haz = ing.elements_hazardous;
+                      if (ben && typeof ben === 'object') {
+                        const keys = Object.keys(ben);
+                        if (keys.includes(elementId)) return true;
+                        for (const k of keys) {
+                          const section = ben[k];
+                          if (section && typeof section === 'object' && Object.keys(section).includes(elementId)) return true;
+                        }
+                      }
+                      if (haz && typeof haz === 'object' && Object.keys(haz).includes(elementId)) return true;
+                      return false;
+                    });
+                    setElementSourcesCache({ elementId, sources: matching });
+                  }
+                } catch (e) { console.error('[Admin] Failed to fetch element sources:', e); }
+                finally { setElementSourcesLoading(false); }
+              };
+              const getQty = (ing: any): string => {
+                const ben = ing.elements_beneficial;
+                if (ben && typeof ben === 'object') {
+                  if (ben[elementId!] !== undefined) {
+                    const v = ben[elementId!];
+                    if (typeof v === 'object' && v !== null) return v.per_100g != null ? `${v.per_100g}` : '';
+                    if (typeof v === 'number') return `${v}`;
+                  }
+                  for (const k of Object.keys(ben)) {
+                    const section = ben[k];
+                    if (section && typeof section === 'object' && section[elementId!] !== undefined) {
+                      const v = section[elementId!];
+                      if (typeof v === 'object' && v !== null) return v.per_100g != null ? `${v.per_100g}` : '';
+                      if (typeof v === 'number') return `${v}`;
+                    }
+                  }
+                }
+                return '';
+              };
+              return (
+                <div key={field.key} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
+                    <button type="button" onClick={fetchSources} disabled={elementSourcesLoading}
+                      className="h-6 px-2 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 font-medium disabled:opacity-50">
+                      {elementSourcesLoading ? 'Loading…' : isLoaded ? `↻ Refresh (${sources.length})` : 'Load Ingredients'}
+                    </button>
+                  </div>
+                  {isLoaded && sources.length === 0 && (
+                    <div className="text-center py-4 text-[11px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
+                      No ingredients found containing this element
+                    </div>
+                  )}
+                  {isLoaded && sources.length > 0 && (
+                    <div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-1">
+                      {sources.map((ing: any) => {
+                        const qty = getQty(ing);
+                        const name = ing.name_common || ing.name || ing.id;
+                        const initials = name.slice(0, 2).toUpperCase();
+                        return (
+                          <button key={ing.id} type="button" onClick={() => openIngredientRecord(ing)}
+                            className="flex items-center gap-2 p-1.5 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 text-left transition-all group">
+                            {ing.image_url ? (
+                              <img src={ing.image_url} alt={name} className="w-8 h-8 rounded-md object-cover flex-shrink-0 border border-gray-100" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-md bg-gradient-to-br from-green-100 to-emerald-200 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-green-700">{initials}</div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] font-medium text-gray-800 truncate group-hover:text-blue-700">{name}</div>
+                              {qty && <div className="text-[9px] text-green-700 font-mono">{qty} / 100g</div>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             if (field.type === 'json') {
               const jsonStr = typeof val === 'string' ? val : JSON.stringify(val || {}, null, 2);
               return (
@@ -4047,6 +5409,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             if (field.type === 'grouped_ingredients') {
               // Data: Array of {name, ingredient_id} | {group, items:[{name, ingredient_id}]}
               const rawItems: any[] = Array.isArray(val) ? val : [];
+              console.log('[Grouped Ingredients Render] rawItems:', rawItems);
 
               // Fuzzy score: 1.0 = exact, 0.0 = no match
               const fuzzyScore = (a: string, b: string): number => {
@@ -4086,9 +5449,16 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 const unique = [...new Set(names)];
                 const results = unique.map(name => {
                   const { match, score } = findBestMatch(name);
-                  return { name, match, score, accepted: null as boolean | null, creating: false };
+                  const autoAccept = match && score >= 0.85;
+                  return { name, match, score, accepted: autoAccept ? true : null as boolean | null, creating: false };
                 });
                 setAutoLinkResults(results);
+                // Auto-link high-confidence matches immediately
+                const currentLinked: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                const newIds = results.filter(r => r.accepted === true && r.match).map(r => r.match!.id).filter(id => !currentLinked.includes(id));
+                if (newIds.length > 0) {
+                  setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: [...currentLinked, ...newIds] }));
+                }
               };
 
               const acceptAutoLink = (idx: number) => {
@@ -4153,8 +5523,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
               const updateItems = (newItems: any[]) => updateField(newItems);
 
-              const addItem = () => updateItems([...rawItems, { name: '', ingredient_id: null }]);
-              const addGroup = () => updateItems([...rawItems, { group: 'Group Name', items: [{ name: '', ingredient_id: null }] }]);
+              const addItem = () => updateItems([...rawItems, { name: '', ingredient_id: null, qty_g: null, unit: 'g' }]);
+              const addGroup = () => updateItems([...rawItems, { group: 'Group Name', items: [{ name: '', ingredient_id: null, qty_g: null, unit: 'g' }] }]);
 
               const updateEntry = (idx: number, patch: any) => {
                 const next = [...rawItems];
@@ -4178,61 +5548,297 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               };
               const addChild = (parentIdx: number) => {
                 const next = [...rawItems];
-                const group = { ...next[parentIdx], items: [...(next[parentIdx].items || []), { name: '', ingredient_id: null }] };
+                const group = { ...next[parentIdx], items: [...(next[parentIdx].items || []), { name: '', ingredient_id: null, qty_g: null, unit: 'g' }] };
                 next[parentIdx] = group;
                 updateItems(next);
               };
 
               const pendingCount = autoLinkResults ? autoLinkResults.filter(r => r.accepted === null).length : 0;
 
+              const runAiGroupedSuggest = async () => {
+                if (aiIngredientSuggesting) return;
+                setAiIngredientSuggesting(true);
+                setAutoLinkResults(null);
+                try {
+                  const rec = editingRecord || {};
+                  const contextParts: string[] = [];
+                  if (rec.description_simple) contextParts.push(`Description: ${rec.description_simple}`);
+                  if (rec.description) contextParts.push(`Description: ${rec.description}`);
+                  if (rec.description_processing) contextParts.push(`Processing: ${rec.description_processing}`);
+                  if (rec.health_benefits) contextParts.push(`Health benefits: ${typeof rec.health_benefits === 'string' ? rec.health_benefits : JSON.stringify(rec.health_benefits)}`);
+                  const context = contextParts.join('\n');
+                  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
+                  const abort = new AbortController();
+                  const timer = setTimeout(() => abort.abort(), 60_000);
+                  let res: Response;
+                  try {
+                    res = await fetch(url, {
+                      method: 'POST',
+                      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        tabType: adminFieldConfig[activeTab]?.label || activeTab,
+                        recordData: { ...rec, ingredients: [] },
+                        fields: [{ key: 'ingredients', label: 'Ingredients', type: 'grouped_ingredients' }],
+                        context,
+                      }),
+                      signal: abort.signal,
+                    });
+                  } catch (e: any) {
+                    clearTimeout(timer);
+                    toast.error(e?.name === 'AbortError' ? 'AI timed out. Try again.' : `Network error: ${e?.message}`);
+                    setAiIngredientSuggesting(false);
+                    return;
+                  } finally { clearTimeout(timer); }
+                  const data = await res.json();
+                  // AI returns array of {name, ingredient_id} | {group, items:[...]}
+                  const suggested: any[] = data?.filledFields?.ingredients || [];
+                  if (suggested.length === 0) { toast.info('AI found no ingredients to suggest'); setAiIngredientSuggesting(false); return; }
+                  // Merge with existing items (don't overwrite)
+                  const existingNames = new Set<string>();
+                  for (const e of rawItems) {
+                    if (e.group !== undefined) { for (const c of (e.items || [])) if (c.name) existingNames.add(c.name.toLowerCase()); }
+                    else if (e.name) existingNames.add(e.name.toLowerCase());
+                  }
+                  const newItems = suggested.filter((e: any) => {
+                    if (e.group !== undefined) return true;
+                    return !existingNames.has((e.name || '').toLowerCase());
+                  }).map((e: any) => {
+                    if (e.group !== undefined) {
+                      return { group: e.group, items: (e.items || []).map((c: any) => ({ name: c.name || '', ingredient_id: resolveIngredient(c.name || ''), qty_g: c.qty_g ?? null, unit: c.unit || 'g' })) };
+                    }
+                    return { name: e.name || '', ingredient_id: resolveIngredient(e.name || ''), qty_g: e.qty_g ?? null, unit: e.unit || 'g' };
+                  });
+                  const merged = [...rawItems, ...newItems];
+                  updateItems(merged);
+                  toast.success(`AI added ${newItems.length} ingredient${newItems.length !== 1 ? 's' : ''} — click Auto-Link to match catalog records`);
+                  // Auto-trigger Auto-Link on the merged list
+                  const allNames: string[] = [];
+                  for (const entry of merged) {
+                    if (entry.group !== undefined) { for (const child of (entry.items || [])) if (child.name) allNames.push(child.name); }
+                    else if (entry.name) allNames.push(entry.name);
+                  }
+                  const unique = [...new Set(allNames)];
+                  const linkResults = unique.map(name => { const { match, score } = findBestMatch(name); const autoAccept = match && score >= 0.85; return { name, match, score, accepted: autoAccept ? true : null as boolean | null, creating: false }; });
+                  setAutoLinkResults(linkResults);
+                  // Auto-link high-confidence matches immediately
+                  const curLinked: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                  const autoIds = linkResults.filter(r => r.accepted === true && r.match).map(r => r.match!.id).filter(id => !curLinked.includes(id));
+                  if (autoIds.length > 0) {
+                    setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: [...curLinked, ...autoIds] }));
+                  }
+                } catch (e: any) {
+                  toast.error(`AI suggest failed: ${e?.message || e}`);
+                } finally {
+                  setAiIngredientSuggesting(false);
+                }
+              };
+
               return (
-                <div key={field.key} className="grid grid-cols-2 gap-4">
-                  {/* LEFT: Ingredients list */}
-                  <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
+                <div key={field.key} className="space-y-3">
+                  {/* AI Enrich All banner */}
+                  <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-violet-50 border border-violet-200">
+                    <span className="text-xs font-semibold text-violet-700">Ingredients &amp; Steps</span>
+                    <button type="button" onClick={handleAiEnrichRecipe} disabled={generatingRecipeEnrich}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg bg-white hover:bg-violet-50 text-violet-700 border border-violet-300 disabled:opacity-50 transition-colors shadow-sm">
+                      {generatingRecipeEnrich ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {generatingRecipeEnrich ? 'Enriching & Saving…' : 'AI Enrich All'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                  {/* COL 1: Equipment */}
+                  <div className="space-y-2 border-r border-gray-100 pr-4">
+                    <CookingToolsField
+                      val={editingRecord?.equipment}
+                      updateField={(v) => setEditingRecord((prev: any) => ({ ...prev, equipment: v }))}
+                      accessToken={accessToken}
+                      onAiEnrich={handleAiEnrichRecipe}
+                      enriching={generatingRecipeEnrich}
+                    />
+                  </div>
+
+                  {/* COL 2: Ingredients — image+text tags + search to link */}
+                  <div className="space-y-2 border-r border-gray-100 pr-4">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      {field.label}
-                      {(() => { const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : []; return linkedIds.length > 0 ? <span className="text-gray-400 font-normal normal-case ml-1">({linkedIds.length} linked)</span> : null; })()}
+                      🥗 Ingredients
+                      {(() => { const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : []; return linkedIds.length > 0 ? <span className="ml-1 text-[10px] font-light italic text-gray-400 normal-case tracking-normal">{linkedIds.length} linked</span> : null; })()}
                     </Label>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1 flex-wrap">
+                      <button type="button" onClick={runAiGroupedSuggest} disabled={aiIngredientSuggesting || ingredientsCache.length === 0}
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 disabled:opacity-50 transition-colors">
+                        {aiIngredientSuggesting ? <><Loader2 className="w-3 h-3 animate-spin" />…</> : <><Sparkles className="w-3 h-3" /> AI Enrich</>}
+                      </button>
                       {rawItems.length > 0 && (
                         <button type="button" onClick={runAutoLink}
-                          className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors">
-                          Auto-Link
+                          className="text-[10px] text-emerald-700 hover:text-emerald-900 font-semibold px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors">
+                          Link
                         </button>
                       )}
                       <button type="button" onClick={addGroup}
-                        className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">+ Group</button>
+                        className="text-[10px] text-purple-600 hover:text-purple-800 font-medium px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors">+ Grp</button>
                       <button type="button" onClick={addItem}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">+ Item</button>
+                        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">+ Item</button>
                     </div>
                   </div>
+
+                  {/* Linked ingredients with qty per portion + equipment images */}
+                  {(() => {
+                    const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                    const linkedIngs = ingredientsCache.filter((ing: AdminRecord) => linkedIds.includes(ing.id));
+                    const rawItems: any[] = Array.isArray(editingRecord?.ingredients) ? editingRecord.ingredients : [];
+                    const getQty = (ingId: string) => {
+                      for (const entry of rawItems) {
+                        if (entry?.group !== undefined) {
+                          for (const child of (entry.items || [])) {
+                            if (child.ingredient_id === ingId) return { qty_g: child.qty_g, unit: child.unit };
+                          }
+                        } else if (entry?.ingredient_id === ingId) {
+                          return { qty_g: entry.qty_g, unit: entry.unit };
+                        }
+                      }
+                      return null;
+                    };
+                    // Get equipment records for selected tools
+                    const selectedEquipment: string[] = Array.isArray(editingRecord?.equipment) ? editingRecord.equipment : [];
+                    const equipmentRecords = selectedEquipment.map(name => equipmentCache.find(e => e.name === name)).filter(Boolean);
+                    
+                    if (linkedIngs.length === 0 && equipmentRecords.length === 0) return null;
+                    return (
+                      <div className="space-y-1 pb-1">
+                        {linkedIngs.map((ing: AdminRecord) => {
+                          const qty = getQty(ing.id);
+                          return (
+                            <div key={ing.id} className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5">
+                              {ing.image_url ? (
+                                <img src={ing.image_url} alt="" className="w-7 h-7 rounded-md object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-md bg-emerald-200 flex items-center justify-center text-[10px] font-bold text-emerald-700 flex-shrink-0">
+                                  {(ing.name_common || ing.name || '?')[0].toUpperCase()}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                {qty && qty.qty_g != null && (
+                                  <span className="text-[10px] font-semibold text-emerald-700 flex-shrink-0">
+                                    {qty.qty_g}g
+                                  </span>
+                                )}
+                                {qty && qty.qty_g != null && <span className="text-gray-400 text-[10px]">•</span>}
+                                <span className="text-[10px] font-medium text-gray-800 truncate">{ing.name_common || ing.name}</span>
+                              </div>
+                              <button type="button" onClick={() => {
+                                const cur: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                                setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: cur.filter((id: string) => id !== ing.id) }));
+                              }} className="text-gray-300 hover:text-red-500 text-sm font-bold leading-none flex-shrink-0">&times;</button>
+                            </div>
+                          );
+                        })}
+                        {equipmentRecords.length > 0 && (
+                          <>
+                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider pt-1">Equipment</div>
+                            {equipmentRecords.map((eq: any) => (
+                              <div key={eq.id} className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5">
+                                {eq.image_url ? (
+                                  <img src={eq.image_url} alt="" className="w-7 h-7 rounded-md object-cover flex-shrink-0" />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-md bg-orange-200 flex items-center justify-center text-[10px] font-bold text-orange-700 flex-shrink-0">
+                                    🔧
+                                  </div>
+                                )}
+                                <span className="text-[10px] font-medium text-gray-800 truncate flex-1">{eq.name}</span>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Ingredient search to add */}
+                  {(() => {
+                    const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                    const available = ingredientsCache.filter((ing: AdminRecord) => !linkedIds.includes(ing.id) && (!ingredientSearchQuery || (ing.name_common || ing.name || '').toLowerCase().includes(ingredientSearchQuery.toLowerCase()))).slice(0, 8);
+                    return (
+                      <div className="space-y-1">
+                        <input
+                          value={ingredientSearchQuery}
+                          onChange={e => setIngredientSearchQuery(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                          placeholder="Search to link ingredient..."
+                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                        {ingredientSearchQuery && available.length > 0 && (
+                          <div className="border border-gray-200 rounded-lg max-h-36 overflow-y-auto bg-white">
+                            {available.map((ing: AdminRecord) => (
+                              <button key={ing.id} type="button"
+                                onClick={() => {
+                                  const cur: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                                  if (!cur.includes(ing.id)) setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: [...cur, ing.id] }));
+                                  setIngredientSearchQuery('');
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-emerald-50 border-b border-gray-100 last:border-b-0 flex items-center gap-2">
+                                {ing.image_url ? (
+                                  <img src={ing.image_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold flex items-center justify-center flex-shrink-0">
+                                    {(ing.name_common || ing.name || '?')[0].toUpperCase()}
+                                  </span>
+                                )}
+                                <span className="font-medium flex-1 truncate">{ing.name_common || ing.name}</span>
+                                <span className="text-[9px] text-gray-400 flex-shrink-0">{ing.category}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Auto-Link Results Panel */}
                   {autoLinkResults && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 overflow-hidden">
                       <div className="flex items-center justify-between px-3 py-2 bg-emerald-100 border-b border-emerald-200">
-                        <span className="text-xs font-semibold text-emerald-800">🔗 Auto-Link Results — {autoLinkResults.length} ingredients</span>
+                        <span className="text-xs font-semibold text-emerald-800">🔗 Auto-Link — {autoLinkResults.length}</span>
                         <div className="flex gap-1.5">
                           {pendingCount > 0 && (
                             <button type="button" onClick={acceptAll}
                               className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
-                              Accept All Matches ({autoLinkResults.filter(r => r.match && r.accepted === null).length})
+                              Accept All ({autoLinkResults.filter(r => r.match && r.accepted === null).length})
                             </button>
                           )}
                           <button type="button" onClick={() => setAutoLinkResults(null)}
                             className="text-[10px] text-emerald-600 hover:text-red-600 px-1.5 py-0.5 rounded bg-white border border-emerald-200 hover:border-red-200">
-                            ✕ Close
+                            ✕
                           </button>
                         </div>
                       </div>
-                      <div className="divide-y divide-emerald-100 max-h-72 overflow-y-auto">
+                      <div className="divide-y divide-emerald-100 max-h-48 overflow-y-auto">
                         {autoLinkResults.map((result, idx) => (
                           <div key={idx} className={`flex items-center gap-2 px-3 py-2 text-xs ${result.accepted === true ? 'bg-green-50' : result.accepted === false ? 'bg-gray-50 opacity-50' : 'bg-white'}`}>
-                            {/* Ingredient name */}
-                            <span className="font-medium text-gray-700 w-36 truncate flex-shrink-0" title={result.name}>{result.name}</span>
+                            <input
+                              value={result.name}
+                              onChange={(e) => {
+                                const nx = [...autoLinkResults];
+                                nx[idx] = { ...nx[idx], name: e.target.value };
+                                setAutoLinkResults(nx);
+                              }}
+                              className="font-medium text-gray-700 w-28 px-1.5 py-0.5 border border-gray-200 rounded text-xs bg-white focus:ring-1 focus:ring-emerald-400 flex-shrink-0"
+                              placeholder="Ingredient name"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nx = [...autoLinkResults];
+                                const newMatch = findBestMatch(result.name);
+                                nx[idx] = { ...nx[idx], match: newMatch.match, score: newMatch.score };
+                                setAutoLinkResults(nx);
+                              }}
+                              className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold flex-shrink-0"
+                              title="Re-match"
+                            >
+                              ↻
+                            </button>
                             <span className="text-gray-300 flex-shrink-0">→</span>
-                            {/* Match result */}
                             {result.match ? (
                               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                 {result.match.image_url ? (
@@ -4246,20 +5852,19 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                                 <span className="text-[9px] text-gray-400 flex-shrink-0">{Math.round(result.score * 100)}%</span>
                               </div>
                             ) : (
-                              <span className="flex-1 text-gray-400 italic text-[10px]">No match found</span>
+                              <span className="flex-1 text-gray-400 italic text-[10px]">No match</span>
                             )}
-                            {/* Actions */}
-                            {result.accepted === true && <span className="text-green-600 font-bold flex-shrink-0">✓ Linked</span>}
-                            {result.accepted === false && <span className="text-gray-400 flex-shrink-0">Skipped</span>}
+                            {result.accepted === true && <span className="text-green-600 font-bold flex-shrink-0">✓</span>}
+                            {result.accepted === false && <span className="text-gray-400 flex-shrink-0">–</span>}
                             {result.accepted === null && (
                               <div className="flex gap-1 flex-shrink-0">
                                 {result.match && (
                                   <button type="button" onClick={() => acceptAutoLink(idx)}
-                                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700">✓ Link</button>
+                                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700">✓</button>
                                 )}
                                 <button type="button" onClick={() => createSkeleton(idx)} disabled={result.creating}
-                                  className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50">
-                                  {result.creating ? '…' : '+ Create'}
+                                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50">
+                                  {result.creating ? '…' : '+'}
                                 </button>
                                 <button type="button" onClick={() => rejectAutoLink(idx)}
                                   className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200">✕</button>
@@ -4270,13 +5875,15 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       </div>
                     </div>
                   )}
+
+                  {/* Ingredient qty + group editor — always visible */}
+                  <div className="space-y-1.5">
                   {rawItems.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">No items. Click + Item or + Group to start.</p>
+                    <p className="text-[10px] text-gray-400 italic">No items yet — click + Item or + Grp above.</p>
                   ) : (
                     <div className="space-y-1.5">
                       {rawItems.map((entry: any, idx: number) => {
                         if (entry && entry.group !== undefined) {
-                          // GROUP entry
                           return (
                             <div key={idx} className="border border-purple-200 rounded-lg overflow-hidden">
                               <div className="flex items-center gap-1.5 px-2 py-1.5 bg-purple-50">
@@ -4298,86 +5905,108 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                                     ? ingredientsCache.find((ing: AdminRecord) => ing.id === child.ingredient_id)
                                     : null;
                                   return (
-                                    <div key={cidx} className="flex items-center gap-1.5 pl-3">
+                                    <div key={cidx} className="flex items-center gap-1 pl-3">
                                       <span className="text-gray-300 text-xs">└</span>
-                                      <input
-                                        value={child.name || ''}
-                                        onChange={(e) => {
-                                          const resolved = resolveIngredient(e.target.value);
-                                          updateChild(idx, cidx, { name: e.target.value, ingredient_id: resolved });
-                                        }}
-                                        className={`flex-1 h-6 px-2 text-xs border rounded bg-white focus:ring-1 focus:ring-purple-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
-                                        placeholder="Ingredient name"
-                                      />
-                                      {linked ? (
-                                        <span className="text-[9px] text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full truncate max-w-[80px]" title={linked.id}>✓ {linked.name_common}</span>
+                                      {linked?.image_url ? (
+                                        <img src={linked.image_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
                                       ) : (
-                                        <span className="text-[9px] text-gray-300 w-[80px]">no link</span>
+                                        <div className="w-5 h-5 rounded bg-purple-100 flex items-center justify-center text-[8px] font-bold text-purple-600 flex-shrink-0">
+                                          {(linked?.name_common || child?.name || '?')[0]?.toUpperCase() || '?'}
+                                        </div>
                                       )}
-                                      <button type="button" onClick={() => removeChild(idx, cidx)}
-                                        className="text-red-400 hover:text-red-600 text-sm px-1 rounded hover:bg-red-50">&times;</button>
+                                      <select
+                                        value={child.ingredient_id || ''}
+                                        onChange={(e) => {
+                                          const ing = ingredientsCache.find((i: AdminRecord) => i.id === e.target.value);
+                                          updateChild(idx, cidx, { ingredient_id: e.target.value, name: ing ? (ing.name_common || ing.name) : child?.name });
+                                        }}
+                                        title="Select ingredient"
+                                        className={`flex-1 h-6 px-1.5 text-xs border rounded bg-white focus:ring-1 focus:ring-purple-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
+                                      >
+                                        <option value="">{child.name || '— select —'}</option>
+                                        {ingredientsCache.map((ing: AdminRecord) => (
+                                          <option key={ing.id} value={ing.id}>{ing.name_common || ing.name}</option>
+                                        ))}
+                                      </select>
+                                      <input type="number" value={child.qty_g ?? ''} onChange={(e) => updateChild(idx, cidx, { qty_g: e.target.value ? parseFloat(e.target.value) : null })} className="w-14 h-6 px-1.5 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-purple-300 text-right" placeholder="qty" min="0" step="any" />
+                                      <select value={child.unit || 'g'} onChange={(e) => updateChild(idx, cidx, { unit: e.target.value })} className="h-6 px-1 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-purple-300" title="Unit">
+                                        {['g','ml','kg','L','tsp','tbsp','cup','oz','lb','piece','slice','pinch'].map(u => <option key={u} value={u}>{u}</option>)}
+                                      </select>
+                                      <button type="button" onClick={() => removeChild(idx, cidx)} className="text-red-400 hover:text-red-600 text-sm px-1 rounded hover:bg-red-50">&times;</button>
                                     </div>
                                   );
                                 })}
-                                {(entry.items || []).length === 0 && (
-                                  <p className="text-[10px] text-gray-400 italic pl-3">No children. Click + Add.</p>
-                                )}
+                                {(entry.items || []).length === 0 && <p className="text-[10px] text-gray-400 italic pl-3">No children. Click + Add.</p>}
                               </div>
                             </div>
                           );
                         }
-                        // PLAIN item entry
-                        const linked = entry?.ingredient_id
-                          ? ingredientsCache.find((ing: AdminRecord) => ing.id === entry.ingredient_id)
-                          : null;
+                        const linked = entry?.ingredient_id ? ingredientsCache.find((ing: AdminRecord) => ing.id === entry.ingredient_id) : null;
                         return (
-                          <div key={idx} className="flex items-center gap-1.5">
-                            <input
-                              value={entry?.name || ''}
-                              onChange={(e) => {
-                                const resolved = resolveIngredient(e.target.value);
-                                updateEntry(idx, { name: e.target.value, ingredient_id: resolved });
-                              }}
-                              className={`flex-1 h-7 px-2 text-xs border rounded bg-white focus:ring-1 focus:ring-blue-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
-                              placeholder="Ingredient name"
-                            />
-                            {linked ? (
-                              <span className="text-[9px] text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full truncate max-w-[90px]" title={linked.id}>✓ {linked.name_common}</span>
+                          <div key={idx} className="flex items-center gap-1">
+                            {linked?.image_url ? (
+                              <img src={linked.image_url} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
                             ) : (
-                              <span className="text-[9px] text-gray-300 w-[90px]">no link</span>
+                              <div className="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center text-[9px] font-bold text-emerald-600 flex-shrink-0">
+                                {(linked?.name_common || entry?.name || '?')[0]?.toUpperCase() || '?'}
+                              </div>
                             )}
-                            <button type="button" onClick={() => removeEntry(idx)}
-                              className="text-red-400 hover:text-red-600 px-2 text-sm shrink-0 rounded-lg hover:bg-red-50 transition-colors">&times;</button>
+                            <select
+                              value={entry?.ingredient_id || ''}
+                              onChange={(e) => {
+                                const ing = ingredientsCache.find((i: AdminRecord) => i.id === e.target.value);
+                                updateEntry(idx, { ingredient_id: e.target.value, name: ing ? (ing.name_common || ing.name) : entry?.name });
+                              }}
+                              title="Select ingredient"
+                              className={`flex-1 h-7 px-1.5 text-xs border rounded bg-white focus:ring-1 focus:ring-blue-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
+                            >
+                              <option value="">{entry?.name || '— select ingredient —'}</option>
+                              {ingredientsCache.map((ing: AdminRecord) => (
+                                <option key={ing.id} value={ing.id}>{ing.name_common || ing.name}</option>
+                              ))}
+                            </select>
+                            <input type="number" value={entry?.qty_g ?? ''} onChange={(e) => updateEntry(idx, { qty_g: e.target.value ? parseFloat(e.target.value) : null })} className="w-14 h-7 px-1.5 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-blue-300 text-right" placeholder="qty" min="0" step="any" />
+                            <select value={entry?.unit || 'g'} onChange={(e) => updateEntry(idx, { unit: e.target.value })} className="h-7 px-1 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-blue-300" title="Unit">
+                              {['g','ml','kg','L','tsp','tbsp','cup','oz','lb','piece','slice','pinch'].map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                            <button type="button" onClick={() => removeEntry(idx)} className="text-red-400 hover:text-red-600 px-1.5 text-sm shrink-0 rounded hover:bg-red-50">&times;</button>
                           </div>
                         );
                       })}
                     </div>
                   )}
-                  </div>{/* end left col */}
+                  </div>
+                  </div>{/* end col 2 */}
 
-                  {/* RIGHT: Tools */}
-                  <CookingToolsField
-                    val={editingRecord?.equipment}
-                    updateField={(v) => setEditingRecord((prev: any) => ({ ...prev, equipment: v }))}
-                  />
+                  {/* COL 3: Cooking Steps */}
+                  <div className="space-y-2">
+                    {(() => {
+                      const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                      const linkedIngs = ingredientsCache.filter((ing: AdminRecord) => linkedIds.includes(ing.id));
+                      return (
+                        <CookingStepsField
+                          val={editingRecord?.instructions}
+                          updateField={(v) => setEditingRecord((prev: any) => ({ ...prev, instructions: v }))}
+                          accessToken={accessToken as string}
+                          linkedIngredients={linkedIngs}
+                          allIngredients={ingredientsCache}
+                          recordData={editingRecord}
+                          catalogEquipment={equipmentCache}
+                        />
+                      );
+                    })()}
+                  </div>
+                  </div>{/* end grid */}
                 </div>
               );
             }
 
+            if (field.type === 'cooking_tools') {
+              return null; // rendered inside grouped_ingredients 3-col layout above
+            }
+
             if (field.type === 'cooking_steps') {
-              const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
-              const linkedIngs = ingredientsCache.filter((ing: AdminRecord) => linkedIds.includes(ing.id));
-              return (
-                <div key={field.key}>
-                  <CookingStepsField
-                    val={val}
-                    updateField={updateField}
-                    accessToken={accessToken as string}
-                    linkedIngredients={linkedIngs}
-                    recordData={editingRecord}
-                  />
-                </div>
-              );
+              return null; // rendered inside grouped_ingredients 3-col layout above
             }
 
             if (field.type === 'array') {
@@ -4429,11 +6058,25 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               );
             }
 
-            // Default: text input
+            // Default: text input (or JSON textarea for complex objects)
+            if (val !== null && val !== undefined && typeof val === 'object') {
+              const jsonStr = JSON.stringify(val, null, 2);
+              return (
+                <div key={field.key} className="space-y-1.5">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
+                  <textarea
+                    title={field.label}
+                    value={jsonStr}
+                    onChange={(e) => { try { updateField(JSON.parse(e.target.value)); } catch { updateField(e.target.value); } }}
+                    className={`${textareaCls} min-h-24 font-mono text-xs`}
+                  />
+                </div>
+              );
+            }
             return (
               <div key={field.key} className="space-y-1.5">
                 <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
-                <input value={typeof val === 'string' || typeof val === 'number' ? String(val) : val || ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className={inputCls} />
+                <input value={typeof val === 'string' || typeof val === 'number' ? String(val) : ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className={inputCls} />
               </div>
             );
           };
@@ -4471,25 +6114,105 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             }
           });
 
+          const SECTION_EMOJI: Record<string, string> = {
+            'Media': '🖼️', 'Basic Info': '📋', 'Identity': '🔬', 'Chemistry': '⚗️',
+            'Summary': '📝', 'Descriptions': '📄', 'Flavor Profile': '👅',
+            'Cooking Details': '🍳', 'Culinary Origin': '🌍', 'Processing': '⚙️',
+            'Ingredients': '🥗', 'Ingredients & Steps': '📖',
+            'Functions & Benefits': '✅', 'Hazards & Risks': '⚠️',
+            'Nutrition Data': '🧪', 'Health & Scoring': '💯', 'Scoring': '📊',
+            'Thresholds & Range': '📏', 'DRV by Population': '👥',
+            'Food Sources': '🌱', 'Detailed Sections': '📚',
+            'Deficiency & Excess': '⚖️', 'Interactions': '🔗',
+            'Detox & Exposure': '🛡️', 'References & Meta': '📎', 'Content': '📰',
+          };
+
           const renderSections = (filterFn?: (sectionName: string) => boolean) =>
             [...sections.entries()]
               .filter(([sectionName]) => !filterFn || filterFn(sectionName))
               .map(([sectionName, fields]) => {
                 const isMediaSection = sectionName === 'Media';
                 const isBasicInfoSection = sectionName === 'Basic Info';
-                const sectionCols = isMediaSection ? 5 : isBasicInfoSection ? 3 : 2;
+                const isSummarySection = sectionName === 'Summary';
+                const sectionCols = isMediaSection ? 5 : (isBasicInfoSection || isSummarySection) ? 3 : 2;
                 const sKey = `sec_${activeTab}_${sectionName}`;
                 const secOpen = isSectionOpen(sKey);
-                const showAiButton = ['Basic Info', 'Processing', 'Nutrition Data', 'Hazards & Risks', 'Ingredients', 'Descriptions', 'Flavor Profile', 'Cooking Details', 'Identity', 'Summary', 'Culinary Origin', 'Media'].includes(sectionName);
+                const showAiButton = ['Basic Info', 'Processing', 'Nutrition Data', 'Hazards & Risks', 'Ingredients', 'Descriptions', 'Flavor Profile', 'Cooking Details', 'Identity', 'Summary', 'Culinary Origin', 'Media',
+                  'Functions & Benefits', 'Thresholds & Range', 'Food Sources', 'Detailed Sections', 'Deficiency & Excess', 'Interactions', 'Detox & Exposure', 'References & Meta', 'Health & Scoring', 'Chemistry', 'Scoring',
+                ].includes(sectionName);
                 const isFillingSec = aiFillingSection === sectionName;
+                const isVecOpen = vecSearchSection === sectionName;
+
+                // Determine which catalog to search and which field to append to
+                const vecCatalog: 'ingredients' | 'elements' | 'both' = (() => {
+                  if (['Ingredients', 'Food Sources', 'Cooking Details', 'Ingredients & Steps'].includes(sectionName)) return 'ingredients';
+                  if (['Functions & Benefits', 'Hazards & Risks', 'Nutrition Data', 'Health & Scoring', 'Scoring'].includes(sectionName)) return 'elements';
+                  return 'both';
+                })();
+
+                // Fuzzy search over the relevant catalog
+                const vecResults: AdminRecord[] = (() => {
+                  if (!isVecOpen || !vecSearchQuery.trim()) return [];
+                  const q = vecSearchQuery.toLowerCase();
+                  const fuzzy = (r: AdminRecord) =>
+                    (r.name_common || r.name || '').toLowerCase().includes(q) ||
+                    (r.name_other || '').toLowerCase().includes(q) ||
+                    (r.category || '').toLowerCase().includes(q);
+                  if (vecCatalog === 'ingredients') return ingredientsCache.filter(fuzzy).slice(0, 10);
+                  if (vecCatalog === 'elements') return elementsCache.filter(fuzzy).slice(0, 10);
+                  // both: interleave results from each catalog, tag with _source
+                  const ings = ingredientsCache.filter(fuzzy).slice(0, 5).map(r => ({ ...r, _vecSource: 'ingredient' }));
+                  const els = elementsCache.filter(fuzzy).slice(0, 5).map(r => ({ ...r, _vecSource: 'element' }));
+                  return [...ings, ...els];
+                })();
+
+                // Add a selected item to the right field on editingRecord
+                const handleVecSelect = (item: AdminRecord) => {
+                  if (!editingRecord) return;
+                  const src = (item as any)._vecSource;
+                  const isIngredient = vecCatalog === 'ingredients' || src === 'ingredient';
+                  const isElement = vecCatalog === 'elements' || src === 'element';
+                  if (isIngredient) {
+                    const cur: string[] = Array.isArray(editingRecord.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                    if (!cur.includes(item.id)) {
+                      setEditingRecord((prev: any) => ({ ...prev, linked_ingredients: [...cur, item.id] }));
+                    }
+                  } else if (isElement) {
+                    const isBenSection = ['Functions & Benefits', 'Nutrition Data', 'Health & Scoring', 'Scoring'].includes(sectionName);
+                    const fieldKey = isBenSection ? 'elements_beneficial' : 'elements_hazardous';
+                    const cur: string[] = Array.isArray(editingRecord[fieldKey]) ? editingRecord[fieldKey] : [];
+                    const name = item.name_common || item.name || '';
+                    if (!cur.includes(name)) {
+                      setEditingRecord((prev: any) => ({ ...prev, [fieldKey]: [...cur, name] }));
+                    }
+                  }
+                  setVecSearchQuery('');
+                };
+
                 return (
                   <div key={sectionName} className="pt-2">
                     <div className="flex items-center gap-2 mb-2">
                       <button type="button" onClick={() => toggleSection(sKey)}
                         className="flex-1 flex items-center gap-2 group cursor-pointer">
-                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{sectionName}</h4>
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                          {SECTION_EMOJI[sectionName] && <span className="mr-1">{SECTION_EMOJI[sectionName]}</span>}
+                          {sectionName}
+                          <span className="ml-1.5 text-[10px] font-light italic text-gray-300 normal-case tracking-normal">{fields.length}</span>
+                        </h4>
                         <div className="flex-1 h-px bg-gray-100" />
                         {secOpen ? <ChevronUp className="w-3 h-3 text-gray-300 group-hover:text-gray-500" /> : <ChevronDown className="w-3 h-3 text-gray-300 group-hover:text-gray-500" />}
+                      </button>
+                      {/* Vector search button — shown on all sections */}
+                      <button type="button"
+                        onClick={(e) => { e.stopPropagation(); setVecSearchSection(isVecOpen ? null : sectionName); setVecSearchQuery(''); }}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border transition-colors ${
+                          isVecOpen
+                            ? 'bg-teal-100 text-teal-700 border-teal-300'
+                            : 'bg-teal-50 text-teal-600 border-teal-200 hover:bg-teal-100'
+                        }`}
+                        title={`Search catalog to add to ${sectionName}`}>
+                        <Search className="w-3 h-3" />
+                        {isVecOpen ? 'Close' : 'Search'}
                       </button>
                       {showAiButton && (
                         <button type="button" onClick={(e) => { e.stopPropagation(); handleAiFillSection(sectionName); }}
@@ -4501,6 +6224,84 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                         </button>
                       )}
                     </div>
+
+                    {/* Inline vector search panel */}
+                    {isVecOpen && (
+                      <div className="mb-3 rounded-xl border border-teal-200 bg-teal-50/60 overflow-hidden">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-teal-100 border-b border-teal-200">
+                          <Search className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                          <input
+                            autoFocus
+                            value={vecSearchQuery}
+                            onChange={(e) => setVecSearchQuery(e.target.value)}
+                            placeholder={
+                              vecCatalog === 'ingredients' ? 'Search ingredients to add...' :
+                              vecCatalog === 'elements' ? 'Search elements / nutrients to add...' :
+                              'Search catalog...'
+                            }
+                            className="flex-1 text-xs bg-transparent outline-none placeholder-teal-400 text-teal-900"
+                          />
+                          <span className="text-[9px] text-teal-500 font-medium uppercase tracking-wide">
+                            {vecCatalog === 'ingredients' ? 'Ingredients' : vecCatalog === 'elements' ? 'Elements' : 'Ingredients + Elements'}
+                          </span>
+                        </div>
+                        {vecSearchQuery.trim() && (
+                          <div className="divide-y divide-teal-100 max-h-48 overflow-y-auto">
+                            {vecResults.length === 0 ? (
+                              <p className="text-xs text-teal-400 italic px-3 py-2">No matches found</p>
+                            ) : vecResults.map((item) => {
+                              const alreadyLinked = (() => {
+                                if (!editingRecord) return false;
+                                const src = (item as any)._vecSource;
+                                const checkIng = vecCatalog === 'ingredients' || src === 'ingredient';
+                                const checkEl = vecCatalog === 'elements' || src === 'element';
+                                if (checkIng) {
+                                  const cur: string[] = Array.isArray(editingRecord.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                                  return cur.includes(item.id);
+                                }
+                                if (checkEl) {
+                                  const isBenSection = ['Functions & Benefits', 'Nutrition Data', 'Health & Scoring', 'Scoring'].includes(sectionName);
+                                  const fieldKey = isBenSection ? 'elements_beneficial' : 'elements_hazardous';
+                                  const cur: string[] = Array.isArray(editingRecord[fieldKey]) ? editingRecord[fieldKey] : [];
+                                  return cur.includes(item.name_common || item.name || '');
+                                }
+                                return false;
+                              })();
+                              return (
+                                <button key={item.id} type="button"
+                                  onClick={() => handleVecSelect(item)}
+                                  disabled={alreadyLinked}
+                                  className={`w-full text-left flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                                    alreadyLinked ? 'opacity-40 cursor-not-allowed bg-white' : 'hover:bg-teal-50 bg-white'
+                                  }`}>
+                                  {item.image_url ? (
+                                    <img src={item.image_url} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0 border border-gray-100" />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0 bg-teal-100 text-teal-700">
+                                      {(item.name_common || item.name || '?')[0].toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-gray-800 truncate">{item.name_common || item.name}</div>
+                                    {item.category && <span className="text-[9px] text-gray-400">{item.category}</span>}
+                                  </div>
+                                  {alreadyLinked
+                                    ? <span className="text-[9px] text-teal-500 font-semibold flex-shrink-0">✓ Added</span>
+                                    : <span className="text-[9px] text-teal-600 font-semibold flex-shrink-0">+ Add</span>
+                                  }
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!vecSearchQuery.trim() && (
+                          <p className="text-[10px] text-teal-400 italic px-3 py-2">
+                            Type to search {vecCatalog === 'ingredients' ? `${ingredientsCache.length} ingredients` : vecCatalog === 'elements' ? `${elementsCache.length} elements` : 'catalog'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {secOpen && (
                       <div className={`grid gap-${isMediaSection ? '3' : '4'}`} style={{ gridTemplateColumns: `repeat(${sectionCols}, minmax(0, 1fr))` }}>
                         {fields.map(f => (
@@ -4563,6 +6364,60 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   {/* Health tab: nutrition, micros, risks, scoring, references */}
                   {editModalTab === 'health' && (
                     <div className="space-y-0">
+                      {/* Linked ingredients + Compute Nutrition at top of health tab */}
+                      {activeTab === 'recipes' && (() => {
+                        const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
+                        const linkedIngs = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
+                        const rawItems: any[] = Array.isArray(editingRecord?.ingredients) ? editingRecord.ingredients : [];
+                        const getQty = (ingId: string) => {
+                          for (const entry of rawItems) {
+                            if (entry?.group !== undefined) {
+                              for (const child of (entry.items || [])) {
+                                if (child.ingredient_id === ingId) return { qty_g: child.qty_g, unit: child.unit };
+                              }
+                            } else if (entry?.ingredient_id === ingId) {
+                              return { qty_g: entry.qty_g, unit: entry.unit };
+                            }
+                          }
+                          return null;
+                        };
+                        return (
+                          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/60 overflow-hidden">
+                            <div className="flex items-center justify-between px-3 py-2 bg-emerald-100 border-b border-emerald-200">
+                              <span className="text-xs font-semibold text-emerald-800">🥗 Linked Ingredients ({linkedIngs.length})</span>
+                              <button type="button" onClick={handleComputeNutrition} disabled={computingNutrition}
+                                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 transition-colors shadow-sm">
+                                {computingNutrition ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span className="text-sm">⚡</span>}
+                                {computingNutrition ? 'Computing…' : 'Compute Nutrition'}
+                              </button>
+                            </div>
+                            {linkedIngs.length === 0 ? (
+                              <p className="text-xs text-gray-400 italic px-3 py-2">No linked ingredients — enrich recipe first.</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2 p-3">
+                                {linkedIngs.map((ing: any) => {
+                                  const qty = getQty(ing.id);
+                                  return (
+                                    <div key={ing.id} className="flex items-center gap-1.5 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 shadow-sm">
+                                      {ing.image_url ? (
+                                        <img src={ing.image_url} alt="" className="w-7 h-7 rounded-md object-cover flex-shrink-0" />
+                                      ) : (
+                                        <div className="w-7 h-7 rounded-md bg-emerald-200 flex items-center justify-center text-[10px] font-bold text-emerald-700 flex-shrink-0">
+                                          {(ing.name_common || ing.name || '?')[0].toUpperCase()}
+                                        </div>
+                                      )}
+                                      <div className="min-w-0">
+                                        <div className="text-[10px] font-semibold text-gray-800 truncate">{ing.name_common || ing.name}</div>
+                                        {qty && <div className="text-[9px] text-emerald-700 font-medium">{qty.qty_g != null ? `${qty.qty_g}${qty.unit || 'g'}` : ''}</div>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {renderSections(s => HEALTH_SECTIONS.has(s) || (!CULINARY_SECTIONS.has(s) && !HEALTH_SECTIONS.has(s) && !CONTENT_SECTIONS.has(s)))}
                     </div>
                   )}

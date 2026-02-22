@@ -14,10 +14,10 @@ import {
   Brain
 } from 'lucide-react';
 
-import riskScreenshot from 'figma:asset/95040abfc382a9000163603b0406e99ced704e94.png';
-import needScreenshot from 'figma:asset/f103676152ae3299f7a7f1ac2b178b16e80fc270.png';
-import productScanScreenshot from 'figma:asset/04f4e7cf7c2e8ce76469148f946eda75769b45ee.png';
-import mealAnalysisScreenshot from 'figma:asset/0d90de2a9245f9d68e76a732655874812e689495.png';
+const riskScreenshot = '';
+const needScreenshot = '';
+const productScanScreenshot = '';
+const mealAnalysisScreenshot = '';
 
 export function AppFeaturesSection() {
   return (

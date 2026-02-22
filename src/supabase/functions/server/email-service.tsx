@@ -1,3 +1,5 @@
+// @ts-nocheck
+// NOTE: Local reference copy only — deployed file is supabase/functions/make-server-ed0fe4c2/index.tsx
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { buildWaitlistAlertEmail, WaitlistAlertPayload } from './email-templates.ts'
 
@@ -349,7 +351,7 @@ export class EmailService {
       }
     } catch (error) {
       console.error('❌ Email service error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: (error as any)?.message || String(error) }
     }
   }
 
@@ -387,7 +389,7 @@ export class EmailService {
       
     } catch (fetchError) {
       // Handle network errors
-      if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
+      if ((fetchError as any)?.name === 'TypeError' && (fetchError as any)?.message?.includes('fetch')) {
         throw new Error('Unable to connect to Resend API - please check your internet connection')
       }
       throw fetchError

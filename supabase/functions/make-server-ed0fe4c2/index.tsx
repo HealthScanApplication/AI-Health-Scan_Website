@@ -1013,7 +1013,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, id, updates } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
     if (table === 'catalog_products') {
@@ -1080,6 +1080,9 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_cubed','image_url_cooked','video_url','images','videos',
         'scientific_papers','social_content',
         'updated_at',
+      ]),
+      catalog_equipment: new Set([
+        'name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','updated_at',
       ]),
       catalog_products: new Set([
         'name_common','name','name_brand','brand','manufacturer','category','category_sub','subcategory','barcode','quantity',
@@ -1198,7 +1201,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, id } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
     if (table === 'catalog_products') { await kv.del(id); return c.json({ success: true }) }
@@ -1215,11 +1218,13 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
 
-    const { tabType, recordData, fields, sampleRecords, context } = await c.req.json()
+    const { tabType, recordData, fields, sampleRecords, context, mode } = await c.req.json()
     if (!tabType || !recordData || !fields) return c.json({ success: false, error: 'tabType, recordData, and fields are required' }, 400)
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiKey) return c.json({ success: false, error: 'OPENAI_API_KEY not configured. Set it with: supabase secrets set OPENAI_API_KEY=sk-...' }, 500)
+
+    const isImproveMode = mode === 'improve'
 
     // Build the prompt
     const recordName = recordData.name || recordData.name_common || recordData.email || 'Unknown'
@@ -1261,11 +1266,19 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
     }
 
     // Field types that cannot be meaningfully AI-filled
-    const SKIP_TYPES = new Set(['image', 'video', 'readonly', 'date', 'linked_elements', 'linked_ingredients', 'content_links', 'grouped_ingredients'])
+    const SKIP_TYPES = new Set(['image', 'video', 'readonly', 'date', 'linked_elements', 'content_links'])
+
+    // Improve mode: include ALL improvable fields (not just empty ones)
+    // Text/description/JSON fields that benefit from rewriting
+    const IMPROVE_ELIGIBLE_TYPES = new Set(['text', 'textarea', 'json', 'nutrition_editor', 'tags', 'select', 'number'])
 
     for (const f of fields) {
       const val = recordData[f.key]
-      if (!isEffectivelyEmpty(f.key, val)) {
+      if (isImproveMode && !SKIP_TYPES.has(f.type) && IMPROVE_ELIGIBLE_TYPES.has(f.type)) {
+        // In improve mode: put existing value in existingData for context, AND add to fields to rewrite
+        if (!isEffectivelyEmpty(f.key, val)) existingData[f.key] = val
+        emptyFields.push({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder })
+      } else if (!isEffectivelyEmpty(f.key, val)) {
         existingData[f.key] = val
       } else if (!SKIP_TYPES.has(f.type)) {
         emptyFields.push({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder })
@@ -1400,13 +1413,38 @@ IMPORTANT: Every key must have real, factual content — no placeholders. Write 
       return desc
     }).join('\n')
 
-    const systemPrompt = `You are a health & nutrition data assistant for the HealthScan app. You populate database fields with accurate, well-formatted data based on real nutritional science and USDA/WHO data. Always return valid JSON. Be factual and use real data — do not make up nutritional values. For select/tags fields, only use the allowed values. For number fields, return numbers. For array fields, return arrays. For JSON fields, return properly structured objects matching the FORMAT specified. For text/textarea, return well-written strings. For boolean fields, return true or false.
+    const systemPrompt = isImproveMode
+      ? `You are a senior health & nutrition scientist and professional culinary writer for the HealthScan app. Your task is to IMPROVE and REWRITE existing database fields to be more scientifically accurate, more specific, and richer in culinary and nutritional depth. Always return valid JSON. Use real USDA/WHO/EFSA data. For descriptions: write with precision — cite specific compounds, mechanisms, and culinary techniques. For recipes: write steps that are chef-quality with exact temperatures, timings, and technique rationale. For nutrition: use precise USDA-level values. For select/tags fields, only use the allowed values. For number fields, return numbers. For array fields, return arrays. For JSON fields, return properly structured objects matching the FORMAT specified.
+CRITICAL FIELD KEY RULES — you MUST use these exact keys in your JSON output:
+- For recipe records: use "name_common" (NOT "name") for the recipe name field
+- For recipe records: use "meal_slot" (NOT "type") for the meal timing/slot field
+- Never invent field keys — only return keys that were explicitly listed in the fields to improve`
+      : `You are a health & nutrition data assistant for the HealthScan app. You populate database fields with accurate, well-formatted data based on real nutritional science and USDA/WHO data. Always return valid JSON. Be factual and use real data — do not make up nutritional values. For select/tags fields, only use the allowed values. For number fields, return numbers. For array fields, return arrays. For JSON fields, return properly structured objects matching the FORMAT specified. For text/textarea, return well-written strings. For boolean fields, return true or false.
 CRITICAL FIELD KEY RULES — you MUST use these exact keys in your JSON output:
 - For recipe records: use "name_common" (NOT "name") for the recipe name field
 - For recipe records: use "meal_slot" (NOT "type") for the meal timing/slot field (e.g. breakfast, lunch, dinner)
 - Never invent field keys — only return keys that were explicitly listed in the fields to fill`
 
-    const userPrompt = `I have a ${tabType} record named "${recordName}" with this existing data:
+    const userPrompt = isImproveMode
+      ? `I have a ${tabType} record named "${recordName}" with this EXISTING data that needs to be improved:
+${JSON.stringify(existingData, null, 2)}
+${context ? `\nAdditional context: ${context}\n` : ''}
+Please REWRITE and IMPROVE these fields with greater scientific accuracy and culinary depth:
+${fieldDescriptions}
+${sampleContext}
+
+IMPROVE MODE RULES:
+- Descriptions: rewrite to be more specific, scientific, and informative. Replace vague language with precise compound names, mechanisms, and evidence-based claims.
+- Culinary descriptions: add specific flavour notes, texture details, cooking chemistry, and technique rationale. Name specific cultivars, regions, or preparations where relevant.
+- Recipe steps/instructions: rewrite as chef-quality instructions with exact temperatures (°C/°F), timings, visual/sensory cues, and brief explanations of WHY each technique matters.
+- Nutrition data (elements_beneficial): verify and improve values to match real USDA data. Add any missing nutrient categories. Ensure per_100g and per_serving are both populated.
+- Hazardous elements: verify levels against current scientific literature. Add any missing real concerns with accurate quantities.
+- taste_profile: recalibrate values based on the full ingredient/recipe profile — be precise, not generic.
+- For Element records: expand description_full with deeper biochemical mechanisms, clinical significance, and population-specific considerations.
+- For all records: improve specificity — replace generic statements with named compounds, studies, or culinary traditions.
+
+Return ONLY a JSON object with the field keys and their improved values. No markdown, no explanation, just the JSON object.`
+      : `I have a ${tabType} record named "${recordName}" with this existing data:
 ${JSON.stringify(existingData, null, 2)}
 ${context ? `\nAdditional context provided by the admin: ${context}\n` : ''}
 Please fill in these empty fields with accurate, real-world data:
@@ -1427,7 +1465,7 @@ IMPORTANT:
 
 Return ONLY a JSON object with the field keys and their values. No markdown, no explanation, just the JSON object.`
 
-    console.log(`[AI Fill] Generating content for ${tabType} "${recordName}" — ${emptyFields.length} empty fields`)
+    console.log(`[AI Fill] ${isImproveMode ? 'IMPROVE' : 'FILL'} mode for ${tabType} "${recordName}" — ${emptyFields.length} fields`)
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1556,6 +1594,317 @@ Return ONLY a JSON object with the field keys and their values. No markdown, no 
   }
 })
 
+// Admin: AI Link Ingredients — finds ingredients in DB that contain a given element and auto-links them
+app.post('/make-server-ed0fe4c2/admin/ai-link-ingredients', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    const { elementId, elementName, elementCategory, healthRole } = await c.req.json()
+    if (!elementId || !elementName) return c.json({ success: false, error: 'elementId and elementName are required' }, 400)
+
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) return c.json({ success: false, error: 'OPENAI_API_KEY not configured' }, 500)
+
+    const sbUrl = Deno.env.get('SUPABASE_URL')!
+    const sbKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    // 1. Fetch all ingredients (id, name, existing elements_beneficial, elements_hazardous)
+    const ingRes = await fetch(`${sbUrl}/rest/v1/catalog_ingredients?select=id,name_common,elements_beneficial,elements_hazardous&limit=1000`, {
+      headers: { 'Authorization': `Bearer ${sbKey}`, 'apikey': sbKey }
+    })
+    if (!ingRes.ok) return c.json({ success: false, error: 'Failed to fetch ingredients' }, 500)
+    const allIngredients: any[] = await ingRes.json()
+
+    // 2. Build a name list for AI to reason over (send names only, not full JSON, to stay within token limits)
+    const nameList = allIngredients.map((ing: any) => `${ing.id}|||${ing.name_common || ing.name || ''}`)
+
+    const isHazardous = (healthRole || []).includes('hazardous')
+    const systemPrompt = `You are a nutrition science expert. Given a list of food ingredients, identify which ones naturally contain or are commonly associated with the element/compound "${elementName}" (category: ${elementCategory || 'unknown'}, role: ${isHazardous ? 'hazardous/contaminant' : 'beneficial nutrient/compound'}).
+
+For each matching ingredient, provide:
+- The ingredient ID (exact string from the list)
+- Estimated amount per 100g in the appropriate unit (mg, mcg, g, IU, or ppb for contaminants)
+- The unit string
+
+Return ONLY a JSON array: [{"id":"ingredient-uuid","per_100g":number,"unit":"mg|mcg|g|IU|ppb","confidence":"high|medium|low"}]
+Only include ingredients where there is real scientific evidence. Aim for 5-20 matches. Return [] if none apply.`
+
+    const userPrompt = `Element/Compound: "${elementName}"
+Health role: ${isHazardous ? 'hazardous' : 'beneficial'}
+
+Ingredient list (format: id|||name):
+${nameList.slice(0, 400).join('\n')}
+
+Which of these ingredients contain "${elementName}"? Return JSON array only.`
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        temperature: 0.2,
+        max_tokens: 4000,
+        response_format: { type: 'json_object' }
+      })
+    })
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text()
+      console.error('[AI Link] OpenAI error:', errText)
+      return c.json({ success: false, error: `OpenAI API error: ${openaiRes.status}` }, 500)
+    }
+
+    const openaiData = await openaiRes.json()
+    const content = openaiData.choices?.[0]?.message?.content
+    if (!content) return c.json({ success: false, error: 'No content from AI' }, 500)
+
+    let matches: any[]
+    try {
+      const parsed = JSON.parse(content)
+      // AI may return { matches: [...] } or just [...]
+      matches = Array.isArray(parsed) ? parsed : (parsed.matches || parsed.results || parsed.ingredients || [])
+    } catch {
+      return c.json({ success: false, error: 'AI returned invalid JSON' }, 500)
+    }
+
+    if (!Array.isArray(matches) || matches.length === 0) {
+      return c.json({ success: true, linked: [], message: 'No matching ingredients found by AI' })
+    }
+
+    // 3. For each match, patch the ingredient's elements_beneficial or elements_hazardous
+    const linked: { id: string; name: string; per_100g: number; unit: string }[] = []
+    const errors: string[] = []
+
+    for (const match of matches) {
+      if (!match.id || typeof match.per_100g !== 'number') continue
+      const ing = allIngredients.find((i: any) => i.id === match.id)
+      if (!ing) continue
+
+      try {
+        if (isHazardous) {
+          // Patch elements_hazardous: { [elementId]: { level, per_100g, per_serving, likelihood, reason } }
+          const existing = (typeof ing.elements_hazardous === 'object' && ing.elements_hazardous) ? ing.elements_hazardous : {}
+          // Only add if not already linked
+          if (existing[elementId]) { linked.push({ id: ing.id, name: ing.name_common, per_100g: match.per_100g, unit: match.unit }); continue }
+          const updated = {
+            ...existing,
+            [elementId]: {
+              level: match.per_100g > 0 ? 'low' : 'trace',
+              per_100g: match.per_100g,
+              per_serving: Math.round(match.per_100g * 0.8 * 10) / 10,
+              likelihood: match.confidence === 'high' ? 80 : match.confidence === 'medium' ? 50 : 25,
+              reason: `Contains ${elementName} — AI-linked`,
+              unit: match.unit || 'mg'
+            }
+          }
+          const patchRes = await fetch(`${sbUrl}/rest/v1/catalog_ingredients?id=eq.${ing.id}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${sbKey}`, 'apikey': sbKey, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ elements_hazardous: updated })
+          })
+          if (patchRes.ok || patchRes.status === 204) linked.push({ id: ing.id, name: ing.name_common, per_100g: match.per_100g, unit: match.unit })
+          else errors.push(`${ing.name_common}: patch failed ${patchRes.status}`)
+        } else {
+          // Patch elements_beneficial — nested under nutrient category sections
+          // Find which nutrient category this element belongs to (vitamins, minerals, amino_acids, etc.)
+          // We store it flat under per_100g as: { per_100g: { [category]: { [elementId]: value } } }
+          const existing = (typeof ing.elements_beneficial === 'object' && ing.elements_beneficial) ? ing.elements_beneficial : {}
+          const per100g = (existing.per_100g && typeof existing.per_100g === 'object') ? { ...existing.per_100g } : {}
+
+          // Determine category from elementCategory field
+          const catMap: Record<string, string> = {
+            'vitamin': 'vitamins', 'mineral': 'minerals', 'amino_acid': 'amino_acids',
+            'fatty_acid': 'fatty_acids', 'antioxidant': 'antioxidants', 'functional': 'functional',
+            'digestive': 'digestive', 'macronutrient': 'macronutrients'
+          }
+          const cat = catMap[elementCategory?.toLowerCase()] || 'functional'
+
+          // Check if already linked
+          const catSection = per100g[cat] || {}
+          if (catSection[elementId] !== undefined) {
+            linked.push({ id: ing.id, name: ing.name_common, per_100g: match.per_100g, unit: match.unit }); continue
+          }
+
+          const updatedPer100g = { ...per100g, [cat]: { ...catSection, [elementId]: match.per_100g } }
+          const updatedBen = { ...existing, per_100g: updatedPer100g }
+
+          const patchRes = await fetch(`${sbUrl}/rest/v1/catalog_ingredients?id=eq.${ing.id}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${sbKey}`, 'apikey': sbKey, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ elements_beneficial: updatedBen })
+          })
+          if (patchRes.ok || patchRes.status === 204) linked.push({ id: ing.id, name: ing.name_common, per_100g: match.per_100g, unit: match.unit })
+          else errors.push(`${ing.name_common}: patch failed ${patchRes.status}`)
+        }
+      } catch (err: any) {
+        errors.push(`${ing.name_common}: ${err?.message}`)
+      }
+    }
+
+    console.log(`[AI Link] Linked ${linked.length} ingredients to element "${elementName}", ${errors.length} errors`)
+    return c.json({ success: true, linked, errors, message: `Linked ${linked.length} ingredients` })
+  } catch (error: any) {
+    console.error('[AI Link] Error:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
+// Admin: Compute recipe nutrition — sums elements_beneficial × qty_g across all linked ingredients
+app.post('/make-server-ed0fe4c2/admin/compute-recipe-nutrition', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    const { recipeId, ingredients, servings } = await c.req.json()
+    // ingredients: Array<{ name, ingredient_id, qty_g, unit }>
+    if (!recipeId || !Array.isArray(ingredients)) {
+      return c.json({ success: false, error: 'recipeId and ingredients array are required' }, 400)
+    }
+
+    const sbUrl = Deno.env.get('SUPABASE_URL')!
+    const sbKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    // Unit → grams conversion table (approximate)
+    const unitToGrams: Record<string, number> = {
+      g: 1, ml: 1, kg: 1000, L: 1000,
+      tsp: 5, tbsp: 15, cup: 240,
+      oz: 28.35, lb: 453.6,
+      piece: 100, slice: 30, pinch: 0.5,
+    }
+
+    // Flatten all items (handle grouped structure)
+    const flatItems: Array<{ ingredient_id: string; qty_g: number }> = []
+    for (const item of ingredients) {
+      if (item.group !== undefined) {
+        for (const child of (item.items || [])) {
+          if (child.ingredient_id && child.qty_g != null) {
+            const factor = unitToGrams[child.unit || 'g'] ?? 1
+            flatItems.push({ ingredient_id: child.ingredient_id, qty_g: child.qty_g * factor })
+          }
+        }
+      } else if (item.ingredient_id && item.qty_g != null) {
+        const factor = unitToGrams[item.unit || 'g'] ?? 1
+        flatItems.push({ ingredient_id: item.ingredient_id, qty_g: item.qty_g * factor })
+      }
+    }
+
+    if (flatItems.length === 0) {
+      return c.json({ success: false, error: 'No ingredients with qty_g and ingredient_id found. Add quantities to your ingredients first.' }, 400)
+    }
+
+    // Fetch all referenced ingredients in one query
+    const ids = [...new Set(flatItems.map(i => i.ingredient_id))]
+    const idsParam = ids.map(id => `"${id}"`).join(',')
+    const ingRes = await fetch(
+      `${sbUrl}/rest/v1/catalog_ingredients?select=id,name_common,elements_beneficial,nutrition_per_100g&id=in.(${idsParam})`,
+      { headers: { 'Authorization': `Bearer ${sbKey}`, 'apikey': sbKey } }
+    )
+    if (!ingRes.ok) return c.json({ success: false, error: 'Failed to fetch ingredients' }, 500)
+    const ingMap: Record<string, any> = {}
+    for (const ing of await ingRes.json()) ingMap[ing.id] = ing
+
+    // Deep-merge helper: sum numeric leaf values across objects
+    const deepSum = (acc: Record<string, any>, obj: Record<string, any>, scale: number) => {
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === 'number') {
+          acc[k] = (acc[k] || 0) + v * scale
+        } else if (v && typeof v === 'object' && !Array.isArray(v)) {
+          if (!acc[k] || typeof acc[k] !== 'object') acc[k] = {}
+          deepSum(acc[k], v, scale)
+        }
+      }
+    }
+
+    // Accumulate per_100g nutrients scaled by qty_g
+    const summedPer100g: Record<string, any> = {}
+    const summedMacros: Record<string, any> = {}
+    let totalWeight = 0
+
+    for (const item of flatItems) {
+      const ing = ingMap[item.ingredient_id]
+      if (!ing) continue
+      const scale = item.qty_g / 100
+      totalWeight += item.qty_g
+
+      // Sum elements_beneficial.per_100g
+      const ben = ing.elements_beneficial
+      if (ben && typeof ben === 'object') {
+        const p100 = ben.per_100g || {}
+        deepSum(summedPer100g, p100, scale)
+      }
+
+      // Sum nutrition_per_100g macros
+      const macros = ing.nutrition_per_100g
+      if (macros && typeof macros === 'object') {
+        deepSum(summedMacros, macros, scale)
+      }
+    }
+
+    // Convert totals back to per-100g of the final dish
+    const recipeWeight = totalWeight > 0 ? totalWeight : 100
+    const normaliseFactor = 100 / recipeWeight
+
+    const normDeep = (obj: Record<string, any>, factor: number): Record<string, any> => {
+      const result: Record<string, any> = {}
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === 'number') {
+          result[k] = Math.round(v * factor * 100) / 100
+        } else if (v && typeof v === 'object') {
+          result[k] = normDeep(v, factor)
+        }
+      }
+      return result
+    }
+
+    const per100g = normDeep(summedPer100g, normaliseFactor)
+    const macrosPer100g = normDeep(summedMacros, normaliseFactor)
+
+    // Build per_serving if servings provided
+    const numServings = servings && servings > 0 ? servings : 1
+    const servingWeight = recipeWeight / numServings
+    const perServingFactor = servingWeight / 100
+    const perServing = normDeep(summedPer100g, perServingFactor / recipeWeight * 100)
+    const macrosPerServing = normDeep(summedMacros, perServingFactor / recipeWeight * 100)
+
+    const elementsBeneficial = {
+      serving: { name: `1 serving (${Math.round(servingWeight)}g)`, size_g: Math.round(servingWeight) },
+      per_100g: per100g,
+      per_serving: perServing,
+    }
+
+    const nutritionPer100g = macrosPer100g
+    const nutritionPerServing = macrosPerServing
+
+    // Save back to the recipe
+    const patchRes = await fetch(`${sbUrl}/rest/v1/catalog_recipes?id=eq.${recipeId}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${sbKey}`, 'apikey': sbKey, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ elements_beneficial: elementsBeneficial, nutrition_per_100g: nutritionPer100g, nutrition_per_serving: nutritionPerServing })
+    })
+
+    if (!patchRes.ok && patchRes.status !== 204) {
+      return c.json({ success: false, error: `Failed to save: ${patchRes.status}` }, 500)
+    }
+
+    console.log(`[Compute Nutrition] Recipe ${recipeId}: ${flatItems.length} ingredients, ${Math.round(totalWeight)}g total`)
+    return c.json({
+      success: true,
+      totalWeight: Math.round(totalWeight),
+      ingredientsUsed: flatItems.length,
+      elementsBeneficial,
+      nutritionPer100g,
+      nutritionPerServing,
+    })
+  } catch (error: any) {
+    console.error('[Compute Nutrition] Error:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
 // Admin: Insert new catalog record
 app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
   try {
@@ -1563,7 +1912,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, record } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!record || typeof record !== 'object') return c.json({ success: false, error: 'Record data is required' }, 400)
 
@@ -1607,6 +1956,9 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_cubed','image_url_cooked','video_url','images','videos',
         'scientific_papers','social_content',
         'created_at','updated_at',
+      ]),
+      catalog_equipment: new Set([
+        'id','name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','created_at','updated_at',
       ]),
       catalog_products: new Set([
         'id','name_common','name','name_brand','brand','manufacturer','category','category_sub','subcategory','barcode','quantity',
@@ -1744,6 +2096,183 @@ Return a JSON array of step strings. Each step should be a single action with qu
     return c.json({ success: true, steps, recipeName, servings: srv })
   } catch (error: any) {
     console.error('[AI Steps] Error:', error)
+    return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
+  }
+})
+
+// Admin: AI Enrich Recipe — generates linked ingredients (with qty_g), equipment list, and cooking steps in one call
+app.post('/make-server-ed0fe4c2/admin/ai-enrich-recipe', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    const { recipeId: _recipeId, recipeName, servings, portionWeightG, servingSize: _servingSize, prepTime, cookTime, difficulty, cuisine, description, existingLinkedIds: _existingLinkedIds } = await c.req.json()
+    if (!recipeName) return c.json({ success: false, error: 'recipeName is required' }, 400)
+
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) return c.json({ success: false, error: 'OPENAI_API_KEY not configured' }, 500)
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    // Fetch all ingredients from DB for matching
+    const ingRes = await fetch(`${supabaseUrl}/rest/v1/catalog_ingredients?select=id,name_common,name,category&limit=2000`, {
+      headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+    })
+    const allIngredients: any[] = ingRes.ok ? await ingRes.json() : []
+
+    // Fetch all equipment from DB
+    const eqRes = await fetch(`${supabaseUrl}/rest/v1/catalog_equipment?select=id,name,category,image_url&limit=500`, {
+      headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+    })
+    const allEquipment: any[] = eqRes.ok ? await eqRes.json() : []
+
+    const srv = Number(servings) || 4
+    const portionG = Number(portionWeightG) || null
+
+    const ingredientList = allIngredients.map((i: any) => i.name_common || i.name).filter(Boolean).slice(0, 300).join(', ')
+    const equipmentList = allEquipment.map((e: any) => e.name).filter(Boolean).join(', ')
+
+    const systemPrompt = `You are a professional nutritionist and recipe developer for a health & nutrition app.
+Given a recipe name and details, you will return a complete recipe enrichment as a single JSON object with three keys:
+1. "ingredients" — array of ingredient objects with name, qty_g (grams for ${srv} servings), and unit
+2. "equipment" — array of equipment/tool names needed
+3. "steps" — array of step strings (professional cooking instructions with quantities embedded, scaled for ${srv} servings)
+
+RULES for ingredients:
+- Only use ingredient names from the provided catalog list (match as closely as possible)
+- qty_g must be realistic grams for ${srv} serving${srv !== 1 ? 's' : ''}${portionG ? ` (total dish weight ≈ ${portionG * srv}g)` : ''}
+- Include all main ingredients plus key seasonings/oils
+
+RULES for equipment:
+- Only use equipment names from the provided catalog list
+- Include only what is actually needed for this recipe
+
+RULES for steps:
+- One step = one action (never combine multiple actions)
+- Embed exact quantities in each step (e.g. "Heat 15 ml olive oil...")
+- All quantities scaled for ${srv} serving${srv !== 1 ? 's' : ''}
+- Steps flow: prep → heat/fat → aromatics → main → seasoning → finish → serve
+- 1–2 sentences max per step`
+
+    const userPrompt = `Recipe: "${recipeName}"
+Servings: ${srv}${portionG ? `\nPortion weight: ${portionG}g per serving` : ''}${prepTime ? `\nPrep time: ${prepTime}` : ''}${cookTime ? `\nCook time: ${cookTime}` : ''}${difficulty ? `\nDifficulty: ${difficulty}` : ''}${cuisine ? `\nCuisine: ${cuisine}` : ''}${description ? `\nDescription: ${description}` : ''}
+
+Available ingredients catalog (use ONLY these names):
+${ingredientList}
+
+Available equipment catalog (use ONLY these names):
+${equipmentList}
+
+Return a JSON object with this exact structure:
+{
+  "ingredients": [{"name": "ingredient name from catalog", "qty_g": 150, "unit": "g"}],
+  "equipment": ["tool name from catalog"],
+  "steps": ["Step text with quantities embedded..."]
+}`
+
+    console.log(`[AI Enrich Recipe] Enriching "${recipeName}" (${srv} servings)`)
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 3000,
+        response_format: { type: 'json_object' }
+      })
+    })
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text()
+      console.error('[AI Enrich Recipe] OpenAI error:', errText)
+      return c.json({ success: false, error: `OpenAI API error: ${openaiRes.status}` }, 500)
+    }
+
+    const openaiData = await openaiRes.json()
+    const content = openaiData.choices?.[0]?.message?.content
+    if (!content) return c.json({ success: false, error: 'No content from AI' }, 500)
+
+    let parsed: any
+    try { parsed = JSON.parse(content) } catch {
+      return c.json({ success: false, error: 'AI returned invalid JSON' }, 500)
+    }
+
+    const aiIngredients: { name: string; qty_g: number; unit: string }[] = Array.isArray(parsed.ingredients) ? parsed.ingredients : []
+    const aiEquipment: string[] = Array.isArray(parsed.equipment) ? parsed.equipment : []
+    const aiSteps: string[] = Array.isArray(parsed.steps) ? parsed.steps : []
+
+    // Fuzzy-match AI ingredient names to catalog IDs
+    const fuzzyScore = (a: string, b: string): number => {
+      const an = a.toLowerCase().trim(); const bn = b.toLowerCase().trim()
+      if (an === bn) return 1.0
+      if (bn.includes(an) || an.includes(bn)) return 0.85
+      const aW = an.split(/\s+/); const bW = bn.split(/\s+/)
+      const shared = aW.filter((w: string) => bW.some((bw: string) => bw.includes(w) || w.includes(bw)))
+      return shared.length > 0 ? 0.6 + (shared.length / Math.max(aW.length, bW.length)) * 0.2 : 0
+    }
+
+    const matchedIngredients: { ingredient_id: string; name: string; qty_g: number; unit: string }[] = []
+    const unmatchedIngredients: { name: string; qty_g: number; unit: string }[] = []
+
+    for (const ai of aiIngredients) {
+      let best: any = null; let bestScore = 0
+      for (const ing of allIngredients) {
+        const s = fuzzyScore(ai.name, ing.name_common || ing.name || '')
+        if (s > bestScore) { bestScore = s; best = ing }
+      }
+      if (best && bestScore >= 0.5) {
+        matchedIngredients.push({ ingredient_id: best.id, name: best.name_common || best.name, qty_g: ai.qty_g, unit: ai.unit || 'g' })
+      } else {
+        unmatchedIngredients.push(ai)
+      }
+    }
+
+    // Match equipment names to catalog
+    const matchedEquipment: { equipment_id: string; name: string; image_url?: string }[] = []
+    for (const eqName of aiEquipment) {
+      let best: any = null; let bestScore = 0
+      for (const eq of allEquipment) {
+        const s = fuzzyScore(eqName, eq.name || '')
+        if (s > bestScore) { bestScore = s; best = eq }
+      }
+      if (best && bestScore >= 0.5) {
+        matchedEquipment.push({ equipment_id: best.id, name: best.name, image_url: best.image_url || '' })
+      }
+    }
+
+    const linkedIngredientIds = matchedIngredients.map(i => i.ingredient_id)
+    // Build grouped_ingredients structure with qty_g
+    const groupedIngredients = matchedIngredients.map(i => ({
+      name: i.name,
+      ingredient_id: i.ingredient_id,
+      qty_g: i.qty_g,
+      unit: i.unit,
+    }))
+
+    // Build steps as CookingStep objects
+    const steps = aiSteps.map((text: string) => ({ text, image_url: '' }))
+
+    console.log(`[AI Enrich Recipe] Done: ${matchedIngredients.length} ingredients, ${matchedEquipment.length} equipment, ${aiSteps.length} steps`)
+
+    return c.json({
+      success: true,
+      linked_ingredient_ids: linkedIngredientIds,
+      grouped_ingredients: groupedIngredients,
+      equipment: matchedEquipment,
+      equipment_names: matchedEquipment.map(e => e.name),
+      steps,
+      unmatched_ingredients: unmatchedIngredients,
+      counts: { ingredients: matchedIngredients.length, equipment: matchedEquipment.length, steps: aiSteps.length }
+    })
+  } catch (error: any) {
+    console.error('[AI Enrich Recipe] Error:', error)
     return c.json({ success: false, error: error?.message || 'Internal server error' }, 500)
   }
 })

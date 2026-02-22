@@ -1,4 +1,5 @@
-// @ts-ignore Deno edge function imports
+// @ts-nocheck
+// NOTE: Local reference copy only — deployed file is supabase/functions/make-server-ed0fe4c2/index.tsx
 import { Hono } from 'npm:hono'
 // @ts-ignore Deno edge function imports
 import { cors } from 'npm:hono/cors'
@@ -738,16 +739,16 @@ async function populateNutrients(count: number, includeImages: boolean, includeM
       type: nutrient.type,
       
       // Regional and age-based RDI data
-      regional_rdi: includeRegionalRDI ? (nutrient.regional_rdi || {}) : {},
+      regional_rdi: includeRegionalRDI ? ((nutrient as any).regional_rdi || {}) : {},
       
       // Mobile app required fields
       description_text_simple: nutrient.description_text_simple || `${nutrient.name} is a ${nutrient.type.toLowerCase()} essential for human health and optimal body function.`,
       description_text_technical: nutrient.description_text_technical || `${nutrient.name} functions as a cofactor in various enzymatic reactions and metabolic pathways essential for cellular function.`,
       
       // Daily intake ranges for mobile app (default adult values)
-      deficient_range: nutrient.deficient_range || { min: 0, max: nutrient.rdi * 0.5, unit: nutrient.unit },
-      optimal_range: nutrient.optimal_range || { min: nutrient.rdi, max: nutrient.rdi * 2, unit: nutrient.unit },
-      excess_range: nutrient.excess_range || { min: nutrient.rdi * 10, max: null, unit: nutrient.unit },
+      deficient_range: (nutrient as any).deficient_range || { min: 0, max: nutrient.rdi * 0.5, unit: nutrient.unit },
+      optimal_range: (nutrient as any).optimal_range || { min: nutrient.rdi, max: nutrient.rdi * 2, unit: nutrient.unit },
+      excess_range: (nutrient as any).excess_range || { min: nutrient.rdi * 10, max: null, unit: nutrient.unit },
       
       // Health benefits as array for mobile app
       health_benefits: nutrient.health_benefits || [
@@ -766,7 +767,7 @@ async function populateNutrients(count: number, includeImages: boolean, includeM
       pregnancy_considerations: nutrient.pregnancy_considerations || `${nutrient.name} needs may be increased during pregnancy. Consult healthcare provider for appropriate dosing during pregnancy and lactation.`,
       
       // Where to get supplements for mobile app
-      where_to_get_supplements: nutrient.where_to_get_supplements || [
+      where_to_get_supplements: (nutrient as any).where_to_get_supplements || [
         {
           name: `High-Quality ${nutrient.name} Supplement`,
           description: `Premium ${nutrient.name} supplement from trusted manufacturers`,
