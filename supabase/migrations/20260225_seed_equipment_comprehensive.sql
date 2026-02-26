@@ -1,0 +1,223 @@
+-- Comprehensive Equipment Seed
+-- Covers all equipment mentioned in cooking methods seed files
+-- Run AFTER: 20260221_seed_catalog_equipment.sql
+
+INSERT INTO catalog_equipment (name, category, description, use_case) VALUES
+-- Grills & Fire Equipment
+('Grill (charcoal)', 'Appliances', 'Charcoal-powered outdoor grill for high-heat cooking', 'Cooking'),
+('Grill (gas)', 'Appliances', 'Gas-powered outdoor grill for consistent heat', 'Cooking'),
+('Grill brush', 'Utensils', 'Wire brush for cleaning grill grates', 'Cooking'),
+('Binchotan charcoal', 'Other', 'Premium Japanese white charcoal for grilling', 'Cooking'),
+('Yakitori grill', 'Cookware', 'Narrow Japanese grill for skewers', 'Cooking'),
+('Asado cross (cruz)', 'Other', 'South American cross-shaped spit for whole animal roasting', 'Cooking'),
+('Parrilla grill', 'Appliances', 'Argentine V-shaped grill', 'Cooking'),
+('Plancha plate', 'Cookware', 'Flat cast-iron or steel griddle for high-heat cooking', 'Cooking'),
+('Cedar plank', 'Other', 'Soaked wooden plank for grilling fish', 'Cooking'),
+('Alder plank', 'Other', 'Soaked wooden plank for grilling', 'Cooking'),
+
+-- Ovens & Baking
+('Oven', 'Appliances', 'Standard kitchen oven for baking and roasting', 'Cooking'),
+('Oven mitts', 'Other', 'Heat-resistant gloves for handling hot items', 'Cooking'),
+('Tandoor oven', 'Appliances', 'Cylindrical clay oven for high-heat Indian cooking', 'Cooking'),
+('Rotisserie spit', 'Appliances', 'Rotating spit for even roasting', 'Cooking'),
+('Combi oven', 'Appliances', 'Professional combination steam/convection oven', 'Cooking'),
+('Kamado grill', 'Appliances', 'Ceramic egg-shaped grill/oven', 'Cooking'),
+('Tannour oven', 'Appliances', 'Clay barrel oven for Middle Eastern bread', 'Cooking'),
+('Taboun oven', 'Appliances', 'Buried clay pot oven', 'Cooking'),
+
+-- Pots & Pans
+('Dutch oven', 'Cookware', 'Heavy lidded pot for braising and stewing', 'Cooking'),
+('Cast-iron skillet', 'Cookware', 'Heavy iron pan for searing and frying', 'Cooking'),
+('Wok', 'Cookware', 'Round-bottomed pan for stir-frying', 'Cooking'),
+('Wok spatula', 'Utensils', 'Wide curved spatula for wok cooking', 'Cooking'),
+('Sauté pan', 'Cookware', 'Flat pan with straight sides for sautéing', 'Cooking'),
+('Frying pan', 'Cookware', 'Flat pan for frying', 'Cooking'),
+('Roasting pan', 'Baking', 'Large pan for roasting meats', 'Baking'),
+('Heavy pot', 'Cookware', 'Large thick-walled pot for slow cooking', 'Cooking'),
+('Stock pot', 'Cookware', 'Tall pot for making stocks and soups', 'Cooking'),
+('Kadai', 'Cookware', 'Indian wok-like vessel for frying', 'Cooking'),
+('Handi pot', 'Cookware', 'Narrow-necked Indian cooking pot', 'Cooking'),
+('Clay pot (sha guo)', 'Cookware', 'Chinese clay pot for rice and stews', 'Cooking'),
+('Donabe', 'Cookware', 'Japanese clay pot for table cooking', 'Cooking'),
+('Tagine pot', 'Cookware', 'Conical Moroccan clay pot', 'Cooking'),
+('Couscoussier', 'Cookware', 'Two-part steamer for couscous', 'Cooking'),
+('Cataplana pot', 'Cookware', 'Portuguese hinged copper vessel', 'Cooking'),
+('Potjie pot', 'Cookware', '3-legged South African cast-iron pot', 'Cooking'),
+('Dolsot', 'Cookware', 'Korean stone bowl', 'Cooking'),
+('Ttukbaegi', 'Cookware', 'Korean earthenware pot', 'Cooking'),
+
+-- Steamers
+('Steamer basket', 'Prep', 'Perforated basket for steaming', 'Cooking'),
+('Bamboo steamer', 'Cookware', 'Traditional Asian steamer', 'Cooking'),
+('Double boiler', 'Cookware', 'Two-pot system for gentle heating', 'Cooking'),
+('Mushiki', 'Cookware', 'Japanese steamer', 'Cooking'),
+
+-- Specialized Cooking Vessels
+('Pressure cooker', 'Appliances', 'Sealed pot for high-pressure cooking', 'Cooking'),
+('Instant Pot', 'Appliances', 'Electric multi-cooker with pressure function', 'Cooking'),
+('Slow cooker', 'Appliances', 'Electric pot for low-temperature cooking', 'Cooking'),
+('Crock-Pot', 'Appliances', 'Brand of slow cooker', 'Cooking'),
+('Sous vide circulator', 'Appliances', 'Precision water bath heater', 'Cooking'),
+('Vacuum sealer', 'Appliances', 'Machine for sealing food in bags', 'Cooking'),
+('Air fryer', 'Appliances', 'Convection oven for crispy cooking', 'Cooking'),
+('Deep fryer', 'Appliances', 'Electric fryer for deep-frying', 'Cooking'),
+('Induction cooktop', 'Appliances', 'Electromagnetic cooking surface', 'Cooking'),
+('Rice cooker', 'Appliances', 'Electric rice cooking appliance', 'Cooking'),
+('Microwave oven', 'Appliances', 'Microwave radiation cooking appliance', 'Cooking'),
+
+-- Smokers & Fire Pits
+('Smoker (offset)', 'Appliances', 'Offset firebox smoker', 'Cooking'),
+('Smoker (pellet)', 'Appliances', 'Wood pellet smoker', 'Cooking'),
+('Smoker (kettle)', 'Appliances', 'Kettle-style charcoal smoker', 'Cooking'),
+('Cold smoke generator', 'Appliances', 'Device for cold smoking', 'Cooking'),
+('Smoking gun', 'Appliances', 'Handheld cold smoke device', 'Cooking'),
+('Smoking chamber', 'Other', 'Enclosed space for smoking food', 'Cooking'),
+('Fire pit', 'Other', 'Outdoor fire cooking area', 'Cooking'),
+('Braai drum', 'Appliances', 'South African barbecue drum', 'Cooking'),
+
+-- Knives & Cutting
+("Chef's knife", 'Cutting', 'All-purpose kitchen knife', 'Cooking'),
+('Paring knife', 'Cutting', 'Small knife for detailed work', 'Cooking'),
+('Cutting board', 'Cutting', 'Surface for cutting food', 'Cooking'),
+('Yanagiba', 'Cutting', 'Japanese sashimi knife', 'Cooking'),
+('Butcher knife', 'Cutting', 'Large knife for butchering', 'Cooking'),
+('Sharp knife', 'Cutting', 'General sharp cutting tool', 'Cooking'),
+
+-- Utensils & Tools
+('Tongs', 'Utensils', 'Gripping tool for handling food', 'Cooking'),
+('Spatula', 'Utensils', 'Flat tool for flipping and serving', 'Cooking'),
+('Wooden spoon', 'Utensils', 'Spoon for stirring', 'Cooking'),
+('Ladle', 'Utensils', 'Deep spoon for serving liquids', 'Cooking'),
+('Whisk', 'Utensils', 'Wire tool for mixing', 'Cooking'),
+('Slotted spoon', 'Utensils', 'Perforated spoon for draining', 'Cooking'),
+('Spider strainer', 'Utensils', 'Wire mesh skimmer', 'Cooking'),
+('Long lighter', 'Other', 'Extended lighter for flambéing', 'Cooking'),
+('Basting brush', 'Utensils', 'Brush for applying liquids', 'Cooking'),
+('Meat thermometer', 'Measuring', 'Temperature probe for meat', 'Cooking'),
+('Thermometer', 'Measuring', 'General cooking thermometer', 'Cooking'),
+('Kitchen scale', 'Measuring', 'Digital or analog scale', 'Measuring'),
+('Measuring cups', 'Measuring', 'Cups for measuring volume', 'Measuring'),
+('Measuring spoons', 'Measuring', 'Spoons for small measurements', 'Measuring'),
+
+-- Baking Equipment
+('Baking sheet', 'Baking', 'Flat metal sheet for baking', 'Baking'),
+('Sheet pan', 'Baking', 'Rimmed baking sheet', 'Baking'),
+('Baking dish', 'Baking', 'Ceramic or glass baking vessel', 'Baking'),
+('Loaf pan', 'Baking', 'Rectangular bread pan', 'Baking'),
+('Parchment paper', 'Baking', 'Non-stick baking paper', 'Baking'),
+('Casserole dish', 'Baking', 'Deep baking dish with lid', 'Baking'),
+('Ramekins', 'Baking', 'Small individual baking dishes', 'Baking'),
+
+-- Prep Equipment
+('Mixing bowl', 'Prep', 'Bowl for mixing ingredients', 'Prep'),
+('Colander', 'Prep', 'Perforated bowl for draining', 'Prep'),
+('Strainer', 'Prep', 'Fine mesh strainer', 'Prep'),
+('Grater', 'Cutting', 'Tool for grating food', 'Cutting'),
+('Zester', 'Cutting', 'Tool for removing citrus zest', 'Cutting'),
+('Peeler', 'Cutting', 'Tool for peeling vegetables', 'Cutting'),
+('Garlic press', 'Prep', 'Tool for crushing garlic', 'Prep'),
+('Mortar and pestle', 'Prep', 'Grinding tool for spices', 'Prep'),
+('Food processor', 'Appliances', 'Electric chopping and mixing appliance', 'Prep'),
+('Blender', 'Appliances', 'Electric blending appliance', 'Prep'),
+('Immersion blender', 'Appliances', 'Handheld blending tool', 'Prep'),
+('Wet grinder', 'Appliances', 'Stone grinder for batters', 'Prep'),
+
+-- Specialized Equipment
+('Skewers (metal)', 'Other', 'Metal rods for grilling', 'Cooking'),
+('Skewers (bamboo)', 'Other', 'Bamboo sticks for grilling', 'Cooking'),
+('Chopsticks', 'Utensils', 'Asian eating and cooking utensils', 'Cooking'),
+('Draining rack', 'Other', 'Rack for draining fried food', 'Cooking'),
+('Wire rack', 'Other', 'Metal cooling/draining rack', 'Cooking'),
+('Ice bath bowl', 'Prep', 'Bowl for ice water blanching', 'Prep'),
+('Splatter guard', 'Other', 'Screen to prevent oil splatter', 'Cooking'),
+('Diffuser plate', 'Other', 'Heat distribution plate', 'Cooking'),
+('Plate setter', 'Other', 'Ceramic heat deflector for kamado', 'Cooking'),
+('Hot pot vessel', 'Cookware', 'Table-top cooking pot', 'Cooking'),
+('Portable burner', 'Appliances', 'Tabletop heating element', 'Cooking'),
+('Strainer ladles', 'Utensils', 'Ladles with mesh for hot pot', 'Cooking'),
+
+-- Fermentation & Preservation
+('Fermentation vessel', 'Other', 'Container for fermenting', 'Prep'),
+('Fermentation crock', 'Other', 'Ceramic crock for pickling', 'Prep'),
+('Mason jars', 'Other', 'Glass jars for canning', 'Prep'),
+('Airlock', 'Other', 'One-way valve for fermentation', 'Prep'),
+('Weights', 'Other', 'Weights to keep food submerged', 'Prep'),
+('Canning jars', 'Other', 'Heat-safe jars for preserving', 'Prep'),
+('Weck jars', 'Other', 'German canning jars', 'Prep'),
+('Jar lifter', 'Utensils', 'Tool for handling hot jars', 'Prep'),
+('Water bath canner', 'Appliances', 'Large pot for canning', 'Prep'),
+('Pressure canner', 'Appliances', 'Pressure cooker for canning', 'Prep'),
+
+-- Dehydration
+('Food dehydrator', 'Appliances', 'Electric dehydrating appliance', 'Prep'),
+('Freeze dryer', 'Appliances', 'Vacuum freeze-drying machine', 'Prep'),
+('Drying racks', 'Other', 'Racks for air drying', 'Prep'),
+('Mesh cover', 'Other', 'Screen to protect drying food', 'Prep'),
+('Biltong box', 'Other', 'Ventilated box for drying meat', 'Prep'),
+('Drying cabinet', 'Other', 'Cabinet with airflow for drying', 'Prep'),
+('Hooks', 'Other', 'Hanging hooks for curing', 'Prep'),
+
+-- Molecular Gastronomy
+('Sodium alginate', 'Other', 'Chemical for spherification', 'Prep'),
+('Calcium chloride', 'Other', 'Chemical for spherification', 'Prep'),
+('Syringes', 'Other', 'For precise liquid dispensing', 'Prep'),
+('Anti-griddle', 'Appliances', 'Frozen surface for freeze-searing', 'Cooking'),
+('Centrifuge', 'Appliances', 'Spinning device for clarification', 'Prep'),
+('Rotary evaporator', 'Appliances', 'Vacuum distillation device', 'Prep'),
+('Vacuum pump', 'Appliances', 'Pump for vacuum processes', 'Prep'),
+
+-- Torches & Fire Tools
+('Culinary blowtorch', 'Other', 'Handheld torch for caramelizing', 'Cooking'),
+('Butane fuel', 'Other', 'Fuel for torches', 'Other'),
+
+-- Specialty Regional Equipment
+('Saj dome', 'Cookware', 'Convex metal griddle for flatbread', 'Cooking'),
+('Mitad', 'Cookware', 'Ethiopian clay griddle for injera', 'Cooking'),
+('Comal', 'Cookware', 'Mexican flat griddle', 'Cooking'),
+('Tawa', 'Cookware', 'Indian flat griddle', 'Cooking'),
+('Teppan griddle', 'Cookware', 'Large flat iron griddle', 'Cooking'),
+('Robata grill', 'Appliances', 'Japanese fireside grill', 'Cooking'),
+('Sigdi', 'Appliances', 'Portable charcoal stove', 'Cooking'),
+('Angeethi', 'Appliances', 'Indian charcoal stove', 'Cooking'),
+('Foukou', 'Other', 'Cypriot rotisserie spit', 'Cooking'),
+('Pierrade stone', 'Cookware', 'Heated stone for table cooking', 'Cooking'),
+('Bulgogi grill pan', 'Cookware', 'Domed Korean grill pan', 'Cooking'),
+
+-- Earth Ovens & Pits
+('Lava rocks', 'Other', 'Volcanic rocks for imu', 'Cooking'),
+('River stones', 'Other', 'Smooth stones for hangi', 'Cooking'),
+('Banana leaves', 'Other', 'Leaves for wrapping food', 'Cooking'),
+('Ti leaves', 'Other', 'Hawaiian leaves for wrapping', 'Cooking'),
+('Burlap', 'Other', 'Fabric for covering earth ovens', 'Cooking'),
+('Wire baskets', 'Other', 'Baskets for earth oven cooking', 'Cooking'),
+('Sacking', 'Other', 'Fabric for earth ovens', 'Cooking'),
+('Muslin cloth', 'Other', 'Fine fabric for wrapping', 'Cooking'),
+
+-- Miscellaneous
+('Toaster', 'Appliances', 'Electric bread toaster', 'Cooking'),
+('Stove', 'Appliances', 'Cooktop for heating', 'Cooking'),
+('High-BTU burner', 'Appliances', 'High-output gas burner', 'Cooking'),
+('Lid', 'Other', 'Cover for pots and pans', 'Cooking'),
+('Otoshibuta', 'Other', 'Japanese drop lid', 'Cooking'),
+('Cheesecloth', 'Other', 'Loose-woven fabric for straining', 'Prep'),
+('Twine', 'Other', 'String for tying', 'Prep'),
+('Butcher twine', 'Other', 'Kitchen string for trussing', 'Prep'),
+('Toothpicks', 'Other', 'Small wooden picks', 'Prep'),
+('Cloche', 'Other', 'Dome cover for smoking', 'Cooking'),
+('Container', 'Other', 'General storage container', 'Prep'),
+('Squeeze bottles', 'Other', 'Bottles for sauces', 'Cooking'),
+('Piping bag', 'Baking', 'Bag for piping dough', 'Baking'),
+('Offset spatula', 'Utensils', 'Angled spatula', 'Baking'),
+('Marble slab', 'Other', 'Stone surface for tempering', 'Baking'),
+('Dough paddle', 'Utensils', 'Paddle for bread', 'Baking'),
+('Cutter', 'Cutting', 'Dough or cookie cutter', 'Baking'),
+('Sugar sifter', 'Utensils', 'Sifter for powdered sugar', 'Baking'),
+('Fan', 'Other', 'Air circulation device', 'Other'),
+('Ventilation', 'Other', 'Air exhaust system', 'Other'),
+('Oil spray bottle', 'Other', 'Spray bottle for oil', 'Cooking'),
+('Paper towels', 'Other', 'Absorbent paper', 'Other'),
+('Foil', 'Other', 'Aluminum foil', 'Cooking'),
+('Plastic wrap', 'Other', 'Cling film', 'Prep'),
+('Storage container', 'Other', 'Container for storing food', 'Prep')
+
+ON CONFLICT (name) DO NOTHING;

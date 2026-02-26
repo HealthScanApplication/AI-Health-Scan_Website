@@ -34,6 +34,14 @@ import {
   Plus,
   Download,
   Wrench,
+  Flame,
+  CheckCircle,
+  AlertCircle,
+  X,
+  Bell,
+  Send,
+  Dumbbell,
+  HeartPulse,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -47,6 +55,10 @@ import { WaitlistDetailTray } from './admin/WaitlistDetailTray';
 import { CatalogDetailTray } from './admin/CatalogDetailTray';
 import { AdminModal } from './ui/AdminModal';
 import { AdminDebugPanel } from './admin/AdminDebugPanel';
+import { CookingToolsField, type EquipmentRecord } from './admin/fields/CookingToolsField';
+import { CatalogItemTag } from './admin/shared/CatalogItemTag';
+import { IconPickerField, LucideIconPreview } from './admin/IconPickerField';
+import { useAdminRecords, type AdminRecord as AdminRecordType } from '../hooks/useAdminRecords';
 
 interface AdminRecord {
   id: string;
@@ -158,6 +170,216 @@ async function uploadFileToStorage(
   return data.publicUrl;
 }
 
+// ── Notification Tester Component ──
+function NotificationTester({ accessToken }: { accessToken: string }) {
+  const [environment, setEnvironment] = useState<'staging' | 'production'>('staging');
+  const [userEmail, setUserEmail] = useState('');
+  const [notificationType, setNotificationType] = useState<'push' | 'email' | 'both'>('push');
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSendNotification = async () => {
+    if (!userEmail || !title || !message) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    setSending(true);
+    setResult(null);
+
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/send-test-notification`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            environment,
+            userEmail,
+            notificationType,
+            title,
+            message,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setResult({ success: true, message: data.message || 'Notification sent successfully!' });
+        toast.success('Notification sent!');
+        // Clear form
+        setUserEmail('');
+        setTitle('');
+        setMessage('');
+      } else {
+        setResult({ success: false, message: data.error || 'Failed to send notification' });
+        toast.error(data.error || 'Failed to send notification');
+      }
+    } catch (error: any) {
+      setResult({ success: false, message: error.message });
+      toast.error('Error sending notification');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
+          <Bell className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Test Notifications</h2>
+          <p className="text-xs text-gray-500">Send test push notifications or emails to users</p>
+        </div>
+      </div>
+
+      {/* Environment Selector */}
+      <div className="space-y-2">
+        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Environment</Label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEnvironment('staging')}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${
+              environment === 'staging'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            🧪 Staging
+          </button>
+          <button
+            type="button"
+            onClick={() => setEnvironment('production')}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${
+              environment === 'production'
+                ? 'bg-red-600 text-white border-red-600'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-red-300'
+            }`}
+          >
+            🚀 Production
+          </button>
+        </div>
+      </div>
+
+      {/* User Email */}
+      <div className="space-y-2">
+        <Label htmlFor="notif-email" className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          User Email
+        </Label>
+        <Input
+          id="notif-email"
+          type="email"
+          value={userEmail}
+          onChange={(e) => setUserEmail(e.target.value)}
+          placeholder="user@example.com"
+          className="w-full"
+        />
+      </div>
+
+      {/* Notification Type */}
+      <div className="space-y-2">
+        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Notification Type</Label>
+        <div className="flex gap-2">
+          {(['push', 'email', 'both'] as const).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setNotificationType(type)}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                notificationType === type
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
+              }`}
+            >
+              {type === 'push' ? '📱 Push' : type === 'email' ? '📧 Email' : '📱📧 Both'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Title */}
+      <div className="space-y-2">
+        <Label htmlFor="notif-title" className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Title
+        </Label>
+        <Input
+          id="notif-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Notification title"
+          className="w-full"
+        />
+      </div>
+
+      {/* Message */}
+      <div className="space-y-2">
+        <Label htmlFor="notif-message" className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Message
+        </Label>
+        <Textarea
+          id="notif-message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Notification message..."
+          rows={4}
+          className="w-full"
+        />
+      </div>
+
+      {/* Send Button */}
+      <Button
+        onClick={handleSendNotification}
+        disabled={sending || !userEmail || !title || !message}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+      >
+        {sending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Sending...
+          </>
+        ) : (
+          <>
+            <Send className="w-4 h-4 mr-2" />
+            Send Notification
+          </>
+        )}
+      </Button>
+
+      {/* Result */}
+      {result && (
+        <div
+          className={`rounded-lg p-4 ${
+            result.success
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : 'bg-red-50 border border-red-200 text-red-800'
+          }`}
+        >
+          <p className="text-sm font-semibold">{result.success ? '✓ Success' : '✗ Error'}</p>
+          <p className="text-xs mt-1">{result.message}</p>
+        </div>
+      )}
+
+      {/* Warning */}
+      {environment === 'production' && (
+        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+          <p className="font-semibold">⚠️ Production Environment</p>
+          <p className="mt-1">You are sending to LIVE users. Double-check the email and message before sending.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type ContentLink = {
   id: string; url: string; title: string; description: string;
   image: string; siteName: string; isPdf: boolean; votes: number; addedAt: string;
@@ -173,8 +395,8 @@ function screenshotUrl(url: string) {
   return `https://image.thum.io/get/width/600/crop/400/${url}`;
 }
 
-// A single cooking step: { text: string, image_url?: string, ingredient_ids?: string[] }
-type CookingStep = { text: string; image_url?: string; ingredient_ids?: string[] };
+// A single cooking step: { text: string, image_url?: string, ingredient_ids?: string[], equipment_ids?: string[] }
+type CookingStep = { text: string; image_url?: string; ingredient_ids?: string[]; equipment_ids?: string[] };
 
 // Common cooking tools for suggestions
 const COMMON_COOKING_TOOLS: { name: string; category: string }[] = [
@@ -210,214 +432,10 @@ const COMMON_COOKING_TOOLS: { name: string; category: string }[] = [
 ];
 
 // ─── Shared CatalogItemTag ─────────────────────────────────────────────────
-// Reusable image+text tag used for ingredients, equipment, and step mentions
-function CatalogItemTag({
-  name, imageUrl, fallbackColor = 'emerald', onRemove,
-}: {
-  name: string; imageUrl?: string; fallbackColor?: 'emerald' | 'orange' | 'blue';
-  onRemove?: () => void;
-}) {
-  const colors: Record<string, string> = {
-    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
-    orange: 'bg-orange-50 border-orange-200 text-orangeald-900',
-    blue: 'bg-blue-50 border-blue-200 text-blue-900',
-  };
-  const fallbackBg: Record<string, string> = {
-    emerald: 'bg-emerald-200 text-emerald-700',
-    orange: 'bg-orange-200 text-orange-700',
-    blue: 'bg-blue-200 text-blue-700',
-  };
-  return (
-    <span className={`flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl border text-xs font-medium shadow-sm ${colors[fallbackColor]}`}>
-      {imageUrl ? (
-        <img src={imageUrl} alt="" className="w-6 h-6 rounded-lg object-cover flex-shrink-0" />
-      ) : (
-        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${fallbackBg[fallbackColor]}`}>
-          {name[0]?.toUpperCase() || '?'}
-        </span>
-      )}
-      <span className="truncate max-w-[100px]">{name}</span>
-      {onRemove && (
-        <button type="button" onClick={onRemove} className="text-gray-400 hover:text-red-600 ml-0.5 font-bold leading-none flex-shrink-0">&times;</button>
-      )}
-    </span>
-  );
-}
+// CatalogItemTag component moved to src/components/admin/shared/CatalogItemTag.tsx
 
 // ─── CookingToolsField ─────────────────────────────────────────────────────
-type EquipmentRecord = { id: string; name: string; category?: string; image_url?: string };
-
-function CookingToolsField({ val, updateField, accessToken, onAiEnrich, enriching }: { val: any; updateField: (v: any) => void; accessToken?: string; onAiEnrich?: () => void; enriching?: boolean }) {
-  const tools: string[] = Array.isArray(val) ? val : [];
-  const [search, setSearch] = React.useState('');
-  const [catalogEquipment, setCatalogEquipment] = React.useState<EquipmentRecord[]>([]);
-  const [loadingCatalog, setLoadingCatalog] = React.useState(false);
-
-  // Load catalog_equipment on mount — try edge function first, fallback to REST
-  React.useEffect(() => {
-    if (!accessToken) return;
-    setLoadingCatalog(true);
-    const metaEnv = (import.meta as any).env || {};
-    const restUrl = `${metaEnv.VITE_SUPABASE_URL || `https://${projectId}.supabase.co`}/rest/v1/catalog_equipment?select=id,name,category,image_url&limit=500&order=category,name`;
-    fetch(restUrl, {
-      headers: {
-        'apikey': metaEnv.VITE_SUPABASE_ANON_KEY || '',
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    })
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d) && d.length > 0) setCatalogEquipment(d); })
-      .catch(() => {})
-      .finally(() => setLoadingCatalog(false));
-  }, [accessToken]);
-
-  // Always use catalog_equipment table — no hardcoded fallback
-  const catalogList: EquipmentRecord[] = catalogEquipment;
-
-  const addTool = (name: string) => {
-    if (!tools.includes(name)) updateField([...tools, name]);
-  };
-  const removeTool = (name: string) => updateField(tools.filter(t => t !== name));
-  const addCustom = () => {
-    const t = search.trim();
-    if (t && !tools.includes(t)) { updateField([...tools, t]); setSearch(''); }
-  };
-
-  const filtered = catalogList.filter(t =>
-    !tools.includes(t.name) &&
-    (!search || t.name.toLowerCase().includes(search.toLowerCase()) || (t.category || '').toLowerCase().includes(search.toLowerCase()))
-  );
-  const categories = [...new Set(filtered.map(t => t.category || 'Other'))];
-
-  // Find catalog record for a tool name (for image lookup)
-  const getCatalogRecord = (name: string) => catalogList.find(e => e.name === name);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-1">
-        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-          🔧 Equipment
-          {loadingCatalog && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-gray-400" />}
-          {tools.length > 0 && <span className="ml-1.5 text-[10px] font-light italic text-gray-400 normal-case tracking-normal">{tools.length} selected</span>}
-        </Label>
-        {onAiEnrich && (
-          <button type="button" onClick={onAiEnrich} disabled={enriching}
-            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 disabled:opacity-50 transition-colors flex-shrink-0">
-            {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-            {enriching ? '…' : 'AI Enrich'}
-          </button>
-        )}
-      </div>
-
-      {/* Search / add custom */}
-      <div className="flex gap-1.5">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustom())}
-          placeholder="Search equipment catalog..."
-          className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
-        />
-        {search.trim() && (
-          <button type="button" onClick={addCustom}
-            className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-100 text-orange-700 hover:bg-orange-200 font-medium">
-            + Add
-          </button>
-        )}
-      </div>
-
-      {/* Catalog — tag cloud with images grouped by category */}
-      <div className="border border-gray-100 rounded-lg bg-white max-h-96 overflow-y-auto p-3">
-        {loadingCatalog ? (
-          <div className="flex items-center justify-center gap-2 py-3 text-gray-400">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-[10px]">Loading equipment catalog...</span>
-          </div>
-        ) : catalogList.length === 0 ? (
-          <p className="text-[10px] text-gray-400 italic text-center py-2">No equipment in catalog yet. Add items to the catalog_equipment table.</p>
-        ) : (() => {
-          const visible = catalogList.filter(t => !search || t.name.toLowerCase().includes(search.toLowerCase()) || (t.category || '').toLowerCase().includes(search.toLowerCase()));
-          if (visible.length === 0) return <p className="text-[10px] text-gray-400 italic text-center py-1">No matches for "{search}"</p>;
-          const cats = [...new Set(visible.map(t => t.category || 'Other'))];
-          return (
-            <div className="space-y-4">
-              {cats.map(cat => {
-                const catItems = visible.filter(t => (t.category || 'Other') === cat);
-                if (catItems.length === 0) return null;
-                return (
-                  <div key={cat} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{cat}</p>
-                      <div className="flex-1 h-px bg-gray-200"></div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {catItems.map(t => {
-                        const isSelected = tools.includes(t.name);
-                        return (
-                          <button key={t.id} type="button"
-                            onClick={() => isSelected ? removeTool(t.name) : addTool(t.name)}
-                            className={`group relative flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all ${
-                              isSelected
-                                ? 'bg-orange-100 border-2 border-orange-400 shadow-md'
-                                : 'bg-gray-50 border border-gray-200 hover:border-orange-300 hover:shadow-sm'
-                            }`}
-                            style={{ width: '80px' }}>
-                            <div className="relative">
-                              {t.image_url ? (
-                                <img src={t.image_url} alt="" className="w-12 h-12 rounded-lg object-cover border border-gray-300" />
-                              ) : (
-                                <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center border border-orange-200">
-                                  <Wrench className="w-6 h-6 text-orange-500" />
-                                </div>
-                              )}
-                              {isSelected && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-orange-500 border-2 border-white flex items-center justify-center shadow-sm">
-                                  <span className="text-[10px] font-bold text-white">✓</span>
-                                </div>
-                              )}
-                            </div>
-                            <span className={`text-[9px] font-medium text-center leading-tight line-clamp-2 ${
-                              isSelected ? 'text-orange-900' : 'text-gray-700'
-                            }`}>{t.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* Selected tools summary — image + text tags below the catalog */}
-      {tools.length > 0 && (
-        <div className="pt-1 border-t border-gray-100">
-          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Selected</p>
-          <div className="flex flex-wrap gap-2">
-            {tools.map(t => {
-              const eq = getCatalogRecord(t);
-              return (
-                <span key={t} className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl border bg-orange-50 border-orange-200 text-orange-900 text-xs font-medium shadow-sm">
-                  {eq?.image_url ? (
-                    <img src={eq.image_url} alt="" className="w-6 h-6 rounded-lg object-cover flex-shrink-0" />
-                  ) : (
-                    <span className="w-6 h-6 rounded-lg bg-orange-200 flex items-center justify-center flex-shrink-0">
-                      <Wrench className="w-3 h-3 text-orange-600" />
-                    </span>
-                  )}
-                  {t}
-                  <button type="button" onClick={() => removeTool(t)} className="text-orange-400 hover:text-red-600 ml-0.5 font-bold leading-none">&times;</button>
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// CookingToolsField component moved to src/components/admin/fields/CookingToolsField.tsx
 
 // ─── RecipeIngredientsToolsField ───────────────────────────────────────────
 // 2-column: left = linked ingredients, right = tools
@@ -519,7 +537,7 @@ const INGREDIENT_IMAGE_KEYS: { key: string; label: string }[] = [
   { key: 'image_url_powdered', label: 'Powdered' },
 ];
 
-function CookingStepsField({ val, updateField, accessToken, linkedIngredients, allIngredients, recordData, catalogEquipment }: {
+function CookingStepsField({ val, updateField, accessToken, linkedIngredients, allIngredients, recordData, catalogEquipment, onUpdateRecord }: {
   val: any;
   updateField: (v: any) => void;
   accessToken: string;
@@ -527,14 +545,20 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
   allIngredients: any[];
   recordData: any;
   catalogEquipment?: EquipmentRecord[];
+  onUpdateRecord?: (updates: Record<string, any>) => void;
 }) {
   const steps: CookingStep[] = React.useMemo(() => {
     if (!val) return [];
     if (Array.isArray(val)) {
       return val.map((s: any) =>
         typeof s === 'string'
-          ? { text: s, image_url: '', ingredient_ids: [] }
-          : { text: s.text || '', image_url: s.image_url || '', ingredient_ids: Array.isArray(s.ingredient_ids) ? s.ingredient_ids : [] }
+          ? { text: s, image_url: '', ingredient_ids: [], equipment_ids: [] }
+          : { 
+              text: s.text || '', 
+              image_url: s.image_url || '', 
+              ingredient_ids: Array.isArray(s.ingredient_ids) ? s.ingredient_ids : [],
+              equipment_ids: Array.isArray(s.equipment_ids) ? s.equipment_ids : []
+            }
       );
     }
     return [];
@@ -547,6 +571,7 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
   const [generatingSteps, setGeneratingSteps] = React.useState(false);
   const [customImageIdx, setCustomImageIdx] = React.useState<Set<number>>(new Set());
   const [linkIngredientIdx, setLinkIngredientIdx] = React.useState<number | null>(null);
+  const [linkEquipmentIdx, setLinkEquipmentIdx] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     setPreviewServings(Number(recordData?.servings) || 4);
@@ -586,13 +611,18 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
 
   const getAutoImage = React.useCallback((text: string): string => {
     const lower = (text || '').toLowerCase();
-    // Search pool: prefer linkedIngredients, fall back to allIngredients
-    const pool = linkedIngredients.length > 0 ? linkedIngredients : allIngredients;
+    // ONLY use linkedIngredients (ingredients actually in this recipe)
+    const pool = linkedIngredients;
+    
     // 1. Try ingredient mentioned by name in the step text
     if (pool.length > 0) {
-      const mentioned = pool.filter((ing: any) => { const n = (ing.name_common || ing.name || '').toLowerCase(); return n.length > 2 && lower.includes(n); });
+      const mentioned = pool.filter((ing: any) => { 
+        const n = (ing.name_common || ing.name || '').toLowerCase(); 
+        return n.length > 2 && lower.includes(n); 
+      });
       if (mentioned.length > 0) {
         const f = mentioned[0];
+        // Match image variant to cooking action
         if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) return f.image_url_cut;
         if ((lower.includes('cube')||lower.includes('dice')) && f.image_url_cubed) return f.image_url_cubed;
         if ((lower.includes('cook')||lower.includes('sauté')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) return f.image_url_cooked;
@@ -600,24 +630,35 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
         if (f.image_url) return f.image_url;
       }
     }
-    // 2. Equipment mentioned by name in the step text
-    if (catalogEquipment && catalogEquipment.length > 0) {
-      const eq = catalogEquipment.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
+    
+    // 2. Try equipment from recipe's equipment list (not all catalog)
+    const recipeEquipment: string[] = Array.isArray(recordData?.equipment) ? recordData.equipment : [];
+    if (catalogEquipment && catalogEquipment.length > 0 && recipeEquipment.length > 0) {
+      const eq = catalogEquipment.find(e => 
+        e.image_url && 
+        recipeEquipment.some(name => name.toLowerCase() === e.name.toLowerCase()) &&
+        lower.includes(e.name.toLowerCase())
+      );
       if (eq?.image_url) return eq.image_url;
     }
-    // 3. Fallback: first ingredient in pool with any image
+    
+    // 3. Fallback: first LINKED ingredient with any image (from this recipe only)
     if (pool.length > 0) {
       const first = pool.find((ing: any) => ing.image_url);
       if (first?.image_url) return first.image_url;
     }
-    // 4. Fallback: first equipment item with an image
-    if (catalogEquipment && catalogEquipment.length > 0) {
-      const first = catalogEquipment.find(e => e.image_url);
+    
+    // 4. Fallback: first equipment from THIS recipe with an image
+    if (catalogEquipment && catalogEquipment.length > 0 && recipeEquipment.length > 0) {
+      const first = catalogEquipment.find(e => 
+        e.image_url && recipeEquipment.some(name => name.toLowerCase() === e.name.toLowerCase())
+      );
       if (first?.image_url) return first.image_url;
     }
-    // 5. Ultimate fallback: cooking placeholder
+    
+    // 5. No fallback - return empty to show placeholder instead of random image
     return '';
-  }, [linkedIngredients, allIngredients, catalogEquipment]);
+  }, [linkedIngredients, catalogEquipment, recordData]);
 
   const getMentionedIngredients = (text: string) => {
     // Search ALL ingredients (not just linked) so steps always show matching ingredients
@@ -634,7 +675,11 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
     return eq.filter((t: string) => lower.includes(t.toLowerCase()));
   };
 
-  const update = (ns: CookingStep[]) => updateField(ns);
+  const update = (ns: CookingStep[]) => {
+    updateField(ns);
+    // Hero image should NEVER be auto-changed - it's set manually by user
+    // The reverse could happen: hero image could be copied TO last step if needed
+  };
   const addStep = () => update([...steps, { text: '', image_url: '' }]);
   const removeStep = (i: number) => { setCustomImageIdx(prev => { const s = new Set(prev); s.delete(i); return s; }); update(steps.filter((_, idx) => idx !== i)); };
   const moveStep = (i: number, dir: -1 | 1) => { const nx = [...steps]; const j = i + dir; if (j < 0 || j >= nx.length) return; [nx[i], nx[j]] = [nx[j], nx[i]]; update(nx); };
@@ -648,6 +693,12 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
     const nx = [...steps];
     const cur: string[] = nx[stepIdx].ingredient_ids || [];
     nx[stepIdx] = { ...nx[stepIdx], ingredient_ids: cur.includes(ingId) ? cur.filter(id => id !== ingId) : [...cur, ingId] };
+    update(nx);
+  };
+  const toggleStepEquipment = (stepIdx: number, eqId: string) => {
+    const nx = [...steps];
+    const cur: string[] = nx[stepIdx].equipment_ids || [];
+    nx[stepIdx] = { ...nx[stepIdx], equipment_ids: cur.includes(eqId) ? cur.filter(id => id !== eqId) : [...cur, eqId] };
     update(nx);
   };
   const setStepImage = (i: number, image_url: string, isCustom = true) => {
@@ -758,8 +809,11 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
           const pinnedIngs = linkedIngredients.filter((ing: any) => pinnedIds.includes(ing.id) && !mentionedByText.find((m: any) => m.id === ing.id));
           const mentioned = [...mentionedByText, ...pinnedIngs];
           const mentionedTools = getMentionedTools(step.text);
+          const pinnedEqIds: string[] = step.equipment_ids || [];
+          const pinnedEquipment = catalogEquipment?.filter((eq: EquipmentRecord) => pinnedEqIds.includes(eq.id)) || [];
           const isPickerOpen = pickerIdx === i;
           const isLinkOpen = linkIngredientIdx === i;
+          const isEquipLinkOpen = linkEquipmentIdx === i;
           const isCustomImg = customImageIdx.has(i);
           const displayImg = step.image_url || getAutoImage(step.text);
 
@@ -788,6 +842,11 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                   title="Link ingredients to this step">
                   {'🥗'} {pinnedIds.length > 0 ? pinnedIds.length : '+'}
                 </button>
+                <button type="button" onClick={() => setLinkEquipmentIdx(isEquipLinkOpen ? null : i)}
+                  className={`flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded border transition-colors ${isEquipLinkOpen ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-white border-gray-200 text-gray-400 hover:text-orange-600 hover:border-orange-300'}`}
+                  title="Link equipment to this step">
+                  {'🔧'} {pinnedEqIds.length > 0 ? pinnedEqIds.length : '+'}
+                </button>
                 <button type="button" onClick={() => removeStep(i)}
                   className="text-red-400 hover:text-red-600 p-0.5 rounded hover:bg-red-50 transition-colors text-sm font-bold">&times;</button>
               </div>
@@ -815,8 +874,8 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
 
                   {/* Ingredient + equipment tags — below the text, inside left column */}
                   <div className="px-3 pb-3 pt-0 flex flex-wrap gap-1.5 border-t border-gray-100">
-                    {mentioned.length === 0 && mentionedTools.length === 0 && step.text && (
-                      <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">⚠ No ingredients detected in step text</span>
+                    {mentioned.length === 0 && mentionedTools.length === 0 && pinnedEquipment.length === 0 && step.text && (
+                      <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">⚠ No ingredients/equipment detected</span>
                     )}
                     {mentioned.map((ing: any) => (
                       <CatalogItemTag
@@ -827,7 +886,7 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                       />
                     ))}
                     {mentionedTools.map((t: string) => {
-                      const eqRecord = catalogEquipment?.find(e => e.name === t);
+                      const eqRecord = catalogEquipment?.find(e => e.name.toLowerCase() === t.toLowerCase());
                       return (
                         <CatalogItemTag
                           key={t}
@@ -837,6 +896,14 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                         />
                       );
                     })}
+                    {pinnedEquipment.map((eq: EquipmentRecord) => (
+                      <CatalogItemTag
+                        key={eq.id}
+                        name={eq.name}
+                        imageUrl={eq.image_url}
+                        fallbackColor="orange"
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -904,6 +971,60 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Equipment link panel */}
+              {isEquipLinkOpen && (
+                <div className="border-t border-orange-100 bg-orange-50/40 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-orange-700 uppercase tracking-wide">Link equipment to this step</p>
+                    <button type="button" onClick={() => setLinkEquipmentIdx(null)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+                  </div>
+                  {!catalogEquipment || catalogEquipment.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No equipment in catalog — add equipment to catalog_equipment table first.</p>
+                  ) : (() => {
+                    // Group equipment by category
+                    const grouped = catalogEquipment.reduce((acc: Record<string, EquipmentRecord[]>, eq) => {
+                      const cat = eq.category || 'Other';
+                      if (!acc[cat]) acc[cat] = [];
+                      acc[cat].push(eq);
+                      return acc;
+                    }, {});
+                    const categories = Object.keys(grouped).sort();
+                    
+                    return (
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {categories.map(category => (
+                          <div key={category}>
+                            <p className="text-[9px] font-bold text-orange-600 uppercase tracking-wider mb-1.5">{category}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {grouped[category].map((eq: EquipmentRecord) => {
+                                const isPinned = pinnedEqIds.includes(eq.id);
+                                return (
+                                  <button key={eq.id} type="button" onClick={() => toggleStepEquipment(i, eq.id)}
+                                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${isPinned ? 'bg-orange-100 border-orange-400 text-orange-800' : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300 hover:text-orange-700'}`}>
+                                    {eq.image_url ? (
+                                      <img src={eq.image_url} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" onError={(e) => {
+                                        console.error('[Equipment] Image failed to load:', eq.name, eq.image_url);
+                                        e.currentTarget.style.display = 'none';
+                                      }} />
+                                    ) : (
+                                      <span className="w-4 h-4 rounded bg-orange-200 text-orange-700 text-[8px] font-bold flex items-center justify-center flex-shrink-0">
+                                        {(eq.name || '?')[0].toUpperCase()}
+                                      </span>
+                                    )}
+                                    {eq.name}
+                                    {isPinned && <span className="text-orange-500 font-bold leading-none">✓</span>}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -1459,8 +1580,31 @@ function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId,
 export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanelProps) {
   const [activeTab, setActiveTab] = useState('waitlist');
   const [searchQuery, setSearchQuery] = useState('');
-  const [records, setRecords] = useState<AdminRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  
+  // Define tabs first (needed for useAdminRecords hook)
+  const tabs = [
+    { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
+    { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
+    { id: 'ingredients', label: 'Ingredients', icon: <Leaf className="w-4 h-4" />, table: 'catalog_ingredients' },
+    { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
+    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' },
+    { id: 'scans', label: 'Scans', icon: <ScanLine className="w-4 h-4" />, table: 'scans' },
+    { id: 'equipment', label: 'Equipment', icon: <Wrench className="w-4 h-4" />, table: 'catalog_equipment' },
+    { id: 'cooking_methods', label: 'Cooking Methods', icon: <Flame className="w-4 h-4" />, table: 'catalog_cooking_methods' },
+    { id: 'activities', label: 'Activities', icon: <Dumbbell className="w-4 h-4" />, table: 'catalog_activities' },
+    { id: 'symptoms', label: 'Symptoms', icon: <HeartPulse className="w-4 h-4" />, table: 'catalog_symptoms' },
+    { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" />, table: '' },
+    { id: 'sync', label: 'Sync', icon: <span className="text-xs">⇄</span>, table: '' },
+  ];
+  
+  // Use React Query for data fetching (eliminates duplicate requests)
+  const currentTab = tabs.find(t => t.id === activeTab);
+  const { data: records = [], isLoading: loading, refetch: fetchRecords } = useAdminRecords({
+    activeTab,
+    table: currentTab?.table || '',
+    accessToken,
+    enabled: !!currentTab && activeTab !== 'sync',
+  });
   const [editingRecord, setEditingRecord] = useState<AdminRecord | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
@@ -1490,7 +1634,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [ipGeoData, setIpGeoData] = useState<Record<string, { city?: string; country?: string; countryCode?: string; flag?: string }>>({});
-  const [showSearch, setShowSearch] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
   const recordsCache = useRef<Record<string, AdminRecord[]>>({});
   const [crossTabResults, setCrossTabResults] = useState<{ tabId: string; tabLabel: string; record: AdminRecord }[]>([]);
   const [elementsCache, setElementsCache] = useState<AdminRecord[]>([]);
@@ -1603,77 +1747,110 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   useEffect(() => {
     if (!showEditModal || elementsCache.length > 0) return;
     if (!['ingredients', 'recipes', 'products', 'elements'].includes(activeTab)) return;
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
+
+    const controller = new AbortController();
     const fetchElements = async () => {
       try {
         const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=id,name_common,category,type_label,health_role,image_url&limit=1000`;
         const res = await fetch(url, {
+          signal: controller.signal,
           headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
         });
+        if (controller.signal.aborted) return;
         if (res.ok) {
           const data = await res.json();
-          console.log(`[Admin] Loaded ${data.length} elements for linking`);
-          setElementsCache(data);
+          if (!controller.signal.aborted && Array.isArray(data)) {
+            console.log(`[Admin] Loaded ${data.length} elements for linking`);
+            setElementsCache(data);
+          }
+        } else {
+          console.error('[Admin] Failed to fetch elements:', res.status, res.statusText);
         }
-      } catch (err) {
-        console.error('[Admin] Failed to fetch elements for linking:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Admin] Failed to fetch elements for linking:', err);
+        }
       }
     };
     fetchElements();
-  }, [showEditModal, activeTab, accessToken, elementsCache.length]);
+    return () => controller.abort();
+  }, [showEditModal, activeTab, accessToken]);
 
-  // Reset ingredientsCache when tab changes so it refetches for the new context
+  // Only reset ingredientsCache when closing modal (not on tab change)
   useEffect(() => {
-    setIngredientsCache([]);
-  }, [activeTab]);
+    if (!showEditModal) {
+      setIngredientsCache([]);
+    }
+  }, [showEditModal]);
 
   // Fetch ingredients for linked_ingredients picker when editing recipes, ingredients, or products
   useEffect(() => {
-    if (!showEditModal || !accessToken || typeof accessToken !== 'string' || accessToken.length < 10 || ingredientsCache.length > 0) return;
+    if (!showEditModal || ingredientsCache.length > 0) return;
     if (activeTab !== 'recipes' && activeTab !== 'ingredients' && activeTab !== 'products') return;
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
+
+    const controller = new AbortController();
     const fetchIngredients = async () => {
       try {
         const url = `https://${projectId}.supabase.co/rest/v1/catalog_ingredients?select=id,name_common,category,processing_type,image_url&limit=1000`;
         const res = await fetch(url, {
+          signal: controller.signal,
           headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
         });
+        if (controller.signal.aborted) return;
         if (res.ok) {
           const data = await res.json();
-          console.log(`[Admin] Loaded ${data.length} ingredients for linking`);
-          setIngredientsCache(data);
+          if (!controller.signal.aborted) {
+            console.log(`[Admin] Loaded ${data.length} ingredients for linking`);
+            setIngredientsCache(data);
+          }
         } else {
           console.error('[Admin] Failed to fetch ingredients:', res.status, res.statusText);
         }
-      } catch (err) {
-        console.error('[Admin] Failed to fetch ingredients for linking:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Admin] Failed to fetch ingredients for linking:', err);
+        }
       }
     };
     fetchIngredients();
-  }, [showEditModal, activeTab, accessToken, ingredientsCache.length]);
+    return () => controller.abort();
+  }, [showEditModal, activeTab, accessToken]);
 
-  // Fetch equipment catalog once for recipes tab (used for step image fallback)
+  // Fetch equipment catalog for recipes tab - uses same publicAnonKey as ingredients
   useEffect(() => {
-    if (!showEditModal || !accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
-    if (activeTab !== 'recipes' || equipmentCache.length > 0) return;
-    const metaEnv = (import.meta as any).env || {};
-    const restUrl = `${metaEnv.VITE_SUPABASE_URL || `https://${projectId}.supabase.co`}/rest/v1/catalog_equipment?select=id,name,category,image_url&limit=500&order=category,name`;
-    fetch(restUrl, {
-      headers: { 'apikey': metaEnv.VITE_SUPABASE_ANON_KEY || '', 'Authorization': `Bearer ${accessToken}` },
-    })
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d) && d.length > 0) setEquipmentCache(d); })
-      .catch(() => {});
-  }, [showEditModal, activeTab, accessToken, equipmentCache.length]);
+    if (!showEditModal || equipmentCache.length > 0) return;
+    if (activeTab !== 'recipes') return;
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
 
-  const tabs = [
-    { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
-    { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
-    { id: 'ingredients', label: 'Ingredients', icon: <Leaf className="w-4 h-4" />, table: 'catalog_ingredients' },
-    { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
-    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' },
-    { id: 'scans', label: 'Scans', icon: <ScanLine className="w-4 h-4" />, table: 'scans' },
-    { id: 'equipment', label: 'Equipment', icon: <Wrench className="w-4 h-4" />, table: 'catalog_equipment' },
-    { id: 'sync', label: 'Sync', icon: <span className="text-xs">⇄</span>, table: '' },
-  ];
+    const controller = new AbortController();
+    const fetchEquipment = async () => {
+      try {
+        const url = `https://${projectId}.supabase.co/rest/v1/catalog_equipment?select=id,name,category,image_url&limit=500&order=category,name`;
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
+        });
+        if (controller.signal.aborted) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (!controller.signal.aborted && Array.isArray(data)) {
+            console.log(`[Admin] Loaded ${data.length} equipment items for catalog`);
+            setEquipmentCache(data);
+          }
+        } else {
+          console.error('[Admin] Failed to fetch equipment:', res.status, res.statusText);
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Admin] Failed to fetch equipment catalog:', err);
+        }
+      }
+    };
+    fetchEquipment();
+    return () => controller.abort();
+  }, [showEditModal, activeTab, accessToken]);
 
   const subFilters: Record<string, { label: string; value: string; color: string }[]> = {
     elements: [
@@ -1727,113 +1904,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     processed: 'bg-orange-100 text-orange-800',
   };
 
-  const currentTab = tabs.find(t => t.id === activeTab);
-
-  // Fetch records for current tab (with abort support)
-  const fetchRecordsRef = useRef<() => void>(() => {});
-
-  useEffect(() => {
-    if (!currentTab) return;
-    const controller = new AbortController();
-    const { signal } = controller;
-
-    const doFetch = async (retry = false) => {
-      try {
-        setLoading(true);
-        console.log(`[Admin] Fetching ${currentTab.label} from ${currentTab.table}...`);
-
-        let url: string;
-
-        // Use custom endpoint for KV-stored data (waitlist, products)
-        if (activeTab === 'waitlist' || activeTab === 'products') {
-          const kvEndpoint = activeTab === 'waitlist' ? 'admin/waitlist' : 'admin/products';
-          url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/${kvEndpoint}`;
-          console.log(`[Admin] Fetching ${currentTab.label} from KV store: ${url}`);
-
-          const response = await fetch(url, {
-            signal,
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (signal.aborted) return;
-          if (response.ok) {
-            const data = await response.json();
-            if (signal.aborted) return;
-            console.log(`[Admin] Loaded ${data?.length || 0} ${currentTab.label} from KV store`);
-            setRecords(Array.isArray(data) ? data : []);
-          } else {
-            const errorText = await response.text();
-            console.warn(`[Admin] Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
-            console.warn(`[Admin] Error response:`, errorText);
-            if (!signal.aborted) setRecords([]);
-          }
-          if (!signal.aborted) setLoading(false);
-          return;
-        }
-
-        url = `https://${projectId}.supabase.co/rest/v1/${currentTab.table}?limit=1000`;
-
-        // Add ordering
-        if (activeTab === 'elements') {
-          url += '&order=category.asc,name_common.asc';
-        } else {
-          url += '&order=created_at.desc';
-        }
-
-        console.log(`[Admin] Fetching URL: ${url}`);
-
-        const response = await fetch(url, {
-          signal,
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'apikey': publicAnonKey,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation'
-          }
-        });
-
-        if (signal.aborted) return;
-        console.log(`[Admin] Response: ${response.status} ${response.statusText}`);
-
-        if (response.ok) {
-          const data = await response.json();
-          if (signal.aborted) return;
-          console.log(`[Admin] Loaded ${data?.length || 0} ${currentTab.label}`);
-          setRecords(Array.isArray(data) ? data : []);
-        } else {
-          const errorText = await response.text();
-          console.warn(`[Admin] Failed to fetch ${currentTab.label}:`, response.status, response.statusText);
-          console.warn(`[Admin] Error:`, errorText);
-          if (!signal.aborted) setRecords([]);
-        }
-      } catch (error: any) {
-        if (signal.aborted) return;
-        // Retry once on network failure (cold-start / transient error)
-        if (!retry && error?.name !== 'AbortError') {
-          console.warn(`[Admin] Network error fetching ${currentTab.label}, retrying...`, error);
-          await new Promise((r) => setTimeout(r, 1500));
-          if (!signal.aborted) return doFetch(true);
-          return;
-        }
-        if (error?.name !== 'AbortError') {
-          console.error(`[Admin] Error fetching ${currentTab.label}:`, error);
-          setRecords([]);
-        }
-      } finally {
-        if (!signal.aborted) setLoading(false);
-      }
-    };
-
-    doFetch();
-    fetchRecordsRef.current = () => { doFetch(); };
-
-    return () => { controller.abort(); };
-  }, [activeTab, accessToken]);
-
-  const fetchRecords = () => fetchRecordsRef.current();
+  // React Query now handles fetching - no manual useEffect needed
 
   // Cache records for cross-tab search whenever they change
   useEffect(() => {
@@ -2042,7 +2113,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         const data = await response.json();
         if (response.ok && data.success) {
           toast.success(`${tabConfig?.label || 'Record'} created successfully`);
-          setRecords(prev => [data.record, ...prev]);
+          fetchRecords(); // Refetch to get updated list
           setShowEditModal(false);
         } else {
           toast.error(data.error || `Failed to create (${response.status})`);
@@ -2081,7 +2152,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin SAVE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Waitlist user updated');
-          setRecords(prev => prev.map(r => r.id === editingRecord.id || r.email === editingRecord.email ? { ...r, ...editingRecord } : r));
+          fetchRecords(); // Refetch to get updated list
           setShowEditModal(false);
           setShowDetailModal(false);
         } else {
@@ -2132,7 +2203,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin SAVE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Record updated successfully');
-          setRecords(prev => prev.map(r => r.id === editingRecord.id ? { ...r, ...editingRecord } : r));
+          fetchRecords(); // Refetch to get updated list
           setShowEditModal(false);
         } else {
           try {
@@ -2294,34 +2365,49 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       if (data.equipment_names?.length > 0) {
         updates.equipment = data.equipment_names;
       }
-      // Set cooking steps
+      // Set cooking steps with auto-assigned images and equipment_ids
       if (data.steps?.length > 0) {
-        // Auto-assign images: search ALL ingredients in cache, not just linked
         const linkedIds = updates.linked_ingredients || editingRecord.linked_ingredients || [];
         const linkedIngs = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
         const pool = linkedIngs.length > 0 ? linkedIngs : ingredientsCache;
-        const stepsWithImages = data.steps.map((step: { text: string; image_url: string }) => {
-          if (step.image_url) return step;
+
+        const stepsWithImagesAndEquipment = data.steps.map((step: { text: string; image_url: string }, idx: number) => {
           const lower = step.text.toLowerCase();
-          // Try name match from pool
-          const mentioned = pool.filter((ing: any) => {
-            const n = (ing.name_common || ing.name || '').toLowerCase();
-            return n.length > 2 && lower.includes(n);
-          });
-          if (mentioned.length > 0) {
-            const f = mentioned[0];
-            if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) return { ...step, image_url: f.image_url_cut };
-            if ((lower.includes('cook')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) return { ...step, image_url: f.image_url_cooked };
-            if (f.image_url) return { ...step, image_url: f.image_url };
+          
+          // Auto-detect equipment_ids from step text
+          const detectedEqIds: string[] = equipmentCache
+            .filter(e => e.name.length > 2 && lower.includes(e.name.toLowerCase()))
+            .map(e => e.id);
+
+          // Auto-assign image if none provided
+          let imageUrl = step.image_url || '';
+          if (!imageUrl) {
+            // 1. Try ingredient mentioned by name
+            const mentioned = pool.filter((ing: any) => {
+              const n = (ing.name_common || ing.name || '').toLowerCase();
+              return n.length > 2 && lower.includes(n);
+            });
+            if (mentioned.length > 0) {
+              const f = mentioned[0];
+              if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) imageUrl = f.image_url_cut;
+              else if ((lower.includes('cook')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) imageUrl = f.image_url_cooked;
+              else if (f.image_url) imageUrl = f.image_url;
+            }
+            // 2. Try equipment image
+            if (!imageUrl) {
+              const eqMatch = equipmentCache.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
+              if (eqMatch?.image_url) imageUrl = eqMatch.image_url;
+            }
+            // 3. Fallback: first linked ingredient with image
+            if (!imageUrl) {
+              const first = pool.find((ing: any) => ing.image_url);
+              if (first?.image_url) imageUrl = first.image_url;
+            }
           }
-          // Try equipment
-          const eqMatch = equipmentCache.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
-          if (eqMatch?.image_url) return { ...step, image_url: eqMatch.image_url };
-          // Fallback: first ingredient with image
-          const first = pool.find((ing: any) => ing.image_url);
-          return { ...step, image_url: first?.image_url || '' };
+
+          return { text: step.text, image_url: imageUrl, ingredient_ids: [], equipment_ids: detectedEqIds };
         });
-        updates.instructions = stepsWithImages;
+        updates.instructions = stepsWithImagesAndEquipment;
       }
 
       setEditingRecord((prev: any) => ({ ...prev, ...updates }));
@@ -2359,7 +2445,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             body: JSON.stringify({ table: currentTab.table, id: editingRecord.id, updates: cleanedUpdates }),
           });
           if (saveRes.ok) {
-            setRecords(prev => prev.map(r => r.id === editingRecord.id ? { ...r, ...updates } : r));
+            fetchRecords(); // Refetch to get updated list
             toast.success('Saved to database ✓');
           } else {
             toast.error('AI enriched but save failed — click Save to retry');
@@ -2555,12 +2641,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               body: JSON.stringify({
                 recipeId: record.id,
                 recipeName: name,
-                servings: record.servings || 4,
-                portionWeightG: record.portion_weight_g || null,
-                prepTime: record.prep_time || '',
-                cookTime: record.cook_time || '',
-                difficulty: record.difficulty || '',
-                cuisine: record.cuisine || '',
+                servings: (record as any).servings || 4,
+                portionWeightG: (record as any).portion_weight_g || null,
+                prepTime: (record as any).prep_time || '',
+                cookTime: (record as any).cook_time || '',
+                difficulty: (record as any).difficulty || '',
+                cuisine: (record as any).cuisine || '',
                 description: (record as any).description_simple || (record as any).description || '',
               }),
               signal: AbortSignal.timeout(120_000),
@@ -2580,7 +2666,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             if (Object.keys(recipeUpdates).length > 0) {
               const saveUrl = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
               await fetch(saveUrl, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ table: currentTab.table, id: record.id, updates: recipeUpdates }) });
-              setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...recipeUpdates } : r));
+              // Note: Records will be refetched after batch completes
               const cnt = enrichData.counts;
               filled += (cnt?.ingredients || 0) + (cnt?.equipment ? 1 : 0) + (cnt?.steps ? 1 : 0);
               recordResults.push({ id: record.id, name, status: 'done', fieldsAdded: Object.keys(recipeUpdates).length });
@@ -2667,7 +2753,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               return;
             }
             if (saveRes.ok) {
-              setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...cleanUpdates } : r));
+              // Note: Records will be refetched after batch completes
             }
           }
           filled += filledCount;
@@ -2755,8 +2841,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       const data = await response.json();
       if (data.success && data.record) {
         toast.success(`AI created ${adminFieldConfig[activeTab]?.label || 'record'} with ${data.fieldsGenerated} fields`);
-        // Add to records list and open for editing
-        setRecords(prev => [data.record, ...prev]);
+        // Refetch and open for editing
+        fetchRecords();
         setEditingRecord({ ...data.record });
         setShowEditModal(true);
       } else {
@@ -2792,7 +2878,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin DELETE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success(`Deleted ${record.email}`);
-          setRecords(prev => prev.filter(r => r.id !== record.id && r.email !== record.email));
+          fetchRecords(); // Refetch to get updated list
           setShowDetailModal(false);
         } else {
           try {
@@ -2818,7 +2904,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         console.log('[Admin DELETE] Response:', response.status, responseText);
         if (response.ok) {
           toast.success('Record deleted successfully');
-          setRecords(prev => prev.filter(r => r.id !== record.id));
+          fetchRecords(); // Refetch to get updated list
           setShowDetailModal(false);
         } else {
           try {
@@ -2879,7 +2965,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
         toast.success(`Deleted ${deleted} records`);
       }
-      setRecords(prev => prev.filter(r => !selectedRecords.has(r.id)));
+      fetchRecords(); // Refetch to get updated list
       setSelectedRecords(new Set());
       setBulkMode(false);
     } catch (error) {
@@ -2931,7 +3017,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
         toast.success(`Updated ${updated} records`);
       }
-      setRecords(prev => prev.map(r => selectedRecords.has(r.id) ? { ...r, [bulkEditField]: bulkEditValue } : r));
+      fetchRecords(); // Refetch to get updated list
       setSelectedRecords(new Set());
       setBulkEditField('');
       setBulkEditValue('');
@@ -2994,10 +3080,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
   const filteredRecords = validRecords.filter(record => {
     const searchLower = searchQuery.toLowerCase();
+    
+    // Handle name_other which can be string or array
+    const nameOtherMatch = record.name_other 
+      ? (Array.isArray(record.name_other) 
+          ? record.name_other.some((n: string) => n?.toLowerCase().includes(searchLower))
+          : String(record.name_other).toLowerCase().includes(searchLower))
+      : false;
+    
     const matchesSearch = !searchQuery ? true : (
       (record.name?.toLowerCase().includes(searchLower)) ||
       (record.name_common?.toLowerCase().includes(searchLower)) ||
-      (record.name_other?.toLowerCase().includes(searchLower)) ||
+      nameOtherMatch ||
       (record.name_scientific?.toLowerCase().includes(searchLower)) ||
       (record.email?.toLowerCase().includes(searchLower)) ||
       (record.title?.toLowerCase().includes(searchLower)) ||
@@ -3169,13 +3263,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           </div>
         ) : (
           <div className="flex-shrink-0">
-            <img
-              src={imageUrl}
-              alt={displayName}
-              className="w-16 h-16 rounded-lg object-cover hover:shadow-lg cursor-pointer transition-shadow"
-              onClick={() => handleEdit(record)}
-              loading="lazy"
-            />
+            {record.icon_name && (activeTab === 'activities' || activeTab === 'symptoms') ? (
+              <div
+                className="w-16 h-16 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 flex items-center justify-center hover:shadow-lg cursor-pointer transition-all hover:scale-105"
+                onClick={() => handleEdit(record)}
+              >
+                <LucideIconPreview name={record.icon_name} className="w-8 h-8 text-blue-600" />
+              </div>
+            ) : (
+              <img
+                src={imageUrl}
+                alt={displayName}
+                className="w-16 h-16 rounded-lg object-cover hover:shadow-lg cursor-pointer transition-shadow"
+                onClick={() => handleEdit(record)}
+                loading="lazy"
+              />
+            )}
           </div>
         )}
 
@@ -3224,12 +3327,50 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               )}
               {!isWaitlist && (
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  {record.category && (
-                    <Badge className={`text-[10px] px-1.5 py-0 ${categoryColorMap[record.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
-                      {record.category}
-                    </Badge>
+                  {/* Elements: show health_role • type_label as underline */}
+                  {activeTab === 'elements' && (record.health_role || record.type_label) && (
+                    <span className="text-[10px] text-gray-500 font-medium">
+                      {record.health_role && <span>{record.health_role}</span>}
+                      {record.health_role && record.type_label && <span className="mx-1">•</span>}
+                      {record.type_label && <span>{record.type_label}</span>}
+                    </span>
                   )}
-                  {record.type && (
+                  {/* Other tabs: show category/type badges */}
+                  {activeTab !== 'elements' && (() => {
+                    // Parse category if it's a JSON object
+                    let categoryValue = record.category;
+                    let categoryMain = null;
+                    let categorySub = null;
+                    
+                    if (typeof categoryValue === 'string' && categoryValue.startsWith('{')) {
+                      try {
+                        const parsed = JSON.parse(categoryValue);
+                        categoryMain = parsed.main;
+                        categorySub = parsed.sub;
+                      } catch (e) {
+                        // If parsing fails, use as-is
+                      }
+                    } else if (typeof categoryValue === 'object' && categoryValue) {
+                      categoryMain = (categoryValue as any).main;
+                      categorySub = (categoryValue as any).sub;
+                    }
+                    
+                    return (
+                      <>
+                        {(categoryMain || categoryValue) && (
+                          <Badge className={`text-[10px] px-1.5 py-0 ${categoryColorMap[(categoryMain || categoryValue)?.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+                            {categoryMain || categoryValue}
+                          </Badge>
+                        )}
+                        {categorySub && (
+                          <Badge className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-600">
+                            {categorySub}
+                          </Badge>
+                        )}
+                      </>
+                    );
+                  })()}
+                  {activeTab !== 'elements' && record.type && (
                     <Badge className={`text-[10px] px-1.5 py-0 ${categoryColorMap[record.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}>
                       {record.type}
                     </Badge>
@@ -3247,11 +3388,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 </p>
               )}
               {!isWaitlist && (() => {
-                const ns = record.nutrition_per_serving || record.nutrition_per_100g || record.nutritional_info || {};
-                const cal = Math.round(ns.calories ?? ns.energy_kcal ?? 0);
-                const pro = Math.round(ns.protein_g ?? ns.protein ?? 0);
-                const carb = Math.round(ns.carbohydrates_g ?? ns.carbs ?? ns.carbohydrates ?? 0);
-                const fat = Math.round(ns.fats_g ?? ns.fat_g ?? ns.fat ?? ns.fats ?? 0);
+                // Single source of truth: server generates nutrition_per_100g with standard field names
+                const ns = record.nutrition_per_100g || record.nutrition_per_serving || {};
+                const cal = Math.round(ns.calories ?? 0);
+                const pro = Math.round(ns.protein_g ?? 0);
+                const carb = Math.round(ns.carbohydrates_g ?? 0);
+                const fat = Math.round(ns.fats_g ?? 0);
                 const hasMacros = cal > 0 || pro > 0 || carb > 0 || fat > 0;
 
                 // Aggregate micros/risks from the record itself AND from all linked ingredients
@@ -3562,15 +3704,20 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               </div>
             </TabsContent>
 
-            {tabs.filter(tab => tab.id !== 'sync').map(tab => (
+            {/* ── Notifications Tab ── */}
+            <TabsContent value="notifications" className="space-y-6 pt-2">
+              <NotificationTester accessToken={accessToken} />
+            </TabsContent>
+
+            {tabs.filter(tab => tab.id !== 'sync' && tab.id !== 'notifications').map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                 {/* Waitlist Funnel Dashboard */}
                 {tab.id === 'waitlist' && validRecords.length > 0 && !showSearch && (
                   <WaitlistFunnelDashboard records={validRecords} accessToken={accessToken} ipGeoData={ipGeoData} />
                 )}
 
-                {/* Catalog Metric Cards (elements, ingredients, recipes, products) */}
-                {['elements', 'ingredients', 'recipes', 'products'].includes(tab.id) && records.length > 0 && !showSearch && (
+                {/* Catalog Metric Cards (elements, ingredients, recipes, products, equipment) */}
+                {['elements', 'ingredients', 'recipes', 'products', 'equipment'].includes(tab.id) && records.length > 0 && (
                   <CatalogMetricCards records={records} tabId={tab.id} />
                 )}
 
@@ -4366,6 +4513,20 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               );
             }
 
+            if (field.type === 'icon_picker') {
+              return (
+                <div key={field.key} className={field.colSpan === 2 ? 'col-span-2' : ''}>
+                  <IconPickerField
+                    value={val || ''}
+                    svgPathValue={editingRecord?.icon_svg_path || ''}
+                    onChange={(iconName: string) => updateField(iconName)}
+                    onSvgPathChange={(svgPath: string) => setEditingRecord((prev: any) => ({ ...prev, icon_svg_path: svgPath }))}
+                    label={field.label}
+                  />
+                </div>
+              );
+            }
+
             if (field.type === 'readonly') {
               return (
                 <div key={field.key} className="space-y-1.5">
@@ -4542,32 +4703,72 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 }
               }
               const noParent = field.conditionalOn && editingRecord && !editingRecord[field.conditionalOn];
+              
+              // Special card layout for benefits and risks
+              const isBenefits = field.key === 'health_benefits' || field.key === 'functions';
+              const isRisks = field.key === 'risk_tags';
+              const useCardLayout = isBenefits || isRisks;
+              
               return (
-                <div key={field.key} className="space-y-1.5">
+                <div key={field.key} className="space-y-2">
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label} <span className="text-gray-400 font-normal normal-case">({selected.length} selected)</span></Label>
                   {noParent ? (
                     <p className="text-xs text-gray-400 italic">Select a {field.conditionalOn} first</p>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {tagOptions.map(opt => {
-                        const isSelected = selected.some(s => s.toLowerCase() === opt.toLowerCase());
-                        return (
-                          <button key={opt} type="button"
-                            onClick={() => {
-                              const next = isSelected ? selected.filter(s => s.toLowerCase() !== opt.toLowerCase()) : [...selected, opt];
-                              updateField(next);
-                            }}
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-                              isSelected
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                            }`}
-                          >
-                            {opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <>
+                      {/* Selected items as stacked cards (for benefits/risks) */}
+                      {useCardLayout && selected.length > 0 && (
+                        <div className="space-y-1.5 mb-3">
+                          {selected.map((item, idx) => (
+                            <div key={idx} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                              isBenefits ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                            }`}>
+                              {isBenefits ? (
+                                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                              )}
+                              <span className={`text-xs font-medium flex-1 ${
+                                isBenefits ? 'text-green-800' : 'text-red-800'
+                              }`}>{item}</span>
+                              <button type="button"
+                                onClick={() => updateField(selected.filter(s => s !== item))}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                title="Remove"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Available options as chips */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {tagOptions.map(opt => {
+                          const isSelected = selected.some(s => s.toLowerCase() === opt.toLowerCase());
+                          return (
+                            <button key={opt} type="button"
+                              onClick={() => {
+                                const next = isSelected ? selected.filter(s => s.toLowerCase() !== opt.toLowerCase()) : [...selected, opt];
+                                updateField(next);
+                              }}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                                isSelected
+                                  ? isBenefits
+                                    ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                                    : isRisks
+                                    ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                                    : 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                  : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                              }`}
+                            >
+                              {opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </div>
               );
@@ -5645,20 +5846,21 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* COL 1: Equipment */}
-                  <div className="space-y-2 border-r border-gray-100 pr-4">
+                  <div className="space-y-2 md:border-r border-gray-100 md:pr-4">
                     <CookingToolsField
                       val={editingRecord?.equipment}
                       updateField={(v) => setEditingRecord((prev: any) => ({ ...prev, equipment: v }))}
                       accessToken={accessToken}
                       onAiEnrich={handleAiEnrichRecipe}
                       enriching={generatingRecipeEnrich}
+                      externalCatalog={equipmentCache}
                     />
                   </div>
 
                   {/* COL 2: Ingredients — image+text tags + search to link */}
-                  <div className="space-y-2 border-r border-gray-100 pr-4">
+                  <div className="space-y-2 md:border-r border-gray-100 md:pr-4">
                   <div className="flex items-center justify-between flex-wrap gap-1">
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                       🥗 Ingredients
@@ -5992,6 +6194,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                           allIngredients={ingredientsCache}
                           recordData={editingRecord}
                           catalogEquipment={equipmentCache}
+                          onUpdateRecord={(updates) => setEditingRecord((prev: any) => ({ ...prev, ...updates }))}
                         />
                       );
                     })()}
@@ -6087,7 +6290,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             'Flavor Profile', 'Descriptions', 'Processing', 'Culinary Origin',
           ]);
           const HEALTH_SECTIONS = new Set([
-            'Nutrition Data', 'Hazards & Risks', 'Health & Scoring',
+            'Media', 'Nutrition Data', 'Hazards & Risks', 'Health & Scoring',
             'Functions & Benefits', 'Thresholds & Range', 'Food Sources',
             'Detailed Sections', 'Deficiency & Excess', 'Interactions',
             'Detox & Exposure', 'References & Meta', 'Summary',

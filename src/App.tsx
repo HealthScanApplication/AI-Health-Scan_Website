@@ -4,6 +4,8 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { DesignSystemProvider } from "./contexts/DesignSystemContext";
 import { PageRenderer } from "./components/PageRenderer";
@@ -634,13 +636,15 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary fallback={AppErrorFallback}>
-      <DesignSystemProvider>
-        <AuthProvider>
-          <ErrorBoundary fallback={AppErrorFallback}>
-            <AppContent />
-          </ErrorBoundary>
-        </AuthProvider>
-      </DesignSystemProvider>
+      <QueryClientProvider client={queryClient}>
+        <DesignSystemProvider>
+          <AuthProvider>
+            <ErrorBoundary fallback={AppErrorFallback}>
+              <AppContent />
+            </ErrorBoundary>
+          </AuthProvider>
+        </DesignSystemProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

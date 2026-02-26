@@ -71,6 +71,8 @@ export function CatalogMetricCards({ records, tabId }: CatalogMetricCardsProps) 
           return ['name', 'category', 'description', 'image_url', 'linked_ingredients', 'elements_beneficial', 'elements_hazardous'];
         case 'products':
           return ['name', 'brand', 'category', 'description', 'image_url', 'linked_ingredients', 'elements_beneficial', 'elements_hazardous'];
+        case 'equipment':
+          return ['name', 'category', 'description', 'image_url'];
         default:
           return ['name', 'description', 'image_url'];
       }
@@ -117,6 +119,14 @@ export function CatalogMetricCards({ records, tabId }: CatalogMetricCardsProps) 
             { key: 'health_benefits', label: 'Benefits', icon: '💚' },
             { key: 'food_sources', label: 'Sources', icon: '🍎' },
             { key: 'reason', label: 'Reason', icon: '🔬' },
+          ];
+        case 'equipment':
+          return [
+            { key: 'description', label: 'Description', icon: '📝' },
+            { key: 'brand', label: 'Brand', icon: '🏷️' },
+            { key: 'material', label: 'Material', icon: '🔨' },
+            { key: 'use_case', label: 'Use Case', icon: '🍳' },
+            { key: 'affiliate_url', label: 'Buy Link', icon: '🛒' },
           ];
         default:
           return [];

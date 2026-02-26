@@ -18,7 +18,7 @@ export function CountdownTimer() {
   });
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const launchDate = new Date("2026-02-27T00:00:00").getTime();
+  const launchDate = new Date("2026-03-07T20:00:00Z").getTime(); // 9pm CEST = 8pm UTC
 
   useEffect(() => {
     // Calculate initial time immediately

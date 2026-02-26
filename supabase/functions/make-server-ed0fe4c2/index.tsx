@@ -12,6 +12,7 @@ import { zapierApp } from './zapier-endpoints.tsx'
 // admin-endpoints-fixed.tsx is no longer used as a sub-app - all admin routes are inline below
 import blogRssApp from './blog-rss-endpoints.tsx'
 import { referralApp } from './referral-endpoints.tsx'
+import { registerNotificationRoutes } from './notification-endpoints.tsx'
 
 // Slack notification helper - sends to configured webhook (non-blocking)
 async function notifySlack(message: { text: string; blocks?: any[] }): Promise<void> {
@@ -467,6 +468,49 @@ app.get('/make-server-ed0fe4c2/confirm-email', handleEmailConfirmation)
 
 // Waitlist stats endpoint
 app.get('/make-server-ed0fe4c2/waitlist/stats', getWaitlistStats)
+
+// Waitlist count endpoint (public - returns total count)
+app.get('/make-server-ed0fe4c2/waitlist-count', async (c) => {
+  try {
+    const allUsers = await kv.getByPrefix('waitlist_user_')
+    const count = allUsers.length
+    console.log(`📊 Waitlist count requested: ${count}`)
+    return c.json({ success: true, count })
+  } catch (error: any) {
+    console.error('❌ Error fetching waitlist count:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// User queue position endpoint (returns position for specific email)
+app.post('/make-server-ed0fe4c2/user-queue-position', async (c) => {
+  try {
+    const { email } = await c.req.json()
+    if (!email) {
+      return c.json({ success: false, error: 'Email required' }, 400)
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim()
+    const userKey = `waitlist_user_${normalizedEmail}`
+    const userData = await kv.get(userKey)
+    
+    if (!userData) {
+      return c.json({ success: false, error: 'User not found in waitlist' }, 404)
+    }
+    
+    console.log(`📍 Queue position requested for ${normalizedEmail}: #${userData.position}`)
+    return c.json({ 
+      success: true, 
+      position: userData.position,
+      totalWaitlist: userData.totalWaitlist || 0,
+      referralCode: userData.referralCode,
+      confirmed: userData.confirmed || false
+    })
+  } catch (error: any) {
+    console.error('❌ Error fetching queue position:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
 
 // User status endpoint  
 app.get('/make-server-ed0fe4c2/user-status', handleUserStatus)
@@ -1013,7 +1057,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, id, updates } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
     if (table === 'catalog_products') {
@@ -1057,7 +1101,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
       catalog_recipes: new Set([
         'name_common','name_other','name_scientific','category','category_sub','meal_slot',
         'cuisine','language','type',
-        'prep_time','cook_time','servings','difficulty','equipment','instructions','cooking_instructions',
+        'prep_time','cook_time','servings','difficulty','equipment','equipment_ids','cooking_method_ids','instructions','cooking_instructions',
         'linked_ingredients','ingredients',
         'description','description_simple','description_technical',
         'health_benefits','taste_profile','flavor_profile','texture_profile',
@@ -1082,7 +1126,10 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'updated_at',
       ]),
       catalog_equipment: new Set([
-        'name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','updated_at',
+        'name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','cooking_methods_used_with','updated_at',
+      ]),
+      catalog_cooking_methods: new Set([
+        'name','slug','category','description','temperature','medium','typical_time','health_impact','nutrient_effect','best_for','equipment_ids','image_url','updated_at',
       ]),
       catalog_products: new Set([
         'name_common','name','name_brand','brand','manufacturer','category','category_sub','subcategory','barcode','quantity',
@@ -1097,13 +1144,46 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'origin_country','region','country',
         'updated_at',
       ]),
+      catalog_activities: new Set([
+        'name','description','category','icon_name','icon_svg_path','image_url',
+        'sweat_level','default_duration_min','calories_per_minute','intensity_levels',
+        'mineral_impact','toxin_loss','benefits','strava_types',
+        'equipment_needed','muscle_groups','contraindications',
+        'is_active','sort_order','updated_at',
+      ]),
+      catalog_symptoms: new Set([
+        'name','slug','category','body_system','severity','onset_type',
+        'description','description_simple',
+        'linked_elements_deficiency','linked_elements_excess',
+        'common_causes','related_symptoms','reversible','population_risk','diagnostic_notes',
+        'image_url','icon_name','tags',
+        'health_score_impact','scientific_references',
+        'is_active','sort_order','ai_enriched_at','updated_at',
+      ]),
     }
     const allowedCols = TABLE_COLUMNS[table]
     const cleanUpdates: Record<string, any> = {}
+    
+    // UUID validation regex
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    
     for (const [k, v] of Object.entries(updates)) {
       if (!allowedCols || allowedCols.has(k)) {
         if (v !== undefined && !['_displayIndex','id','created_at','imported_at','api_source','external_id'].includes(k)) {
-          cleanUpdates[k] = v
+          // Validate UUID arrays (equipment_ids, cooking_method_ids, cooking_methods_used_with, etc.)
+          if (Array.isArray(v) && (k.includes('_ids') || k.includes('_used_with'))) {
+            const validUUIDs = v.filter((uuid: any) => {
+              if (typeof uuid !== 'string') return false
+              const isValid = UUID_REGEX.test(uuid)
+              if (!isValid) {
+                console.warn(`[Admin] Invalid UUID "${uuid}" in field "${k}", skipping`)
+              }
+              return isValid
+            })
+            cleanUpdates[k] = validUUIDs
+          } else {
+            cleanUpdates[k] = v
+          }
         }
       } else {
         console.warn(`[Admin] Stripping unknown column "${k}" from ${table} update`)
@@ -1201,7 +1281,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, id } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
     if (table === 'catalog_products') { await kv.del(id); return c.json({ success: true }) }
@@ -1912,7 +1992,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, record } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!record || typeof record !== 'object') return c.json({ success: false, error: 'Record data is required' }, 400)
 
@@ -1931,7 +2011,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'ai_enriched_at','ai_enrichment_version','created_at','updated_at',
       ]),
       catalog_recipes: new Set([
-        'id','name_common','name_other','name_scientific','category','category_sub','meal_slot','equipment',
+        'id','name_common','name_other','name_scientific','category','category_sub','meal_slot','equipment','equipment_ids','cooking_method_ids',
         'cuisine','language','type',
         'prep_time','cook_time','servings','difficulty','instructions','cooking_instructions',
         'linked_ingredients','ingredients',
@@ -1958,7 +2038,17 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'created_at','updated_at',
       ]),
       catalog_equipment: new Set([
-        'id','name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','created_at','updated_at',
+        'id','name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','cooking_methods_used_with','created_at','updated_at',
+      ]),
+      catalog_cooking_methods: new Set([
+        'id','name','slug','category','description','temperature','medium','typical_time','health_impact','nutrient_effect','best_for','equipment_ids','image_url','created_at','updated_at',
+      ]),
+      catalog_activities: new Set([
+        'id','name','description','category','icon_name','icon_svg_path','image_url',
+        'sweat_level','default_duration_min','calories_per_minute','intensity_levels',
+        'mineral_impact','toxin_loss','benefits','strava_types',
+        'equipment_needed','muscle_groups','contraindications',
+        'is_active','sort_order','created_at','updated_at',
       ]),
       catalog_products: new Set([
         'id','name_common','name','name_brand','brand','manufacturer','category','category_sub','subcategory','barcode','quantity',
@@ -1971,6 +2061,15 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'image_url','image_url_back','image_url_detail','video_url',
         'scientific_papers','social_content',
         'created_at','updated_at',
+      ]),
+      catalog_symptoms: new Set([
+        'id','name','slug','category','body_system','severity','onset_type',
+        'description','description_simple',
+        'linked_elements_deficiency','linked_elements_excess',
+        'common_causes','related_symptoms','reversible','population_risk','diagnostic_notes',
+        'image_url','icon_name','tags',
+        'health_score_impact','scientific_references',
+        'is_active','sort_order','ai_enriched_at','created_at','updated_at',
       ]),
     }
 
@@ -2769,6 +2868,9 @@ app.route('/make-server-ed0fe4c2/zapier', zapierApp)
 
 // Mount Blog RSS endpoints
 app.route('/make-server-ed0fe4c2', blogRssApp)
+
+// Register Notification endpoints
+registerNotificationRoutes(app)
 
 // Add explicit blog endpoint for debugging
 app.get('/make-server-ed0fe4c2/blog/test', (c) => {

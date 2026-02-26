@@ -13,6 +13,8 @@ import {
   PLACEHOLDER_IMAGE,
 } from '../../utils/adminHelpers';
 import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { ElementDetailView } from './ElementDetailView';
+import { LucideIconPreview } from './IconPickerField';
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -68,8 +70,8 @@ export function CatalogDetailTray({
     for (const f of linkedFields) {
       const ids = Array.isArray(record[f.key]) ? record[f.key] as string[] : [];
       if (!ids.length) continue;
-      const table =
-        f.type === 'linked_elements' ? 'catalog_elements' : 'catalog_ingredients';
+      const table = f.linkedTable || 
+        (f.type === 'linked_elements' ? 'catalog_elements' : 'catalog_ingredients');
       idsToResolve.push({ field: f.key, ids, table });
     }
     if (!idsToResolve.length) return;
@@ -83,7 +85,12 @@ export function CatalogDetailTray({
         try {
           const nameCol = table === 'catalog_elements' ? 'name_common,name' : 'name';
           const idFilter = ids.map((id) => `"${id}"`).join(',');
-          const url = `https://${projectId}.supabase.co/rest/v1/${table}?select=id,${nameCol},category,type,image_url&id=in.(${idFilter})`;
+          const selectFields = table === 'catalog_cooking_methods' 
+            ? 'id,name,slug,category,description,image_url'
+            : table === 'catalog_equipment'
+            ? 'id,name,category,description,image_url'
+            : `id,${nameCol},category,type,image_url`;
+          const url = `https://${projectId}.supabase.co/rest/v1/${table}?select=${selectFields}&id=in.(${idFilter})`;
           const res = await fetch(url, {
             headers: {
               Authorization: `Bearer ${accessToken || publicAnonKey}`,
@@ -96,7 +103,7 @@ export function CatalogDetailTray({
               id: d.id,
               name: d.name_common || d.name || 'Unknown',
               category: d.category,
-              type: d.type,
+              type: d.type || d.slug,
               image_url: d.image_url,
             }));
           }
@@ -171,68 +178,75 @@ export function CatalogDetailTray({
         {/* Badges */}
         <BadgeRow record={record} />
 
-        {/* Description(s) */}
-        {descFields.length > 0 && (
-          <div className="space-y-2">
-            {descFields.map((df) => (
-              <div key={df.key} className="bg-gray-50 rounded-xl p-4">
-                {descFields.length > 1 && (
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{df.label}</div>
-                )}
-                <div className="text-sm text-gray-700 leading-relaxed">{record[df.key]}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Sectioned fields */}
-        {sections.map((section) => (
-          <SectionBlock
-            key={section}
-            section={section}
-            fields={sectionedFields.filter((f) => f.section === section)}
-            record={record}
-            ipGeoData={ipGeoData}
-            resolvedLinked={resolvedLinked}
-            linkedLoading={linkedLoading}
-          />
-        ))}
-
-        {/* Unsectioned detail fields */}
-        {unsectionedFields.length > 0 && (
-          <CollapsibleSection
-            title="Details"
-            itemCount={unsectionedFields.length}
-            previewCount={6}
-            totalItems={unsectionedFields.length}
-          >
-            {(expanded: boolean) => (
-              <div className="grid grid-cols-2 gap-2">
-                {(expanded ? unsectionedFields : unsectionedFields.slice(0, 6)).map(
-                  (field) => {
-                    const val = record[field.key];
-                    const span =
-                      field.colSpan === 2 ||
-                      field.type === 'textarea' ||
-                      field.type === 'json' ||
-                      field.type === 'array'
-                        ? 'col-span-2'
-                        : '';
-                    return (
-                      <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
-                        <div className="text-[10px] text-gray-400 font-medium uppercase">
-                          {field.label}
-                        </div>
-                        <div className="text-sm text-gray-900 mt-0.5 break-all">
-                          <FieldValue field={field} value={val} ipGeoData={ipGeoData} resolvedLinked={resolvedLinked} linkedLoading={linkedLoading} />
-                        </div>
-                      </div>
-                    );
-                  },
-                )}
+        {/* ── ELEMENTS TAB: Dedicated detail view ── */}
+        {activeTab === 'elements' ? (
+          <ElementDetailView record={record} accessToken={accessToken} />
+        ) : (
+          <>
+            {/* Description(s) */}
+            {descFields.length > 0 && (
+              <div className="space-y-2">
+                {descFields.map((df) => (
+                  <div key={df.key} className="bg-gray-50 rounded-xl p-4">
+                    {descFields.length > 1 && (
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{df.label}</div>
+                    )}
+                    <div className="text-sm text-gray-700 leading-relaxed">{record[df.key]}</div>
+                  </div>
+                ))}
               </div>
             )}
-          </CollapsibleSection>
+
+            {/* Sectioned fields */}
+            {sections.map((section) => (
+              <SectionBlock
+                key={section}
+                section={section}
+                fields={sectionedFields.filter((f) => f.section === section)}
+                record={record}
+                ipGeoData={ipGeoData}
+                resolvedLinked={resolvedLinked}
+                linkedLoading={linkedLoading}
+              />
+            ))}
+
+            {/* Unsectioned detail fields */}
+            {unsectionedFields.length > 0 && (
+              <CollapsibleSection
+                title="Details"
+                itemCount={unsectionedFields.length}
+                previewCount={6}
+                totalItems={unsectionedFields.length}
+              >
+                {(expanded: boolean) => (
+                  <div className="grid grid-cols-2 gap-2">
+                    {(expanded ? unsectionedFields : unsectionedFields.slice(0, 6)).map(
+                      (field) => {
+                        const val = record[field.key];
+                        const span =
+                          field.colSpan === 2 ||
+                          field.type === 'textarea' ||
+                          field.type === 'json' ||
+                          field.type === 'array'
+                            ? 'col-span-2'
+                            : '';
+                        return (
+                          <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
+                            <div className="text-[10px] text-gray-400 font-medium uppercase">
+                              {field.label}
+                            </div>
+                            <div className="text-sm text-gray-900 mt-0.5 break-all">
+                              <FieldValue field={field} value={val} ipGeoData={ipGeoData} resolvedLinked={resolvedLinked} linkedLoading={linkedLoading} />
+                            </div>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
+              </CollapsibleSection>
+            )}
+          </>
         )}
       </div>
     </AdminModal>
@@ -740,6 +754,18 @@ function FieldValue({
   if (field.type === 'linked_elements' || field.type === 'linked_ingredients') {
     const items = resolvedLinked?.[field.key] || [];
     return <LinkedItemsList items={items} loading={!!linkedLoading} category={field.linkedCategory} />;
+  }
+
+  if (field.type === 'icon_picker') {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
+          <LucideIconPreview name={String(value)} className="w-5 h-5 text-gray-700" />
+        </div>
+        <span className="text-sm font-medium">{String(value)}</span>
+        <Badge className="text-[10px] bg-blue-50 text-blue-700">Lucide</Badge>
+      </div>
+    );
   }
 
   if (field.type === 'boolean') {
