@@ -1,0 +1,152 @@
+{
+  "version": "1.0.0",
+  "description": "Shared hazard category definitions for web admin and mobile app. Each hazard element belongs to exactly one category.",
+  "levels": ["none", "trace", "low", "moderate", "high"],
+  "categories": [
+    {
+      "key": "contaminants",
+      "label": "Contaminants",
+      "description": "Environmental pollutants from air, water, soil, and packaging materials including heavy metals, VOCs, PFAS, plasticizers, and industrial chemicals",
+      "icon": "factory",
+      "emoji": "🏭",
+      "color": "orange",
+      "element_ids": [
+        "1_3_butadiene", "1_4_dioxane", "acetaldehyde", "acrolein", "antimony",
+        "benzene", "benzyl_butyl_phthalate", "bisphenol_a", "bisphenol_f", "bisphenol_s",
+        "cadmium", "carbon_disulfide", "carbon_monoxide", "chloroform", "chromium_vi",
+        "dbp", "dehp", "dichloromethane", "didp", "dimethylformamide", "dinp",
+        "dioxins_tcdd", "epichlorohydrin", "ethylbenzene", "ethylene_oxide",
+        "formaldehyde", "furans", "genx_pfoa_replacement", "ground_level_ozone",
+        "hexachlorobenzene", "lead", "melamine", "mercury", "methyl_ethyl_ketone",
+        "methylene_chloride", "microplastics", "mycotoxins", "nanomaterials",
+        "nitrogen_dioxide", "nonylphenol", "pahs", "pbdes", "pcbs", "perchlorate",
+        "perchloroethylene", "pfas", "pfbs", "pfda", "pfdoda", "pfhpa", "pfhxs",
+        "pfna", "pfoa", "pfos", "pfunda", "pm10", "pm2_5", "polycyclic_oil_mist",
+        "propylene_oxide", "residual_formaldehyde", "styrene", "sulfur_dioxide",
+        "tetrachloroethane", "tetrachloroethylene", "thallium", "toluene",
+        "tributyltin", "trichlorobenzene", "trichloroethylene", "triphenyl_phosphate",
+        "uranium", "vinyl_acetate", "vinyl_chloride", "xylene"
+      ]
+    },
+    {
+      "key": "pesticides",
+      "label": "Pesticides",
+      "description": "Agricultural chemicals and crop treatment residues including herbicides, insecticides, fungicides, and neonicotinoids",
+      "icon": "wheat",
+      "emoji": "🌾",
+      "color": "orange",
+      "element_ids": [
+        "2_4_d", "aldicarb", "aldrin", "atrazine", "carbaryl", "carbofuran",
+        "chlordane", "chlorpyrifos", "clothianidin", "cypermethrin", "ddt",
+        "diazinon", "dicamba", "dieldrin", "endosulfan", "fipronil", "glyphosate",
+        "heptachlor", "imidacloprid", "lindane", "malathion", "methamidophos",
+        "methomyl", "methyl_parathion", "monocrotophos", "neonicotinoids",
+        "paraquat", "parathion", "permethrin", "thiamethoxam"
+      ]
+    },
+    {
+      "key": "additives",
+      "label": "Additives",
+      "description": "Intentionally added food ingredients including preservatives, artificial colorants, sweeteners, emulsifiers, and stabilizers",
+      "icon": "flask-conical",
+      "emoji": "🧪",
+      "color": "orange",
+      "element_ids": [
+        "acesulfame_potassium", "advantame", "allura_red_ac", "amaranth",
+        "aspartame", "azodicarbonamide", "brilliant_blue", "brown_ht",
+        "bha_butylated_hydroxyanisole", "bht_butylated_hydroxytoluene",
+        "caffeine", "calcium_propionate", "caramel_color", "carmine",
+        "carrageenan", "erythrosine", "ethanol", "glycerol", "green_s",
+        "guar_gum", "high_fructose_corn_syrup", "indigotine", "invert_sugar",
+        "isomalt", "malic_acid", "maltitol", "maltodextrin", "mannitol",
+        "monoglycerides", "neotame", "polyglycerol_esters_of_fatty_acids",
+        "polysorbate_60", "polysorbate_80", "ponceau_4r", "potassium_bromate",
+        "potassium_sorbate", "saccharin", "sodium_benzoate",
+        "sodium_metabisulfite", "sodium_nitrate", "sodium_nitrite", "sorbitol",
+        "sucralose", "sunset_yellow", "tartrazine",
+        "tbhq_tertiary_butylhydroquinone", "theobromine", "titanium_dioxide",
+        "xanthan_gum", "xylitol"
+      ]
+    },
+    {
+      "key": "cooking_byproducts",
+      "label": "Cooking Byproducts",
+      "description": "Harmful compounds formed during food processing, cooking, and heating such as polycyclic aromatic hydrocarbons (PAHs) and acrylamide",
+      "icon": "flame",
+      "emoji": "🔥",
+      "color": "orange",
+      "element_ids": [
+        "acrylamide", "anthracene", "benzo_a_pyrene", "benzo_b_fluoranthene",
+        "benzo_k_fluoranthene", "dibenz_a_h_anthracene", "fluoranthene",
+        "indeno_1_2_3_cd_pyrene", "naphthalene", "nitrosamines",
+        "phenanthrene", "pyrene"
+      ]
+    },
+    {
+      "key": "mold_toxins",
+      "label": "Mold Toxins",
+      "description": "Mycotoxins produced by fungal contamination during storage and spoilage including aflatoxins, ochratoxin, and fumonisins",
+      "icon": "bug",
+      "emoji": "🧫",
+      "color": "orange",
+      "element_ids": [
+        "aflatoxin_b1", "citrinin", "deoxynivalenol", "ergot_alkaloids",
+        "fumonisin_b1", "nivalenol", "ochratoxin_a", "patulin",
+        "t_2_toxin", "zearalenone"
+      ]
+    },
+    {
+      "key": "pathogens",
+      "label": "Pathogens",
+      "description": "Disease-causing bacteria, viruses, and parasites responsible for foodborne illness and contamination",
+      "icon": "shield-alert",
+      "emoji": "🦠",
+      "color": "green",
+      "element_ids": [
+        "adenovirus", "anisakis_simplex", "ascaris_lumbricoides", "astrovirus",
+        "bacillus_cereus", "campylobacter_jejuni", "clonorchis_sinensis",
+        "clostridium_botulinum", "clostridium_perfringens", "cronobacter_sakazakii",
+        "cryptosporidium_parvum", "cyclospora_cayetanensis",
+        "diphyllobothrium_latum", "e_coli_o157_h7", "echinococcus_granulosus",
+        "entamoeba_histolytica", "fasciola_hepatica", "giardia_lamblia",
+        "hepatitis_a_virus", "hepatitis_e", "influenza_a", "influenza_b",
+        "listeria_monocytogenes", "measles", "norovirus", "poliovirus",
+        "rotavirus", "salmonella", "salmonella_enteritidis", "sapovirus",
+        "sars_cov_2", "schistosoma_mansoni", "shigella_dysenteriae",
+        "staphylococcus_aureus", "strongyloides_stercoralis", "taenia_saginata",
+        "taenia_solium", "toxoplasma_gondii", "trichinella_spiralis",
+        "vibrio_cholerae", "vibrio_parahaemolyticus", "yersinia_enterocolitica"
+      ]
+    },
+    {
+      "key": "vet_drugs",
+      "label": "Vet Drugs",
+      "description": "Veterinary pharmaceuticals, growth hormones, antibiotics, and aquaculture treatments used in animal farming",
+      "icon": "syringe",
+      "emoji": "💉",
+      "color": "orange",
+      "element_ids": [
+        "rbgh_rbst", "estradiol", "zeranol", "trenbolone_acetate",
+        "melengestrol_acetate", "progesterone", "testosterone", "igf_1",
+        "ractopamine", "clenbuterol", "tetracycline", "oxytetracycline",
+        "amoxicillin", "sulfamethazine", "enrofloxacin", "chloramphenicol",
+        "florfenicol", "erythromycin", "emamectin_benzoate", "malachite_green",
+        "ethoxyquin", "synthetic_astaxanthin", "diflubenzuron", "ivermectin",
+        "fenbendazole"
+      ]
+    },
+    {
+      "key": "plant_toxins",
+      "label": "Plant Toxins",
+      "description": "Naturally occurring toxins and antinutrients found in plants, fungi, and seafood including lectins, oxalates, and marine biotoxins",
+      "icon": "leaf",
+      "emoji": "🌿",
+      "color": "orange",
+      "element_ids": [
+        "ciguatoxin", "goitrogens", "grayanotoxins", "hypoglycin_a", "lectins",
+        "oxalates", "phytates", "pyrrolizidine_alkaloids", "sambunigrin",
+        "saponins", "saxitoxin", "solanine", "tannins", "tetrodotoxin"
+      ]
+    }
+  ]
+}

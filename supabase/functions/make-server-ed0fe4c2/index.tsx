@@ -1087,14 +1087,16 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     // Per-table column allowlists — strip any unknown columns before update to prevent schema errors
     const TABLE_COLUMNS: Record<string, Set<string>> = {
       catalog_elements: new Set([
-        'name_common','name_other','category','type_label','subcategory','health_role','essential_90',
+        'name_common','name_other','name_scientific','category','type_label','subcategory','health_role','essential_90',
         'chemical_symbol','molecular_formula','cas_number','slug',
+        'nutrient_key','nutrient_unit','nutrient_category',
         'description','description_simple','description_technical','description_full',
         'functions','health_benefits','risk_tags','thresholds','deficiency_ranges','excess_ranges','drv_by_population',
         'found_in','food_sources_detailed','food_strategy','reason',
         'deficiency','interactions','detox_strategy',
+        'prevention_items','elimination_items',
         'health_score','scientific_references','info_sections',
-        'image_url','image_url_raw','image_url_powdered','image_url_cut','video_url','images','videos',
+        'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_capsule','video_url','images','videos',
         'scientific_papers','social_content',
         'ai_enriched_at','ai_enrichment_version','updated_at',
       ]),
@@ -1120,6 +1122,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'description_simple','description_technical','health_benefits','taste_profile',
         'elements_beneficial','elements_hazardous','health_score','scientific_references',
         'nutrition_per_100g','nutrition_per_serving',
+        'herbal_quality',
         'origin_country','origin_region','origin_city','culinary_history',
         'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_cubed','image_url_cooked','video_url','images','videos',
         'scientific_papers','social_content',
@@ -1145,7 +1148,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'updated_at',
       ]),
       catalog_activities: new Set([
-        'name','description','category','icon_name','icon_svg_path','image_url',
+        'name','description','category','icon_name','icon_svg_path','icon_url','image_url','video_url',
         'sweat_level','default_duration_min','calories_per_minute','intensity_levels',
         'mineral_impact','toxin_loss','benefits','strava_types',
         'equipment_needed','muscle_groups','contraindications',
@@ -1156,7 +1159,8 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'description','description_simple',
         'linked_elements_deficiency','linked_elements_excess',
         'common_causes','related_symptoms','reversible','population_risk','diagnostic_notes',
-        'image_url','icon_name','tags',
+        'herbal_treatments',
+        'icon_name','icon_url','image_url','video_url','tags',
         'health_score_impact','scientific_references',
         'is_active','sort_order','ai_enriched_at','updated_at',
       ]),
@@ -1195,8 +1199,18 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
       cleanUpdates.category = hr === 'conditional' ? 'both' : hr
     }
     cleanUpdates.updated_at = new Date().toISOString()
-    const { error } = await supabase.from(table).update(cleanUpdates).eq('id', id)
-    if (error) return c.json({ success: false, error: error.message }, 500)
+    const fieldCount = Object.keys(cleanUpdates).length
+    console.log(`[Admin UPDATE] Table: ${table}, ID: ${id}, ${fieldCount} fields: ${Object.keys(cleanUpdates).join(', ')}`)
+    const { error, data } = await supabase.from(table).update(cleanUpdates).eq('id', id).select('id')
+    if (error) {
+      console.error(`[Admin UPDATE ERROR] ${error.message}`, error)
+      return c.json({ success: false, error: error.message }, 500)
+    }
+    if (!data || data.length === 0) {
+      console.warn(`[Admin UPDATE] No rows matched for ${table}/${id} — record may not exist`)
+      return c.json({ success: false, error: `No record found with id "${id}" in ${table}` }, 404)
+    }
+    console.log(`[Admin UPDATE SUCCESS] ${table}/${id} (${fieldCount} fields)`)
     return c.json({ success: true })
   } catch (error: any) {
     console.error('[Admin] Error updating catalog record:', error)
@@ -1341,6 +1355,12 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
         if (key === 'nutrition_per_100g' || key === 'nutrition_per_serving') {
           return !JSON.stringify(val).match(/[1-9]/)
         }
+        // herbal_quality: treat as empty if no identity or no symptom uses
+        if (key === 'herbal_quality') {
+          const hq = val as any
+          if (!hq.herbal_identity?.common_name && (!hq.symptom_uses || hq.symptom_uses.length === 0) && (!hq.mechanisms || hq.mechanisms.length === 0)) return true
+          return false
+        }
       }
       return false
     }
@@ -1350,7 +1370,7 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
 
     // Improve mode: include ALL improvable fields (not just empty ones)
     // Text/description/JSON fields that benefit from rewriting
-    const IMPROVE_ELIGIBLE_TYPES = new Set(['text', 'textarea', 'json', 'nutrition_editor', 'tags', 'select', 'number'])
+    const IMPROVE_ELIGIBLE_TYPES = new Set(['text', 'textarea', 'json', 'nutrition_editor', 'herbal_quality_editor', 'tags', 'select', 'number'])
 
     for (const f of fields) {
       const val = recordData[f.key]
@@ -1483,6 +1503,25 @@ IMPORTANT: Every key must have real, factual content — no placeholders. Write 
       'functions': `JSON array of function strings. For beneficial: ["vision_support","immune_defence","cell_growth","antioxidant_protection","bone_health","energy_metabolism"]. For hazardous: ["endocrine_disruption","oxidative_stress","dna_damage"]. Use snake_case.`,
       'detox_strategy': `For hazardous elements: practical 3-5 sentence guidance on how to reduce exposure. Include specific actionable swaps (e.g. "Avoid heating food in plastic", "Choose fragrance-free products", "Use glass/steel storage"). For beneficial elements: leave as empty string "".`,
       'found_in': `JSON array of where this element is commonly found: ["food","supplements","water","soil","packaging","cosmetics","household_products","industrial"]. Only include relevant sources.`,
+      'herbal_quality': `JSON object describing the pharmacological/herbal properties of this ingredient. Structure:
+{
+  "herbal_identity": {"common_name": "string", "latin_name": "string (binomial)", "summary": "2-3 sentence pharmacological description"},
+  "mechanisms": [{"mechanism_type": "anti-inflammatory|antioxidant|antimicrobial|adaptogenic|analgesic|anxiolytic|carminative|demulcent|diuretic|expectorant|hepatoprotective|immunomodulatory|nervine|sedative|spasmolytic|tonic|vasodilator|vulnerary", "biological_system": "nervous|immune|digestive|cardiovascular|respiratory|endocrine|musculoskeletal|integumentary|urinary|reproductive|lymphatic|hepatic|whole body", "description": "how this mechanism works"}],
+  "symptom_uses": [{"symptom_name": "symptom name matching catalog_symptoms", "effectiveness": "high|moderate|low", "evidence_level": "clinical|observational|traditional", "onset": "acute|chronic"}],
+  "dosage_ranges": [{"preparation": "tea / infusion|tincture|capsule|powder|essential oil|decoction|extract|fresh|dried", "min": number, "max": number, "unit": "mg|g|ml|drops|cups", "population_notes": "e.g. Adults only"}],
+  "risks": [{"type": "side_effect|contraindication|toxicity", "description": "description", "severity": "mild|moderate|severe"}],
+  "interactions": [{"interacts_with": "drug or herb name", "severity": "mild|moderate|severe", "mechanism": "how they interact"}],
+  "evidence": {"level": "systematic review|RCT|cohort study|expert opinion|traditional use|in-vitro only|animal study", "sources": ["URL or citation"], "reviewer": "", "last_reviewed": ""},
+  "scoring_hint": {"category": "therapeutic|adaptogenic|nutritive|toxic", "default_direction": "positive|negative|neutral", "magnitude": 1-10, "conditional_rules": []}
+}
+RULES:
+- Include 2-5 mechanisms based on real pharmacological data
+- Include 3-8 symptom uses with real evidence-based effectiveness ratings
+- Include 1-3 dosage ranges for common preparations
+- Include ALL known risks and drug interactions (be thorough for safety)
+- Use real symptom names that match common medical terminology
+- If this ingredient has NO meaningful herbal/medicinal properties (e.g. plain rice, sugar), return an empty object {}
+- Map effectiveness to scoring: high=8, moderate=5, low=2`,
     }
 
     const fieldDescriptions = emptyFields.map(f => {
@@ -1999,14 +2038,16 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     // Per-table column allowlists — strip unknown columns to prevent schema errors on insert
     const INSERT_COLUMNS: Record<string, Set<string>> = {
       catalog_elements: new Set([
-        'id','name_common','name_other','category','type_label','subcategory','health_role','essential_90',
+        'id','name_common','name_other','name_scientific','category','type_label','subcategory','health_role','essential_90',
         'chemical_symbol','molecular_formula','cas_number','slug',
+        'nutrient_key','nutrient_unit','nutrient_category',
         'description','description_simple','description_technical','description_full',
         'functions','health_benefits','risk_tags','thresholds','deficiency_ranges','excess_ranges','drv_by_population',
         'found_in','food_sources_detailed','food_strategy','reason',
         'deficiency','interactions','detox_strategy',
+        'prevention_items','elimination_items',
         'health_score','scientific_references','info_sections',
-        'image_url','image_url_raw','image_url_powdered','image_url_cut','video_url','images','videos',
+        'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_capsule','video_url','images','videos',
         'scientific_papers','social_content',
         'ai_enriched_at','ai_enrichment_version','created_at','updated_at',
       ]),
@@ -2032,6 +2073,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'description_simple','description_technical','health_benefits','taste_profile',
         'elements_beneficial','elements_hazardous','health_score','scientific_references',
         'nutrition_per_100g','nutrition_per_serving','linked_ingredients',
+        'herbal_quality',
         'origin_country','origin_region','origin_city','culinary_history',
         'image_url','image_url_raw','image_url_powdered','image_url_cut','image_url_cubed','image_url_cooked','video_url','images','videos',
         'scientific_papers','social_content',
@@ -2044,7 +2086,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'id','name','slug','category','description','temperature','medium','typical_time','health_impact','nutrient_effect','best_for','equipment_ids','image_url','created_at','updated_at',
       ]),
       catalog_activities: new Set([
-        'id','name','description','category','icon_name','icon_svg_path','image_url',
+        'id','name','description','category','icon_name','icon_svg_path','icon_url','image_url','video_url',
         'sweat_level','default_duration_min','calories_per_minute','intensity_levels',
         'mineral_impact','toxin_loss','benefits','strava_types',
         'equipment_needed','muscle_groups','contraindications',
@@ -2067,7 +2109,8 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'description','description_simple',
         'linked_elements_deficiency','linked_elements_excess',
         'common_causes','related_symptoms','reversible','population_risk','diagnostic_notes',
-        'image_url','icon_name','tags',
+        'herbal_treatments',
+        'icon_name','icon_url','image_url','video_url','tags',
         'health_score_impact','scientific_references',
         'is_active','sort_order','ai_enriched_at','created_at','updated_at',
       ]),

@@ -21,8 +21,8 @@ export interface RiskCategory {
 
 export const RISK_CATEGORIES: RiskCategory[] = [
   {
-    key: 'environmental_contamination',
-    label: 'Environmental contamination (air, water, soil, packaging)',
+    key: 'contaminants',
+    label: 'Contaminants',
     icon: '🏭',
     color: 'orange',
     elements: [
@@ -103,8 +103,8 @@ export const RISK_CATEGORIES: RiskCategory[] = [
     ],
   },
   {
-    key: 'farming_chemicals',
-    label: 'Farming chemicals (crop residues)',
+    key: 'pesticides',
+    label: 'Pesticides',
     icon: '🌾',
     color: 'orange',
     elements: [
@@ -141,8 +141,8 @@ export const RISK_CATEGORIES: RiskCategory[] = [
     ],
   },
   {
-    key: 'ingredients_formulation',
-    label: 'Ingredients & formulation (added to products)',
+    key: 'additives',
+    label: 'Additives',
     icon: '🧪',
     color: 'orange',
     elements: [
@@ -199,8 +199,8 @@ export const RISK_CATEGORIES: RiskCategory[] = [
     ],
   },
   {
-    key: 'processing_cooking_byproducts',
-    label: 'Processing & cooking byproducts',
+    key: 'cooking_byproducts',
+    label: 'Cooking Byproducts',
     icon: '🔥',
     color: 'orange',
     elements: [
@@ -219,8 +219,8 @@ export const RISK_CATEGORIES: RiskCategory[] = [
     ],
   },
   {
-    key: 'storage_spoilage',
-    label: 'Storage & spoilage (mold toxins)',
+    key: 'mold_toxins',
+    label: 'Mold Toxins',
     icon: '🧫',
     color: 'orange',
     elements: [
@@ -237,8 +237,8 @@ export const RISK_CATEGORIES: RiskCategory[] = [
     ],
   },
   {
-    key: 'microorganisms',
-    label: 'Microorganisms (bacteria, viruses, parasites)',
+    key: 'pathogens',
+    label: 'Pathogens',
     icon: '🦠',
     color: 'green',
     elements: [
@@ -287,8 +287,8 @@ export const RISK_CATEGORIES: RiskCategory[] = [
     ],
   },
   {
-    key: 'veterinary_drugs_hormones',
-    label: 'Veterinary drugs, hormones & antibiotics (animal farming)',
+    key: 'vet_drugs',
+    label: 'Vet Drugs',
     icon: '💉',
     color: 'orange',
     elements: [
@@ -320,8 +320,8 @@ export const RISK_CATEGORIES: RiskCategory[] = [
     ],
   },
   {
-    key: 'natural_food_compounds',
-    label: 'Natural food compounds (plant toxins / antinutrients)',
+    key: 'plant_toxins',
+    label: 'Plant Toxins',
     icon: '🌿',
     color: 'orange',
     elements: [

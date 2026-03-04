@@ -42,6 +42,7 @@ export interface FieldConfig {
     | "grouped_ingredients"
     | "image"
     | "video"
+    | "media_upload"
     | "linked_elements"
     | "linked_ingredients"
     | "taste_profile"
@@ -63,10 +64,14 @@ export interface FieldConfig {
     | "interactions_editor"
     | "references_editor"
     | "element_sources_viewer"
+    | "interventions_editor"
+    | "herbal_quality_editor"
     | "icon_picker";
   categoryTree?: Record<string, Record<string, string[]>>;
   linkedCategory?: "beneficial" | "hazardous" | "all";
   linkedTable?: "catalog_elements" | "catalog_ingredients" | "catalog_cooking_methods" | "catalog_equipment";
+  mediaType?: "icon" | "image" | "video";
+  accept?: string;
   options?: string[];
   showInList?: boolean;
   showInDetail?: boolean;
@@ -82,6 +87,7 @@ export interface FieldConfig {
   dynamicOptionsMap?: Record<string, string[]>;
   conditionalOn?: string;
   showWhen?: { field: string; not?: string[]; is?: string[] };
+  accentColor?: 'orange' | 'green' | 'red';
 }
 
 export interface TabFieldConfig {
@@ -118,6 +124,25 @@ export const badgeColorMap: Record<string, string> = {
   pesticide: "bg-red-100 text-red-800",
   preservative: "bg-orange-100 text-orange-800",
   "endocrine disruptor": "bg-red-100 text-red-800",
+  plasticizer: "bg-red-100 text-red-800",
+  microorganism: "bg-red-100 text-red-800",
+  parasite: "bg-red-100 text-red-800",
+  probiotic: "bg-teal-100 text-teal-800",
+  prebiotic: "bg-teal-100 text-teal-800",
+  enzyme: "bg-violet-100 text-violet-800",
+  phytonutrient: "bg-lime-100 text-lime-800",
+  "natural toxin": "bg-orange-100 text-orange-800",
+  mycotoxin: "bg-red-100 text-red-800",
+  "environmental contaminant": "bg-red-100 text-red-800",
+  herbicide: "bg-red-100 text-red-800",
+  insecticide: "bg-red-100 text-red-800",
+  "processing byproduct": "bg-orange-100 text-orange-800",
+  "artificial sweetener": "bg-orange-100 text-orange-800",
+  "veterinary drug": "bg-red-100 text-red-800",
+  antibiotic: "bg-red-100 text-red-800",
+  hormone: "bg-amber-100 text-amber-800",
+  "food additive": "bg-orange-100 text-orange-800",
+  antinutrient: "bg-orange-100 text-orange-800",
 };
 
 /**
@@ -244,6 +269,14 @@ const elementsFields: FieldConfig[] = [
     section: "Media",
   },
   {
+    key: "image_url_capsule",
+    label: "In Capsules",
+    type: "image",
+    showInDetail: true,
+    showInEdit: true,
+    section: "Media",
+  },
+  {
     key: "video_url",
     label: "Video",
     type: "video",
@@ -278,6 +311,16 @@ const elementsFields: FieldConfig[] = [
     colSpan: 1,
   },
   {
+    key: "name_scientific",
+    label: "Scientific Name",
+    type: "text",
+    showInDetail: true,
+    showInEdit: true,
+    placeholder: "e.g. Ascorbic acid, Retinol",
+    section: "Identity",
+    colSpan: 1,
+  },
+  {
     key: "health_role",
     label: "Health Role",
     type: "tags",
@@ -303,31 +346,52 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     section: "Identity",
-    colSpan: 1,
+    colSpan: 2,
+    conditionalOn: "health_role",
     options: [
-      "vitamin",
-      "mineral",
-      "amino acid",
-      "fatty acid",
-      "antioxidant",
-      "natural toxin",
-      "antinutrient",
-      "mycotoxin",
-      "heavy metal",
-      "environmental contaminant",
-      "pesticide",
-      "herbicide",
-      "insecticide",
-      "processing byproduct",
-      "food additive",
-      "preservative",
-      "artificial sweetener",
-      "veterinary drug",
-      "hormone",
-      "antibiotic",
-      "endocrine disruptor",
-      "plasticizer",
+      // Beneficial
+      "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
+      "probiotic", "prebiotic", "enzyme", "phytonutrient",
+      // Hazardous
+      "natural toxin", "antinutrient", "mycotoxin",
+      "heavy metal", "environmental contaminant",
+      "pesticide", "herbicide", "insecticide",
+      "processing byproduct", "food additive", "preservative", "artificial sweetener",
+      "veterinary drug", "hormone", "antibiotic",
+      "endocrine disruptor", "plasticizer",
+      "microorganism", "parasite",
     ],
+    dynamicOptionsMap: {
+      beneficial: [
+        "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
+        "probiotic", "prebiotic", "enzyme", "phytonutrient",
+      ],
+      hazardous: [
+        "natural toxin", "antinutrient", "mycotoxin",
+        "heavy metal", "environmental contaminant",
+        "pesticide", "herbicide", "insecticide",
+        "processing byproduct", "food additive", "preservative", "artificial sweetener",
+        "veterinary drug", "hormone", "antibiotic",
+        "endocrine disruptor", "plasticizer",
+        "microorganism", "parasite",
+      ],
+      both: [
+        "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
+        "probiotic", "prebiotic", "enzyme", "phytonutrient",
+        "natural toxin", "antinutrient", "mycotoxin",
+        "heavy metal", "environmental contaminant",
+        "pesticide", "herbicide", "insecticide",
+        "processing byproduct", "food additive", "preservative", "artificial sweetener",
+        "veterinary drug", "hormone", "antibiotic",
+        "endocrine disruptor", "plasticizer",
+        "microorganism", "parasite",
+      ],
+      conditional: [
+        "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
+        "probiotic", "prebiotic", "enzyme", "phytonutrient",
+        "food additive", "preservative", "hormone", "antinutrient",
+      ],
+    },
   },
   {
     key: "subcategory",
@@ -347,6 +411,7 @@ const elementsFields: FieldConfig[] = [
     showInEdit: true,
     section: "Identity",
     colSpan: 1,
+    showWhen: { field: "health_role", is: ["beneficial", "both"] },
   },
 
   // --- Chemistry ---
@@ -388,7 +453,7 @@ const elementsFields: FieldConfig[] = [
     type: "textarea",
     showInDetail: true,
     showInEdit: true,
-    colSpan: 2,
+    colSpan: 1,
     section: "Summary",
     placeholder: "Brief overview — what it is and why it matters",
     aiSuggest: true,
@@ -401,7 +466,7 @@ const elementsFields: FieldConfig[] = [
     type: "textarea",
     showInDetail: true,
     showInEdit: true,
-    colSpan: 2,
+    colSpan: 1,
     section: "Summary",
     placeholder:
       "Plain-language summary shown to users in the top card (3-4 sentences)",
@@ -412,7 +477,7 @@ const elementsFields: FieldConfig[] = [
     type: "textarea",
     showInDetail: true,
     showInEdit: true,
-    colSpan: 2,
+    colSpan: 1,
     section: "Summary",
     placeholder: "Scientific/biochemical description for advanced users",
   },
@@ -427,6 +492,7 @@ const elementsFields: FieldConfig[] = [
     colSpan: 1,
     section: "Functions & Benefits",
     placeholder: "Add function tags",
+    showWhen: { field: "health_role", not: ["hazardous"] },
     options: [
       "Vision Support",
       "Immune Defence",
@@ -459,6 +525,7 @@ const elementsFields: FieldConfig[] = [
     colSpan: 1,
     section: "Functions & Benefits",
     placeholder: "Add benefit tags",
+    showWhen: { field: "health_role", not: ["hazardous"] },
     options: [
       "Boosts Immunity",
       "Improves Vision",
@@ -491,6 +558,7 @@ const elementsFields: FieldConfig[] = [
     colSpan: 2,
     section: "Functions & Benefits",
     placeholder: "Add risk/hazard tags",
+    showWhen: { field: "health_role", not: ["beneficial"] },
     options: [
       "Endocrine Disruptor",
       "Reproductive Harm",
@@ -515,36 +583,7 @@ const elementsFields: FieldConfig[] = [
     ],
   },
 
-  // --- Thresholds & Range (Section A4 / B4) ---
-  {
-    key: "thresholds",
-    label: "Thresholds / Range",
-    type: "thresholds_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Thresholds & Range",
-  },
-  {
-    key: "deficiency_ranges",
-    label: "Deficiency Ranges",
-    type: "deficiency_ranges_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Thresholds & Range",
-  },
-  {
-    key: "excess_ranges",
-    label: "Excess / Toxicity Ranges",
-    type: "excess_ranges_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Thresholds & Range",
-  },
-
-  // --- DRV by Population ---
+  // --- DRV by Population (before thresholds) ---
   {
     key: "drv_by_population",
     label: "DRV by Age / Gender / Pregnancy",
@@ -553,8 +592,50 @@ const elementsFields: FieldConfig[] = [
     showInEdit: true,
     colSpan: 2,
     section: "DRV by Population",
-    placeholder:
-      'JSON: { "unit": "mg/day", "groups": [ { "group": "Infants 0–6 months", "age_range": "0–6m", "gender": "all", "rda": 200, "ul": null }, { "group": "Children 1–3 years", "age_range": "1–3y", "gender": "all", "rda": 700, "ul": 2500 }, { "group": "Adult male", "age_range": "19–50y", "gender": "male", "rda": 1000, "ul": 2500 }, { "group": "Adult female", "age_range": "19–50y", "gender": "female", "rda": 1000, "ul": 2500 }, { "group": "Pregnant", "age_range": "any", "gender": "female", "pregnant": true, "rda": 1300, "ul": 2500 }, { "group": "Lactating", "age_range": "any", "gender": "female", "lactating": true, "rda": 1300, "ul": 2500 }, { "group": "Elderly 70+", "age_range": "70+y", "gender": "all", "rda": 1200, "ul": 2000 } ] }',
+    showWhen: { field: "health_role", not: ["hazardous"] },
+  },
+
+  // --- Thresholds & Range — 3-column: Deficiency (orange) | Optimal (green) | Excess (red) ---
+  {
+    key: "deficiency_ranges",
+    label: "Deficiency Ranges",
+    type: "deficiency_ranges_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Thresholds & Range",
+    accentColor: "orange",
+  },
+  {
+    key: "thresholds",
+    label: "Optimal / Thresholds",
+    type: "thresholds_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Thresholds & Range",
+    accentColor: "green",
+  },
+  {
+    key: "excess_ranges",
+    label: "Excess / Toxicity Ranges",
+    type: "excess_ranges_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Thresholds & Range",
+    accentColor: "red",
+  },
+  {
+    key: "deficiency",
+    label: "Deficiency Info (causes, symptoms, treatment)",
+    type: "deficiency_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Thresholds & Range",
+    placeholder: "Causes, early/moderate/severe symptoms, and treatment info",
+    showWhen: { field: "health_role", not: ["hazardous"] },
   },
 
   // --- Food Sources (Section A7 / B6) ---
@@ -628,18 +709,7 @@ const elementsFields: FieldConfig[] = [
       "JSON with keys: simple, technical, harmful_effects, what_depletes, how_builds, how_lasts, when_to_supplement, needed_for_absorption, pregnancy_considerations, summary_bullets, risk_benefit_analysis, therapeutic_window, ...",
   },
 
-  // --- Deficiency (Section A8a — too low) ---
-  {
-    key: "deficiency",
-    label: "Deficiency Info",
-    type: "deficiency_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Deficiency & Excess",
-    placeholder:
-      'JSON: { "name": "...", "causes": [...], "symptoms": { "early": [...], "moderate": [...], "severe": [...] }, "treatment": {...} }',
-  },
+  // --- Deficiency Info moved into Thresholds & Range section above ---
 
   // --- Interactions (Section A8g) ---
   {
@@ -654,7 +724,7 @@ const elementsFields: FieldConfig[] = [
       'JSON: { "nutrients": [...], "medications": [...], "conditions": [...], "herbs": [...] }',
   },
 
-  // --- Detox / Reduce Exposure (Section B7c) ---
+  // --- Interventions & Detox (consolidated) ---
   {
     key: "detox_strategy",
     label: "How to Reduce Exposure",
@@ -662,14 +732,35 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Detox & Exposure",
+    section: "Interventions",
     placeholder: "Practical steps to reduce exposure (for hazardous elements)",
+    showWhen: { field: "health_role", not: ["beneficial"] },
+  },
+  {
+    key: "prevention_items",
+    label: "Prevention / Protective Items",
+    type: "interventions_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Interventions",
+    placeholder: "Items that help prevent harm or support the body",
+  },
+  {
+    key: "elimination_items",
+    label: "Elimination / Detox Items",
+    type: "interventions_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Interventions",
+    placeholder: "Binders, chelators, anti-parasitic herbs, etc.",
   },
 
-  // --- Ingredients containing this element ---
+  // --- Linked records containing this element (ingredients, recipes, products) ---
   {
     key: "_element_sources",
-    label: "Ingredients Containing This Element",
+    label: "Linked Records (Ingredients, Recipes, Products)",
     type: "element_sources_viewer",
     showInDetail: false,
     showInEdit: true,
@@ -732,15 +823,6 @@ const elementsFields: FieldConfig[] = [
 
   // --- References & Meta ---
   {
-    key: "scientific_references",
-    label: "Scientific References",
-    type: "references_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "References & Meta",
-  },
-  {
     key: "info_sections",
     label: "Info Sections",
     type: "json",
@@ -778,7 +860,16 @@ const elementsFields: FieldConfig[] = [
     section: "References & Meta",
   },
 
-  // --- Content ---
+  // --- Content (all articles, references, social, video) ---
+  {
+    key: "scientific_references",
+    label: "Scientific References",
+    type: "references_editor",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Content",
+  },
   {
     key: "scientific_papers",
     label: "Scientific Papers",
@@ -791,6 +882,24 @@ const elementsFields: FieldConfig[] = [
   {
     key: "social_content",
     label: "Social Content",
+    type: "content_links",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Content",
+  },
+  {
+    key: "images",
+    label: "Image Gallery",
+    type: "content_links",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Content",
+  },
+  {
+    key: "videos",
+    label: "Video Content",
     type: "content_links",
     showInDetail: true,
     showInEdit: true,
@@ -1291,6 +1400,17 @@ const ingredientsFields: FieldConfig[] = [
     section: "Health & Scoring",
   },
 
+  // --- Herbal / Medicinal Quality ---
+  {
+    key: "herbal_quality",
+    label: "Herbal / Medicinal Profile",
+    type: "herbal_quality_editor",
+    showInDetail: false,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Herbal / Medicinal Quality",
+  },
+
   // --- References & Meta ---
   {
     key: "scientific_references",
@@ -1613,7 +1733,7 @@ const recipesFields: FieldConfig[] = [
     showInList: false,
     showInDetail: true,
     showInEdit: true,
-    colSpan: 2,
+    colSpan: 1,
     placeholder: "Cooking method UUIDs from catalog_cooking_methods",
     section: "Ingredients & Steps",
     aiSuggest: true,
@@ -1628,7 +1748,7 @@ const recipesFields: FieldConfig[] = [
     showInList: false,
     showInDetail: true,
     showInEdit: true,
-    colSpan: 2,
+    colSpan: 1,
     placeholder: "Equipment UUIDs from catalog_equipment",
     section: "Ingredients & Steps",
     aiSuggest: true,
@@ -2553,7 +2673,7 @@ const activitiesFields: FieldConfig[] = [
   },
   {
     key: "icon_name",
-    label: "Icon",
+    label: "Icon (Library)",
     type: "icon_picker",
     showInList: true,
     showInDetail: true,
@@ -2561,12 +2681,37 @@ const activitiesFields: FieldConfig[] = [
     colSpan: 2,
   },
   {
-    key: "image_url",
-    label: "Image",
-    type: "image",
+    key: "icon_url",
+    label: "Icon (Upload)",
+    type: "media_upload",
+    mediaType: "icon",
+    accept: "image/svg+xml,image/png,image/jpeg",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
+    placeholder: "Drop or click to upload icon (SVG, PNG, JPG)",
+  },
+  {
+    key: "image_url",
+    label: "Image",
+    type: "media_upload",
+    mediaType: "image",
+    accept: "image/*",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "Drop or click to upload image",
+  },
+  {
+    key: "video_url",
+    label: "Video",
+    type: "media_upload",
+    mediaType: "video",
+    accept: "video/*",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "Drop or click to upload video",
   },
   {
     key: "sweat_level",
@@ -2943,23 +3088,63 @@ const symptomsFields: FieldConfig[] = [
     aiPrompt:
       "Write a brief note on how to confirm or test for '{name}' in a clinical setting. 1-2 sentences.",
   },
+
+  // --- Herbal Treatments (reverse link from ingredients) ---
   {
-    key: "image_url",
-    label: "Image",
-    type: "image",
+    key: "herbal_treatments",
+    label: "Herbal Treatments",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Herbal Treatments",
+    placeholder: '[{"ingredient_id": "...", "ingredient_name": "Turmeric", "effectiveness": "high"}]',
+  },
+
+  {
+    key: "icon_name",
+    label: "Icon (Library)",
+    type: "icon_picker",
+    showInList: true,
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
     section: "Presentation",
   },
   {
-    key: "icon_name",
-    label: "Icon",
-    type: "icon_picker",
-    showInList: true,
+    key: "icon_url",
+    label: "Icon (Upload)",
+    type: "media_upload",
+    mediaType: "icon",
+    accept: "image/svg+xml,image/png,image/jpeg",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
+    placeholder: "Drop or click to upload icon (SVG, PNG, JPG)",
+    section: "Presentation",
+  },
+  {
+    key: "image_url",
+    label: "Image",
+    type: "media_upload",
+    mediaType: "image",
+    accept: "image/*",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "Drop or click to upload image",
+    section: "Presentation",
+  },
+  {
+    key: "video_url",
+    label: "Video",
+    type: "media_upload",
+    mediaType: "video",
+    accept: "video/*",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "Drop or click to upload video",
     section: "Presentation",
   },
   {

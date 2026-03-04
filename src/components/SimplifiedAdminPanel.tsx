@@ -42,6 +42,7 @@ import {
   Send,
   Dumbbell,
   HeartPulse,
+  Copy,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -58,6 +59,11 @@ import { AdminDebugPanel } from './admin/AdminDebugPanel';
 import { CookingToolsField, type EquipmentRecord } from './admin/fields/CookingToolsField';
 import { CatalogItemTag } from './admin/shared/CatalogItemTag';
 import { IconPickerField, LucideIconPreview } from './admin/IconPickerField';
+import { MediaUploadField } from './admin/MediaUploadField';
+import DrvTableEditor from './admin/DrvTableEditor';
+import InterventionsEditor from './admin/InterventionsEditor';
+import StructuredJsonEditor from './admin/StructuredJsonEditor';
+import HerbalQualityEditor from './admin/HerbalQualityEditor';
 import { useAdminRecords, type AdminRecord as AdminRecordType } from '../hooks/useAdminRecords';
 
 interface AdminRecord {
@@ -907,38 +913,86 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                   </div>
                 </div>
 
-                {/* RIGHT: hero image — full height of card body */}
-                <div
-                  className={`relative flex-shrink-0 w-32 self-stretch cursor-pointer overflow-hidden ${displayImg ? 'bg-gray-50' : 'bg-gradient-to-b from-blue-50 to-blue-100 border-l-2 border-blue-200'} ${isPickerOpen ? 'ring-2 ring-inset ring-blue-400' : ''}`}
-                  style={{ minHeight: '110px' }}
-                  onClick={() => setPickerIdx(isPickerOpen ? null : i)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => handleDrop(i, e)}
-                  title="Click to pick or drag an image"
-                >
-                  {displayImg ? (
-                    <>
-                      <img src={displayImg} alt="" className="w-full h-full object-cover absolute inset-0" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                      {isCustomImg && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-blue-500 border border-white" title="Custom image" />}
-                      <span className="absolute bottom-1 left-0 right-0 text-center text-[8px] text-white/80 font-medium">change</span>
-                    </>
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-400 gap-1.5">
-                      <ImageIcon className="w-7 h-7" />
-                      <span className="text-[9px] text-center leading-tight px-1 font-bold">Pick image</span>
-                      <span className="text-[7px] text-center text-blue-300">click or drop</span>
+                {/* RIGHT: compact image square with multi-thumbnail grid */}
+                {(() => {
+                  const isLastStep = i === steps.length - 1;
+                  const mainRecordImg = recordData?.image_url || '';
+
+                  // Collect equipment images for this step
+                  const stepToolNames = getMentionedTools(step.text);
+                  const stepToolImgs: { name: string; url: string; type: 'eq' }[] = [];
+                  stepToolNames.forEach((t: string) => {
+                    const eq = catalogEquipment?.find(e => e.name.toLowerCase() === t.toLowerCase());
+                    if (eq?.image_url) stepToolImgs.push({ name: eq.name, url: eq.image_url, type: 'eq' });
+                  });
+                  pinnedEquipment.forEach((eq: EquipmentRecord) => {
+                    if (eq.image_url && !stepToolImgs.find(x => x.url === eq.image_url)) {
+                      stepToolImgs.push({ name: eq.name, url: eq.image_url, type: 'eq' });
+                    }
+                  });
+
+                  // Collect ingredient images for this step
+                  const stepIngImgs: { name: string; url: string; type: 'ing' }[] = [];
+                  mentioned.forEach((ing: any) => {
+                    if (ing.image_url) stepIngImgs.push({ name: ing.name_common || ing.name || '', url: ing.image_url, type: 'ing' });
+                  });
+
+                  // Last step with main image → serving thumbnail
+                  const allImgs = [...stepToolImgs, ...stepIngImgs];
+                  if (isLastStep && mainRecordImg) {
+                    allImgs.push({ name: 'Serving', url: mainRecordImg, type: 'ing' as const });
+                  }
+
+                  // How many thumbnails to show (max 4 in a 2x2 grid)
+                  const thumbs = allImgs.slice(0, 4);
+                  const cols = thumbs.length === 1 ? 1 : 2;
+
+                  return (
+                    <div
+                      className={`relative flex-shrink-0 w-32 self-stretch cursor-pointer overflow-hidden border-l border-gray-200 ${thumbs.length > 0 ? 'bg-gray-50' : displayImg ? 'bg-gray-50' : 'bg-gradient-to-b from-blue-50 to-blue-100 border-l-2 border-blue-200'} ${isPickerOpen ? 'ring-2 ring-inset ring-blue-400' : ''}`}
+                      onClick={() => setPickerIdx(isPickerOpen ? null : i)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => handleDrop(i, e)}
+                      title={isLastStep && mainRecordImg ? 'Serving image' : 'Click to pick or drag an image'}
+                    >
+                      {thumbs.length > 0 ? (
+                        <div className={`grid h-full w-full ${cols === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                          {thumbs.map((t, ti) => (
+                            <div key={ti} className="relative overflow-hidden">
+                              <img src={t.url} alt={t.name} className="w-full h-full object-cover" />
+                              <span className={`absolute top-0 right-0 text-[6px] px-0.5 leading-tight font-bold text-white ${t.type === 'eq' ? 'bg-orange-500/80' : 'bg-emerald-500/80'}`}>
+                                {t.type === 'eq' ? '🔧' : '🥗'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : displayImg ? (
+                        <>
+                          <img src={displayImg} alt="" className="w-full h-full object-cover absolute inset-0" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                          {isCustomImg && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-blue-500 border border-white" title="Custom image" />}
+                          <span className="absolute bottom-1 left-0 right-0 text-center text-[8px] text-white/80 font-medium">change</span>
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-400 gap-1">
+                          <ImageIcon className="w-6 h-6" />
+                          <span className="text-[8px] font-bold">Pick image</span>
+                        </div>
+                      )}
+                      {isLastStep && mainRecordImg && thumbs.length > 0 && (
+                        <span className="absolute bottom-0.5 left-0 right-0 text-center text-[7px] text-white/90 font-semibold drop-shadow">🍽 Serving</span>
+                      )}
+                      {uploadingIdx === i && (
+                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                        </div>
+                      )}
+                      <label className="absolute bottom-0 left-0 right-0 h-5 cursor-pointer opacity-0" title="Upload image">
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(i, f); }} />
+                      </label>
                     </div>
-                  )}
-                  {uploadingIdx === i && (
-                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                    </div>
-                  )}
-                  <label className="absolute bottom-0 left-0 right-0 h-5 cursor-pointer opacity-0" title="Upload image">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(i, f); }} />
-                  </label>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Ingredient link panel */}
@@ -1639,7 +1693,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [crossTabResults, setCrossTabResults] = useState<{ tabId: string; tabLabel: string; record: AdminRecord }[]>([]);
   const [elementsCache, setElementsCache] = useState<AdminRecord[]>([]);
   const [elementSearchQuery, setElementSearchQuery] = useState('');
-  const [elementSourcesCache, setElementSourcesCache] = useState<{ elementId: string; sources: AdminRecord[] } | null>(null);
+  const [elementSourcesCache, setElementSourcesCache] = useState<{ elementId: string; ingredients: AdminRecord[]; recipes: AdminRecord[]; products: AdminRecord[] } | null>(null);
   const [elementSourcesLoading, setElementSourcesLoading] = useState(false);
   const [aiLinkingIngredients, setAiLinkingIngredients] = useState(false);
   const [aiLinkResults, setAiLinkResults] = useState<{ linked: { id: string; name: string; per_100g: number; unit: string }[]; errors: string[] } | null>(null);
@@ -1647,6 +1701,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [ingredientsCache, setIngredientsCache] = useState<AdminRecord[]>([]);
   const [ingredientSearchQuery, setIngredientSearchQuery] = useState('');
   const [equipmentCache, setEquipmentCache] = useState<EquipmentRecord[]>([]);
+  const [cookingMethodsCache, setCookingMethodsCache] = useState<AdminRecord[]>([]);
+  const [symptomsCache, setSymptomsCache] = useState<AdminRecord[]>([]);
   const [autoLinkResults, setAutoLinkResults] = useState<null | Array<{
     name: string;
     match: AdminRecord | null;
@@ -1671,7 +1727,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [batchProgress, setBatchProgress] = useState<{
     current: number; total: number; name: string;
     filled: number; skipped: number; errors: number;
-    recordResults: Array<{ id: string; name: string; status: 'done' | 'skipped' | 'error'; fieldsAdded: number }>;
+    completedRecords: number; initialIncomplete: number;
+    recordResults: Array<{ id: string; name: string; status: 'done' | 'skipped' | 'error'; fieldsAdded: number; filledFields: number; totalFields: number }>;
   } | null>(null);
   const batchCancelRef = useRef(false);
   const [showAiCreatePrompt, setShowAiCreatePrompt] = useState(false);
@@ -1849,6 +1906,74 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       }
     };
     fetchEquipment();
+    return () => controller.abort();
+  }, [showEditModal, activeTab, accessToken]);
+
+  // Fetch cooking methods catalog for recipes tab
+  useEffect(() => {
+    if (!showEditModal || cookingMethodsCache.length > 0) return;
+    if (activeTab !== 'recipes') return;
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
+
+    const controller = new AbortController();
+    const fetchCookingMethods = async () => {
+      try {
+        const url = `https://${projectId}.supabase.co/rest/v1/catalog_cooking_methods?select=id,name,category,image_url&limit=500&order=category,name`;
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
+        });
+        if (controller.signal.aborted) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (!controller.signal.aborted && Array.isArray(data)) {
+            console.log(`[Admin] Loaded ${data.length} cooking methods for catalog`);
+            setCookingMethodsCache(data);
+          }
+        } else {
+          console.error('[Admin] Failed to fetch cooking methods:', res.status, res.statusText);
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Admin] Failed to fetch cooking methods catalog:', err);
+        }
+      }
+    };
+    fetchCookingMethods();
+    return () => controller.abort();
+  }, [showEditModal, activeTab, accessToken]);
+
+  // Fetch symptoms catalog for ingredients tab (herbal quality editor)
+  useEffect(() => {
+    if (!showEditModal || symptomsCache.length > 0) return;
+    if (activeTab !== 'ingredients') return;
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
+
+    const controller = new AbortController();
+    const fetchSymptoms = async () => {
+      try {
+        const url = `https://${projectId}.supabase.co/rest/v1/catalog_symptoms?select=id,name,slug,category,body_system,severity,image_url,icon_name&limit=500&order=name.asc`;
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
+        });
+        if (controller.signal.aborted) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (!controller.signal.aborted && Array.isArray(data)) {
+            console.log(`[Admin] Loaded ${data.length} symptoms for herbal quality`);
+            setSymptomsCache(data);
+          }
+        } else {
+          console.error('[Admin] Failed to fetch symptoms:', res.status, res.statusText);
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Admin] Failed to fetch symptoms catalog:', err);
+        }
+      }
+    };
+    fetchSymptoms();
     return () => controller.abort();
   }, [showEditModal, activeTab, accessToken]);
 
@@ -2174,6 +2299,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         for (const key of editableKeys) {
           if (key in editingRecord) {
             const v = editingRecord[key];
+            // Skip null/undefined — no point sending empty fields
+            if (v === null || v === undefined) continue;
             // Strip base64 data URLs — they're too large for the API
             if (typeof v === 'string' && v.startsWith('data:') && v.length > 5000) {
               console.warn(`[Admin SAVE] Skipping base64 field "${key}" (${(v.length / 1024).toFixed(0)}KB)`);
@@ -2184,33 +2311,49 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             cleanedUpdates[key] = v;
           }
         }
-        console.log('[Admin SAVE] Editable fields being sent:', Object.keys(cleanedUpdates));
-        const body = {
+        const bodyStr = JSON.stringify({
           table: currentTab.table,
           id: editingRecord.id,
           updates: cleanedUpdates
-        };
-        console.log('[Admin SAVE] Catalog update:', url, body);
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(body)
         });
-        const responseText = await response.text();
-        console.log('[Admin SAVE] Response:', response.status, responseText);
-        if (response.ok) {
-          toast.success('Record updated successfully');
-          fetchRecords(); // Refetch to get updated list
-          setShowEditModal(false);
-        } else {
-          try {
-            const err = JSON.parse(responseText);
-            toast.error(err.error || `Failed to update (${response.status})`);
-          } catch {
-            toast.error(`Failed to update: ${response.status} ${responseText.slice(0, 100)}`);
+        console.log(`[Admin SAVE] Sending ${Object.keys(cleanedUpdates).length} fields (${(bodyStr.length / 1024).toFixed(1)}KB) to ${currentTab.table}/${editingRecord.id}:`, Object.keys(cleanedUpdates).join(', '));
+
+        // Use AbortController with 30s timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: bodyStr,
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          const responseText = await response.text();
+          console.log('[Admin SAVE] Response:', response.status, responseText.slice(0, 500));
+          if (response.ok) {
+            toast.success('Record updated successfully');
+            // Wait for refetch to complete BEFORE closing modal — prevents stale data when user reopens
+            await fetchRecords();
+            setShowEditModal(false);
+          } else {
+            try {
+              const err = JSON.parse(responseText);
+              toast.error(err.error || `Failed to update (${response.status})`);
+            } catch {
+              toast.error(`Failed to update: ${response.status} ${responseText.slice(0, 100)}`);
+            }
+          }
+        } catch (fetchErr: any) {
+          clearTimeout(timeoutId);
+          if (fetchErr.name === 'AbortError') {
+            console.error('[Admin SAVE] Request timed out after 30s');
+            toast.error('Save timed out — try again or check your connection');
+          } else {
+            throw fetchErr;
           }
         }
       }
@@ -2222,45 +2365,184 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     }
   };
 
+  // ─── Shared AI helpers ────────────────────────────────────────────
+  const adminApiFetch = async (endpoint: string, body: Record<string, any>, timeoutMs = 120_000): Promise<Response> => {
+    const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2${endpoint}`;
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  };
+
+  const saveRecordToDB = async (table: string, id: string, updates: Record<string, any>): Promise<{ ok: boolean; expired: boolean }> => {
+    const tabConfig = adminFieldConfig[activeTab];
+    const editableKeys = new Set(tabConfig?.fields?.filter((f: any) => f.showInEdit).map((f: any) => f.key) || []);
+    const clean: Record<string, any> = {};
+    for (const [key, v] of Object.entries(updates)) {
+      if (!editableKeys.has(key)) continue;
+      if (typeof v === 'string' && v.startsWith('data:') && v.length > 5000) continue;
+      clean[key] = v;
+    }
+    if (Object.keys(clean).length === 0) return { ok: true, expired: false };
+    const res = await adminApiFetch('/admin/catalog/update', { table, id, updates: clean });
+    return { ok: res.ok, expired: res.status === 401 };
+  };
+
+  const buildSampleRecords = (excludeId: string | undefined, fields: ReturnType<typeof getFieldsForView>) => {
+    return sortedRecords
+      .filter(r => r.id !== excludeId && (r.name || r.name_common))
+      .slice(0, 2)
+      .map(r => {
+        const sample: Record<string, any> = {};
+        fields.forEach(f => { const v = (r as any)[f.key]; if (v !== null && v !== undefined && v !== '') sample[f.key] = v; });
+        return sample;
+      });
+  };
+
+  const mapFieldsForAI = (fields: FieldConfig[]) =>
+    fields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory }));
+
+  // Shared: call ai-enrich-recipe and return { equipment, ingredients, steps } payload for a record
+  const callRecipeEnrich = async (record: AdminRecord) => {
+    const name = record.name_common || record.name || '';
+    return adminApiFetch('/admin/ai-enrich-recipe', {
+      recipeId: record.id,
+      recipeName: name,
+      servings: (record as any).servings || 4,
+      portionWeightG: (record as any).portion_weight_g || null,
+      servingSize: (record as any).serving_size || null,
+      prepTime: (record as any).prep_time || '',
+      cookTime: (record as any).cook_time || '',
+      difficulty: (record as any).difficulty || '',
+      cuisine: (record as any).cuisine || '',
+      description: (record as any).description_simple || (record as any).description || '',
+      existingLinkedIds: (record as any).linked_ingredients || [],
+    });
+  };
+
+  // Shared: process ai-enrich-recipe JSON into DB-ready updates with full step post-processing
+  const processRecipeEnrichResponse = (data: any, record: AdminRecord): Record<string, any> => {
+    const updates: Record<string, any> = {};
+    // 1. Equipment
+    if (data.equipment_names?.length > 0) updates.equipment = data.equipment_names;
+    // 2. Ingredients
+    if (data.linked_ingredient_ids?.length > 0) updates.linked_ingredients = data.linked_ingredient_ids;
+    if (data.grouped_ingredients?.length > 0) updates.ingredients = data.grouped_ingredients;
+    // 3. Cooking steps — with auto-assigned images and equipment_ids
+    if (data.steps?.length > 0) {
+      const linkedIds = updates.linked_ingredients || (record as any).linked_ingredients || [];
+      const linkedIngs = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
+      const pool = linkedIngs.length > 0 ? linkedIngs : ingredientsCache;
+      const eqFromResponse: { name: string; equipment_id: string }[] = data.equipment || [];
+
+      const processedSteps = data.steps.map((step: any) => {
+        const text = typeof step === 'string' ? step : step?.text || '';
+        const lower = text.toLowerCase();
+
+        // Detect equipment_ids from response + cache
+        const responseEqIds = eqFromResponse
+          .filter(eq => eq.name.length > 2 && lower.includes(eq.name.toLowerCase()))
+          .map(eq => eq.equipment_id);
+        const cacheEqIds = equipmentCache
+          .filter(e => e.name.length > 2 && lower.includes(e.name.toLowerCase()))
+          .map(e => e.id);
+        const detectedEqIds = [...new Set([...responseEqIds, ...cacheEqIds])];
+
+        // Auto-assign image
+        let imageUrl = (typeof step === 'object' ? step?.image_url : '') || '';
+        if (!imageUrl) {
+          // 1. Try ingredient mentioned by name
+          const mentioned = pool.filter((ing: any) => {
+            const n = (ing.name_common || ing.name || '').toLowerCase();
+            return n.length > 2 && lower.includes(n);
+          });
+          if (mentioned.length > 0) {
+            const f = mentioned[0];
+            if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) imageUrl = f.image_url_cut;
+            else if ((lower.includes('cook')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) imageUrl = f.image_url_cooked;
+            else if (f.image_url) imageUrl = f.image_url;
+          }
+          // 2. Try equipment image
+          if (!imageUrl) {
+            const eqMatch = equipmentCache.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
+            if (eqMatch?.image_url) imageUrl = eqMatch.image_url;
+          }
+          // 3. Fallback: first linked ingredient with image
+          if (!imageUrl) {
+            const first = pool.find((ing: any) => ing.image_url);
+            if (first?.image_url) imageUrl = first.image_url;
+          }
+        }
+
+        return { text, image_url: imageUrl, ingredient_ids: [], equipment_ids: detectedEqIds };
+      });
+      updates.instructions = processedSteps;
+    }
+    return updates;
+  };
+  // ─── End shared AI helpers ──────────────────────────────────────
+
   const handleAiFill = async () => {
     if (!editingRecord || !activeTab || activeTab === 'waitlist') return;
     setAiFillingFields(true);
     try {
       const editFields = getFieldsForView(activeTab, 'edit');
-      // Collect up to 2 sample records that have good data for format reference
-      const sampleRecords = sortedRecords
-        .filter(r => r.id !== editingRecord.id && (r.name || r.name_common))
-        .slice(0, 2)
-        .map(r => {
-          const sample: Record<string, any> = {};
-          editFields.forEach(f => { const v = (r as any)[f.key]; if (v !== null && v !== undefined && v !== '') sample[f.key] = v; });
-          return sample;
-        });
+      let mergedRecord: Record<string, any> = { ...editingRecord };
 
-      const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
-      const _aiFillAbort1 = new AbortController();
-      const _aiFillTimer1 = setTimeout(() => _aiFillAbort1.abort(), 120_000);
-      let response: Response;
-      try {
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tabType: adminFieldConfig[activeTab]?.label || activeTab,
-            recordData: editingRecord,
-            fields: editFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
-            sampleRecords,
-            context: aiContext.trim() || undefined,
-          }),
-          signal: _aiFillAbort1.signal,
-        });
-      } catch (fetchErr: any) {
-        clearTimeout(_aiFillTimer1);
-        const msg = fetchErr?.name === 'AbortError' ? 'AI request timed out (>2 min). Try fewer fields or a simpler record.' : `Network error: ${fetchErr?.message || fetchErr}`;
-        toast.error(msg);
-        setAiFillingFields(false);
-        return;
-      } finally { clearTimeout(_aiFillTimer1); }
+      // ── Phase 1 (recipes only): Equipment → Ingredients → Cooking Steps ──
+      if (activeTab === 'recipes') {
+        const name = editingRecord.name_common || editingRecord.name || '';
+        if (name) {
+          try {
+            toast.info('Phase 1/2: Enriching equipment, ingredients & steps…');
+            const enrichRes = await callRecipeEnrich(editingRecord);
+            if (enrichRes.status === 401) { toast.error('Session expired — please refresh'); return; }
+            const enrichData = await enrichRes.json();
+            if (enrichData.success) {
+              const recipeUpdates = processRecipeEnrichResponse(enrichData, editingRecord);
+              if (Object.keys(recipeUpdates).length > 0) {
+                // Apply to UI immediately so user sees progress
+                setEditingRecord((prev: any) => ({ ...prev, ...recipeUpdates }));
+                mergedRecord = { ...mergedRecord, ...recipeUpdates };
+                // Save to DB so Phase 2 AI fill sees this data
+                if (editingRecord.id && currentTab) {
+                  await saveRecordToDB(currentTab.table, editingRecord.id, recipeUpdates);
+                }
+                const { counts } = enrichData;
+                const parts = [];
+                if (counts?.equipment) parts.push(`${counts.equipment} equipment`);
+                if (counts?.ingredients) parts.push(`${counts.ingredients} ingredients`);
+                if (counts?.steps) parts.push(`${counts.steps} steps`);
+                toast.success(`Recipe enriched: ${parts.join(', ')}`);
+                if (enrichData.unmatched_ingredients?.length > 0) {
+                  toast.info(`${enrichData.unmatched_ingredients.length} not in catalog: ${enrichData.unmatched_ingredients.map((u: any) => u.name).join(', ')}`);
+                }
+              }
+            }
+          } catch (recipeErr: any) {
+            if (recipeErr?.name === 'TimeoutError' || recipeErr?.name === 'AbortError') {
+              console.warn('[AI Fill] Recipe enrich timed out, continuing to general fill…');
+              toast.info('Recipe enrich timed out — continuing with general AI fill…');
+            } else {
+              console.error('[AI Fill] Recipe enrich error:', recipeErr);
+              toast.error(`Recipe enrich failed: ${recipeErr?.message || recipeErr}`);
+            }
+          }
+        }
+        toast.info('Phase 2/2: AI filling remaining fields…');
+      }
+
+      // ── Phase 2: General AI fill for ALL remaining empty fields ──
+      const response = await adminApiFetch('/admin/ai-fill-fields', {
+        tabType: adminFieldConfig[activeTab]?.label || activeTab,
+        recordData: mergedRecord,
+        fields: mapFieldsForAI(editFields),
+        sampleRecords: buildSampleRecords(editingRecord.id, editFields),
+        context: aiContext.trim() || undefined,
+      });
+      if (response.status === 401) { toast.error('Session expired — please refresh'); return; }
       const data = await response.json();
       if (data.success && data.filledFields) {
         const filledCount = Object.keys(data.filledFields).length;
@@ -2274,8 +2556,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         toast.error(data.error || 'AI fill failed');
       }
     } catch (err: any) {
+      const msg = err?.name === 'TimeoutError' || err?.name === 'AbortError' ? 'AI request timed out (>2 min). Try fewer fields or a simpler record.' : `AI fill error: ${err?.message || err}`;
       console.error('[AI Fill] Error:', err);
-      toast.error(`AI fill error: ${err?.message || err}`);
+      toast.error(msg);
     } finally {
       setAiFillingFields(false);
     }
@@ -2328,94 +2611,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     if (!name) { toast.error('Recipe needs a name first'); return; }
     setGeneratingRecipeEnrich(true);
     try {
-      const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-enrich-recipe`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipeId: editingRecord.id,
-          recipeName: name,
-          servings: editingRecord.servings || 4,
-          portionWeightG: editingRecord.portion_weight_g || null,
-          servingSize: editingRecord.serving_size || null,
-          prepTime: editingRecord.prep_time || '',
-          cookTime: editingRecord.cook_time || '',
-          difficulty: editingRecord.difficulty || '',
-          cuisine: editingRecord.cuisine || '',
-          description: editingRecord.description_simple || editingRecord.description || '',
-          existingLinkedIds: editingRecord.linked_ingredients || [],
-        }),
-        signal: AbortSignal.timeout(120_000),
-      });
-      const data = await res.json();
+      const enrichRes = await callRecipeEnrich(editingRecord);
+      if (enrichRes.status === 401) { toast.error('Session expired — please refresh'); return; }
+      const data = await enrichRes.json();
       if (!data.success) { toast.error(data.error || 'AI recipe enrichment failed'); return; }
 
-      const updates: Record<string, any> = {};
-
-      // Set linked_ingredients
-      if (data.linked_ingredient_ids?.length > 0) {
-        updates.linked_ingredients = data.linked_ingredient_ids;
-      }
-      // Set ingredients (grouped_ingredients structure with qty_g)
-      if (data.grouped_ingredients?.length > 0) {
-        console.log('[AI Enrich] Received grouped_ingredients:', data.grouped_ingredients);
-        updates.ingredients = data.grouped_ingredients;
-      }
-      // Set equipment as array of names
-      if (data.equipment_names?.length > 0) {
-        updates.equipment = data.equipment_names;
-      }
-      // Set cooking steps with auto-assigned images and equipment_ids
-      if (data.steps?.length > 0) {
-        const linkedIds = updates.linked_ingredients || editingRecord.linked_ingredients || [];
-        const linkedIngs = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
-        const pool = linkedIngs.length > 0 ? linkedIngs : ingredientsCache;
-
-        const stepsWithImagesAndEquipment = data.steps.map((step: { text: string; image_url: string }, idx: number) => {
-          const lower = step.text.toLowerCase();
-          
-          // Auto-detect equipment_ids from step text
-          const detectedEqIds: string[] = equipmentCache
-            .filter(e => e.name.length > 2 && lower.includes(e.name.toLowerCase()))
-            .map(e => e.id);
-
-          // Auto-assign image if none provided
-          let imageUrl = step.image_url || '';
-          if (!imageUrl) {
-            // 1. Try ingredient mentioned by name
-            const mentioned = pool.filter((ing: any) => {
-              const n = (ing.name_common || ing.name || '').toLowerCase();
-              return n.length > 2 && lower.includes(n);
-            });
-            if (mentioned.length > 0) {
-              const f = mentioned[0];
-              if ((lower.includes('cut')||lower.includes('slice')||lower.includes('chop')) && f.image_url_cut) imageUrl = f.image_url_cut;
-              else if ((lower.includes('cook')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) imageUrl = f.image_url_cooked;
-              else if (f.image_url) imageUrl = f.image_url;
-            }
-            // 2. Try equipment image
-            if (!imageUrl) {
-              const eqMatch = equipmentCache.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
-              if (eqMatch?.image_url) imageUrl = eqMatch.image_url;
-            }
-            // 3. Fallback: first linked ingredient with image
-            if (!imageUrl) {
-              const first = pool.find((ing: any) => ing.image_url);
-              if (first?.image_url) imageUrl = first.image_url;
-            }
-          }
-
-          return { text: step.text, image_url: imageUrl, ingredient_ids: [], equipment_ids: detectedEqIds };
-        });
-        updates.instructions = stepsWithImagesAndEquipment;
-      }
-
+      const updates = processRecipeEnrichResponse(data, editingRecord);
       setEditingRecord((prev: any) => ({ ...prev, ...updates }));
 
       const { counts } = data;
       const parts = [];
-      if (counts?.ingredients) parts.push(`${counts.ingredients} ingredients`);
       if (counts?.equipment) parts.push(`${counts.equipment} equipment`);
+      if (counts?.ingredients) parts.push(`${counts.ingredients} ingredients`);
       if (counts?.steps) parts.push(`${counts.steps} steps`);
       toast.success(`AI enriched: ${parts.join(', ')} — saving…`);
 
@@ -2425,32 +2632,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
       // Auto-save enriched data to DB immediately
       if (editingRecord?.id && currentTab) {
-        try {
-          const tabConfig = adminFieldConfig[activeTab];
-          const editableKeys = new Set(
-            tabConfig?.fields?.filter((f: any) => f.showInEdit).map((f: any) => f.key) || []
-          );
-          const enrichedRecord = { ...editingRecord, ...updates };
-          const cleanedUpdates: Record<string, any> = {};
-          for (const key of editableKeys) {
-            if (key in enrichedRecord) {
-              const v = enrichedRecord[key];
-              if (typeof v === 'string' && v.startsWith('data:') && v.length > 5000) continue;
-              cleanedUpdates[key] = v;
-            }
-          }
-          const saveRes = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ table: currentTab.table, id: editingRecord.id, updates: cleanedUpdates }),
-          });
-          if (saveRes.ok) {
-            fetchRecords(); // Refetch to get updated list
-            toast.success('Saved to database ✓');
-          } else {
-            toast.error('AI enriched but save failed — click Save to retry');
-          }
-        } catch {
+        const saveResult = await saveRecordToDB(currentTab.table, editingRecord.id, updates);
+        if (saveResult.ok) {
+          fetchRecords();
+          toast.success('Saved to database ✓');
+        } else if (saveResult.expired) {
+          toast.error('Session expired — please refresh');
+        } else {
           toast.error('AI enriched but save failed — click Save to retry');
         }
       }
@@ -2470,17 +2658,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       const sectionFields = editFields.filter(f => f.section === sectionName);
       if (sectionFields.length === 0) { toast.info(`No fields in section "${sectionName}"`); return; }
 
-      const sampleRecords = sortedRecords
-        .filter(r => r.id !== editingRecord.id && (r.name || r.name_common))
-        .slice(0, 2)
-        .map(r => {
-          const sample: Record<string, any> = {};
-          sectionFields.forEach(f => { const v = (r as any)[f.key]; if (v !== null && v !== undefined && v !== '') sample[f.key] = v; });
-          return sample;
-        });
-
       // Build section context — start with any manual context
-      let sectionContext = aiContext.trim() || undefined;
+      let sectionContext: string | undefined = aiContext.trim() || undefined;
       const isFlavorSection = sectionName === 'Flavor Profile';
       const isStepsSection = sectionName === 'Steps' || sectionName === 'Preparation' || sectionName === 'Instructions' || sectionName === 'Cooking';
       const isRecipeTab = (adminFieldConfig[activeTab]?.label || activeTab).toLowerCase().includes('recipe');
@@ -2539,30 +2718,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         }
       }
 
-      const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
-      const _aiFillAbort2 = new AbortController();
-      const _aiFillTimer2 = setTimeout(() => _aiFillAbort2.abort(), 120_000);
-      let response: Response;
-      try {
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tabType: adminFieldConfig[activeTab]?.label || activeTab,
-            recordData: editingRecord,
-            fields: sectionFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
-            sampleRecords,
-            context: sectionContext,
-          }),
-          signal: _aiFillAbort2.signal,
-        });
-      } catch (fetchErr: any) {
-        clearTimeout(_aiFillTimer2);
-        const msg = fetchErr?.name === 'AbortError' ? 'AI request timed out (>2 min). Try fewer fields.' : `Network error: ${fetchErr?.message || fetchErr}`;
-        toast.error(msg);
-        setAiFillingSection(null);
-        return;
-      } finally { clearTimeout(_aiFillTimer2); }
+      const response = await adminApiFetch('/admin/ai-fill-fields', {
+        tabType: adminFieldConfig[activeTab]?.label || activeTab,
+        recordData: editingRecord,
+        fields: mapFieldsForAI(sectionFields),
+        sampleRecords: buildSampleRecords(editingRecord.id, sectionFields),
+        context: sectionContext,
+      });
       if (response.status === 401) {
         toast.error('Session expired — please refresh the page and log in again');
         return;
@@ -2580,26 +2742,60 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         toast.error(data.error || `AI fill ${sectionName} failed`);
       }
     } catch (err: any) {
+      const msg = err?.name === 'TimeoutError' || err?.name === 'AbortError' ? 'AI request timed out (>2 min). Try fewer fields.' : `AI fill error: ${err?.message || err}`;
       console.error(`[AI Fill ${sectionName}] Error:`, err);
-      toast.error(`AI fill error: ${err?.message || err}`);
+      toast.error(msg);
     } finally {
       setAiFillingSection(null);
     }
   };
 
-  // Count how many editable fields a record has data for (0–100 score)
+  // Count how many AI-fillable editable fields a record has data for (0–100 score)
+  // Must align with server-side SKIP_TYPES in ai-fill-fields + non-AI types
+  const COMPLETENESS_SKIP_TYPES = new Set([
+    'image', 'video', 'media_upload', 'icon_picker',           // media — not AI-fillable
+    'readonly', 'date',                                          // server SKIP_TYPES
+    'linked_elements', 'content_links',                          // server SKIP_TYPES
+    'element_sources_viewer',                                    // viewer-only
+  ]);
   const getRecordCompleteness = (record: AdminRecord, editFields: ReturnType<typeof getFieldsForView>): number => {
-    const SKIP_TYPES = new Set(['image', 'video', 'element_sources_viewer', 'nutrient_viewer', 'ingredient_viewer']);
-    const scoreable = editFields.filter(f => !SKIP_TYPES.has(f.type));
+    const scoreable = editFields.filter(f => !COMPLETENESS_SKIP_TYPES.has(f.type));
     if (scoreable.length === 0) return 100;
     const filled = scoreable.filter(f => {
       const v = (record as any)[f.key];
       if (v === null || v === undefined || v === '') return false;
       if (Array.isArray(v)) return v.length > 0;
-      if (typeof v === 'object') return Object.keys(v).length > 0;
+      if (typeof v === 'object') {
+        if (Object.keys(v).length === 0) return false;
+        // taste_profile / nutrition: treat as empty if all zeroes
+        if (f.key === 'taste_profile' || f.key === 'nutrition_per_100g' || f.key === 'nutrition_per_serving') {
+          return !!JSON.stringify(v).match(/[1-9]/);
+        }
+        // elements_beneficial/hazardous: treat as empty if no real values
+        if (f.key === 'elements_beneficial') {
+          const p = v.per_100g || v.nutrition_per_100g || {};
+          return !!JSON.stringify(p).match(/[1-9]/);
+        }
+        if (f.key === 'elements_hazardous') {
+          return Object.values(v).some((x: any) => {
+            if (typeof x === 'string') return x !== 'none' && x !== '';
+            if (typeof x === 'object' && x) return x.level && x.level !== 'none';
+            return false;
+          });
+        }
+        return true;
+      }
       return true;
     }).length;
     return Math.round((filled / scoreable.length) * 100);
+  };
+
+  const getRecordFieldCounts = (record: AdminRecord, editFields: ReturnType<typeof getFieldsForView>): { filled: number; total: number; pct: number } => {
+    const scoreable = editFields.filter(f => !COMPLETENESS_SKIP_TYPES.has(f.type));
+    if (scoreable.length === 0) return { filled: 0, total: 0, pct: 100 };
+    const pct = getRecordCompleteness(record, editFields);
+    const filledCount = Math.round((pct / 100) * scoreable.length);
+    return { filled: filledCount, total: scoreable.length, pct };
   };
 
   const handleBatchAiEnrich = async (mode: 'all' | 'sparse' | 'improve' = 'all') => {
@@ -2609,169 +2805,165 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     // Filter candidates
     let candidates = sortedRecords.filter(r => r.name || r.name_common);
     if (mode === 'sparse') {
-      // Only records with < 40% completeness
       candidates = candidates.filter(r => getRecordCompleteness(r, editFields) < 40);
     }
-    // 'improve' mode runs on all records but tells AI to overwrite+improve existing data
     if (candidates.length === 0) {
       toast.info(mode === 'sparse' ? 'No sparse records found (all records are ≥40% complete)' : 'No records to enrich');
       return;
     }
 
+    // Sort: nearly-complete records first so incomplete count drops fastest
+    candidates = candidates.sort((a, b) => getRecordCompleteness(b, editFields) - getRecordCompleteness(a, editFields));
+
+    // Count initially incomplete records (< 100%)
+    const initialIncomplete = candidates.filter(r => getRecordCompleteness(r, editFields) < 100).length;
+
     setBatchEnriching(true);
     batchCancelRef.current = false;
-    const recordResults: Array<{ id: string; name: string; status: 'done' | 'skipped' | 'error'; fieldsAdded: number }> = [];
-    setBatchProgress({ current: 0, total: candidates.length, name: '', filled: 0, skipped: 0, errors: 0, recordResults });
-    let filled = 0; let skipped = 0; let errors = 0;
+    const recordResults: Array<{ id: string; name: string; status: 'done' | 'skipped' | 'error'; fieldsAdded: number; filledFields: number; totalFields: number }> = [];
+    setBatchProgress({ current: 0, total: candidates.length, name: '', filled: 0, skipped: 0, errors: 0, completedRecords: 0, initialIncomplete, recordResults });
+    let filled = 0; let skipped = 0; let errors = 0; let completedRecords = 0;
 
     for (let i = 0; i < candidates.length; i++) {
       if (batchCancelRef.current) break;
       const record = candidates[i];
       const name = record.name_common || record.name || `Record ${i + 1}`;
-      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
+      const beforeCounts = getRecordFieldCounts(record, editFields);
+      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, completedRecords, initialIncomplete, recordResults: [...recordResults] });
+
+      // Skip 100% complete records — no API call needed
+      if (mode !== 'improve' && beforeCounts.pct >= 100) {
+        skipped++;
+        recordResults.push({ id: record.id, name, status: 'skipped', fieldsAdded: 0, filledFields: beforeCounts.filled, totalFields: beforeCounts.total });
+        setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, completedRecords, initialIncomplete, recordResults: [...recordResults] });
+        continue;
+      }
+
+      // Refresh records every 10 to update overview completeness %
+      if (i > 0 && i % 10 === 0) fetchRecords();
+
       try {
-        // For recipes: also call ai-enrich-recipe to fill ingredients, equipment, and steps
-        if (activeTab === 'recipes') {
-          const enrichUrl = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-enrich-recipe`;
-          let enrichResponse: Response;
-          try {
-            enrichResponse = await fetch(enrichUrl, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                recipeId: record.id,
-                recipeName: name,
-                servings: (record as any).servings || 4,
-                portionWeightG: (record as any).portion_weight_g || null,
-                prepTime: (record as any).prep_time || '',
-                cookTime: (record as any).cook_time || '',
-                difficulty: (record as any).difficulty || '',
-                cuisine: (record as any).cuisine || '',
-                description: (record as any).description_simple || (record as any).description || '',
-              }),
-              signal: AbortSignal.timeout(120_000),
-            });
-          } catch (fetchErr: any) {
-            if (fetchErr?.name === 'AbortError') { errors++; recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 }); continue; }
-            throw fetchErr;
+        let recordFieldsAdded = 0;
+        let hadError = false;
+        let sessionExpired = false;
+        // Merge enriched data into a copy so ai-fill-fields sees the full picture
+        let mergedRecord: Record<string, any> = { ...record };
+
+        // Helper: attempt a fetch with one retry on 500/network errors
+        const fetchWithRetry = async (fn: () => Promise<Response>, label: string): Promise<Response | null> => {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const res = await fn();
+              if (res.status === 401) {
+                sessionExpired = true;
+                setBatchEnriching(false); setBatchProgress(null);
+                toast.error('Session expired — please refresh and log in again');
+                return null;
+              }
+              if (res.status === 429) {
+                console.warn(`[Batch AI] ${label} rate-limited: ${name}, waiting 5s…`);
+                await new Promise(r => setTimeout(r, 5000));
+                continue;
+              }
+              if (res.status >= 500 && attempt === 0) {
+                console.warn(`[Batch AI] ${label} returned ${res.status} for "${name}", retrying in 3s…`);
+                await new Promise(r => setTimeout(r, 3000));
+                continue;
+              }
+              return res;
+            } catch (fetchErr: any) {
+              if ((fetchErr?.name === 'TimeoutError' || fetchErr?.name === 'AbortError' || fetchErr?.message?.includes('fetch')) && attempt === 0) {
+                console.warn(`[Batch AI] ${label} network error for "${name}", retrying in 3s…`);
+                await new Promise(r => setTimeout(r, 3000));
+                continue;
+              }
+              throw fetchErr;
+            }
           }
-          if (enrichResponse.status === 401) { setBatchEnriching(false); setBatchProgress(null); toast.error('Session expired'); return; }
-          const enrichData = await enrichResponse.json();
-          if (enrichData.success) {
-            const recipeUpdates: Record<string, any> = {};
-            if (enrichData.linked_ingredient_ids?.length > 0) recipeUpdates.linked_ingredients = enrichData.linked_ingredient_ids;
-            if (enrichData.grouped_ingredients?.length > 0) recipeUpdates.ingredients = enrichData.grouped_ingredients;
-            if (enrichData.equipment_names?.length > 0) recipeUpdates.equipment = enrichData.equipment_names;
-            if (enrichData.steps?.length > 0) recipeUpdates.instructions = enrichData.steps;
-            if (Object.keys(recipeUpdates).length > 0) {
-              const saveUrl = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
-              await fetch(saveUrl, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ table: currentTab.table, id: record.id, updates: recipeUpdates }) });
-              // Note: Records will be refetched after batch completes
-              const cnt = enrichData.counts;
-              filled += (cnt?.ingredients || 0) + (cnt?.equipment ? 1 : 0) + (cnt?.steps ? 1 : 0);
-              recordResults.push({ id: record.id, name, status: 'done', fieldsAdded: Object.keys(recipeUpdates).length });
-            } else {
-              skipped++;
-              recordResults.push({ id: record.id, name, status: 'skipped', fieldsAdded: 0 });
+          return null; // both attempts failed
+        };
+
+        // ── Phase 1: Recipe-specific enrichment (equipment → ingredients → steps) ──
+        if (activeTab === 'recipes') {
+          const enrichResponse = await fetchWithRetry(() => callRecipeEnrich(record), 'ai-enrich-recipe');
+          if (enrichResponse === null) {
+            if (sessionExpired) return; // 401 halted the batch
+            hadError = true;
+            console.warn(`[Batch AI] Recipe enrich failed after retry: ${name}`);
+          } else if (enrichResponse.ok) {
+            const enrichData = await enrichResponse.json();
+            if (enrichData.success) {
+              const recipeUpdates = processRecipeEnrichResponse(enrichData, record);
+              if (Object.keys(recipeUpdates).length > 0) {
+                const saveResult = await saveRecordToDB(currentTab.table, record.id, recipeUpdates);
+                if (saveResult.expired) { setBatchEnriching(false); setBatchProgress(null); toast.error('Session expired'); return; }
+                recordFieldsAdded += Object.keys(recipeUpdates).length;
+                mergedRecord = { ...mergedRecord, ...recipeUpdates };
+              }
             }
           } else {
-            errors++;
-            recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 });
+            // Non-retryable error (e.g. 500 on second attempt)
+            hadError = true;
+            console.warn(`[Batch AI] Recipe enrich returned ${enrichResponse.status}: ${name}`);
           }
-          setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
-          if (i < candidates.length - 1 && !batchCancelRef.current) await new Promise(r => setTimeout(r, 500));
-          continue;
         }
 
-        const sampleRecords = candidates
-          .filter(r => r.id !== record.id)
-          .slice(0, 2)
-          .map(r => {
-            const sample: Record<string, any> = {};
-            editFields.forEach(f => { const v = (r as any)[f.key]; if (v !== null && v !== undefined && v !== '') sample[f.key] = v; });
-            return sample;
-          });
-        const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-fill-fields`;
-        const _aiFillAbort3 = new AbortController();
-        const _aiFillTimer3 = setTimeout(() => _aiFillAbort3.abort(), 120_000);
-        let response: Response;
-        try {
-          response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tabType: adminFieldConfig[activeTab]?.label || activeTab,
-              recordData: record,
-              fields: editFields.map(f => ({ key: f.key, label: f.label, type: f.type, options: f.options, placeholder: f.placeholder, linkedCategory: f.linkedCategory })),
-              sampleRecords,
-              mode: mode === 'improve' ? 'improve' : 'fill',
-            }),
-            signal: _aiFillAbort3.signal,
-          });
-        } catch (fetchErr: any) {
-          clearTimeout(_aiFillTimer3);
-          if (fetchErr?.name === 'AbortError') {
-            errors++;
-            console.warn(`[Batch AI] Record timed out: ${record.name || record.name_common}`);
-            continue;
-          }
-          throw fetchErr;
-        } finally { clearTimeout(_aiFillTimer3); }
-        if (response.status === 401) {
-          setBatchEnriching(false);
-          setBatchProgress(null);
-          toast.error('Session expired — please refresh the page and log in again to continue batch enrichment');
-          return;
-        }
-        if (response.status === 429) {
-          await new Promise(r => setTimeout(r, 5000));
-          errors++;
-          recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 });
-          setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
-          continue;
-        }
-        const data = await response.json();
-        if (data.success && data.filledFields && Object.keys(data.filledFields).length > 0) {
-          const filledCount = Object.keys(data.filledFields).length;
-          const saveUrl = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
-          const tabConfig = adminFieldConfig[activeTab];
-          const editableKeys = new Set(tabConfig?.fields?.filter((f: any) => f.showInEdit).map((f: any) => f.key) || []);
-          const cleanUpdates: Record<string, any> = {};
-          for (const key of Object.keys(data.filledFields)) {
-            if (editableKeys.has(key)) cleanUpdates[key] = data.filledFields[key];
-          }
-          if (Object.keys(cleanUpdates).length > 0) {
-            const saveRes = await fetch(saveUrl, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ table: currentTab.table, id: record.id, updates: cleanUpdates }),
-            });
-            if (saveRes.status === 401) {
-              setBatchEnriching(false);
-              setBatchProgress(null);
+        // ── Phase 2: General AI fill for ALL remaining empty fields ──
+        const fillResponse = await fetchWithRetry(() => adminApiFetch('/admin/ai-fill-fields', {
+          tabType: adminFieldConfig[activeTab]?.label || activeTab,
+          recordData: mergedRecord,
+          fields: mapFieldsForAI(editFields),
+          sampleRecords: buildSampleRecords(record.id, editFields),
+          mode: mode === 'improve' ? 'improve' : 'fill',
+        }), 'ai-fill-fields');
+
+        if (fillResponse === null) {
+          if (sessionExpired) return; // 401 halted the batch
+          hadError = true;
+          console.warn(`[Batch AI] ai-fill-fields failed after retry: ${name}`);
+        } else if (fillResponse.ok) {
+          const data = await fillResponse.json();
+          if (data.success && data.filledFields && Object.keys(data.filledFields).length > 0) {
+            const saveResult = await saveRecordToDB(currentTab.table, record.id, data.filledFields);
+            if (saveResult.expired) {
+              setBatchEnriching(false); setBatchProgress(null);
               toast.error('Session expired — please refresh and log in again');
               return;
             }
-            if (saveRes.ok) {
-              // Note: Records will be refetched after batch completes
-            }
+            recordFieldsAdded += Object.keys(data.filledFields).length;
           }
-          filled += filledCount;
-          recordResults.push({ id: record.id, name, status: 'done', fieldsAdded: filledCount });
+        } else {
+          hadError = true;
+          console.warn(`[Batch AI] ai-fill-fields returned ${fillResponse.status}: ${name}`);
+        }
+
+        // ── Record result with field counts ──
+        const afterFilled = Math.min(beforeCounts.filled + recordFieldsAdded, beforeCounts.total);
+        const isNowComplete = afterFilled >= beforeCounts.total;
+        if (isNowComplete && beforeCounts.filled < beforeCounts.total) completedRecords++;
+
+        if (hadError && recordFieldsAdded === 0) {
+          errors++;
+          recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0, filledFields: beforeCounts.filled, totalFields: beforeCounts.total });
+        } else if (recordFieldsAdded > 0) {
+          filled += recordFieldsAdded;
+          recordResults.push({ id: record.id, name, status: 'done', fieldsAdded: recordFieldsAdded, filledFields: afterFilled, totalFields: beforeCounts.total });
         } else {
           skipped++;
-          recordResults.push({ id: record.id, name, status: 'skipped', fieldsAdded: 0 });
+          recordResults.push({ id: record.id, name, status: 'skipped', fieldsAdded: 0, filledFields: beforeCounts.filled, totalFields: beforeCounts.total });
         }
       } catch {
         errors++;
-        recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0 });
+        const fc = getRecordFieldCounts(record, editFields);
+        recordResults.push({ id: record.id, name, status: 'error', fieldsAdded: 0, filledFields: fc.filled, totalFields: fc.total });
       }
-      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, recordResults: [...recordResults] });
+      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped, errors, completedRecords, initialIncomplete, recordResults: [...recordResults] });
       if (i < candidates.length - 1 && !batchCancelRef.current) await new Promise(r => setTimeout(r, 300));
     }
     setBatchEnriching(false);
     const wasCancelled = batchCancelRef.current;
     setBatchProgress(null);
+    fetchRecords(); // Refresh data so overview completeness % updates
     if (wasCancelled) {
       toast.info(`Batch enrichment cancelled — ${filled} fields filled across ${recordResults.length} records`);
     } else {
@@ -2782,8 +2974,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const handleExportCsv = () => {
     if (!sortedRecords.length) { toast.info('No records to export'); return; }
     const editFields = getFieldsForView(activeTab, 'edit');
-    const SKIP_TYPES = new Set(['image', 'video', 'element_sources_viewer', 'nutrient_viewer', 'ingredient_viewer']);
-    const cols = editFields.filter(f => !SKIP_TYPES.has(f.type));
+    const cols = editFields.filter(f => !COMPLETENESS_SKIP_TYPES.has(f.type));
     const headers = cols.map(f => f.label);
     const rows = sortedRecords.map(record =>
       cols.map(f => {
@@ -3717,7 +3908,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 )}
 
                 {/* Catalog Metric Cards (elements, ingredients, recipes, products, equipment) */}
-                {['elements', 'ingredients', 'recipes', 'products', 'equipment'].includes(tab.id) && records.length > 0 && (
+                {['elements', 'ingredients', 'recipes', 'products', 'equipment', 'cooking_methods', 'activities', 'symptoms'].includes(tab.id) && records.length > 0 && (
                   <CatalogMetricCards records={records} tabId={tab.id} />
                 )}
 
@@ -3825,43 +4016,68 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                         <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
                         <span className="text-sm font-semibold text-amber-800">Batch AI Enrichment</span>
                         <span className="text-xs text-amber-600 font-mono">{batchProgress.current} / {batchProgress.total}</span>
+                        <span className="text-xs text-amber-400">{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs">
-                        <span className="text-green-700 font-semibold">+{batchProgress.filled} fields</span>
-                        <span className="text-gray-400">{batchProgress.skipped} skipped</span>
-                        {batchProgress.errors > 0 && <span className="text-red-600 font-medium">{batchProgress.errors} errors</span>}
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-green-700 font-semibold bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">+{batchProgress.filled} fields</span>
+                        {batchProgress.completedRecords > 0 && (
+                          <span className="text-emerald-700 font-semibold bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full">
+                            {batchProgress.completedRecords} completed
+                          </span>
+                        )}
+                        {batchProgress.skipped > 0 && <span className="text-gray-400">{batchProgress.skipped} skip</span>}
+                        {batchProgress.errors > 0 && <span className="text-red-600 font-medium">{batchProgress.errors} err</span>}
                       </div>
                     </div>
                     {/* Progress bar */}
-                    <div className="w-full bg-amber-100 rounded-full h-2">
+                    <div className="w-full bg-amber-100 rounded-full h-2 overflow-hidden flex">
                       <div
-                        className="bg-amber-500 h-2 rounded-full transition-all duration-300"
+                        className="bg-amber-500 h-2 transition-all duration-300"
                         style={{ width: `${Math.round((batchProgress.current / batchProgress.total) * 100)}%` }}
                       />
                     </div>
-                    {/* Currently processing */}
-                    {batchProgress.name && (
-                      <p className="text-xs text-amber-600 truncate">
-                        Processing: <span className="font-medium">{batchProgress.name}</span>
-                        <span className="ml-2 text-amber-400">{Math.round((batchProgress.current / batchProgress.total) * 100)}%</span>
+                    {/* Stats row: remaining incomplete + currently processing */}
+                    <div className="flex items-center justify-between">
+                      {batchProgress.name && (
+                        <p className="text-xs text-amber-600 truncate flex-1">
+                          Processing: <span className="font-medium">{batchProgress.name}</span>
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                        Remaining incomplete: <span className="font-semibold text-amber-700">{Math.max(0, batchProgress.initialIncomplete - batchProgress.completedRecords)}</span>
+                        <span className="text-gray-400">/{batchProgress.initialIncomplete}</span>
                       </p>
-                    )}
+                    </div>
                     {/* Per-record results log */}
                     {batchProgress.recordResults.length > 0 && (
-                      <div className="max-h-36 overflow-y-auto rounded-lg border border-amber-100 bg-white divide-y divide-gray-50">
+                      <div className="max-h-44 overflow-y-auto rounded-lg border border-amber-100 bg-white divide-y divide-gray-50">
                         {[...batchProgress.recordResults].reverse().map((r, idx) => (
                           <div key={`${r.id}-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 text-xs">
-                            {r.status === 'done' && <span className="text-green-500 flex-shrink-0">✓</span>}
+                            {r.status === 'done' && r.filledFields >= r.totalFields && <span className="text-emerald-500 flex-shrink-0">★</span>}
+                            {r.status === 'done' && r.filledFields < r.totalFields && <span className="text-green-500 flex-shrink-0">✓</span>}
                             {r.status === 'skipped' && <span className="text-gray-300 flex-shrink-0">–</span>}
                             {r.status === 'error' && <span className="text-red-400 flex-shrink-0">✕</span>}
                             <span className="flex-1 truncate text-gray-700 font-medium">{r.name}</span>
+                            {/* Field count badge */}
+                            <span className={`flex-shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded-full border ${
+                              r.filledFields >= r.totalFields
+                                ? 'text-emerald-700 bg-emerald-50 border-emerald-100'
+                                : r.filledFields > 0
+                                  ? 'text-amber-700 bg-amber-50 border-amber-100'
+                                  : 'text-gray-400 bg-gray-50 border-gray-100'
+                            }`}>
+                              {r.filledFields}/{r.totalFields}
+                            </span>
                             {r.status === 'done' && (
                               <span className="flex-shrink-0 text-[10px] font-semibold text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">
-                                +{r.fieldsAdded} fields
+                                +{r.fieldsAdded}
                               </span>
                             )}
-                            {r.status === 'skipped' && (
-                              <span className="flex-shrink-0 text-[10px] text-gray-400">complete</span>
+                            {r.status === 'skipped' && r.filledFields >= r.totalFields && (
+                              <span className="flex-shrink-0 text-[10px] text-emerald-500 font-medium">100%</span>
+                            )}
+                            {r.status === 'skipped' && r.filledFields < r.totalFields && (
+                              <span className="flex-shrink-0 text-[10px] text-gray-400">no change</span>
                             )}
                             {r.status === 'error' && (
                               <span className="flex-shrink-0 text-[10px] text-red-400">error</span>
@@ -4351,10 +4567,10 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     onClick={handleAiLinkIngredients}
                     disabled={aiLinkingIngredients || (!editingRecord?.name && !editingRecord?.name_common)}
                     className="h-8 px-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-emerald-700 hover:from-emerald-100 hover:to-teal-100"
-                    title="AI scans all ingredients in the DB and links those that contain this element"
+                    title="AI scans ingredients, recipes & products in the DB and links those that contain this element"
                   >
                     {aiLinkingIngredients ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <span className="mr-1 text-sm">🔗</span>}
-                    <span className="text-xs">{aiLinkingIngredients ? 'Linking...' : 'AI Link Ingredients'}</span>
+                    <span className="text-xs">{aiLinkingIngredients ? 'Matching...' : 'Match to Records'}</span>
                   </Button>
                 )}
                 {activeTab === 'elements' && (
@@ -4385,6 +4601,28 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 )}
               </>
             )}
+            {editingRecord?.id && activeTab !== 'waitlist' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const cloned = { ...editingRecord };
+                  delete cloned.id;
+                  delete cloned.created_at;
+                  delete cloned.updated_at;
+                  const nameKey = cloned.name_common ? 'name_common' : 'name';
+                  cloned[nameKey] = `${cloned[nameKey] || ''} (Copy)`;
+                  if (cloned.slug) cloned.slug = `${cloned.slug}-copy`;
+                  setEditingRecord(cloned);
+                  toast.info('Record cloned — edit and click Create to save');
+                }}
+                className="h-8 px-3 border-amber-200 text-amber-700 hover:bg-amber-50"
+                title="Clone this record as a new entry with all images and data"
+              >
+                <Copy className="w-3.5 h-3.5 mr-1" />
+                <span className="text-xs">Clone</span>
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => { setShowEditModal(false); setEditingRecord(null); }}>Cancel</Button>
             <Button size="sm" onClick={handleSave} disabled={savingRecord} className="bg-blue-600 hover:bg-blue-700 text-white">
               {savingRecord ? 'Saving...' : editingRecord?.id ? 'Save' : 'Create'}
@@ -4413,6 +4651,37 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 const notVals = field.showWhen.not.map(v => v.toLowerCase());
                 if (isEmpty || notVals.includes(watchVal)) return null;
               }
+            }
+
+            if (field.type === 'media_upload') {
+              const handleUpload = async (file: File) => {
+                setUploadingImage(true);
+                try {
+                  toast.info(`Uploading ${field.mediaType || 'file'}...`);
+                  const publicUrl = await uploadFileToStorage(file, 'catalog-media', accessToken);
+                  toast.success(`${field.mediaType || 'File'} uploaded!`);
+                  return publicUrl;
+                } catch (err: any) {
+                  toast.error(`Upload failed: ${(err?.message || '').slice(0, 80)}`);
+                  throw err;
+                } finally {
+                  setUploadingImage(false);
+                }
+              };
+
+              return (
+                <div key={field.key} className={field.colSpan === 2 ? 'col-span-2' : ''}>
+                  <MediaUploadField
+                    value={val || ''}
+                    onChange={(url: string) => updateField(url)}
+                    label={field.label}
+                    mediaType={field.mediaType || 'image'}
+                    accept={field.accept}
+                    placeholder={field.placeholder}
+                    onUpload={handleUpload}
+                  />
+                </div>
+              );
             }
 
             if (field.type === 'image') {
@@ -4658,28 +4927,44 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             if (field.type === 'tags') {
               const currentVal = typeof val === 'string' ? val : '';
               const desc = currentVal && field.optionDescriptions?.[currentVal];
+              // Support dynamic options based on another field's value (like multi_tags)
+              let tagOptions = field.options || [];
+              if (field.dynamicOptionsMap && field.conditionalOn && editingRecord) {
+                const parentVal = editingRecord[field.conditionalOn];
+                if (parentVal && field.dynamicOptionsMap[parentVal]) {
+                  tagOptions = field.dynamicOptionsMap[parentVal];
+                } else if (!parentVal) {
+                  tagOptions = [];
+                }
+              }
+              const noParent = field.conditionalOn && editingRecord && !editingRecord[field.conditionalOn];
               return (
-                <div key={field.key} className="space-y-1.5">
+                <div key={field.key} className={`space-y-1.5 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(field.options || []).map(opt => {
-                      const isSelected = currentVal.toLowerCase() === opt.toLowerCase();
-                      return (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => updateField(isSelected ? '' : opt)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                              : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                          }`}
-                        >
-                          {opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {noParent ? (
+                    <p className="text-xs text-gray-400 italic">Select a {field.conditionalOn?.replace(/_/g, ' ')} first</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {tagOptions.map(opt => {
+                        const isSelected = currentVal.toLowerCase() === opt.toLowerCase();
+                        const cm = field.colorMap;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => updateField(isSelected ? '' : opt)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                              isSelected
+                                ? (cm?.[opt] ? cm[opt] + ' border-current shadow-sm' : 'bg-blue-600 text-white border-blue-600 shadow-sm')
+                                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                            }`}
+                          >
+                            {opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   {desc && (
                     <div className="flex items-start gap-1.5 mt-1 px-2 py-1.5 bg-blue-50 border border-blue-100 rounded-lg">
                       <span className="text-blue-500 text-xs mt-0.5">ℹ</span>
@@ -4730,7 +5015,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                               )}
                               <span className={`text-xs font-medium flex-1 ${
                                 isBenefits ? 'text-green-800' : 'text-red-800'
-                              }`}>{item}</span>
+                              }`}>{item.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
                               <button type="button"
                                 onClick={() => updateField(selected.filter(s => s !== item))}
                                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -5138,14 +5423,25 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             if (field.type === 'linked_elements') {
               const linkedIds: string[] = Array.isArray(val) ? val : [];
               const catFilter = field.linkedCategory || 'all';
-              const filteredElements = elementsCache.filter((el: AdminRecord) => {
+              // Pick the correct source cache based on linkedTable
+              const sourceCache: AdminRecord[] = field.linkedTable === 'catalog_cooking_methods'
+                ? cookingMethodsCache
+                : field.linkedTable === 'catalog_equipment'
+                  ? (equipmentCache as unknown as AdminRecord[])
+                  : elementsCache;
+              const searchLabel = field.linkedTable === 'catalog_cooking_methods'
+                ? 'cooking methods'
+                : field.linkedTable === 'catalog_equipment'
+                  ? 'equipment'
+                  : catFilter === 'beneficial' ? 'nutrients' : catFilter === 'hazardous' ? 'hazards' : 'elements';
+              const filteredItems = sourceCache.filter((el: AdminRecord) => {
                 if (catFilter !== 'all' && el.category !== catFilter) return false;
                 if (!elementSearchQuery) return true;
                 const q = elementSearchQuery.toLowerCase();
-                return (el.name_common || '').toLowerCase().includes(q) || (el.name || '').toLowerCase().includes(q) || (el.type || '').toLowerCase().includes(q);
+                return (el.name_common || '').toLowerCase().includes(q) || (el.name || '').toLowerCase().includes(q) || (el.type || '').toLowerCase().includes(q) || (el.category || '').toLowerCase().includes(q);
               });
-              const linkedElements = elementsCache.filter((el: AdminRecord) => linkedIds.includes(el.id));
-              const availableElements = filteredElements.filter((el: AdminRecord) => !linkedIds.includes(el.id)).slice(0, 8);
+              const linkedElements = sourceCache.filter((el: AdminRecord) => linkedIds.includes(el.id));
+              const availableElements = filteredItems.filter((el: AdminRecord) => !linkedIds.includes(el.id)).slice(0, 8);
 
               return (
                 <div key={field.key} className="space-y-1.5">
@@ -5166,9 +5462,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                           <div className="flex-1 min-w-0">
                             <div className="text-xs font-semibold text-gray-800 truncate">{el.name_common || el.name}</div>
                             <div className="flex items-center gap-1 mt-0.5">
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                              {el.category && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
                                 el.category === 'beneficial' ? 'bg-green-200 text-green-800' : el.category === 'hazardous' ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-700'
-                              }`}>{el.category}</span>
+                              }`}>{el.category}</span>}
                               {el.type && <span className="text-[9px] text-gray-400">{el.type}</span>}
                               {el.unit && <span className="text-[9px] text-gray-400">({el.unit})</span>}
                             </div>
@@ -5183,7 +5479,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     value={elementSearchQuery}
                     onChange={(e) => setElementSearchQuery(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                    placeholder={`Search ${catFilter === 'beneficial' ? 'nutrients' : catFilter === 'hazardous' ? 'hazards' : 'elements'}...`}
+                    placeholder={`Search ${searchLabel}...`}
                     className={inputCls}
                   />
                   {(elementSearchQuery || linkedElements.length === 0) && availableElements.length > 0 && (
@@ -5201,12 +5497,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                             }`}>{(el.name_common || el.name || '?')[0].toUpperCase()}</div>
                           )}
                           <span className="font-medium flex-1 truncate">{el.name_common || el.name}</span>
-                          <span className="text-xs text-gray-400 flex-shrink-0">{el.type} · {el.category}</span>
+                          <span className="text-xs text-gray-400 flex-shrink-0">{el.category}</span>
                         </button>
                       ))}
                     </div>
                   )}
-                  {elementsCache.length === 0 && <p className="text-xs text-gray-400 italic">Loading elements...</p>}
+                  {sourceCache.length === 0 && <p className="text-xs text-gray-400 italic">Loading {searchLabel}...</p>}
                 </div>
               );
             }
@@ -5499,51 +5795,69 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               );
             }
 
-            // ── Element Sources Viewer ────────────────────────────────────────
+            // ── Element Sources Viewer (3 categories: Ingredients, Recipes, Products) ──
             if (field.type === 'element_sources_viewer') {
               const elementId = editingRecord?.id as string | undefined;
-              const isLoaded = elementSourcesCache?.elementId === elementId;
-              const sources = isLoaded ? elementSourcesCache!.sources : [];
+              const isLoaded = !!elementSourcesCache && elementSourcesCache.elementId === elementId;
+              const srcIngredients = isLoaded ? elementSourcesCache.ingredients : [];
+              const srcRecipes = isLoaded ? elementSourcesCache.recipes : [];
+              const srcProducts = isLoaded ? elementSourcesCache.products : [];
+              const totalCount = srcIngredients.length + srcRecipes.length + srcProducts.length;
+
+              const matchesElement = (record: any, elId: string): boolean => {
+                const ben = record.elements_beneficial;
+                const haz = record.elements_hazardous;
+                if (ben && typeof ben === 'object') {
+                  if (Object.keys(ben).includes(elId)) return true;
+                  for (const k of Object.keys(ben)) {
+                    const section = ben[k];
+                    if (section && typeof section === 'object' && Object.keys(section).includes(elId)) return true;
+                  }
+                }
+                if (haz && typeof haz === 'object' && Object.keys(haz).includes(elId)) return true;
+                return false;
+              };
+
               const fetchSources = async () => {
                 if (!elementId || elementSourcesLoading) return;
                 setElementSourcesLoading(true);
                 try {
-                  const metaEnv = (import.meta as any).env || {};
-                  const url = `${metaEnv.VITE_SUPABASE_URL}/rest/v1/catalog_ingredients?select=id,name_common,image_url,elements_beneficial,elements_hazardous&limit=1000`;
-                  const res = await fetch(url, { headers: { 'apikey': metaEnv.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken || metaEnv.VITE_SUPABASE_ANON_KEY}` } });
-                  if (res.ok) {
-                    const all: any[] = await res.json();
-                    const matching = all.filter(ing => {
-                      const ben = ing.elements_beneficial;
-                      const haz = ing.elements_hazardous;
-                      if (ben && typeof ben === 'object') {
-                        const keys = Object.keys(ben);
-                        if (keys.includes(elementId)) return true;
-                        for (const k of keys) {
-                          const section = ben[k];
-                          if (section && typeof section === 'object' && Object.keys(section).includes(elementId)) return true;
-                        }
+                  const hdrs = { 'apikey': publicAnonKey, 'Authorization': `Bearer ${accessToken}` };
+                  const base = `https://${projectId}.supabase.co`;
+                  const tables = [
+                    { key: 'ingredients', table: 'catalog_ingredients', select: 'id,name_common,image_url,elements_beneficial,elements_hazardous' },
+                    { key: 'recipes', table: 'catalog_recipes', select: 'id,name_common,image_url,elements_beneficial,elements_hazardous,category' },
+                    { key: 'products', table: 'catalog_products', select: 'id,name_common,name,image_url,elements_beneficial,elements_hazardous,category' },
+                  ];
+                  const results: Record<string, any[]> = { ingredients: [], recipes: [], products: [] };
+                  await Promise.all(tables.map(async ({ key, table, select }) => {
+                    try {
+                      const res = await fetch(`${base}/rest/v1/${table}?select=${select}&limit=1000`, { headers: hdrs });
+                      if (res.ok) {
+                        const all: any[] = await res.json();
+                        results[key] = all.filter(r => matchesElement(r, elementId));
+                      } else {
+                        console.error(`[Admin] ${table} returned ${res.status}:`, await res.text().catch(() => ''));
                       }
-                      if (haz && typeof haz === 'object' && Object.keys(haz).includes(elementId)) return true;
-                      return false;
-                    });
-                    setElementSourcesCache({ elementId, sources: matching });
-                  }
+                    } catch (e) { console.error(`[Admin] Failed to fetch ${table}:`, e); }
+                  }));
+                  setElementSourcesCache({ elementId, ingredients: results.ingredients, recipes: results.recipes, products: results.products });
                 } catch (e) { console.error('[Admin] Failed to fetch element sources:', e); }
                 finally { setElementSourcesLoading(false); }
               };
-              const getQty = (ing: any): string => {
-                const ben = ing.elements_beneficial;
-                if (ben && typeof ben === 'object') {
-                  if (ben[elementId!] !== undefined) {
-                    const v = ben[elementId!];
+
+              const getQty = (record: any): string => {
+                const ben = record.elements_beneficial;
+                if (ben && typeof ben === 'object' && elementId) {
+                  if (ben[elementId] !== undefined) {
+                    const v = ben[elementId];
                     if (typeof v === 'object' && v !== null) return v.per_100g != null ? `${v.per_100g}` : '';
                     if (typeof v === 'number') return `${v}`;
                   }
                   for (const k of Object.keys(ben)) {
                     const section = ben[k];
-                    if (section && typeof section === 'object' && section[elementId!] !== undefined) {
-                      const v = section[elementId!];
+                    if (section && typeof section === 'object' && section[elementId] !== undefined) {
+                      const v = section[elementId];
                       if (typeof v === 'object' && v !== null) return v.per_100g != null ? `${v.per_100g}` : '';
                       if (typeof v === 'number') return `${v}`;
                     }
@@ -5551,33 +5865,31 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 }
                 return '';
               };
-              return (
-                <div key={field.key} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
-                    <button type="button" onClick={fetchSources} disabled={elementSourcesLoading}
-                      className="h-6 px-2 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 font-medium disabled:opacity-50">
-                      {elementSourcesLoading ? 'Loading…' : isLoaded ? `↻ Refresh (${sources.length})` : 'Load Ingredients'}
-                    </button>
+
+              const renderSourceCategory = (
+                label: string, emoji: string, items: any[], colorFrom: string, colorTo: string, textColor: string
+              ) => (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">{emoji}</span>
+                    <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">{label}</span>
+                    <span className="text-[9px] text-gray-400">({items.length})</span>
                   </div>
-                  {isLoaded && sources.length === 0 && (
-                    <div className="text-center py-4 text-[11px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
-                      No ingredients found containing this element
-                    </div>
-                  )}
-                  {isLoaded && sources.length > 0 && (
-                    <div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-1">
-                      {sources.map((ing: any) => {
-                        const qty = getQty(ing);
-                        const name = ing.name_common || ing.name || ing.id;
+                  {items.length === 0 ? (
+                    <div className="text-[10px] text-gray-400 italic pl-5">None found</div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                      {items.map((item: any) => {
+                        const qty = getQty(item);
+                        const name = item.name_common || item.name || item.id;
                         const initials = name.slice(0, 2).toUpperCase();
                         return (
-                          <button key={ing.id} type="button" onClick={() => openIngredientRecord(ing)}
+                          <button key={item.id} type="button" onClick={() => openIngredientRecord(item)}
                             className="flex items-center gap-2 p-1.5 rounded-lg border border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 text-left transition-all group">
-                            {ing.image_url ? (
-                              <img src={ing.image_url} alt={name} className="w-8 h-8 rounded-md object-cover flex-shrink-0 border border-gray-100" />
+                            {item.image_url ? (
+                              <img src={item.image_url} alt={name} className="w-8 h-8 rounded-md object-cover flex-shrink-0 border border-gray-100" />
                             ) : (
-                              <div className="w-8 h-8 rounded-md bg-gradient-to-br from-green-100 to-emerald-200 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-green-700">{initials}</div>
+                              <div className={`w-8 h-8 rounded-md bg-gradient-to-br ${colorFrom} ${colorTo} flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${textColor}`}>{initials}</div>
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="text-[10px] font-medium text-gray-800 truncate group-hover:text-blue-700">{name}</div>
@@ -5590,19 +5902,117 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   )}
                 </div>
               );
+
+              return (
+                <div key={field.key} className="space-y-3 col-span-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Linked Records Containing This Element</Label>
+                    <button type="button" onClick={fetchSources} disabled={elementSourcesLoading}
+                      className="h-6 px-2 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 font-medium disabled:opacity-50">
+                      {elementSourcesLoading ? 'Loading…' : isLoaded ? `↻ Refresh (${totalCount})` : 'Load Linked Records'}
+                    </button>
+                  </div>
+                  {isLoaded && totalCount === 0 && (
+                    <div className="text-center py-4 text-[11px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
+                      No linked records found containing this element
+                    </div>
+                  )}
+                  {isLoaded && totalCount > 0 && (
+                    <div className="space-y-4">
+                      {renderSourceCategory('Ingredients', '🥬', srcIngredients, 'from-green-100', 'to-emerald-200', 'text-green-700')}
+                      {renderSourceCategory('Recipes & Meals', '🍽️', srcRecipes, 'from-orange-100', 'to-amber-200', 'text-orange-700')}
+                      {renderSourceCategory('Products', '📦', srcProducts, 'from-blue-100', 'to-indigo-200', 'text-blue-700')}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // ── DRV Table Editor ──────────────────────────────────────────
+            if (field.type === 'drv_editor') {
+              return (
+                <div key={field.key} className={field.colSpan === 2 ? 'col-span-2' : ''}>
+                  <DrvTableEditor value={val} onChange={updateField} label={field.label} />
+                </div>
+              );
+            }
+
+            // ── Herbal Quality Editor ────────────────────────────────
+            if (field.type === 'herbal_quality_editor') {
+              const handleCreateSymptom = async (name: string) => {
+                try {
+                  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/insert`;
+                  const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      table: 'catalog_symptoms',
+                      record: {
+                        name: name.trim(),
+                        slug: name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+                        category: 'general',
+                        severity: 'moderate',
+                        onset_type: 'gradual',
+                      },
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.success && data.record) {
+                    const newSym = data.record;
+                    setSymptomsCache(prev => [...prev, newSym]);
+                    toast.success(`Created symptom "${name}"`);
+                    return newSym;
+                  }
+                  toast.error(data.error || 'Failed to create symptom');
+                  return null;
+                } catch (err: any) {
+                  toast.error(`Error creating symptom: ${err?.message || err}`);
+                  return null;
+                }
+              };
+              return (
+                <div key={field.key}>
+                  <HerbalQualityEditor
+                    value={val}
+                    onChange={updateField}
+                    symptomsCache={symptomsCache.map(s => ({ ...s, id: s.id, name: s.name || s.name_common || '' })) as any}
+                    onCreateSymptom={handleCreateSymptom}
+                    ingredientName={editingRecord?.name_common || editingRecord?.name || ''}
+                  />
+                </div>
+              );
+            }
+
+            // ── Interventions Editor (prevention / elimination items) ────
+            if (field.type === 'interventions_editor') {
+              return (
+                <div key={field.key}>
+                  <InterventionsEditor value={val} onChange={updateField} label={field.label} placeholder={field.placeholder} />
+                </div>
+              );
+            }
+
+            // ── Structured editors (thresholds, deficiency, interactions, etc.) ──
+            if (field.type === 'thresholds_editor' || field.type === 'deficiency_ranges_editor' ||
+                field.type === 'excess_ranges_editor' || field.type === 'description_full_editor' ||
+                field.type === 'deficiency_editor' || field.type === 'interactions_editor' ||
+                field.type === 'food_sources_editor' || field.type === 'food_strategy_editor' ||
+                field.type === 'references_editor' || field.type === 'health_benefits_editor') {
+              const accentBorder = field.accentColor === 'orange' ? 'border-t-4 border-t-orange-400 rounded-t-lg'
+                : field.accentColor === 'green' ? 'border-t-4 border-t-green-500 rounded-t-lg'
+                : field.accentColor === 'red' ? 'border-t-4 border-t-red-500 rounded-t-lg'
+                : '';
+              return (
+                <div key={field.key} className={`${field.colSpan === 2 ? 'col-span-2' : ''} ${accentBorder}`}>
+                  <StructuredJsonEditor value={val} onChange={updateField} label={field.label} placeholder={field.placeholder} fieldType={field.type} />
+                </div>
+              );
             }
 
             if (field.type === 'json') {
-              const jsonStr = typeof val === 'string' ? val : JSON.stringify(val || {}, null, 2);
               return (
                 <div key={field.key} className="space-y-1.5">
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
-                  <textarea
-                    value={jsonStr}
-                    onChange={(e) => { try { updateField(JSON.parse(e.target.value)); } catch { updateField(e.target.value); } }}
-                    placeholder='{"key": "value"}'
-                    className={`${textareaCls} min-h-24 font-mono text-xs`}
-                  />
+                  <StructuredJsonEditor value={val} onChange={updateField} label={field.label} placeholder={field.placeholder} fieldType="json" />
                 </div>
               );
             }
@@ -6261,18 +6671,11 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               );
             }
 
-            // Default: text input (or JSON textarea for complex objects)
+            // Default: structured editor for complex objects (no raw JSON for non-dev users)
             if (val !== null && val !== undefined && typeof val === 'object') {
-              const jsonStr = JSON.stringify(val, null, 2);
               return (
                 <div key={field.key} className="space-y-1.5">
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
-                  <textarea
-                    title={field.label}
-                    value={jsonStr}
-                    onChange={(e) => { try { updateField(JSON.parse(e.target.value)); } catch { updateField(e.target.value); } }}
-                    className={`${textareaCls} min-h-24 font-mono text-xs`}
-                  />
+                  <StructuredJsonEditor value={val} onChange={updateField} label={field.label} placeholder={field.placeholder} />
                 </div>
               );
             }
@@ -6291,9 +6694,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           ]);
           const HEALTH_SECTIONS = new Set([
             'Media', 'Nutrition Data', 'Hazards & Risks', 'Health & Scoring',
-            'Functions & Benefits', 'Thresholds & Range', 'Food Sources',
-            'Detailed Sections', 'Deficiency & Excess', 'Interactions',
-            'Detox & Exposure', 'References & Meta', 'Summary',
+            'Functions & Benefits', 'DRV by Population', 'Thresholds & Range', 'Food Sources',
+            'Detailed Sections', 'Interactions',
+            'Interventions', 'References & Meta', 'Summary',
             'Chemistry', 'Identity', 'Scoring',
           ]);
           const CONTENT_SECTIONS = new Set(['Content']);
@@ -6326,8 +6729,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             'Nutrition Data': '🧪', 'Health & Scoring': '💯', 'Scoring': '📊',
             'Thresholds & Range': '📏', 'DRV by Population': '👥',
             'Food Sources': '🌱', 'Detailed Sections': '📚',
-            'Deficiency & Excess': '⚖️', 'Interactions': '🔗',
-            'Detox & Exposure': '🛡️', 'References & Meta': '📎', 'Content': '📰',
+            'Interactions': '🔗',
+            'Interventions': '💊🛡️', 'References & Meta': '📎', 'Content': '📰',
           };
 
           const renderSections = (filterFn?: (sectionName: string) => boolean) =>
@@ -6335,13 +6738,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               .filter(([sectionName]) => !filterFn || filterFn(sectionName))
               .map(([sectionName, fields]) => {
                 const isMediaSection = sectionName === 'Media';
-                const isBasicInfoSection = sectionName === 'Basic Info';
-                const isSummarySection = sectionName === 'Summary';
-                const sectionCols = isMediaSection ? 5 : (isBasicInfoSection || isSummarySection) ? 3 : 2;
+                const THREE_COL_SECTIONS = ['Basic Info', 'Summary', 'Identity', 'Chemistry', 'Thresholds & Range', 'Interventions'];
+                const sectionCols = isMediaSection ? 5 : THREE_COL_SECTIONS.includes(sectionName) ? 3 : 2;
                 const sKey = `sec_${activeTab}_${sectionName}`;
                 const secOpen = isSectionOpen(sKey);
                 const showAiButton = ['Basic Info', 'Processing', 'Nutrition Data', 'Hazards & Risks', 'Ingredients', 'Descriptions', 'Flavor Profile', 'Cooking Details', 'Identity', 'Summary', 'Culinary Origin', 'Media',
-                  'Functions & Benefits', 'Thresholds & Range', 'Food Sources', 'Detailed Sections', 'Deficiency & Excess', 'Interactions', 'Detox & Exposure', 'References & Meta', 'Health & Scoring', 'Chemistry', 'Scoring',
+                  'Functions & Benefits', 'DRV by Population', 'Thresholds & Range', 'Food Sources', 'Detailed Sections', 'Interactions', 'Interventions', 'References & Meta', 'Health & Scoring', 'Chemistry', 'Scoring', 'Content',
+                  'Herbal / Medicinal Quality',
                 ].includes(sectionName);
                 const isFillingSec = aiFillingSection === sectionName;
                 const isVecOpen = vecSearchSection === sectionName;
