@@ -18,7 +18,7 @@ export function CountdownTimer() {
   });
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const launchDate = new Date("2026-03-07T20:00:00Z").getTime(); // 9pm CEST = 8pm UTC
+  const launchDate = new Date("2026-03-21T20:00:00Z").getTime(); // 9pm CEST = 8pm UTC
 
   useEffect(() => {
     // Calculate initial time immediately
@@ -119,7 +119,7 @@ export function CountdownTimer() {
             animation: 'gradient-x 4s ease infinite 1s'
           }}
         >
-          The beta launched on February 27, 2026 — download now!
+          The beta launched on March 21, 2026 — download now!
         </p>
       </div>
     );
@@ -161,7 +161,7 @@ export function CountdownTimer() {
           animation: 'gradient-x 5s ease infinite 1.5s'
         }}
       >
-        Until HealthScan Beta Launch • Feb 27, 2026
+        Until HealthScan Beta Launch • Mar 21, 2026
       </p>
     </div>
   );

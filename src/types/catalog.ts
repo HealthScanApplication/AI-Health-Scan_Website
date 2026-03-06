@@ -69,13 +69,154 @@ export interface NutritionPer100g {
 
 export interface NutritionPerServing extends NutritionPer100g {}
 
+// ─── Age Ranges & DRV types (deficiency / optimal / excess by region × age × gender) ─
+
+export interface DeficiencyBlock {
+  threshold: number;
+  mild?: { symptoms: string[] };
+  severe?: { symptoms: string[] };
+}
+
+export interface OptimalBlock {
+  minimum: number;
+  recommended: number;
+  maximum: number;
+  benefits?: string[];
+}
+
+export interface ExcessBlock {
+  daily_limit: { value: number; symptoms?: string[] };
+  acute_limit?: { value: number; symptoms?: string[] };
+}
+
+export interface GenderDrvBlock {
+  deficiency: DeficiencyBlock;
+  optimal: OptimalBlock;
+  excess: ExcessBlock;
+  pregnancy?: { optimal: OptimalBlock; excess: ExcessBlock };
+  breastfeeding?: { optimal: OptimalBlock; excess: ExcessBlock };
+}
+
+export interface AgeRangeEntry {
+  age_group: string;   // "0-6m" | "7-12m" | "1-3y" | ... | "51+y" | "pregnancy" | "breastfeeding"
+  basis: string;       // "per_day"
+  male?: GenderDrvBlock;
+  female?: GenderDrvBlock;
+}
+
+export interface RegionMeta {
+  authority: string;
+  reference_url: string;
+  notes?: string;
+}
+
+export interface AgeRanges {
+  europe?: AgeRangeEntry[];
+  north_america?: AgeRangeEntry[];
+  healthscan?: AgeRangeEntry[];
+}
+
+// ─── Testing & Diagnostics ──────────────────────────────────────────────────
+
+export interface TestingMethod {
+  name: string;
+  description: string;
+  accuracy?: string;
+  cost?: string;
+  availability?: string;
+}
+
+export interface TestingOrDiagnostics {
+  matrix?: string;
+  best_test?: string;
+  why_best?: string;
+  optimal_range?: { low: number; high: number; unit: string };
+  detection_threshold?: { value: number; unit: string };
+  frequency?: string;
+  method?: string;
+  self_test_available?: boolean;
+  turnaround_days?: number;
+  methods?: TestingMethod[];
+}
+
+// ─── Interventions ──────────────────────────────────────────────────────────
+
+export interface DosageEntry {
+  age_group: string;
+  male?: { amount: number; unit: string; frequency: string; timing?: string };
+  female?: { amount: number; unit: string; frequency: string; timing?: string };
+  pregnancy?: { amount: number; unit: string; frequency: string; timing?: string } | null;
+  breastfeeding?: { amount: number; unit: string; frequency: string; timing?: string } | null;
+}
+
+export interface Intervention {
+  title: string;
+  type: 'supplement' | 'lifestyle' | 'herbal' | 'dietary';
+  phase: string[];
+  description: string;
+  mechanism?: string;
+  timing?: string;
+  duration?: string;
+  dosage?: string;
+  contraindications?: string[];
+  monitoring?: string;
+  evidence?: { label: string; url: string }[];
+  products?: any[];
+  region_scope?: string[];
+  age_scope?: string[];
+  tags?: string[];
+  confidence?: string;
+  dosage_by_age_gender?: { europe?: DosageEntry[]; north_america?: DosageEntry[] };
+  blood_level_conversion?: Record<string, any>;
+  notes?: string;
+}
+
+// ─── Key Interactions ───────────────────────────────────────────────────────
+
+export interface KeyInteraction {
+  element: string;
+  type: 'synergistic' | 'antagonistic' | 'competitive';
+  description: string;
+  reference?: string;
+  id?: string;
+}
+
+// ─── Food Data (rich) ───────────────────────────────────────────────────────
+
+export interface FoodSourceEntry {
+  name: string;
+  amount_100g: number;
+  unit: string;
+  bioavailability?: number;
+  source?: string;
+  source_url?: string;
+  notes?: string;
+  id?: string;
+}
+
+export interface FoodData {
+  strategy?: Record<string, string>;
+  sources?: {
+    description?: string;
+    animal?: FoodSourceEntry[];
+    plant?: FoodSourceEntry[];
+    fortified?: FoodSourceEntry[];
+    fermented?: FoodSourceEntry[];
+    other?: FoodSourceEntry[];
+  };
+  bioavailability?: Record<string, any>;
+  preparation_methods?: Record<string, any>;
+}
+
 // ─── catalog_elements ──────────────────────────────────────────────────────
 
 export interface CatalogElement {
   id: string;
   slug?: string;
+  slug_path?: string;
   name_common: string;
   name_other?: string;
+  other_names?: string[];
   category?: string;
   type_label?: string;
   subcategory?: string;
@@ -95,6 +236,17 @@ export interface CatalogElement {
   deficiency_ranges?: Record<string, any>;
   excess_ranges?: Record<string, any>;
   drv_by_population?: Record<string, any>;
+  // New rich DRV structure (supersedes drv_by_population + individual drv_ columns)
+  age_ranges?: AgeRanges;
+  daily_recommended_adult?: { male?: { value: number; unit: string }; female?: { value: number; unit: string } };
+  regions_meta?: { europe?: RegionMeta; north_america?: RegionMeta };
+  // Testing & diagnostics
+  testing_or_diagnostics?: TestingOrDiagnostics;
+  // Rich interactions & interventions
+  key_interactions?: KeyInteraction[];
+  interventions?: Intervention[];
+  // Rich food data
+  food_data?: FoodData;
   found_in?: string[];
   food_sources_detailed?: Record<string, any>;
   food_strategy?: Record<string, any>;
@@ -105,6 +257,9 @@ export interface CatalogElement {
   health_score?: number;
   scientific_references?: Record<string, any>;
   info_sections?: Record<string, any>;
+  content_urls?: Record<string, string>;
+  confidence?: 'verified' | 'ai_generated' | 'draft' | 'needs_review';
+  qa_rules?: Record<string, any>;
   image_url?: string;
   image_url_raw?: string;
   image_url_powdered?: string;

@@ -1174,8 +1174,9 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     for (const [k, v] of Object.entries(updates)) {
       if (!allowedCols || allowedCols.has(k)) {
         if (v !== undefined && !['_displayIndex','id','created_at','imported_at','api_source','external_id'].includes(k)) {
-          // Validate UUID arrays (equipment_ids, cooking_method_ids, cooking_methods_used_with, etc.)
-          if (Array.isArray(v) && (k.includes('_ids') || k.includes('_used_with'))) {
+          // Validate UUID arrays (equipment_ids, cooking_method_ids, linked_ingredients, cooking_methods_used_with, etc.)
+          const UUID_ARRAY_COLS = new Set(['linked_ingredients', 'linked_elements_deficiency', 'linked_elements_excess'])
+          if (Array.isArray(v) && (k.includes('_ids') || k.includes('_used_with') || UUID_ARRAY_COLS.has(k))) {
             const validUUIDs = v.filter((uuid: any) => {
               if (typeof uuid !== 'string') return false
               const isValid = UUID_REGEX.test(uuid)
@@ -1201,16 +1202,26 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     cleanUpdates.updated_at = new Date().toISOString()
     const fieldCount = Object.keys(cleanUpdates).length
     console.log(`[Admin UPDATE] Table: ${table}, ID: ${id}, ${fieldCount} fields: ${Object.keys(cleanUpdates).join(', ')}`)
-    const { error, data } = await supabase.from(table).update(cleanUpdates).eq('id', id).select('id')
+    // Use UPDATE (not upsert) — upsert triggers an INSERT attempt which requires all NOT NULL cols
+    const { error, data: updatedRows } = await supabase.from(table).update(cleanUpdates).eq('id', id).select('id')
     if (error) {
       console.error(`[Admin UPDATE ERROR] ${error.message}`, error)
       return c.json({ success: false, error: error.message }, 500)
     }
-    if (!data || data.length === 0) {
-      console.warn(`[Admin UPDATE] No rows matched for ${table}/${id} — record may not exist`)
-      return c.json({ success: false, error: `No record found with id "${id}" in ${table}` }, 404)
+    if (!updatedRows || updatedRows.length === 0) {
+      // Record doesn't exist — attempt insert with slug auto-derived for tables that require it
+      if (table === 'catalog_elements' && !cleanUpdates.slug) {
+        cleanUpdates.slug = (cleanUpdates.name_common || id).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+      }
+      const { error: insertError } = await supabase.from(table).insert({ id, ...cleanUpdates })
+      if (insertError) {
+        console.error(`[Admin INSERT FALLBACK ERROR] ${insertError.message}`, insertError)
+        return c.json({ success: false, error: insertError.message }, 500)
+      }
+      console.log(`[Admin INSERT FALLBACK SUCCESS] ${table}/${id} (${fieldCount} fields)`)
+    } else {
+      console.log(`[Admin UPDATE SUCCESS] ${table}/${id} (${fieldCount} fields)`)
     }
-    console.log(`[Admin UPDATE SUCCESS] ${table}/${id} (${fieldCount} fields)`)
     return c.json({ success: true })
   } catch (error: any) {
     console.error('[Admin] Error updating catalog record:', error)
@@ -1408,8 +1419,8 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
       'taste_profile': isRecipeTab
         ? `JSON object with exact structure: {"taste":{"sweet":0-10,"sour":0-10,"salty":0-10,"bitter":0-10,"umami":0-10,"spicy":0-10},"texture":{"crispy":0-10,"crunchy":0-10,"chewy":0-10,"smooth":0-10,"creamy":0-10,"juicy":0-10}}. IMPORTANT: Read the cooking steps and full ingredient list provided in the context above. Analyse HOW the ingredients are cooked (e.g. roasting adds sweetness/bitterness, frying adds crunch, braising adds umami/richness, spices add heat) and derive the OVERALL finished-dish flavour and texture profile — not just the raw ingredients in isolation. Use realistic 0-10 values that reflect the final eating experience of this specific recipe.`
         : `JSON object with exact structure: {"taste":{"sweet":0-10,"sour":0-10,"salty":0-10,"bitter":0-10,"umami":0-10,"spicy":0-10},"texture":{"crispy":0-10,"crunchy":0-10,"chewy":0-10,"smooth":0-10,"creamy":0-10,"juicy":0-10}}. Use realistic values based on the sensory profile of this ingredient.`,
-      'nutrition_per_100g': `JSON object with macro values per 100g: {"calories":number,"protein_g":number,"carbohydrates_g":number,"fats_g":number,"fiber_g":number,"sugar_g":number,"sodium_mg":number}. Use real USDA/nutritional database values.`,
-      'nutrition_per_serving': `JSON object with macro values per typical serving: {"calories":number,"protein_g":number,"carbohydrates_g":number,"fats_g":number,"fiber_g":number,"sugar_g":number,"sodium_mg":number,"serving_size_g":number}. Base serving size on typical portion for this ${isRecipeTab ? 'recipe/dish' : 'product/ingredient'}.`,
+      'nutrition_per_100g': `JSON object with macro values per 100g: {"calories":number,"protein_g":number,"carbohydrates_g":number,"fats_g":number,"fiber_g":number,"sugar_g":number,"water_g":number,"sodium_mg":number}. IMPORTANT: "water_g" is the water content per 100g (e.g. apple=86, chicken breast=65, rice=12, bread=36). The mobile app uses this for hydration tracking. Use real USDA/nutritional database values.`,
+      'nutrition_per_serving': `JSON object with macro values per typical serving: {"calories":number,"protein_g":number,"carbohydrates_g":number,"fats_g":number,"fiber_g":number,"sugar_g":number,"water_g":number,"sodium_mg":number,"serving_size_g":number}. Include "water_g" for hydration tracking. Base serving size on typical portion for this ${isRecipeTab ? 'recipe/dish' : 'product/ingredient'}.`,
       'prep_time': `String with time and unit, e.g. "15 min" or "1 hour". Realistic prep time for this recipe.`,
       'cook_time': `String with time and unit, e.g. "30 min" or "1 hour 15 min". Realistic cooking time for this recipe.`,
       'servings': `Integer number of servings this recipe yields, e.g. 4`,
@@ -1420,7 +1431,7 @@ app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
       'category_sub': isRecipeTab
         ? `JSON array of subcategory strings relevant to this recipe's main category. E.g. for "meal": ["One-Pot","High-Protein","Gluten-Free"]. For "beverage": ["Smoothie","Cold-Pressed"].`
         : `JSON array of subcategory strings relevant to this ingredient's main category.`,
-      'elements_beneficial': `JSON object: {"serving":{"name":"e.g. 1 cup","size_g":number},"per_100g":{"calories":number,"macronutrients":{"protein_g":g,"fat_g":g,"carbohydrates_g":g,"fiber_g":g,"sugars_g":g,"water_content_g":g},"vitamins":{"vitamin_a_mcg":mcg,"vitamin_d3_mcg":mcg,"vitamin_e_mg":mg,"vitamin_k2_mcg":mcg,"vitamin_c_mg":mg,"thiamine_mg":mg,"riboflavin_mg":mg,"niacin_mg":mg,"pantothenic_acid_mg":mg,"pyridoxine_mg":mg,"biotin_mcg":mcg,"folate_mcg":mcg,"vitamin_b12_mcg":mcg},"minerals":{"calcium_mg":mg,"phosphorus_mg":mg,"magnesium_mg":mg,"sodium_mg":mg,"potassium_mg":mg,"iron_mg":mg,"zinc_mg":mg,"copper_mg":mg,"manganese_mg":mg,"selenium_mcg":mcg,"iodine_mcg":mcg,"chromium_mcg":mcg,"molybdenum_mcg":mcg},"amino_acids":{"leucine_g":g,"isoleucine_g":g,"valine_g":g,"lysine_g":g,"methionine_g":g,"phenylalanine_g":g,"threonine_g":g,"tryptophan_g":g,"histidine_g":g},"fatty_acids":{"omega_3_mg":mg,"omega_6_g":g,"saturated_g":g,"monounsaturated_g":g,"polyunsaturated_g":g},"antioxidants":{"beta_carotene_mg":mg,"lutein_mg":mg,"lycopene_mg":mg},"functional":{"choline_mg":mg,"coq10_mg":mg},"digestive":{"soluble_fiber_g":g,"insoluble_fiber_g":g}},"per_serving":{...same structure...}}. Use real USDA-level data. Only include nutrients meaningfully present (>0). ALWAYS populate macronutrients, vitamins, and minerals for any real food ingredient.`,
+      'elements_beneficial': `JSON object: {"serving":{"name":"e.g. 1 cup","size_g":number},"per_100g":{"calories":number,"macronutrients":{"protein_g":g,"fat_g":g,"carbohydrates_g":g,"fiber_g":g,"sugars_g":g,"water_g":g},"vitamins":{"vitamin_a_mcg":mcg,"vitamin_d3_mcg":mcg,"vitamin_e_mg":mg,"vitamin_k2_mcg":mcg,"vitamin_c_mg":mg,"thiamine_mg":mg,"riboflavin_mg":mg,"niacin_mg":mg,"pantothenic_acid_mg":mg,"pyridoxine_mg":mg,"biotin_mcg":mcg,"folate_mcg":mcg,"vitamin_b12_mcg":mcg},"minerals":{"calcium_mg":mg,"phosphorus_mg":mg,"magnesium_mg":mg,"sodium_mg":mg,"potassium_mg":mg,"iron_mg":mg,"zinc_mg":mg,"copper_mg":mg,"manganese_mg":mg,"selenium_mcg":mcg,"iodine_mcg":mcg,"chromium_mcg":mcg,"molybdenum_mcg":mcg},"amino_acids":{"leucine_g":g,"isoleucine_g":g,"valine_g":g,"lysine_g":g,"methionine_g":g,"phenylalanine_g":g,"threonine_g":g,"tryptophan_g":g,"histidine_g":g},"fatty_acids":{"omega_3_mg":mg,"omega_6_g":g,"saturated_g":g,"monounsaturated_g":g,"polyunsaturated_g":g},"antioxidants":{"beta_carotene_mg":mg,"lutein_mg":mg,"lycopene_mg":mg},"functional":{"choline_mg":mg,"coq10_mg":mg},"digestive":{"soluble_fiber_g":g,"insoluble_fiber_g":g}},"per_serving":{...same structure...}}. Use real USDA-level data. Only include nutrients meaningfully present (>0). ALWAYS populate macronutrients, vitamins, and minerals for any real food ingredient.`,
       'elements_hazardous': `JSON object mapping element IDs to risk objects: {"element_id": {"level": "trace|low|moderate|high", "per_100g": number_in_mg_or_mcg, "per_serving": number_in_mg_or_mcg, "likelihood": 0-100, "reason": "brief explanation"}, ...}. Only include elements with level OTHER than "none". "per_100g" is the estimated quantity of this contaminant per 100g (in mg or mcg as appropriate). "per_serving" is per typical serving. "likelihood" is the % chance this risk is present (0-100). "reason" is a brief scientific explanation of WHY this risk exists for this ingredient. You MUST use ONLY these exact element IDs:
 NATURAL FOOD COMPOUNDS (check these first for whole foods): oxalates, phytates, lectins, solanine, tannins, goitrogens, saponins, ciguatoxin, grayanotoxins, hypoglycin_a, pyrrolizidine_alkaloids, sambunigrin, saxitoxin, tetrodotoxin.
 STORAGE & SPOILAGE (mycotoxins): aflatoxin_b1, ochratoxin_a, deoxynivalenol, fumonisin_b1, zearalenone, patulin, citrinin, ergot_alkaloids, nivalenol, t_2_toxin.
@@ -1497,6 +1508,38 @@ IMPORTANT: Every key must have real, factual content — no placeholders. Write 
   "excess": {"above": number, "label": "Higher-than-needed intake. Risk increases if repeated."},
   "ul": number
 }. For hazardous elements use: {"unit":"mg/kg bw/day|ppb|ppm","optimal":{"below":number,"label":"Below guidance threshold — risk is lower."},"excess":{"above":number,"label":"Above threshold — repeated exposure increases risk."},"regulatory_limits":{"fda":number,"who":number,"eu":number}}. Use real WHO/FDA/EFSA reference values.`,
+      'age_ranges': `JSON object with BOTH "europe" and "north_america" arrays. Each array contains entries for age groups: 0-6m, 7-12m, 1-3y, 4-8y, 9-13y, 14-18y, 19-30y, 31-50y, 51+y, plus standalone "pregnancy" and "breastfeeding" entries.
+Each entry: {"age_group":"0-6m","basis":"per_day","male":{...},"female":{...}}
+Each gender block: {
+  "deficiency":{"threshold":number,"mild":{"symptoms":["🟠 symptom1","🟠 symptom2"]},"severe":{"symptoms":["🔴 symptom1","🔴 symptom2"]}},
+  "optimal":{"minimum":number,"recommended":number,"maximum":number,"benefits":["🟢 benefit1","🟢 benefit2","🟢 benefit3","🟢 benefit4","🟢 benefit5","🟢 benefit6"]},
+  "excess":{"daily_limit":{"value":number,"symptoms":["🔴 symptom1","🔴 symptom2"]},"acute_limit":{"value":number,"symptoms":["🔴 symptom1","🔴 symptom2"]}}
+}
+For female entries in age groups 14-18y, 19-30y, 31-50y: also include "pregnancy" and "breastfeeding" sub-objects with their own optimal+excess blocks.
+RULES:
+- Use REAL EFSA values for europe and REAL NIH DRI values for north_america
+- deficiency.threshold = ~70% of recommended (clinical deficiency cutoff)
+- optimal.minimum = EAR or lower bound of adequate intake
+- optimal.recommended = RDA or AI (Adequate Intake)
+- optimal.maximum = UL (Tolerable Upper Intake Level)
+- excess.daily_limit.value = UL
+- excess.acute_limit.value = ~1.5× UL (acute toxicity threshold)
+- Include 2 mild deficiency symptoms and 2 severe deficiency symptoms
+- Include 6 optimal benefits
+- Include 2 daily excess symptoms and 2 acute excess symptoms
+- Use emoji prefixes: 🟠 for deficiency, 🟢 for benefits, 🔴 for excess
+- All values in the element's native unit (μg RAE for Vitamin A, mg for Vitamin C, etc.)
+- Pregnancy/breastfeeding entries: standalone age_group entries have ONLY "female" key (no "male")`,
+      'daily_recommended_adult': `JSON: {"male":{"value":number,"unit":"unit_string"},"female":{"value":number,"unit":"unit_string"}}. Use RDA for adults 19-50y. Unit should match the element's standard (e.g. "μg RAE", "mg", "mcg", "IU").`,
+      'regions_meta': `JSON: {"europe":{"authority":"European Food Safety Authority (EFSA)","reference_url":"https://www.efsa.europa.eu/en/topics/topic/dietary-reference-values","notes":"Based on EFSA Dietary Reference Values"},"north_america":{"authority":"National Academies of Sciences, Engineering, and Medicine","reference_url":"https://www.nationalacademies.org/our-work/dietary-reference-intakes-for-nutrients","notes":"Based on Dietary Reference Intakes (DRIs)"}}`,
+      'testing_or_diagnostics': `JSON: {"matrix":"serum|urine|whole_blood|hair","best_test":"🩸 Test name","why_best":"Why this is the gold standard","optimal_range":{"low":number,"high":number,"unit":"unit"},"detection_threshold":{"value":number,"unit":"unit"},"frequency":"When to test","method":"clinic|home|lab","self_test_available":boolean,"turnaround_days":number,"methods":[{"name":"Test name","description":"What it measures","accuracy":"High|Moderate|Low","cost":"Low|Moderate|High","availability":"Description"}]}. Use real clinical laboratory reference ranges.`,
+      'interventions': `JSON array of 2-4 interventions: [{"title":"💊 Intervention name","type":"supplement|lifestyle|herbal|dietary","phase":["deficiency","optimal"],"description":"What and why","mechanism":"How it works biochemically","timing":"When to take","duration":"How long","contraindications":["condition1"],"monitoring":"What to monitor","evidence":[{"label":"Source name","url":"pubmed_url"}],"products":[],"region_scope":["europe","north_america"],"age_scope":["9-13y","14-18y","19-30y","31-50y","51+y"],"tags":["first_line"],"confidence":"established|emerging|traditional","dosage_by_age_gender":{"europe":[{"age_group":"0-6m","male":{"amount":number,"unit":"unit","frequency":"daily","timing":"with meals"},"female":{...},"pregnancy":null,"breastfeeding":null},...],"north_america":[...same...]},"blood_level_conversion":{"conversion_factor":number,"blood_unit":"unit","target_range":"range","notes":"conversion note"},"notes":"Additional notes"}]. Include at least: 1 supplement, 1 lifestyle/dietary, 1 herbal/traditional. Use real dosages from clinical guidelines.`,
+      'key_interactions': `JSON array of 3-6 interactions: [{"element":"Element name","type":"synergistic|antagonistic|competitive","description":"How they interact and clinical significance","reference":"https://pubmed.ncbi.nlm.nih.gov/PMID/","id":"element_type"}]. Include real PubMed references. Cover both enhancing and inhibiting interactions.`,
+      'food_data': `JSON: {"strategy":{"animal":"Strategy for animal sources","plant":"Strategy for plant sources","fortified":"Strategy for fortified foods","fermented":"Strategy for fermented foods","other":"General absorption tips"},"sources":{"description":"Overview of major sources","animal":[{"name":"🥩 Food name","amount_100g":number,"unit":"unit","bioavailability":0-100,"source":"USDA FDC","source_url":"https://fdc.nal.usda.gov/","notes":"Preparation and form","id":"food_id"}],"plant":[...],"fortified":[...],"fermented":[...],"other":[...]},"bioavailability":{"factors_enhancing":["factor1"],"factors_inhibiting":["factor1"],"absorption_rate":"percentage or range","optimal_conditions":"with_meals|empty_stomach|etc"},"preparation_methods":{"best_retention":["method1"],"cooking_losses":"minimal|moderate|significant","storage_stability":"stable|sensitive_to_light|etc"}}. Use real USDA values. Include 3+ animal sources, 4+ plant sources, 1+ fortified, 1+ fermented.`,
+      'content_urls': `JSON: {"wikipedia":"https://en.wikipedia.org/wiki/Element_name","examine":"https://examine.com/supplements/element/","pubmed":"https://pubmed.ncbi.nlm.nih.gov/?term=element+nutrition","nih_factsheet":"https://ods.od.nih.gov/factsheets/Element-HealthProfessional/"}. Use real URLs that exist.`,
+      'other_names': `JSON array of alternative names for this element: ["Name1","Name2","Name3"]. Include scientific names, common abbreviations, and chemical forms (e.g. for Vitamin A: ["Retinol","Retinyl acetate","Retinyl palmitate","Beta-carotene","Provitamin A carotenoids"]).`,
+      'slug_path': `URL-friendly identifier string in snake_case: e.g. "vitamin_a", "iron", "vitamin_b12", "omega_3". Must be unique across all elements.`,
+      'confidence': `One of: "verified", "ai_generated", "draft", "needs_review". Set to "ai_generated" for AI-filled data.`,
       'food_sources_detailed': `JSON array of top food sources: [{"name":"Beef liver","amount":"9442 mcg / 100g","category":"animal"},{"name":"Sweet potato","amount":"961 mcg / 100g","category":"plant"},...]. Include 8-12 sources with real USDA values. Include both animal and plant sources where applicable.`,
       'food_strategy': `JSON object with strategy cards: {"cards":[{"title":"Card Title","subtitle":"brief qualifier","body":"2-3 sentence explanation of this source strategy"}]}. For beneficial elements with both animal and plant sources, include 2 cards (e.g. "Animal Retinol (fast-acting)" and "Plant Carotenoids (safer, self-limited)"). For hazardous elements, include 1-2 cards about exposure reduction strategies.`,
       'risk_tags': `JSON array of risk/hazard tag strings. For hazardous elements: ["endocrine_disruptor","reproductive_harm","developmental_toxicity","liver_damage","kidney_damage","cancer_suspect","neurotoxin","immunotoxin"]. For beneficial elements with excess risks: ["hypervitaminosis","liver_toxicity","teratogenic"]. Only include tags supported by evidence.`,
@@ -1700,6 +1743,55 @@ Return ONLY a JSON object with the field keys and their values. No markdown, no 
             }
           } catch (err) {
             console.error(`[AI Fill] Error matching ingredient names for ${linkField}:`, err)
+          }
+        }
+      }
+    }
+
+    // Post-process: auto-sync macros from elements_beneficial → nutrition_per_100g / nutrition_per_serving
+    // The mobile app reads macros from nutrition_per_100g as #1 priority
+    if (validated['elements_beneficial'] && typeof validated['elements_beneficial'] === 'object') {
+      const eb = validated['elements_beneficial']
+      const macros = eb.per_100g?.macronutrients || {}
+      const cal = eb.per_100g?.calories
+      if (cal || macros.protein_g || macros.carbohydrates_g || macros.fat_g) {
+        const synced: Record<string, number> = {}
+        if (cal) synced.calories = cal
+        if (macros.protein_g) synced.protein_g = macros.protein_g
+        if (macros.carbohydrates_g) synced.carbohydrates_g = macros.carbohydrates_g
+        synced.fats_g = macros.fats_g || macros.fat_g || 0
+        if (macros.fiber_g) synced.fiber_g = macros.fiber_g
+        synced.sugar_g = macros.sugars_g || macros.sugar_g || 0
+        synced.water_g = macros.water_g || macros.water_content_g || 0
+        if (eb.per_100g?.minerals?.sodium_mg) synced.sodium_mg = eb.per_100g.minerals.sodium_mg
+        // Only auto-fill if nutrition_per_100g was not already AI-filled in this batch
+        if (!validated['nutrition_per_100g']) {
+          const existingN = recordData?.nutrition_per_100g
+          if (!existingN || typeof existingN !== 'object' || !JSON.stringify(existingN).match(/[1-9]/)) {
+            validated['nutrition_per_100g'] = synced
+            console.log('[AI Fill] Auto-synced macros from elements_beneficial → nutrition_per_100g', synced)
+          }
+        }
+      }
+      // Also sync per_serving
+      const servMacros = eb.per_serving?.macronutrients || {}
+      const servCal = eb.per_serving?.calories
+      if (servCal || servMacros.protein_g) {
+        const syncedServ: Record<string, any> = {}
+        if (servCal) syncedServ.calories = servCal
+        if (servMacros.protein_g) syncedServ.protein_g = servMacros.protein_g
+        if (servMacros.carbohydrates_g) syncedServ.carbohydrates_g = servMacros.carbohydrates_g
+        syncedServ.fats_g = servMacros.fats_g || servMacros.fat_g || 0
+        if (servMacros.fiber_g) syncedServ.fiber_g = servMacros.fiber_g
+        syncedServ.sugar_g = servMacros.sugars_g || servMacros.sugar_g || 0
+        syncedServ.water_g = servMacros.water_g || servMacros.water_content_g || 0
+        if (eb.serving?.name) syncedServ.serving_size = eb.serving.name
+        if (eb.serving?.size_g) syncedServ.serving_size_g = eb.serving.size_g
+        if (!validated['nutrition_per_serving']) {
+          const existingNS = recordData?.nutrition_per_serving
+          if (!existingNS || typeof existingNS !== 'object' || !JSON.stringify(existingNS).match(/[1-9]/)) {
+            validated['nutrition_per_serving'] = syncedServ
+            console.log('[AI Fill] Auto-synced macros from elements_beneficial → nutrition_per_serving', syncedServ)
           }
         }
       }
@@ -2270,20 +2362,28 @@ app.post('/make-server-ed0fe4c2/admin/ai-enrich-recipe', async (c: any) => {
     })
     const allEquipment: any[] = eqRes.ok ? await eqRes.json() : []
 
+    // Fetch cooking methods from DB
+    const cmRes = await fetch(`${supabaseUrl}/rest/v1/catalog_cooking_methods?select=id,name,slug,category,typical_time&limit=300`, {
+      headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+    })
+    const allCookingMethods: any[] = cmRes.ok ? await cmRes.json() : []
+
     const srv = Number(servings) || 4
     const portionG = Number(portionWeightG) || null
 
     const ingredientList = allIngredients.map((i: any) => i.name_common || i.name).filter(Boolean).slice(0, 300).join(', ')
     const equipmentList = allEquipment.map((e: any) => e.name).filter(Boolean).join(', ')
+    const cookingMethodList = allCookingMethods.map((m: any) => m.name).filter(Boolean).join(', ')
 
     const systemPrompt = `You are a professional nutritionist and recipe developer for a health & nutrition app.
-Given a recipe name and details, you will return a complete recipe enrichment as a single JSON object with three keys:
+Given a recipe name and details, return a complete recipe enrichment as a single JSON object with four keys:
 1. "ingredients" — array of ingredient objects with name, qty_g (grams for ${srv} servings), and unit
-2. "equipment" — array of equipment/tool names needed
-3. "steps" — array of step strings (professional cooking instructions with quantities embedded, scaled for ${srv} servings)
+2. "equipment" — array of equipment/tool names needed for the whole recipe
+3. "cooking_methods" — array of cooking method names used in this recipe (from the provided catalog)
+4. "steps" — array of step OBJECTS (not strings) with rich metadata per step
 
 RULES for ingredients:
-- Only use ingredient names from the provided catalog list (match as closely as possible)
+- Only use ingredient names from the provided catalog list
 - qty_g must be realistic grams for ${srv} serving${srv !== 1 ? 's' : ''}${portionG ? ` (total dish weight ≈ ${portionG * srv}g)` : ''}
 - Include all main ingredients plus key seasonings/oils
 
@@ -2291,12 +2391,19 @@ RULES for equipment:
 - Only use equipment names from the provided catalog list
 - Include only what is actually needed for this recipe
 
+RULES for cooking_methods:
+- Only use cooking method names from the provided catalog list
+- Include all primary methods used (e.g. "Sautéing", "Baking", "Grilling")
+
 RULES for steps:
 - One step = one action (never combine multiple actions)
-- Embed exact quantities in each step (e.g. "Heat 15 ml olive oil...")
-- All quantities scaled for ${srv} serving${srv !== 1 ? 's' : ''}
-- Steps flow: prep → heat/fat → aromatics → main → seasoning → finish → serve
-- 1–2 sentences max per step`
+- Each step is an OBJECT with: text, duration_min, cooking_method, equipment_used (array), ingredients_used (array)
+- "text": embed exact quantities (e.g. "Heat 15 ml olive oil..."), 1–2 sentences, scaled for ${srv} servings
+- "duration_min": realistic time in minutes for this step (e.g. prep=2, sauté=5, bake=25)
+- "cooking_method": the cooking method name from the catalog used in THIS step (e.g. "Sautéing"), or null for prep steps
+- "equipment_used": array of equipment names from catalog used in THIS step (e.g. ["Skillet", "Spatula"])
+- "ingredients_used": array of ingredient names from catalog used in THIS step
+- Steps flow: prep → heat/fat → aromatics → main → seasoning → finish → serve`
 
     const userPrompt = `Recipe: "${recipeName}"
 Servings: ${srv}${portionG ? `\nPortion weight: ${portionG}g per serving` : ''}${prepTime ? `\nPrep time: ${prepTime}` : ''}${cookTime ? `\nCook time: ${cookTime}` : ''}${difficulty ? `\nDifficulty: ${difficulty}` : ''}${cuisine ? `\nCuisine: ${cuisine}` : ''}${description ? `\nDescription: ${description}` : ''}
@@ -2307,11 +2414,23 @@ ${ingredientList}
 Available equipment catalog (use ONLY these names):
 ${equipmentList}
 
+Available cooking methods catalog (use ONLY these names):
+${cookingMethodList}
+
 Return a JSON object with this exact structure:
 {
   "ingredients": [{"name": "ingredient name from catalog", "qty_g": 150, "unit": "g"}],
   "equipment": ["tool name from catalog"],
-  "steps": ["Step text with quantities embedded..."]
+  "cooking_methods": ["cooking method name from catalog"],
+  "steps": [
+    {
+      "text": "Step text with quantities embedded...",
+      "duration_min": 5,
+      "cooking_method": "Sautéing",
+      "equipment_used": ["Skillet"],
+      "ingredients_used": ["Olive Oil", "Onion"]
+    }
+  ]
 }`
 
     console.log(`[AI Enrich Recipe] Enriching "${recipeName}" (${srv} servings)`)
@@ -2348,9 +2467,10 @@ Return a JSON object with this exact structure:
 
     const aiIngredients: { name: string; qty_g: number; unit: string }[] = Array.isArray(parsed.ingredients) ? parsed.ingredients : []
     const aiEquipment: string[] = Array.isArray(parsed.equipment) ? parsed.equipment : []
-    const aiSteps: string[] = Array.isArray(parsed.steps) ? parsed.steps : []
+    const aiCookingMethods: string[] = Array.isArray(parsed.cooking_methods) ? parsed.cooking_methods : []
+    const aiSteps: any[] = Array.isArray(parsed.steps) ? parsed.steps : []
 
-    // Fuzzy-match AI ingredient names to catalog IDs
+    // Fuzzy-match helper
     const fuzzyScore = (a: string, b: string): number => {
       const an = a.toLowerCase().trim(); const bn = b.toLowerCase().trim()
       if (an === bn) return 1.0
@@ -2360,9 +2480,9 @@ Return a JSON object with this exact structure:
       return shared.length > 0 ? 0.6 + (shared.length / Math.max(aW.length, bW.length)) * 0.2 : 0
     }
 
+    // Match ingredients
     const matchedIngredients: { ingredient_id: string; name: string; qty_g: number; unit: string }[] = []
     const unmatchedIngredients: { name: string; qty_g: number; unit: string }[] = []
-
     for (const ai of aiIngredients) {
       let best: any = null; let bestScore = 0
       for (const ing of allIngredients) {
@@ -2389,19 +2509,72 @@ Return a JSON object with this exact structure:
       }
     }
 
+    // Match cooking method names to catalog IDs
+    const matchedCookingMethods: { cooking_method_id: string; name: string; typical_time?: string }[] = []
+    for (const cmName of aiCookingMethods) {
+      let best: any = null; let bestScore = 0
+      for (const cm of allCookingMethods) {
+        const s = fuzzyScore(cmName, cm.name || '')
+        if (s > bestScore) { bestScore = s; best = cm }
+      }
+      if (best && bestScore >= 0.5) {
+        matchedCookingMethods.push({ cooking_method_id: best.id, name: best.name, typical_time: best.typical_time || '' })
+      }
+    }
+
+    // Build ingredient name→id map for fast lookup in step processing
+    const ingNameToId = new Map<string, string>()
+    for (const m of matchedIngredients) ingNameToId.set(m.name.toLowerCase(), m.ingredient_id)
+    // Build cooking method name→id map
+    const cmNameToId = new Map<string, string>()
+    for (const cm of allCookingMethods) cmNameToId.set((cm.name || '').toLowerCase(), cm.id)
+    // Build equipment name→id map
+    const eqNameToId = new Map<string, string>()
+    for (const eq of allEquipment) eqNameToId.set((eq.name || '').toLowerCase(), eq.id)
+
+    // Build enriched step objects
+    const steps = aiSteps.map((step: any) => {
+      const text = typeof step === 'string' ? step : (step?.text || '')
+      const duration_min: number = (typeof step === 'object' && step?.duration_min) ? Number(step.duration_min) : 0
+
+      // Resolve cooking_method_id for this step
+      const stepCmName: string = (typeof step === 'object' && step?.cooking_method) ? String(step.cooking_method) : ''
+      let cooking_method_id: string | null = null
+      if (stepCmName) {
+        let best: any = null; let bestScore = 0
+        for (const cm of allCookingMethods) {
+          const s = fuzzyScore(stepCmName, cm.name || '')
+          if (s > bestScore) { bestScore = s; best = cm }
+        }
+        if (best && bestScore >= 0.5) cooking_method_id = best.id
+      }
+
+      // Resolve ingredient_ids used in this step
+      const stepIngNames: string[] = (typeof step === 'object' && Array.isArray(step?.ingredients_used)) ? step.ingredients_used : []
+      const ingredient_ids: string[] = stepIngNames
+        .map((n: string) => ingNameToId.get(n.toLowerCase()))
+        .filter(Boolean) as string[]
+
+      // Resolve equipment_ids used in this step (from AI + text matching fallback)
+      const stepEqNames: string[] = (typeof step === 'object' && Array.isArray(step?.equipment_used)) ? step.equipment_used : []
+      const eqFromAI: string[] = stepEqNames
+        .map((n: string) => eqNameToId.get(n.toLowerCase()))
+        .filter(Boolean) as string[]
+      const lower = text.toLowerCase()
+      const eqFromText: string[] = allEquipment
+        .filter((e: any) => e.name.length > 2 && lower.includes(e.name.toLowerCase()))
+        .map((e: any) => e.id)
+      const equipment_ids: string[] = [...new Set([...eqFromAI, ...eqFromText])]
+
+      return { text, image_url: '', duration_min, cooking_method_id, ingredient_ids, equipment_ids }
+    })
+
     const linkedIngredientIds = matchedIngredients.map(i => i.ingredient_id)
-    // Build grouped_ingredients structure with qty_g
     const groupedIngredients = matchedIngredients.map(i => ({
-      name: i.name,
-      ingredient_id: i.ingredient_id,
-      qty_g: i.qty_g,
-      unit: i.unit,
+      name: i.name, ingredient_id: i.ingredient_id, qty_g: i.qty_g, unit: i.unit,
     }))
 
-    // Build steps as CookingStep objects
-    const steps = aiSteps.map((text: string) => ({ text, image_url: '' }))
-
-    console.log(`[AI Enrich Recipe] Done: ${matchedIngredients.length} ingredients, ${matchedEquipment.length} equipment, ${aiSteps.length} steps`)
+    console.log(`[AI Enrich Recipe] Done: ${matchedIngredients.length} ingredients, ${matchedEquipment.length} equipment, ${matchedCookingMethods.length} cooking methods, ${steps.length} steps`)
 
     return c.json({
       success: true,
@@ -2409,9 +2582,11 @@ Return a JSON object with this exact structure:
       grouped_ingredients: groupedIngredients,
       equipment: matchedEquipment,
       equipment_names: matchedEquipment.map(e => e.name),
+      cooking_methods: matchedCookingMethods,
+      cooking_method_ids: matchedCookingMethods.map(m => m.cooking_method_id),
       steps,
       unmatched_ingredients: unmatchedIngredients,
-      counts: { ingredients: matchedIngredients.length, equipment: matchedEquipment.length, steps: aiSteps.length }
+      counts: { ingredients: matchedIngredients.length, equipment: matchedEquipment.length, cooking_methods: matchedCookingMethods.length, steps: steps.length }
     })
   } catch (error: any) {
     console.error('[AI Enrich Recipe] Error:', error)
@@ -3120,6 +3295,252 @@ app.post('/make-server-ed0fe4c2/admin/sync/pull-from-prod', async (c: any) => {
   }
 })
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  POST /admin/import-element-data — Generate official EU/USA/HealthScan data
+//  Fills: age_ranges, testing_or_diagnostics, interventions, key_interactions,
+//         food_data, content_urls, regions_meta, daily_recommended_adult,
+//         other_names, slug_path, confidence
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/make-server-ed0fe4c2/admin/import-element-data', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) return c.json({ success: false, error: 'OPENAI_API_KEY not configured' }, 500)
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    const { elementIds, source, fields } = await c.req.json() as {
+      elementIds: string[];
+      source?: 'eu' | 'usa' | 'healthscan' | 'all';
+      fields?: string[];
+    }
+
+    if (!elementIds?.length) return c.json({ success: false, error: 'elementIds required' }, 400)
+    const importSource = source || 'all'
+
+    // Default fields to generate if not specified
+    const fieldsToGenerate = fields || [
+      'age_ranges', 'testing_or_diagnostics', 'interventions', 'key_interactions',
+      'food_data', 'content_urls', 'regions_meta', 'daily_recommended_adult',
+      'other_names', 'slug_path', 'confidence'
+    ]
+
+    // Fetch elements
+    const fetchRes = await fetch(`${supabaseUrl}/rest/v1/catalog_elements?id=in.(${elementIds.join(',')})&select=*`, {
+      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+    })
+    if (!fetchRes.ok) return c.json({ success: false, error: 'Failed to fetch elements' }, 500)
+    const elements = await fetchRes.json()
+
+    const AGE_GROUPS = ['0-6m', '7-12m', '1-3y', '4-8y', '9-13y', '14-18y', '19-30y', '31-50y', '51+y']
+
+    const results: any[] = []
+
+    for (const element of elements) {
+      const name = element.name_common || element.name_other || 'Unknown'
+      const category = element.category || element.type_label || 'nutrient'
+      const healthRole = element.health_role || 'beneficial'
+      const unit = element.nutrient_unit || 'mg'
+
+      // Determine which regions to generate
+      const regions: string[] = []
+      if (importSource === 'all' || importSource === 'eu') regions.push('europe')
+      if (importSource === 'all' || importSource === 'usa') regions.push('north_america')
+      if (importSource === 'all' || importSource === 'healthscan') regions.push('healthscan')
+
+      const regionInstructions = regions.map(r => {
+        if (r === 'europe') return 'For "europe": Use EFSA (European Food Safety Authority) Dietary Reference Values. Use real published EFSA DRV numbers.'
+        if (r === 'north_america') return 'For "north_america": Use NIH/IOM Dietary Reference Intakes (DRIs). Use real published NIH DRI numbers.'
+        return 'For "healthscan": Create a curated blend taking the stricter (more protective) values from EU and USA, suitable as a health-optimized default.'
+      }).join('\n')
+
+      const systemPrompt = `You are a clinical nutrition data specialist. You produce EXACT, research-backed nutritional reference data in strict JSON format. You MUST use real published values from EFSA and NIH/IOM. Never fabricate numbers — use actual DRI/DRV tables.
+
+Element: "${name}" (${category}, ${healthRole})
+Unit: ${unit}
+
+Age groups to cover: ${AGE_GROUPS.join(', ')} plus standalone "pregnancy" and "breastfeeding" entries.
+
+${regionInstructions}
+
+CRITICAL RULES:
+- deficiency.threshold = approximately 70% of the RDA/recommended value (clinical deficiency cutoff)
+- optimal.minimum = EAR (Estimated Average Requirement) or lower bound
+- optimal.recommended = RDA (Recommended Dietary Allowance) or AI (Adequate Intake)
+- optimal.maximum = UL (Tolerable Upper Intake Level)
+- excess.daily_limit.value = UL
+- excess.acute_limit.value = approximately 1.5× UL
+- For infants (0-6m, 7-12m): use AI (Adequate Intake) since no RDA exists
+- For pregnancy/breastfeeding standalone entries: only include "female" key (no "male")
+- For female entries in age groups 14-18y, 19-30y, 31-50y: include nested "pregnancy" and "breastfeeding" sub-objects
+- All symptom strings must start with emoji: 🟠 for deficiency, 🟢 for benefits, 🔴 for excess
+- Include exactly 2 mild deficiency symptoms, 2 severe deficiency symptoms, 6 optimal benefits, 2 daily excess symptoms, 2 acute excess symptoms
+- Use the element's native unit consistently throughout
+
+For hazardous elements (health_role = "hazardous"):
+- There are NO "benefits" — use risk thresholds instead
+- deficiency block should show "safe below" ranges
+- optimal block represents "acceptable exposure" range
+- excess block represents regulatory limits (FDA, WHO, EU)`
+
+      const fieldsRequest: Record<string, string> = {}
+
+      if (fieldsToGenerate.includes('age_ranges')) {
+        fieldsRequest.age_ranges = `Generate the full age_ranges object with keys: ${regions.map(r => `"${r}"`).join(', ')}. Each is an array of ${AGE_GROUPS.length + 2} entries (${AGE_GROUPS.join(', ')}, pregnancy, breastfeeding). Follow the exact structure described in the system prompt.`
+      }
+      if (fieldsToGenerate.includes('daily_recommended_adult')) {
+        fieldsRequest.daily_recommended_adult = `{"male":{"value":NUMBER,"unit":"${unit}"},"female":{"value":NUMBER,"unit":"${unit}"}} using adult 19-50y RDA values.`
+      }
+      if (fieldsToGenerate.includes('regions_meta')) {
+        fieldsRequest.regions_meta = 'Generate authority metadata for each region being imported.'
+      }
+      if (fieldsToGenerate.includes('testing_or_diagnostics')) {
+        fieldsRequest.testing_or_diagnostics = 'Generate full testing & diagnostics object with best_test, optimal_range, detection_threshold, methods array.'
+      }
+      if (fieldsToGenerate.includes('interventions')) {
+        fieldsRequest.interventions = 'Generate 2-4 evidence-based interventions with dosage_by_age_gender per region.'
+      }
+      if (fieldsToGenerate.includes('key_interactions')) {
+        fieldsRequest.key_interactions = 'Generate 3-6 key interactions with element names, types, descriptions, and PubMed reference URLs.'
+      }
+      if (fieldsToGenerate.includes('food_data')) {
+        fieldsRequest.food_data = 'Generate rich food source data with USDA amounts per 100g, bioavailability percentages, strategies, and preparation methods.'
+      }
+      if (fieldsToGenerate.includes('content_urls')) {
+        fieldsRequest.content_urls = 'Generate reference URLs (wikipedia, examine, pubmed, nih_factsheet) using real URLs.'
+      }
+      if (fieldsToGenerate.includes('other_names')) {
+        fieldsRequest.other_names = 'Generate array of alternative/common/scientific names.'
+      }
+      if (fieldsToGenerate.includes('slug_path')) {
+        fieldsRequest.slug_path = 'Generate URL-friendly snake_case identifier.'
+      }
+      if (fieldsToGenerate.includes('confidence')) {
+        fieldsRequest.confidence = 'Set to "ai_generated".'
+      }
+
+      const userPrompt = `Generate the following fields for "${name}" (${category}):
+
+${Object.entries(fieldsRequest).map(([k, v]) => `## ${k}\n${v}`).join('\n\n')}
+
+Return a single JSON object with these exact keys. Every numeric value must be a real published number, not a placeholder.`
+
+      try {
+        // Use gpt-4o for accuracy on regulatory data (not gpt-4o-mini)
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.2,
+            max_tokens: 16000,
+            response_format: { type: 'json_object' }
+          })
+        })
+
+        if (!openaiRes.ok) {
+          const errText = await openaiRes.text()
+          console.error(`[Import] OpenAI error for ${name}:`, errText)
+          results.push({ id: element.id, name, status: 'error', error: `OpenAI: ${openaiRes.status}` })
+          continue
+        }
+
+        const openaiData = await openaiRes.json()
+        const content = openaiData.choices?.[0]?.message?.content
+        if (!content) {
+          results.push({ id: element.id, name, status: 'error', error: 'No AI content' })
+          continue
+        }
+
+        let parsed: Record<string, any>
+        try { parsed = JSON.parse(content) } catch {
+          results.push({ id: element.id, name, status: 'error', error: 'Invalid JSON from AI' })
+          continue
+        }
+
+        // Merge age_ranges with existing data (preserve user edits in other regions)
+        if (parsed.age_ranges && element.age_ranges && typeof element.age_ranges === 'object') {
+          parsed.age_ranges = { ...element.age_ranges, ...parsed.age_ranges }
+        }
+
+        // Build update payload — only include fields that were generated
+        const updatePayload: Record<string, any> = {}
+        for (const field of fieldsToGenerate) {
+          if (parsed[field] !== undefined) {
+            updatePayload[field] = parsed[field]
+          }
+        }
+
+        if (Object.keys(updatePayload).length === 0) {
+          results.push({ id: element.id, name, status: 'skipped', error: 'No fields generated' })
+          continue
+        }
+
+        // Update in Supabase
+        const updateRes = await fetch(
+          `${supabaseUrl}/rest/v1/catalog_elements?id=eq.${element.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(updatePayload)
+          }
+        )
+
+        if (!updateRes.ok) {
+          const errText = await updateRes.text()
+          results.push({ id: element.id, name, status: 'error', error: `DB update failed: ${errText}` })
+          continue
+        }
+
+        const generatedFields = Object.keys(updatePayload)
+        const ageRangeRegions = parsed.age_ranges ? Object.keys(parsed.age_ranges) : []
+        results.push({
+          id: element.id,
+          name,
+          status: 'success',
+          fieldsGenerated: generatedFields.length,
+          fields: generatedFields,
+          regions: ageRangeRegions,
+          tokens: openaiData.usage?.total_tokens || 0
+        })
+
+        console.log(`[Import] Generated ${generatedFields.length} fields for ${name} (regions: ${ageRangeRegions.join(',')}), tokens: ${openaiData.usage?.total_tokens || '?'}`)
+      } catch (err: any) {
+        results.push({ id: element.id, name, status: 'error', error: err.message })
+      }
+    }
+
+    const successCount = results.filter(r => r.status === 'success').length
+    const totalTokens = results.reduce((sum, r) => sum + (r.tokens || 0), 0)
+
+    return c.json({
+      success: true,
+      source: importSource,
+      processed: results.length,
+      succeeded: successCount,
+      failed: results.length - successCount,
+      totalTokens,
+      results
+    })
+  } catch (error: any) {
+    console.error('[Import] Error:', error)
+    return c.json({ success: false, error: error?.message || 'Import failed' }, 500)
+  }
+})
 
 // All admin CRUD routes are now in admin-endpoints-fixed.tsx to avoid Hono sub-app routing conflicts
 

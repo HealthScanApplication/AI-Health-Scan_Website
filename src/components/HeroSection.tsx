@@ -28,18 +28,50 @@ interface HeroSectionProps {
 
 export function HeroSection({ hasReferral, isActive, referralCode }: HeroSectionProps = {}) {
   const { user } = useAuth();
-  const [waitlistCount, setWaitlistCount] = useState<
-    number | null
-  >(null);
-  const [userPosition, setUserPosition] = useState<
-    number | null
-  >(null);
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
+  const [userPosition, setUserPosition] = useState<number | null>(null);
   const [isLoadingCount, setIsLoadingCount] = useState(true);
+  const [backgroundVideos, setBackgroundVideos] = useState<string[]>([]);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [fadingOut, setFadingOut] = useState(false);
 
-  // Show celebration elements with higher probability during pre-launch
-  const [showCelebration, setShowCelebration] = useState(
-    Math.random() > 0.7,
-  );
+  const [showCelebration, setShowCelebration] = useState(Math.random() > 0.7);
+
+  // Fetch videos from ingredients + recipes for background slideshow
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const base = `https://${projectId}.supabase.co/rest/v1`;
+        const headers = { 'apikey': publicAnonKey, 'Authorization': `Bearer ${publicAnonKey}` };
+        const [ingRes, recRes] = await Promise.all([
+          fetch(`${base}/catalog_ingredients?select=video_url&video_url=not.is.null&video_url=neq.&limit=6`, { headers }),
+          fetch(`${base}/catalog_recipes?select=video_url&video_url=not.is.null&video_url=neq.&limit=6`, { headers }),
+        ]);
+        const ingData = ingRes.ok ? await ingRes.json() : [];
+        const recData = recRes.ok ? await recRes.json() : [];
+        const ing = (ingData as any[]).map((r: any) => r.video_url).filter(Boolean);
+        const rec = (recData as any[]).map((r: any) => r.video_url).filter(Boolean);
+        const all = [...ing, ...rec].slice(0, 9);
+        if (all.length > 0) setBackgroundVideos(all);
+      } catch {
+        // silently ignore — background is optional
+      }
+    };
+    fetchVideos();
+  }, [projectId, publicAnonKey]);
+
+  // Auto-advance video every 6s with a 0.8s fade-out before switching
+  useEffect(() => {
+    if (backgroundVideos.length < 2) return;
+    const interval = setInterval(() => {
+      setFadingOut(true);
+      setTimeout(() => {
+        setCurrentVideoIndex(prev => (prev + 1) % backgroundVideos.length);
+        setFadingOut(false);
+      }, 800);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [backgroundVideos]);
 
   // Curated words that work well with the HealthScan theme
   const animatedWords = [
@@ -153,7 +185,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
       id="hero-section"
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
     >
-      {/* Hero Background Image */}
+      {/* Hero Background — static image + faded video mosaic */}
       <div className="absolute inset-0 w-full h-full">
         <img
           src={heroBackground}
@@ -161,7 +193,24 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
           className="absolute top-0 left-0 w-full h-full object-cover"
         />
 
-        {/* White transparent overlay with animated gradient */}
+        {/* Single fullscreen background video — fades to next clip every 6s */}
+        {backgroundVideos.length > 0 && (
+          <video
+            key={backgroundVideos[currentVideoIndex]}
+            src={backgroundVideos[currentVideoIndex]}
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              opacity: fadingOut ? 0 : 0.28,
+              transition: 'opacity 0.8s ease-in-out',
+            }}
+          />
+        )}
+
+        {/* White transparent overlay */}
         <div className="absolute inset-0 bg-white/15"></div>
         
         {/* Animated luminosity gradient overlay */}
@@ -232,7 +281,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
         {/* Launch Badge */}
         <div className="flex justify-center items-center mb-6 mt-4 sm:mt-0">
           <Badge variant="secondary" className="bg-gray-100 text-gray-500 text-xs font-normal border-gray-200 opacity-80">
-            Beta Launch • Feb 27, 2026
+            Beta Launch • Mar 21, 2026
           </Badge>
         </div>
 

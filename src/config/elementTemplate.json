@@ -1,0 +1,184 @@
+{
+  "_description": "Template for a complete catalog_elements record. The Vitamin A example shows the full structure the importer generates.",
+  "_usage": "Used by: (1) AI enrichment prompt, (2) import-element-data endpoint, (3) mobile app rendering",
+  "schema_version": "2.0",
+  "field_map": {
+    "id": "UUID — auto-generated",
+    "name_common": "Common name (e.g. Vitamin A)",
+    "name_scientific": "Scientific name (e.g. Retinol)",
+    "other_names": ["Array of alternative names"],
+    "slug_path": "URL-friendly snake_case (e.g. vitamin_a)",
+    "category": "vitamin | mineral | amino_acid | fatty_acid | antioxidant | functional | digestive | heavy_metal | pesticide | ...",
+    "type_label": "Vitamin | Mineral | Trace Element | ...",
+    "health_role": "beneficial | hazardous | both | conditional",
+    "daily_recommended_adult": {
+      "male": { "value": 900, "unit": "μg RAE" },
+      "female": { "value": 700, "unit": "μg RAE" }
+    },
+    "regions_meta": {
+      "europe": {
+        "authority": "European Food Safety Authority (EFSA)",
+        "reference_url": "https://www.efsa.europa.eu/en/topics/topic/dietary-reference-values",
+        "notes": "Based on EFSA Dietary Reference Values"
+      },
+      "north_america": {
+        "authority": "National Academies of Sciences, Engineering, and Medicine",
+        "reference_url": "https://www.nationalacademies.org/our-work/dietary-reference-intakes-for-nutrients",
+        "notes": "Based on Dietary Reference Intakes (DRIs)"
+      }
+    },
+    "age_ranges": {
+      "_structure": "Each region has an array of age group entries",
+      "_age_groups": ["0-6m", "7-12m", "1-3y", "4-8y", "9-13y", "14-18y", "19-30y", "31-50y", "51+y", "pregnancy", "breastfeeding"],
+      "europe": [
+        {
+          "age_group": "19-30y",
+          "basis": "per_day",
+          "male": {
+            "deficiency": {
+              "threshold": 630,
+              "mild": { "symptoms": ["🟠 Night blindness", "🟠 Dry eyes"] },
+              "severe": { "symptoms": ["🔴 Immune suppression", "🔴 Xerophthalmia"] }
+            },
+            "optimal": {
+              "minimum": 750,
+              "recommended": 900,
+              "maximum": 3000,
+              "benefits": ["🟢 Normal vision", "🟢 Immune support", "🟢 Skin health", "🟢 Antioxidant protection", "🟢 Epithelial health", "🟢 Tissue repair"]
+            },
+            "excess": {
+              "daily_limit": { "value": 3000, "symptoms": ["🔴 Hypervitaminosis A", "🔴 Headaches"] },
+              "acute_limit": { "value": 4500, "symptoms": ["🔴 Acute toxicity", "🔴 Liver damage"] }
+            }
+          },
+          "female": {
+            "deficiency": {
+              "threshold": 490,
+              "mild": { "symptoms": ["🟠 Night blindness", "🟠 Dry eyes"] },
+              "severe": { "symptoms": ["🔴 Immune suppression", "🔴 Xerophthalmia"] }
+            },
+            "optimal": {
+              "minimum": 600,
+              "recommended": 700,
+              "maximum": 3000,
+              "benefits": ["🟢 Normal vision", "🟢 Immune support", "🟢 Skin health", "🟢 Antioxidant protection", "🟢 Epithelial health", "🟢 Tissue repair"]
+            },
+            "excess": {
+              "daily_limit": { "value": 3000, "symptoms": ["🔴 Hypervitaminosis A", "🔴 Headaches"] },
+              "acute_limit": { "value": 4500, "symptoms": ["🔴 Acute toxicity", "🔴 Liver damage"] }
+            },
+            "pregnancy": {
+              "optimal": { "minimum": 550, "recommended": 770, "maximum": 3000, "benefits": ["🟢 Fetal development", "🟢 Placental function", "🟢 Vision development", "🟢 Immune formation", "🟢 Organ development", "🟢 Growth support"] },
+              "excess": {
+                "daily_limit": { "value": 3000, "symptoms": ["🔴 Birth defects", "🔴 Liver damage"] },
+                "acute_limit": { "value": 10000, "symptoms": ["🔴 Teratogenicity", "🔴 Spontaneous abortion"] }
+              }
+            },
+            "breastfeeding": {
+              "optimal": { "minimum": 900, "recommended": 1300, "maximum": 3000, "benefits": ["🟢 Milk quality", "🟢 Infant immunity", "🟢 Vision transfer", "🟢 Growth factors", "🟢 Maternal recovery", "🟢 Tissue repair"] },
+              "excess": {
+                "daily_limit": { "value": 3000, "symptoms": ["🔴 Infant toxicity", "🔴 Maternal symptoms"] },
+                "acute_limit": { "value": 10000, "symptoms": ["🔴 Severe toxicity", "🔴 Liver damage"] }
+              }
+            }
+          }
+        },
+        {
+          "age_group": "pregnancy",
+          "basis": "per_day",
+          "female": {
+            "deficiency": {
+              "threshold": 490,
+              "mild": { "symptoms": ["🟠 Night blindness", "🟠 Dry eyes"] },
+              "severe": { "symptoms": ["🔴 Frequent infections", "🔴 Impaired fetal development"] }
+            },
+            "optimal": {
+              "minimum": 650,
+              "recommended": 770,
+              "maximum": 3000,
+              "benefits": ["🟢 Fetal development", "🟢 Immune support", "🟢 Eye health", "🟢 Cell growth", "🟢 Organ formation", "🟢 Neural development"]
+            },
+            "excess": {
+              "daily_limit": { "value": 3000, "symptoms": ["🔴 Fetal harm", "🔴 Liver toxicity"] },
+              "acute_limit": { "value": 4500, "symptoms": ["🔴 Birth defects", "🔴 Teratogenicity"] }
+            }
+          }
+        }
+      ],
+      "north_america": ["... same structure with NIH DRI values ..."],
+      "healthscan": ["... curated blend of stricter EU/USA values ..."]
+    },
+    "testing_or_diagnostics": {
+      "matrix": "serum",
+      "best_test": "🩸 Serum retinol concentration",
+      "why_best": "Reflects liver stores and functional status",
+      "optimal_range": { "low": 1.05, "high": 2.27, "unit": "μmol/L" },
+      "detection_threshold": { "value": 0.7, "unit": "μmol/L" },
+      "frequency": "When deficiency suspected or in high-risk populations",
+      "method": "clinic",
+      "self_test_available": false,
+      "turnaround_days": 3,
+      "methods": [
+        { "name": "Serum retinol", "description": "Circulating vitamin A levels", "accuracy": "High", "cost": "Moderate", "availability": "Clinical laboratories" }
+      ]
+    },
+    "interventions": [
+      {
+        "title": "💊 Retinyl palmitate supplementation",
+        "type": "supplement",
+        "phase": ["deficiency", "optimal"],
+        "description": "Correct deficiency and maintain adequate status",
+        "mechanism": "Provides bioavailable preformed vitamin A stored in liver",
+        "timing": "With meals containing fat",
+        "duration": "2-3 months for deficiency, then maintenance",
+        "contraindications": ["Pregnancy (>3000 μg RAE)", "Liver disease"],
+        "monitoring": "Monitor serum retinol levels",
+        "evidence": [{ "label": "NIH ODS", "url": "https://ods.od.nih.gov/factsheets/VitaminA-HealthProfessional/" }],
+        "region_scope": ["europe", "north_america"],
+        "age_scope": ["9-13y", "14-18y", "19-30y", "31-50y", "51+y"],
+        "tags": ["first_line"],
+        "confidence": "established",
+        "dosage_by_age_gender": {
+          "europe": [
+            { "age_group": "19-30y", "male": { "amount": 900, "unit": "mcg RAE", "frequency": "daily", "timing": "with fat-containing meal" }, "female": { "amount": 700, "unit": "mcg RAE", "frequency": "daily", "timing": "with fat-containing meal" }, "pregnancy": { "amount": 770, "unit": "mcg RAE", "frequency": "daily", "timing": "with prenatal vitamin" }, "breastfeeding": { "amount": 1300, "unit": "mcg RAE", "frequency": "daily", "timing": "with meals" } }
+          ],
+          "north_america": ["... same structure ..."]
+        }
+      }
+    ],
+    "key_interactions": [
+      { "element": "Zinc", "type": "synergistic", "description": "Zinc essential for vitamin A transport", "reference": "https://pubmed.ncbi.nlm.nih.gov/12001975/", "id": "zinc_synergistic" },
+      { "element": "Iron", "type": "synergistic", "description": "Vitamin A helps mobilize iron stores", "reference": "https://pubmed.ncbi.nlm.nih.gov/12001979/", "id": "iron_synergistic" },
+      { "element": "Alcohol", "type": "antagonistic", "description": "Chronic alcohol depletes liver vitamin A", "reference": "https://pubmed.ncbi.nlm.nih.gov/11893483/", "id": "alcohol_antagonistic" }
+    ],
+    "food_data": {
+      "strategy": {
+        "animal": "Include liver, dairy, and fish for preformed vitamin A",
+        "plant": "Choose orange, red, and dark green vegetables for carotenoids",
+        "fortified": "Select fortified foods when natural sources are limited",
+        "other": "Consume with healthy fats to optimize absorption"
+      },
+      "sources": {
+        "animal": [{ "name": "🥩 Beef liver", "amount_100g": 9442, "unit": "μg RAE", "bioavailability": 95, "source": "USDA FDC", "id": "beef_liver" }],
+        "plant": [{ "name": "🥕 Carrots", "amount_100g": 835, "unit": "μg RAE", "bioavailability": 25, "source": "USDA FDC", "id": "carrots" }],
+        "fortified": [{ "name": "🥛 Fortified milk", "amount_100g": 46, "unit": "μg RAE", "bioavailability": 90, "source": "USDA FDC", "id": "fortified_milk" }]
+      },
+      "bioavailability": { "absorption_rate": "varies", "optimal_conditions": "with_meals" },
+      "preparation_methods": { "cooking_losses": "minimal", "storage_stability": "stable" }
+    },
+    "content_urls": {
+      "wikipedia": "https://en.wikipedia.org/wiki/Vitamin_A",
+      "examine": "https://examine.com/supplements/vitamin-a/",
+      "pubmed": "https://pubmed.ncbi.nlm.nih.gov/?term=vitamin+a+nutrition",
+      "nih_factsheet": "https://ods.od.nih.gov/factsheets/VitaminA-HealthProfessional/"
+    },
+    "confidence": "ai_generated",
+    "qa_rules": {
+      "validation_profile": "template_02.v1",
+      "regions_required": ["europe", "north_america"],
+      "age_buckets_required": ["0-6m", "7-12m", "1-3y", "4-8y", "9-13y", "14-18y", "19-30y", "31-50y", "51+y"],
+      "interactions_minimum": 3,
+      "interventions_minimum": 3
+    }
+  }
+}

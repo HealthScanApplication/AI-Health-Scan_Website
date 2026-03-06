@@ -43,6 +43,8 @@ import {
   Dumbbell,
   HeartPulse,
   Copy,
+  Upload,
+  Database,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -56,7 +58,9 @@ import { WaitlistDetailTray } from './admin/WaitlistDetailTray';
 import { CatalogDetailTray } from './admin/CatalogDetailTray';
 import { AdminModal } from './ui/AdminModal';
 import { AdminDebugPanel } from './admin/AdminDebugPanel';
-import { CookingToolsField, type EquipmentRecord } from './admin/fields/CookingToolsField';
+import { CookingToolsField, PROCESSING_METHODS, type EquipmentRecord } from './admin/fields/CookingToolsField';
+import { CookingMethodLinksSection } from './admin/fields/CookingMethodLinksSection';
+import { stripProcessing, cleanIngredientName } from '../utils/recipeProcessing';
 import { CatalogItemTag } from './admin/shared/CatalogItemTag';
 import { IconPickerField, LucideIconPreview } from './admin/IconPickerField';
 import { MediaUploadField } from './admin/MediaUploadField';
@@ -402,7 +406,7 @@ function screenshotUrl(url: string) {
 }
 
 // A single cooking step: { text: string, image_url?: string, ingredient_ids?: string[], equipment_ids?: string[] }
-type CookingStep = { text: string; image_url?: string; ingredient_ids?: string[]; equipment_ids?: string[] };
+type CookingStep = { text: string; image_url?: string; ingredient_ids?: string[]; equipment_ids?: string[]; cooking_method_ids?: string[] };
 
 // Common cooking tools for suggestions
 const COMMON_COOKING_TOOLS: { name: string; category: string }[] = [
@@ -543,7 +547,7 @@ const INGREDIENT_IMAGE_KEYS: { key: string; label: string }[] = [
   { key: 'image_url_powdered', label: 'Powdered' },
 ];
 
-function CookingStepsField({ val, updateField, accessToken, linkedIngredients, allIngredients, recordData, catalogEquipment, onUpdateRecord }: {
+function CookingStepsField({ val, updateField, accessToken, linkedIngredients, allIngredients, recordData, catalogEquipment, onUpdateRecord, catalogCookingMethods, recipeMethodIds }: {
   val: any;
   updateField: (v: any) => void;
   accessToken: string;
@@ -552,18 +556,21 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
   recordData: any;
   catalogEquipment?: EquipmentRecord[];
   onUpdateRecord?: (updates: Record<string, any>) => void;
+  catalogCookingMethods?: { id: string; name: string; category?: string; image_url?: string }[];
+  recipeMethodIds?: string[];
 }) {
   const steps: CookingStep[] = React.useMemo(() => {
     if (!val) return [];
     if (Array.isArray(val)) {
       return val.map((s: any) =>
         typeof s === 'string'
-          ? { text: s, image_url: '', ingredient_ids: [], equipment_ids: [] }
+          ? { text: s, image_url: '', ingredient_ids: [], equipment_ids: [], cooking_method_ids: [] }
           : { 
               text: s.text || '', 
               image_url: s.image_url || '', 
               ingredient_ids: Array.isArray(s.ingredient_ids) ? s.ingredient_ids : [],
-              equipment_ids: Array.isArray(s.equipment_ids) ? s.equipment_ids : []
+              equipment_ids: Array.isArray(s.equipment_ids) ? s.equipment_ids : [],
+              cooking_method_ids: Array.isArray(s.cooking_method_ids) ? s.cooking_method_ids : []
             }
       );
     }
@@ -578,6 +585,7 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
   const [customImageIdx, setCustomImageIdx] = React.useState<Set<number>>(new Set());
   const [linkIngredientIdx, setLinkIngredientIdx] = React.useState<number | null>(null);
   const [linkEquipmentIdx, setLinkEquipmentIdx] = React.useState<number | null>(null);
+  const [linkMethodIdx, setLinkMethodIdx] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     setPreviewServings(Number(recordData?.servings) || 4);
@@ -707,6 +715,12 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
     nx[stepIdx] = { ...nx[stepIdx], equipment_ids: cur.includes(eqId) ? cur.filter(id => id !== eqId) : [...cur, eqId] };
     update(nx);
   };
+  const toggleStepCookingMethod = (stepIdx: number, methodId: string) => {
+    const nx = [...steps];
+    const cur: string[] = nx[stepIdx].cooking_method_ids || [];
+    nx[stepIdx] = { ...nx[stepIdx], cooking_method_ids: cur.includes(methodId) ? cur.filter(id => id !== methodId) : [...cur, methodId] };
+    update(nx);
+  };
   const setStepImage = (i: number, image_url: string, isCustom = true) => {
     const nx = [...steps]; nx[i] = { ...nx[i], image_url }; update(nx);
     if (isCustom) setCustomImageIdx(prev => new Set(prev).add(i));
@@ -817,9 +831,12 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
           const mentionedTools = getMentionedTools(step.text);
           const pinnedEqIds: string[] = step.equipment_ids || [];
           const pinnedEquipment = catalogEquipment?.filter((eq: EquipmentRecord) => pinnedEqIds.includes(eq.id)) || [];
+          const pinnedMethodIds: string[] = step.cooking_method_ids || [];
+          const pinnedMethods = catalogCookingMethods?.filter(m => pinnedMethodIds.includes(m.id)) || [];
           const isPickerOpen = pickerIdx === i;
           const isLinkOpen = linkIngredientIdx === i;
           const isEquipLinkOpen = linkEquipmentIdx === i;
+          const isMethodLinkOpen = linkMethodIdx === i;
           const isCustomImg = customImageIdx.has(i);
           const displayImg = step.image_url || getAutoImage(step.text);
 
@@ -852,6 +869,11 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                   className={`flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded border transition-colors ${isEquipLinkOpen ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-white border-gray-200 text-gray-400 hover:text-orange-600 hover:border-orange-300'}`}
                   title="Link equipment to this step">
                   {'🔧'} {pinnedEqIds.length > 0 ? pinnedEqIds.length : '+'}
+                </button>
+                <button type="button" onClick={() => setLinkMethodIdx(isMethodLinkOpen ? null : i)}
+                  className={`flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded border transition-colors ${isMethodLinkOpen ? 'bg-red-100 border-red-300 text-red-700' : 'bg-white border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-300'}`}
+                  title="Link cooking methods to this step">
+                  {'🔥'} {pinnedMethodIds.length > 0 ? pinnedMethodIds.length : '+'}
                 </button>
                 <button type="button" onClick={() => removeStep(i)}
                   className="text-red-400 hover:text-red-600 p-0.5 rounded hover:bg-red-50 transition-colors text-sm font-bold">&times;</button>
@@ -909,6 +931,12 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                         imageUrl={eq.image_url}
                         fallbackColor="orange"
                       />
+                    ))}
+                    {pinnedMethods.map(m => (
+                      <span key={m.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-full border bg-red-50 border-red-200 text-red-800 text-[9px] font-medium">
+                        🔥 {m.name}
+                        <button type="button" onClick={() => toggleStepCookingMethod(i, m.id)} className="text-red-400 hover:text-red-700 font-bold leading-none">&times;</button>
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -1079,6 +1107,51 @@ function CookingStepsField({ val, updateField, accessToken, linkedIngredients, a
                       </div>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* Cooking method link panel */}
+              {isMethodLinkOpen && (
+                <div className="border-t border-red-100 bg-red-50/40 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide">Link cooking methods to this step</p>
+                    <button type="button" onClick={() => setLinkMethodIdx(null)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+                  </div>
+                  {!catalogCookingMethods || catalogCookingMethods.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No cooking methods in catalog yet.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5 max-h-[300px] overflow-y-auto">
+                      {/* Show recipe-level methods first, then all catalog */}
+                      {catalogCookingMethods
+                        .filter(m => (recipeMethodIds || []).includes(m.id))
+                        .map(m => {
+                          const isPinned = pinnedMethodIds.includes(m.id);
+                          return (
+                            <button key={m.id} type="button" onClick={() => toggleStepCookingMethod(i, m.id)}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${isPinned ? 'bg-red-100 border-red-400 text-red-800' : 'bg-white border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50'}`}>
+                              🔥 {m.name}
+                              {isPinned && <span className="text-red-500 font-bold leading-none">✓</span>}
+                            </button>
+                          );
+                        })}
+                      {/* Divider if recipe methods exist */}
+                      {(recipeMethodIds || []).length > 0 && catalogCookingMethods.some(m => !(recipeMethodIds || []).includes(m.id)) && (
+                        <div className="w-full border-t border-red-100 my-1" />
+                      )}
+                      {catalogCookingMethods
+                        .filter(m => !(recipeMethodIds || []).includes(m.id))
+                        .map(m => {
+                          const isPinned = pinnedMethodIds.includes(m.id);
+                          return (
+                            <button key={m.id} type="button" onClick={() => toggleStepCookingMethod(i, m.id)}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-colors ${isPinned ? 'bg-red-100 border-red-400 text-red-800' : 'bg-white border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-700'}`}>
+                              🔥 {m.name}
+                              {isPinned && <span className="text-red-500 font-bold leading-none">✓</span>}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1741,6 +1814,15 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [vecSearchQuery, setVecSearchQuery] = useState('');
   const [vecSearchResults, setVecSearchResults] = useState<AdminRecord[]>([]);
   const [generatingMoleculeImage, setGeneratingMoleculeImage] = useState(false);
+  const [importingElementData, setImportingElementData] = useState(false);
+  const [showImportMenu, setShowImportMenu] = useState(false);
+  const importCancelRef = useRef(false);
+  const [importProgress, setImportProgress] = useState<{
+    source: string; current: number; total: number; name: string;
+    startTime: number; succeeded: number; failed: number;
+    completedIds: string[];
+    recordResults: Array<{ id: string; name: string; status: 'done' | 'error' | 'skipped'; fieldsGenerated: number; error?: string; duration: number }>;
+  } | null>(null);
   const [generatingRecipeEnrich, setGeneratingRecipeEnrich] = useState(false);
 
   // Reset modal tab when switching catalog types — elements has no Culinary tab
@@ -1844,7 +1926,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   // Fetch ingredients for linked_ingredients picker when editing recipes, ingredients, or products
   useEffect(() => {
     if (!showEditModal || ingredientsCache.length > 0) return;
-    if (activeTab !== 'recipes' && activeTab !== 'ingredients' && activeTab !== 'products') return;
+    if (activeTab !== 'recipes' && activeTab !== 'ingredients' && activeTab !== 'products' && activeTab !== 'cooking_methods') return;
     if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
 
     const controller = new AbortController();
@@ -1878,13 +1960,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   // Fetch equipment catalog for recipes tab - uses same publicAnonKey as ingredients
   useEffect(() => {
     if (!showEditModal || equipmentCache.length > 0) return;
-    if (activeTab !== 'recipes') return;
+    if (activeTab !== 'recipes' && activeTab !== 'cooking_methods') return;
     if (!accessToken || typeof accessToken !== 'string' || accessToken.length < 10) return;
 
     const controller = new AbortController();
     const fetchEquipment = async () => {
       try {
-        const url = `https://${projectId}.supabase.co/rest/v1/catalog_equipment?select=id,name,category,image_url&limit=500&order=category,name`;
+        const url = `https://${projectId}.supabase.co/rest/v1/catalog_equipment?select=id,name,category,image_url,description,use_case,material,size_notes,brand&limit=500&order=category,name`;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': publicAnonKey },
@@ -2311,6 +2393,50 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             cleanedUpdates[key] = v;
           }
         }
+        // Auto-sync: extract macros from elements_beneficial → nutrition_per_100g / nutrition_per_serving
+        // The mobile app reads macros from nutrition_per_100g as #1 priority
+        if (cleanedUpdates.elements_beneficial && typeof cleanedUpdates.elements_beneficial === 'object') {
+          const eb = cleanedUpdates.elements_beneficial;
+          const macros = eb.per_100g?.macronutrients || eb.per_100g || {};
+          const cal = eb.per_100g?.calories;
+          if (cal || macros.protein_g || macros.carbohydrates_g || macros.fat_g || macros.fats_g) {
+            const synced: Record<string, number> = {};
+            if (cal) synced.calories = cal;
+            if (macros.protein_g) synced.protein_g = macros.protein_g;
+            if (macros.carbohydrates_g) synced.carbohydrates_g = macros.carbohydrates_g;
+            synced.fats_g = macros.fats_g || macros.fat_g || 0;
+            if (macros.fiber_g) synced.fiber_g = macros.fiber_g;
+            synced.sugar_g = macros.sugars_g || macros.sugar_g || 0;
+            synced.water_g = macros.water_g || macros.water_content_g || 0;
+            if (macros.sodium_mg) synced.sodium_mg = macros.sodium_mg;
+            // Only overwrite if nutrition_per_100g is empty or was not manually set
+            const existing = cleanedUpdates.nutrition_per_100g;
+            if (!existing || typeof existing !== 'object' || !JSON.stringify(existing).match(/[1-9]/)) {
+              cleanedUpdates.nutrition_per_100g = synced;
+              console.log('[Admin SAVE] Auto-synced macros from elements_beneficial → nutrition_per_100g', synced);
+            }
+          }
+          // Also sync per_serving if available
+          const servMacros = eb.per_serving?.macronutrients || eb.per_serving || {};
+          const servCal = eb.per_serving?.calories;
+          if (servCal || servMacros.protein_g) {
+            const syncedServ: Record<string, any> = {};
+            if (servCal) syncedServ.calories = servCal;
+            if (servMacros.protein_g) syncedServ.protein_g = servMacros.protein_g;
+            if (servMacros.carbohydrates_g) syncedServ.carbohydrates_g = servMacros.carbohydrates_g;
+            syncedServ.fats_g = servMacros.fats_g || servMacros.fat_g || 0;
+            if (servMacros.fiber_g) syncedServ.fiber_g = servMacros.fiber_g;
+            syncedServ.sugar_g = servMacros.sugars_g || servMacros.sugar_g || 0;
+            syncedServ.water_g = servMacros.water_g || servMacros.water_content_g || 0;
+            if (eb.serving?.name) syncedServ.serving_size = eb.serving.name;
+            if (eb.serving?.size_g) syncedServ.serving_size_g = eb.serving.size_g;
+            const existingServ = cleanedUpdates.nutrition_per_serving;
+            if (!existingServ || typeof existingServ !== 'object' || !JSON.stringify(existingServ).match(/[1-9]/)) {
+              cleanedUpdates.nutrition_per_serving = syncedServ;
+              console.log('[Admin SAVE] Auto-synced macros from elements_beneficial → nutrition_per_serving', syncedServ);
+            }
+          }
+        }
         const bodyStr = JSON.stringify({
           table: currentTab.table,
           id: editingRecord.id,
@@ -2427,10 +2553,17 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     const updates: Record<string, any> = {};
     // 1. Equipment
     if (data.equipment_names?.length > 0) updates.equipment = data.equipment_names;
-    // 2. Ingredients
-    if (data.linked_ingredient_ids?.length > 0) updates.linked_ingredients = data.linked_ingredient_ids;
+    if (data.equipment?.length > 0) updates.equipment_ids = data.equipment.map((e: any) => e.equipment_id).filter(Boolean);
+    // 2. Ingredients — filter to valid UUIDs only to prevent DB type errors
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (data.linked_ingredient_ids?.length > 0) {
+      const validIds = data.linked_ingredient_ids.filter((id: any) => typeof id === 'string' && UUID_RE.test(id));
+      if (validIds.length > 0) updates.linked_ingredients = validIds;
+    }
     if (data.grouped_ingredients?.length > 0) updates.ingredients = data.grouped_ingredients;
-    // 3. Cooking steps — with auto-assigned images and equipment_ids
+    // 3. Cooking methods — set on recipe level
+    if (data.cooking_method_ids?.length > 0) updates.cooking_method_ids = data.cooking_method_ids;
+    // 4. Cooking steps — with auto-assigned images, equipment_ids, ingredient_ids, cooking_method_id, duration_min
     if (data.steps?.length > 0) {
       const linkedIds = updates.linked_ingredients || (record as any).linked_ingredients || [];
       const linkedIngs = ingredientsCache.filter((ing: any) => linkedIds.includes(ing.id));
@@ -2440,20 +2573,29 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       const processedSteps = data.steps.map((step: any) => {
         const text = typeof step === 'string' ? step : step?.text || '';
         const lower = text.toLowerCase();
+        const duration_min: number = (typeof step === 'object' && step?.duration_min) ? Number(step.duration_min) : 0;
+        const cooking_method_ids: string[] = (typeof step === 'object' && step?.cooking_method_id) ? [step.cooking_method_id] : [];
 
-        // Detect equipment_ids from response + cache
-        const responseEqIds = eqFromResponse
-          .filter(eq => eq.name.length > 2 && lower.includes(eq.name.toLowerCase()))
-          .map(eq => eq.equipment_id);
+        // ingredient_ids: prefer AI-resolved, fallback to text detection
+        let ingredient_ids: string[] = (typeof step === 'object' && Array.isArray(step?.ingredient_ids) && step.ingredient_ids.length > 0)
+          ? step.ingredient_ids
+          : pool.filter((ing: any) => {
+              const n = (ing.name_common || ing.name || '').toLowerCase();
+              return n.length > 2 && lower.includes(n);
+            }).map((ing: any) => ing.id);
+
+        // equipment_ids: prefer AI-resolved, augment with text detection
+        const responseEqIds: string[] = (typeof step === 'object' && Array.isArray(step?.equipment_ids) && step.equipment_ids.length > 0)
+          ? step.equipment_ids
+          : eqFromResponse.filter(eq => eq.name.length > 2 && lower.includes(eq.name.toLowerCase())).map(eq => eq.equipment_id);
         const cacheEqIds = equipmentCache
-          .filter(e => e.name.length > 2 && lower.includes(e.name.toLowerCase()))
-          .map(e => e.id);
-        const detectedEqIds = [...new Set([...responseEqIds, ...cacheEqIds])];
+          .filter((e: any) => e.name.length > 2 && lower.includes(e.name.toLowerCase()))
+          .map((e: any) => e.id);
+        const equipment_ids: string[] = [...new Set([...responseEqIds, ...cacheEqIds])];
 
         // Auto-assign image
         let imageUrl = (typeof step === 'object' ? step?.image_url : '') || '';
         if (!imageUrl) {
-          // 1. Try ingredient mentioned by name
           const mentioned = pool.filter((ing: any) => {
             const n = (ing.name_common || ing.name || '').toLowerCase();
             return n.length > 2 && lower.includes(n);
@@ -2464,19 +2606,17 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             else if ((lower.includes('cook')||lower.includes('fry')||lower.includes('roast')||lower.includes('bake')) && f.image_url_cooked) imageUrl = f.image_url_cooked;
             else if (f.image_url) imageUrl = f.image_url;
           }
-          // 2. Try equipment image
           if (!imageUrl) {
-            const eqMatch = equipmentCache.find(e => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
+            const eqMatch = equipmentCache.find((e: any) => e.image_url && e.name.length > 2 && lower.includes(e.name.toLowerCase()));
             if (eqMatch?.image_url) imageUrl = eqMatch.image_url;
           }
-          // 3. Fallback: first linked ingredient with image
           if (!imageUrl) {
             const first = pool.find((ing: any) => ing.image_url);
             if (first?.image_url) imageUrl = first.image_url;
           }
         }
 
-        return { text, image_url: imageUrl, ingredient_ids: [], equipment_ids: detectedEqIds };
+        return { text, image_url: imageUrl, duration_min, cooking_method_ids, ingredient_ids, equipment_ids };
       });
       updates.instructions = processedSteps;
     }
@@ -2513,6 +2653,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 const { counts } = enrichData;
                 const parts = [];
                 if (counts?.equipment) parts.push(`${counts.equipment} equipment`);
+                if (counts?.cooking_methods) parts.push(`${counts.cooking_methods} cooking methods`);
                 if (counts?.ingredients) parts.push(`${counts.ingredients} ingredients`);
                 if (counts?.steps) parts.push(`${counts.steps} steps`);
                 toast.success(`Recipe enriched: ${parts.join(', ')}`);
@@ -2622,6 +2763,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       const { counts } = data;
       const parts = [];
       if (counts?.equipment) parts.push(`${counts.equipment} equipment`);
+      if (counts?.cooking_methods) parts.push(`${counts.cooking_methods} cooking methods`);
       if (counts?.ingredients) parts.push(`${counts.ingredients} ingredients`);
       if (counts?.steps) parts.push(`${counts.steps} steps`);
       toast.success(`AI enriched: ${parts.join(', ')} — saving…`);
@@ -2968,6 +3110,120 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       toast.info(`Batch enrichment cancelled — ${filled} fields filled across ${recordResults.length} records`);
     } else {
       toast.success(`Batch ${mode === 'improve' ? 'improvement' : 'enrichment'} complete — ${filled} fields updated, ${skipped} skipped, ${errors} errors`);
+    }
+  };
+
+  // ─── Import Element Data (EU, USA, HealthScan, All) ──────────────
+  // Processes one record at a time to avoid edge function timeouts.
+  // Tracks per-record results for resume capability.
+  const handleImportElementData = async (source: 'eu' | 'usa' | 'healthscan' | 'all', elementIds?: string[], resumeFromIdx = 0) => {
+    if (activeTab !== 'elements') return;
+    const ids = elementIds || (selectedRecords.size > 0 ? [...selectedRecords] : sortedRecords.map(r => r.id));
+    if (ids.length === 0) { toast.info('No elements to import'); return; }
+
+    importCancelRef.current = false;
+    setImportingElementData(true);
+    setShowImportMenu(false);
+
+    const startTime = Date.now();
+    const recordResults: typeof importProgress extends null ? never : NonNullable<typeof importProgress>['recordResults'] = [];
+    const completedIds: string[] = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    // If resuming, mark skipped records
+    for (let i = 0; i < resumeFromIdx && i < ids.length; i++) {
+      const rec = sortedRecords.find(r => r.id === ids[i]);
+      recordResults.push({ id: ids[i], name: rec?.name_common || rec?.name || 'Unknown', status: 'skipped', fieldsGenerated: 0, duration: 0 });
+      completedIds.push(ids[i]);
+    }
+
+    setImportProgress({ source, current: resumeFromIdx, total: ids.length, name: '', startTime, succeeded: 0, failed: 0, completedIds: [...completedIds], recordResults: [...recordResults] });
+
+    for (let i = resumeFromIdx; i < ids.length; i++) {
+      if (importCancelRef.current) break;
+
+      const id = ids[i];
+      const rec = sortedRecords.find(r => r.id === id);
+      const name = rec?.name_common || rec?.name || 'Unknown';
+      const recStart = Date.now();
+
+      setImportProgress(prev => prev ? { ...prev, current: i, name, succeeded, failed, completedIds: [...completedIds], recordResults: [...recordResults] } : prev);
+
+      try {
+        const response = await adminApiFetch('/admin/import-element-data', {
+          elementIds: [id],
+          source,
+        }, 240_000);
+        const data = await response.json();
+        const duration = Math.round((Date.now() - recStart) / 1000);
+
+        if (data.success && data.results?.[0]) {
+          const fieldsGen = data.results[0].fieldsGenerated || 0;
+          recordResults.push({ id, name, status: 'done', fieldsGenerated: fieldsGen, duration });
+          completedIds.push(id);
+          succeeded++;
+        } else {
+          const errMsg = data.error || 'Unknown error';
+          recordResults.push({ id, name, status: 'error', fieldsGenerated: 0, error: errMsg, duration });
+          failed++;
+        }
+      } catch (err: unknown) {
+        const duration = Math.round((Date.now() - recStart) / 1000);
+        const msg = err instanceof Error ? err.message : String(err);
+        recordResults.push({ id, name, status: 'error', fieldsGenerated: 0, error: msg, duration });
+        failed++;
+      }
+
+      // Update progress after each record
+      setImportProgress(prev => prev ? { ...prev, current: i + 1, name: '', succeeded, failed, completedIds: [...completedIds], recordResults: [...recordResults] } : prev);
+
+      // Refresh data every 5 records
+      if ((i + 1) % 5 === 0) fetchRecords();
+    }
+
+    setImportingElementData(false);
+    fetchRecords();
+
+    const wasCancelled = importCancelRef.current;
+    const sourceLabel = source === 'all' ? 'EU + USA + HealthScan' : source.toUpperCase();
+    if (wasCancelled) {
+      toast.info(`Import cancelled at record ${succeeded + failed}/${ids.length}. ${succeeded} succeeded, ${failed} failed. Use "Resume" to continue.`);
+    } else {
+      toast.success(`Import complete (${sourceLabel}): ${succeeded} succeeded, ${failed} failed`);
+      // Clear progress after 10 seconds on success
+      setTimeout(() => setImportProgress(null), 10_000);
+    }
+  };
+
+  // Single-record import (from edit modal)
+  const handleImportSingleElement = async (source: 'eu' | 'usa' | 'healthscan' | 'all') => {
+    if (!editingRecord) return;
+    setImportingElementData(true);
+    const name = editingRecord.name_common || editingRecord.name || 'Unknown';
+    toast.info(`Importing DRV data for "${name}" (${source.toUpperCase()})…`);
+    try {
+      const response = await adminApiFetch('/admin/import-element-data', {
+        elementIds: [editingRecord.id],
+        source,
+      }, 240_000);
+      const data = await response.json();
+      if (data.success && data.results?.[0]) {
+        const fieldsGen = data.results[0].fieldsGenerated || 0;
+        toast.success(`Imported ${fieldsGen} fields for "${name}"`);
+        const updatedFields = data.results[0].generatedData || {};
+        if (Object.keys(updatedFields).length > 0) {
+          setEditingRecord((prev: any) => prev ? { ...prev, ...updatedFields } : prev);
+        }
+        fetchRecords();
+      } else {
+        toast.error(`Import failed for "${name}": ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Import error for "${name}": ${msg}`);
+    } finally {
+      setImportingElementData(false);
     }
   };
 
@@ -3403,7 +3659,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       }
     }
     
-    return imageUrl || PLACEHOLDER_IMAGE;
+    const base = imageUrl || PLACEHOLDER_IMAGE;
+    // Cache-bust Supabase storage URLs using updated_at so stale browser cache is invalidated
+    if (base && base.includes('supabase.co/storage') && record.updated_at) {
+      const ts = new Date(record.updated_at).getTime();
+      return `${base}?v=${ts}`;
+    }
+    return base;
   };
 
   // Highlight matching query text in green
@@ -4007,6 +4269,101 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   </div>
                 )}
 
+                {/* Import DRV Progress Banner */}
+                {importProgress && (() => {
+                  const elapsed = Math.round((Date.now() - importProgress.startTime) / 1000);
+                  const elapsedMin = Math.floor(elapsed / 60);
+                  const elapsedSec = elapsed % 60;
+                  const processed = importProgress.succeeded + importProgress.failed;
+                  const avgPerRecord = processed > 0 ? elapsed / processed : 0;
+                  const remaining = importProgress.total - importProgress.current;
+                  const etaSec = Math.round(avgPerRecord * remaining);
+                  const etaMin = Math.floor(etaSec / 60);
+                  const pct = Math.round((importProgress.current / importProgress.total) * 100);
+                  const sourceLabel = importProgress.source === 'all' ? '🌍 All Regions' : importProgress.source === 'eu' ? '🇪🇺 EU' : importProgress.source === 'usa' ? '🇺🇸 USA' : '💚 HealthScan';
+                  const isDone = !importingElementData;
+
+                  return (
+                    <div className="rounded-xl bg-cyan-50 border border-cyan-200 p-3 space-y-2">
+                      {/* Header row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {importingElementData ? <Loader2 className="w-4 h-4 animate-spin text-cyan-600" /> : <Database className="w-4 h-4 text-cyan-600" />}
+                          <span className="text-sm font-semibold text-cyan-800">Import DRV Data — {sourceLabel}</span>
+                          <span className="text-xs text-cyan-600 font-mono">{importProgress.current} / {importProgress.total}</span>
+                          <span className="text-xs text-cyan-400">{pct}%</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-gray-500 font-mono">{elapsedMin}m{String(elapsedSec).padStart(2, '0')}s</span>
+                          {!isDone && remaining > 0 && avgPerRecord > 0 && (
+                            <span className="text-cyan-400 font-mono">~{etaMin}m left</span>
+                          )}
+                          {importProgress.succeeded > 0 && <span className="text-green-700 font-semibold bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">{importProgress.succeeded} done</span>}
+                          {importProgress.failed > 0 && <span className="text-red-600 font-semibold bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">{importProgress.failed} err</span>}
+                        </div>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="w-full bg-cyan-100 rounded-full h-2 overflow-hidden flex">
+                        <div className="bg-cyan-500 h-2 transition-all duration-300" style={{ width: `${pct}%` }} />
+                      </div>
+                      {/* Currently processing */}
+                      {importProgress.name && importingElementData && (
+                        <p className="text-xs text-cyan-600 truncate">
+                          Processing: <span className="font-medium">{importProgress.name}</span>
+                          {avgPerRecord > 0 && <span className="text-cyan-400 ml-2">(~{Math.round(avgPerRecord)}s per record)</span>}
+                        </p>
+                      )}
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2">
+                        {importingElementData && (
+                          <button onClick={() => { importCancelRef.current = true; }}
+                            className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors">
+                            Cancel
+                          </button>
+                        )}
+                        {isDone && importProgress.failed > 0 && (
+                          <button onClick={() => {
+                            const failedIds = importProgress.recordResults.filter(r => r.status === 'error').map(r => r.id);
+                            if (failedIds.length > 0) handleImportElementData(importProgress.source as 'eu' | 'usa' | 'healthscan' | 'all', failedIds);
+                          }}
+                            className="px-2.5 py-1 text-xs font-medium text-cyan-700 bg-cyan-100 border border-cyan-300 rounded-md hover:bg-cyan-200 transition-colors">
+                            Retry {importProgress.failed} Failed
+                          </button>
+                        )}
+                        {isDone && (
+                          <button onClick={() => setImportProgress(null)}
+                            className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors">
+                            Dismiss
+                          </button>
+                        )}
+                      </div>
+                      {/* Per-record results log */}
+                      {importProgress.recordResults.length > 0 && (
+                        <div className="max-h-44 overflow-y-auto rounded-lg border border-cyan-100 bg-white divide-y divide-gray-50">
+                          {[...importProgress.recordResults].filter(r => r.status !== 'skipped').reverse().map((r, idx) => (
+                            <div key={`${r.id}-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 text-xs">
+                              {r.status === 'done' && <span className="text-green-500 flex-shrink-0">✓</span>}
+                              {r.status === 'error' && <span className="text-red-400 flex-shrink-0">✕</span>}
+                              <span className="flex-1 truncate text-gray-700 font-medium">{r.name}</span>
+                              {r.status === 'done' && (
+                                <span className="flex-shrink-0 text-[10px] font-semibold text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">
+                                  +{r.fieldsGenerated} fields
+                                </span>
+                              )}
+                              {r.status === 'error' && (
+                                <span className="flex-shrink-0 text-[10px] text-red-400 truncate max-w-[200px]" title={r.error}>
+                                  {r.error}
+                                </span>
+                              )}
+                              <span className="flex-shrink-0 text-[10px] text-gray-300 font-mono">{r.duration}s</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Batch Enrich Progress Banner */}
                 {batchProgress && (
                   <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
@@ -4217,6 +4574,54 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                           </div>
                         )}
                       </>
+                    )}
+                    {/* Import Element Data button — elements tab only */}
+                    {activeTab === 'elements' && (
+                      importingElementData ? (
+                        <Button variant="outline" size="sm" disabled className="gap-1 whitespace-nowrap text-cyan-600 border-cyan-200">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="hidden sm:inline">Importing...</span>
+                        </Button>
+                      ) : (
+                        <div className="relative">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowImportMenu(v => !v)}
+                            className="gap-1 whitespace-nowrap text-cyan-700 border-cyan-200 hover:bg-cyan-50"
+                            title="Import official DRV data (EU, USA, HealthScan)"
+                          >
+                            <Database className="w-4 h-4" />
+                            <span className="hidden sm:inline">Import DRV</span>
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </Button>
+                          {showImportMenu && (
+                            <div className="absolute top-full right-0 mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[200px]"
+                              onMouseLeave={() => setShowImportMenu(false)}>
+                              <button className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-50 flex items-center gap-2 text-gray-700"
+                                onClick={() => handleImportElementData('all')}>
+                                <span className="text-cyan-500 flex-shrink-0 text-sm">🌍</span>
+                                <div><div className="font-medium">All Regions</div><div className="text-[10px] text-gray-400">EU + USA + HealthScan data</div></div>
+                              </button>
+                              <button className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 text-gray-700"
+                                onClick={() => handleImportElementData('eu')}>
+                                <span className="text-blue-500 flex-shrink-0 text-sm">🇪🇺</span>
+                                <div><div className="font-medium">EU (EFSA)</div><div className="text-[10px] text-gray-400">European DRV data only</div></div>
+                              </button>
+                              <button className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-gray-700"
+                                onClick={() => handleImportElementData('usa')}>
+                                <span className="text-red-500 flex-shrink-0 text-sm">🇺🇸</span>
+                                <div><div className="font-medium">USA (NIH)</div><div className="text-[10px] text-gray-400">American DRI data only</div></div>
+                              </button>
+                              <button className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700"
+                                onClick={() => handleImportElementData('healthscan')}>
+                                <span className="text-emerald-500 flex-shrink-0 text-sm">💚</span>
+                                <div><div className="font-medium">HealthScan</div><div className="text-[10px] text-gray-400">Curated blend (stricter values)</div></div>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
                     )}
                     <Button
                       variant="outline"
@@ -4586,6 +4991,47 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     <span className="text-xs">{generatingMoleculeImage ? 'Generating...' : 'Molecule Image'}</span>
                   </Button>
                 )}
+                {activeTab === 'elements' && editingRecord?.id && (
+                  <div className="relative">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowImportMenu(v => !v)}
+                      disabled={importingElementData || (!editingRecord?.name && !editingRecord?.name_common)}
+                      className="h-8 px-3 bg-gradient-to-r from-cyan-50 to-sky-50 border-cyan-200 text-cyan-700 hover:from-cyan-100 hover:to-sky-100"
+                      title="Import official DRV data for this element (EU, USA, HealthScan)"
+                    >
+                      {importingElementData ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Database className="w-3.5 h-3.5 mr-1" />}
+                      <span className="text-xs">{importingElementData ? 'Importing...' : 'Import DRV'}</span>
+                      <ChevronDown className="w-3 h-3 ml-0.5" />
+                    </Button>
+                    {showImportMenu && (
+                      <div className="absolute bottom-full left-0 mb-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[200px]"
+                        onMouseLeave={() => setShowImportMenu(false)}>
+                        <button className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-50 flex items-center gap-2 text-gray-700"
+                          onClick={() => { setShowImportMenu(false); handleImportSingleElement('all'); }}>
+                          <span className="text-cyan-500 flex-shrink-0 text-sm">🌍</span>
+                          <div><div className="font-medium">All Regions</div><div className="text-[10px] text-gray-400">EU + USA + HealthScan</div></div>
+                        </button>
+                        <button className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 text-gray-700"
+                          onClick={() => { setShowImportMenu(false); handleImportSingleElement('eu'); }}>
+                          <span className="text-blue-500 flex-shrink-0 text-sm">🇪🇺</span>
+                          <div><div className="font-medium">EU (EFSA)</div><div className="text-[10px] text-gray-400">European DRV only</div></div>
+                        </button>
+                        <button className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-gray-700"
+                          onClick={() => { setShowImportMenu(false); handleImportSingleElement('usa'); }}>
+                          <span className="text-red-500 flex-shrink-0 text-sm">🇺🇸</span>
+                          <div><div className="font-medium">USA (NIH)</div><div className="text-[10px] text-gray-400">American DRI only</div></div>
+                        </button>
+                        <button className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700"
+                          onClick={() => { setShowImportMenu(false); handleImportSingleElement('healthscan'); }}>
+                          <span className="text-emerald-500 flex-shrink-0 text-sm">💚</span>
+                          <div><div className="font-medium">HealthScan</div><div className="text-[10px] text-gray-400">Curated blend</div></div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {activeTab === 'recipes' && (
                   <Button
                     size="sm"
@@ -4797,6 +5243,73 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             }
 
             if (field.type === 'readonly') {
+              // Special handling for top_foods_list
+              if (field.key === 'top_foods_list' && activeTab === 'elements' && editingRecord?.id) {
+                const [topFoods, setTopFoods] = React.useState<any[]>([]);
+                const [loading, setLoading] = React.useState(true);
+                
+                React.useEffect(() => {
+                  const fetchTopFoods = async () => {
+                    try {
+                      const res = await fetch(
+                        `https://${projectId}.supabase.co/rest/v1/element_foods?element_id=eq.${editingRecord.id}&order=rank.asc&limit=10`,
+                        { headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` } }
+                      );
+                      if (res.ok) {
+                        const data = await res.json();
+                        setTopFoods(data);
+                      }
+                    } catch (err) {
+                      console.error('Failed to fetch top foods:', err);
+                    } finally {
+                      setLoading(false);
+                    }
+                  };
+                  fetchTopFoods();
+                }, [editingRecord?.id]);
+
+                return (
+                  <div key={field.key} className="space-y-2 col-span-2">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
+                    {loading ? (
+                      <div className="text-sm text-gray-400">Loading...</div>
+                    ) : topFoods.length === 0 ? (
+                      <div className="text-sm text-gray-400 italic">No top foods data yet. Run seed or add manually.</div>
+                    ) : (
+                      <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
+                        {topFoods.map((food, idx) => (
+                          <div key={food.id} className="p-3 hover:bg-gray-50 flex items-start gap-3">
+                            <div className="text-2xl flex-shrink-0">{food.emoji_icon || '🍽️'}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">#{food.rank}</span>
+                                <span className="font-semibold text-sm">{food.food_name}</span>
+                                {food.bioavailability && (
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    food.bioavailability === 'high' ? 'bg-green-100 text-green-700' :
+                                    food.bioavailability === 'moderate' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {food.bioavailability}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-600 mt-1">
+                                <span className="font-mono">{food.amount_per_serving} {food.unit}</span>
+                                {' per '}
+                                <span className="font-mono">{food.serving_size}{food.serving_unit}</span>
+                                {food.food_category && <span className="ml-2 text-gray-400">• {food.food_category}</span>}
+                              </div>
+                              {food.notes && <div className="text-xs text-gray-500 mt-1">{food.notes}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <div key={field.key} className="space-y-1.5">
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
@@ -6244,6 +6757,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 }
               };
 
+              // Use shared utilities from utils/recipeProcessing
+              const cleanIngName = (ing: AdminRecord) => cleanIngredientName(ing as any);
+
               return (
                 <div key={field.key} className="space-y-3">
                   {/* AI Enrich All banner */}
@@ -6257,7 +6773,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* COL 1: Equipment */}
+                  {/* COL 1: Equipment + Cooking Methods */}
                   <div className="space-y-2 md:border-r border-gray-100 md:pr-4">
                     <CookingToolsField
                       val={editingRecord?.equipment}
@@ -6266,6 +6782,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       onAiEnrich={handleAiEnrichRecipe}
                       enriching={generatingRecipeEnrich}
                       externalCatalog={equipmentCache}
+                      cookingMethodsCatalog={cookingMethodsCache as any}
+                      selectedMethodIds={Array.isArray(editingRecord?.cooking_method_ids) ? editingRecord.cooking_method_ids : []}
+                      onUpdateMethodIds={(ids) => setEditingRecord((prev: any) => ({ ...prev, cooking_method_ids: ids }))}
                     />
                   </div>
 
@@ -6517,34 +7036,62 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                                     ? ingredientsCache.find((ing: AdminRecord) => ing.id === child.ingredient_id)
                                     : null;
                                   return (
-                                    <div key={cidx} className="flex items-center gap-1 pl-3">
-                                      <span className="text-gray-300 text-xs">└</span>
-                                      {linked?.image_url ? (
-                                        <img src={linked.image_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                                      ) : (
-                                        <div className="w-5 h-5 rounded bg-purple-100 flex items-center justify-center text-[8px] font-bold text-purple-600 flex-shrink-0">
-                                          {(linked?.name_common || child?.name || '?')[0]?.toUpperCase() || '?'}
-                                        </div>
-                                      )}
-                                      <select
-                                        value={child.ingredient_id || ''}
-                                        onChange={(e) => {
-                                          const ing = ingredientsCache.find((i: AdminRecord) => i.id === e.target.value);
-                                          updateChild(idx, cidx, { ingredient_id: e.target.value, name: ing ? (ing.name_common || ing.name) : child?.name });
-                                        }}
-                                        title="Select ingredient"
-                                        className={`flex-1 h-6 px-1.5 text-xs border rounded bg-white focus:ring-1 focus:ring-purple-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
-                                      >
-                                        <option value="">{child.name || '— select —'}</option>
-                                        {ingredientsCache.map((ing: AdminRecord) => (
-                                          <option key={ing.id} value={ing.id}>{ing.name_common || ing.name}</option>
-                                        ))}
-                                      </select>
-                                      <input type="number" value={child.qty_g ?? ''} onChange={(e) => updateChild(idx, cidx, { qty_g: e.target.value ? parseFloat(e.target.value) : null })} className="w-14 h-6 px-1.5 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-purple-300 text-right" placeholder="qty" min="0" step="any" />
-                                      <select value={child.unit || 'g'} onChange={(e) => updateChild(idx, cidx, { unit: e.target.value })} className="h-6 px-1 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-purple-300" title="Unit">
-                                        {['g','ml','kg','L','tsp','tbsp','cup','oz','lb','piece','slice','pinch'].map(u => <option key={u} value={u}>{u}</option>)}
-                                      </select>
-                                      <button type="button" onClick={() => removeChild(idx, cidx)} className="text-red-400 hover:text-red-600 text-sm px-1 rounded hover:bg-red-50">&times;</button>
+                                    <div key={cidx} className="space-y-0.5 pl-3">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-gray-300 text-xs">└</span>
+                                        {linked?.image_url ? (
+                                          <img src={linked.image_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                                        ) : (
+                                          <div className="w-5 h-5 rounded bg-purple-100 flex items-center justify-center text-[8px] font-bold text-purple-600 flex-shrink-0">
+                                            {(linked?.name_common || child?.name || '?')[0]?.toUpperCase() || '?'}
+                                          </div>
+                                        )}
+                                        <select
+                                          value={child.ingredient_id || ''}
+                                          onChange={(e) => {
+                                            const ing = ingredientsCache.find((i: AdminRecord) => i.id === e.target.value);
+                                            if (ing) {
+                                              const raw = ing.name_common || ing.name || '';
+                                              const { cleanName, detectedProcessing } = stripProcessing(raw);
+                                              const updates: any = { ingredient_id: e.target.value, name: cleanName };
+                                              if (detectedProcessing && !child?.processing) updates.processing = detectedProcessing;
+                                              updateChild(idx, cidx, updates);
+                                            } else {
+                                              updateChild(idx, cidx, { ingredient_id: e.target.value });
+                                            }
+                                          }}
+                                          title="Select ingredient"
+                                          className={`flex-1 h-6 px-1.5 text-xs border rounded bg-white focus:ring-1 focus:ring-purple-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
+                                        >
+                                          <option value="">{child.name || '— select —'}</option>
+                                          {ingredientsCache.map((ing: AdminRecord) => (
+                                            <option key={ing.id} value={ing.id}>{cleanIngName(ing)}</option>
+                                          ))}
+                                        </select>
+                                        <input type="number" value={child.qty_g ?? ''} onChange={(e) => updateChild(idx, cidx, { qty_g: e.target.value ? parseFloat(e.target.value) : null })} className="w-14 h-6 px-1.5 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-purple-300 text-right" placeholder="qty" min="0" step="any" />
+                                        <select value={child.unit || 'g'} onChange={(e) => updateChild(idx, cidx, { unit: e.target.value })} className="h-6 px-1 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-purple-300" title="Unit">
+                                          {['g','ml','kg','L','tsp','tbsp','cup','oz','lb','piece','slice','pinch'].map(u => <option key={u} value={u}>{u}</option>)}
+                                        </select>
+                                        <button type="button" onClick={() => removeChild(idx, cidx)} className="text-red-400 hover:text-red-600 text-sm px-1 rounded hover:bg-red-50">&times;</button>
+                                      </div>
+                                      {/* Processing row */}
+                                      <div className="flex items-center gap-1 pl-6">
+                                        <span className="text-[9px] text-gray-400 flex-shrink-0">⚙</span>
+                                        <select
+                                          value={child.processing || ''}
+                                          onChange={(e) => updateChild(idx, cidx, { processing: e.target.value || null })}
+                                          title="Processing method"
+                                          className={`h-5 px-1 text-[10px] border rounded bg-white focus:ring-1 focus:ring-amber-300 ${child.processing ? 'border-amber-300 text-amber-800 bg-amber-50' : 'border-gray-200 text-gray-400'}`}
+                                        >
+                                          <option value="">No processing</option>
+                                          {PROCESSING_METHODS.map(p => <option key={p} value={p}>{p}</option>)}
+                                        </select>
+                                        {child.processing && child.qty_g && (
+                                          <span className="text-[9px] text-amber-700 font-medium truncate">
+                                            → {child.processing} {linked?.name_common || child.name || ''} ({child.qty_g}{child.unit || 'g'})
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -6555,33 +7102,61 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                         }
                         const linked = entry?.ingredient_id ? ingredientsCache.find((ing: AdminRecord) => ing.id === entry.ingredient_id) : null;
                         return (
-                          <div key={idx} className="flex items-center gap-1">
-                            {linked?.image_url ? (
-                              <img src={linked.image_url} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
-                            ) : (
-                              <div className="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center text-[9px] font-bold text-emerald-600 flex-shrink-0">
-                                {(linked?.name_common || entry?.name || '?')[0]?.toUpperCase() || '?'}
-                              </div>
-                            )}
-                            <select
-                              value={entry?.ingredient_id || ''}
-                              onChange={(e) => {
-                                const ing = ingredientsCache.find((i: AdminRecord) => i.id === e.target.value);
-                                updateEntry(idx, { ingredient_id: e.target.value, name: ing ? (ing.name_common || ing.name) : entry?.name });
-                              }}
-                              title="Select ingredient"
-                              className={`flex-1 h-7 px-1.5 text-xs border rounded bg-white focus:ring-1 focus:ring-blue-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
-                            >
-                              <option value="">{entry?.name || '— select ingredient —'}</option>
-                              {ingredientsCache.map((ing: AdminRecord) => (
-                                <option key={ing.id} value={ing.id}>{ing.name_common || ing.name}</option>
-                              ))}
-                            </select>
-                            <input type="number" value={entry?.qty_g ?? ''} onChange={(e) => updateEntry(idx, { qty_g: e.target.value ? parseFloat(e.target.value) : null })} className="w-14 h-7 px-1.5 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-blue-300 text-right" placeholder="qty" min="0" step="any" />
-                            <select value={entry?.unit || 'g'} onChange={(e) => updateEntry(idx, { unit: e.target.value })} className="h-7 px-1 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-blue-300" title="Unit">
-                              {['g','ml','kg','L','tsp','tbsp','cup','oz','lb','piece','slice','pinch'].map(u => <option key={u} value={u}>{u}</option>)}
-                            </select>
-                            <button type="button" onClick={() => removeEntry(idx)} className="text-red-400 hover:text-red-600 px-1.5 text-sm shrink-0 rounded hover:bg-red-50">&times;</button>
+                          <div key={idx} className="space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              {linked?.image_url ? (
+                                <img src={linked.image_url} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center text-[9px] font-bold text-emerald-600 flex-shrink-0">
+                                  {(linked?.name_common || entry?.name || '?')[0]?.toUpperCase() || '?'}
+                                </div>
+                              )}
+                              <select
+                                value={entry?.ingredient_id || ''}
+                                onChange={(e) => {
+                                  const ing = ingredientsCache.find((i: AdminRecord) => i.id === e.target.value);
+                                  if (ing) {
+                                    const raw = ing.name_common || ing.name || '';
+                                    const { cleanName, detectedProcessing } = stripProcessing(raw);
+                                    const updates: any = { ingredient_id: e.target.value, name: cleanName };
+                                    if (detectedProcessing && !entry?.processing) updates.processing = detectedProcessing;
+                                    updateEntry(idx, updates);
+                                  } else {
+                                    updateEntry(idx, { ingredient_id: e.target.value });
+                                  }
+                                }}
+                                title="Select ingredient"
+                                className={`flex-1 h-7 px-1.5 text-xs border rounded bg-white focus:ring-1 focus:ring-blue-300 ${linked ? 'border-green-300 text-green-800' : 'border-gray-200'}`}
+                              >
+                                <option value="">{entry?.name || '— select ingredient —'}</option>
+                                {ingredientsCache.map((ing: AdminRecord) => (
+                                  <option key={ing.id} value={ing.id}>{cleanIngName(ing)}</option>
+                                ))}
+                              </select>
+                              <input type="number" value={entry?.qty_g ?? ''} onChange={(e) => updateEntry(idx, { qty_g: e.target.value ? parseFloat(e.target.value) : null })} className="w-14 h-7 px-1.5 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-blue-300 text-right" placeholder="qty" min="0" step="any" />
+                              <select value={entry?.unit || 'g'} onChange={(e) => updateEntry(idx, { unit: e.target.value })} className="h-7 px-1 text-xs border border-gray-200 rounded bg-white focus:ring-1 focus:ring-blue-300" title="Unit">
+                                {['g','ml','kg','L','tsp','tbsp','cup','oz','lb','piece','slice','pinch'].map(u => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                              <button type="button" onClick={() => removeEntry(idx)} className="text-red-400 hover:text-red-600 px-1.5 text-sm shrink-0 rounded hover:bg-red-50">&times;</button>
+                            </div>
+                            {/* Processing row */}
+                            <div className="flex items-center gap-1 pl-7">
+                              <span className="text-[9px] text-gray-400 flex-shrink-0">⚙</span>
+                              <select
+                                value={entry?.processing || ''}
+                                onChange={(e) => updateEntry(idx, { processing: e.target.value || null })}
+                                title="Processing method"
+                                className={`h-5 px-1 text-[10px] border rounded bg-white focus:ring-1 focus:ring-amber-300 ${entry?.processing ? 'border-amber-300 text-amber-800 bg-amber-50' : 'border-gray-200 text-gray-400'}`}
+                              >
+                                <option value="">No processing</option>
+                                {PROCESSING_METHODS.map(p => <option key={p} value={p}>{p}</option>)}
+                              </select>
+                              {entry?.processing && entry?.qty_g && (
+                                <span className="text-[9px] text-amber-700 font-medium truncate">
+                                  → {entry.processing} {linked?.name_common || entry.name || ''} ({entry.qty_g}{entry.unit || 'g'})
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -6605,6 +7180,8 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                           recordData={editingRecord}
                           catalogEquipment={equipmentCache}
                           onUpdateRecord={(updates) => setEditingRecord((prev: any) => ({ ...prev, ...updates }))}
+                          catalogCookingMethods={cookingMethodsCache as any}
+                          recipeMethodIds={Array.isArray(editingRecord?.cooking_method_ids) ? editingRecord.cooking_method_ids : []}
                         />
                       );
                     })()}
@@ -6620,6 +7197,22 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             if (field.type === 'cooking_steps') {
               return null; // rendered inside grouped_ingredients 3-col layout above
+            }
+
+            if (field.type === 'cooking_method_equipment') {
+              const ids: string[] = Array.isArray(val) ? val : [];
+              return (
+                <div key={field.key}>
+                  <CookingMethodLinksSection
+                    equipmentIds={ids}
+                    onUpdateIds={(newIds) => updateField(newIds)}
+                    equipmentCatalog={equipmentCache as any}
+                    ingredientsCatalog={ingredientsCache as any}
+                    bestFor={String(editingRecord?.best_for || '')}
+                    methodName={String(editingRecord?.name || '')}
+                  />
+                </div>
+              );
             }
 
             if (field.type === 'array') {
@@ -6694,12 +7287,13 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           ]);
           const HEALTH_SECTIONS = new Set([
             'Media', 'Nutrition Data', 'Hazards & Risks', 'Health & Scoring',
-            'Functions & Benefits', 'DRV by Population', 'Thresholds & Range', 'Food Sources',
+            'Functions & Benefits', 'Age Ranges & DRV', 'Testing & Diagnostics',
+            'Deficiency Info', 'Food Sources',
             'Detailed Sections', 'Interactions',
             'Interventions', 'References & Meta', 'Summary',
             'Chemistry', 'Identity', 'Scoring',
           ]);
-          const CONTENT_SECTIONS = new Set(['Content']);
+          const CONTENT_SECTIONS = new Set(['Content', 'Content: Academic', 'Content: Social', 'Content: All']);
 
           // Tabs apply to recipes, ingredients, products, elements
           const useModalTabs = ['recipes', 'ingredients', 'products', 'elements'].includes(activeTab);
@@ -6727,23 +7321,27 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             'Ingredients': '🥗', 'Ingredients & Steps': '📖',
             'Functions & Benefits': '✅', 'Hazards & Risks': '⚠️',
             'Nutrition Data': '🧪', 'Health & Scoring': '💯', 'Scoring': '📊',
-            'Thresholds & Range': '📏', 'DRV by Population': '👥',
-            'Food Sources': '🌱', 'Detailed Sections': '📚',
+            'Age Ranges & DRV': '📊', 'Testing & Diagnostics': '🩸',
+            'Deficiency Info': '🟠', 'Food Sources': '🌱', 'Detailed Sections': '📚',
             'Interactions': '🔗',
-            'Interventions': '💊🛡️', 'References & Meta': '📎', 'Content': '📰',
+            'Interventions': '💊', 'References & Meta': '📎', 'Content': '📰',
+            'Content: Academic': '🎓', 'Content: Social': '💬', 'Content: All': '📦',
+            'Herbal / Medicinal Quality': '🌿',
           };
 
-          const renderSections = (filterFn?: (sectionName: string) => boolean) =>
-            [...sections.entries()]
-              .filter(([sectionName]) => !filterFn || filterFn(sectionName))
-              .map(([sectionName, fields]) => {
+          const renderSections = (filterFn?: (sectionName: string) => boolean) => {
+            const filteredEntries = [...sections.entries()]
+              .filter(([sectionName]) => !filterFn || filterFn(sectionName));
+            return filteredEntries.map(([sectionName, fields], sectionIdx) => {
                 const isMediaSection = sectionName === 'Media';
-                const THREE_COL_SECTIONS = ['Basic Info', 'Summary', 'Identity', 'Chemistry', 'Thresholds & Range', 'Interventions'];
+                const THREE_COL_SECTIONS = ['Basic Info', 'Summary', 'Identity', 'Chemistry', 'Interventions'];
                 const sectionCols = isMediaSection ? 5 : THREE_COL_SECTIONS.includes(sectionName) ? 3 : 2;
                 const sKey = `sec_${activeTab}_${sectionName}`;
                 const secOpen = isSectionOpen(sKey);
+                const sectionNumber = String(sectionIdx + 1).padStart(2, '0');
                 const showAiButton = ['Basic Info', 'Processing', 'Nutrition Data', 'Hazards & Risks', 'Ingredients', 'Descriptions', 'Flavor Profile', 'Cooking Details', 'Identity', 'Summary', 'Culinary Origin', 'Media',
-                  'Functions & Benefits', 'DRV by Population', 'Thresholds & Range', 'Food Sources', 'Detailed Sections', 'Interactions', 'Interventions', 'References & Meta', 'Health & Scoring', 'Chemistry', 'Scoring', 'Content',
+                  'Functions & Benefits', 'Age Ranges & DRV', 'Testing & Diagnostics', 'Deficiency Info', 'Food Sources', 'Detailed Sections', 'Interactions', 'Interventions', 'References & Meta', 'Health & Scoring', 'Chemistry', 'Scoring', 'Content',
+                  'Content: Academic', 'Content: Social', 'Content: All',
                   'Herbal / Medicinal Quality',
                 ].includes(sectionName);
                 const isFillingSec = aiFillingSection === sectionName;
@@ -6801,6 +7399,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       <button type="button" onClick={() => toggleSection(sKey)}
                         className="flex-1 flex items-center gap-2 group cursor-pointer">
                         <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                          <span className="text-[10px] font-mono text-gray-300 mr-1.5">{sectionNumber} •</span>
                           {SECTION_EMOJI[sectionName] && <span className="mr-1">{SECTION_EMOJI[sectionName]}</span>}
                           {sectionName}
                           <span className="ml-1.5 text-[10px] font-light italic text-gray-300 normal-case tracking-normal">{fields.length}</span>
@@ -6920,6 +7519,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   </div>
                 );
               });
+          };
 
           return (
             <div className="space-y-4">

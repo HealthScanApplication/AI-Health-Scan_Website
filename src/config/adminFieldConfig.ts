@@ -66,7 +66,8 @@ export interface FieldConfig {
     | "element_sources_viewer"
     | "interventions_editor"
     | "herbal_quality_editor"
-    | "icon_picker";
+    | "icon_picker"
+    | "cooking_method_equipment";
   categoryTree?: Record<string, Record<string, string[]>>;
   linkedCategory?: "beneficial" | "hazardous" | "all";
   linkedTable?: "catalog_elements" | "catalog_ingredients" | "catalog_cooking_methods" | "catalog_equipment";
@@ -583,49 +584,7 @@ const elementsFields: FieldConfig[] = [
     ],
   },
 
-  // --- DRV by Population (before thresholds) ---
-  {
-    key: "drv_by_population",
-    label: "DRV by Age / Gender / Pregnancy",
-    type: "drv_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "DRV by Population",
-    showWhen: { field: "health_role", not: ["hazardous"] },
-  },
-
-  // --- Thresholds & Range — 3-column: Deficiency (orange) | Optimal (green) | Excess (red) ---
-  {
-    key: "deficiency_ranges",
-    label: "Deficiency Ranges",
-    type: "deficiency_ranges_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 1,
-    section: "Thresholds & Range",
-    accentColor: "orange",
-  },
-  {
-    key: "thresholds",
-    label: "Optimal / Thresholds",
-    type: "thresholds_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 1,
-    section: "Thresholds & Range",
-    accentColor: "green",
-  },
-  {
-    key: "excess_ranges",
-    label: "Excess / Toxicity Ranges",
-    type: "excess_ranges_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 1,
-    section: "Thresholds & Range",
-    accentColor: "red",
-  },
+  // --- Deficiency Info (causes, symptoms, treatment — text content, not ranges) ---
   {
     key: "deficiency",
     label: "Deficiency Info (causes, symptoms, treatment)",
@@ -633,7 +592,7 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Thresholds & Range",
+    section: "Deficiency Info",
     placeholder: "Causes, early/moderate/severe symptoms, and treatment info",
     showWhen: { field: "health_role", not: ["hazardous"] },
   },
@@ -667,24 +626,6 @@ const elementsFields: FieldConfig[] = [
     ],
   },
   {
-    key: "food_sources_detailed",
-    label: "Top Food Sources",
-    type: "food_sources_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Food Sources",
-  },
-  {
-    key: "food_strategy",
-    label: "Food Strategy",
-    type: "food_strategy_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Food Sources",
-  },
-  {
     key: "reason",
     label: "Source / Reason",
     type: "textarea",
@@ -707,21 +648,6 @@ const elementsFields: FieldConfig[] = [
     section: "Detailed Sections",
     placeholder:
       "JSON with keys: simple, technical, harmful_effects, what_depletes, how_builds, how_lasts, when_to_supplement, needed_for_absorption, pregnancy_considerations, summary_bullets, risk_benefit_analysis, therapeutic_window, ...",
-  },
-
-  // --- Deficiency Info moved into Thresholds & Range section above ---
-
-  // --- Interactions (Section A8g) ---
-  {
-    key: "interactions",
-    label: "Key Interactions",
-    type: "interactions_editor",
-    showInDetail: true,
-    showInEdit: true,
-    colSpan: 2,
-    section: "Interactions",
-    placeholder:
-      'JSON: { "nutrients": [...], "medications": [...], "conditions": [...], "herbs": [...] }',
   },
 
   // --- Interventions & Detox (consolidated) ---
@@ -860,7 +786,162 @@ const elementsFields: FieldConfig[] = [
     section: "References & Meta",
   },
 
-  // --- Content (all articles, references, social, video) ---
+  // --- Age Ranges & DRV (rich structure: EU + USA deficiency/optimal/excess by age × gender) ---
+  {
+    key: "age_ranges",
+    label: "Age Ranges (EU / USA / HealthScan)",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Age Ranges & DRV",
+    placeholder:
+      '{"europe":[...], "north_america":[...], "healthscan":[...]} — each entry: {age_group, basis, male: {deficiency, optimal, excess}, female: {...}}',
+    aiSuggest: true,
+    aiPrompt: "Generate the full age_ranges structure with EU and USA deficiency/optimal/excess values by age group and gender, using real EFSA and NIH DRI data.",
+  },
+  {
+    key: "daily_recommended_adult",
+    label: "Adult RDA (Quick Ref)",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Age Ranges & DRV",
+    placeholder: '{"male":{"value":900,"unit":"μg RAE"},"female":{"value":700,"unit":"μg RAE"}}',
+  },
+  {
+    key: "regions_meta",
+    label: "Regulatory Authorities",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Age Ranges & DRV",
+    placeholder: '{"europe":{"authority":"EFSA","reference_url":"..."},"north_america":{"authority":"NIH","reference_url":"..."}}',
+  },
+
+  // --- Testing & Diagnostics ---
+  {
+    key: "testing_or_diagnostics",
+    label: "Testing & Diagnostics",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Testing & Diagnostics",
+    placeholder:
+      '{"best_test":"Serum retinol","optimal_range":{"low":1.05,"high":2.27,"unit":"μmol/L"},"methods":[...]}',
+    aiSuggest: true,
+    aiPrompt: "Generate testing & diagnostics data: best test, optimal range, detection threshold, methods, and clinical guidance.",
+  },
+
+  // --- Interventions ---
+  {
+    key: "interventions",
+    label: "Interventions (Supplement / Lifestyle / Herbal)",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Interventions",
+    placeholder:
+      '[{"title":"Retinyl palmitate","type":"supplement","phase":["deficiency","optimal"],"dosage_by_age_gender":{...}}]',
+    aiSuggest: true,
+    aiPrompt: "Generate 2-4 evidence-based interventions with dosage_by_age_gender per region, contraindications, and monitoring.",
+  },
+
+  // --- Key Interactions (rich) ---
+  {
+    key: "key_interactions",
+    label: "Key Interactions (with references)",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Interactions",
+    placeholder:
+      '[{"element":"Zinc","type":"synergistic","description":"...","reference":"pubmed_url"}]',
+    aiSuggest: true,
+    aiPrompt: "Generate 3-6 key element interactions with type (synergistic/antagonistic), description, and PubMed reference URLs.",
+  },
+
+  // --- Food Data (rich sources with bioavailability) ---
+  {
+    key: "food_data",
+    label: "Food Sources (Rich)",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    section: "Food Sources",
+    placeholder:
+      '{"strategy":{...},"sources":{"animal":[...],"plant":[...],"fortified":[...]},"bioavailability":{...}}',
+    aiSuggest: true,
+    aiPrompt: "Generate rich food source data with USDA amounts per 100g, bioavailability %, preparation methods, and strategy per source type.",
+  },
+  {
+    key: "top_foods_list",
+    label: "Top 10 Foods (Mobile)",
+    type: "readonly",
+    showInDetail: true,
+    showInEdit: false,
+    colSpan: 2,
+    section: "Food Sources",
+  },
+
+  // --- Identity extras ---
+  {
+    key: "other_names",
+    label: "Other Names (Array)",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Identity",
+    placeholder: '["Retinol","Beta-carotene","Provitamin A"]',
+  },
+  {
+    key: "content_urls",
+    label: "Reference URLs",
+    type: "json",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "References & Meta",
+    placeholder: '{"wikipedia":"...","examine":"...","pubmed":"...","nih_factsheet":"..."}',
+  },
+  {
+    key: "confidence",
+    label: "Data Confidence",
+    type: "select",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "References & Meta",
+    options: ["verified", "ai_generated", "draft", "needs_review"],
+  },
+  {
+    key: "slug_path",
+    label: "Slug Path",
+    type: "text",
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 1,
+    section: "Identity",
+    placeholder: "e.g. vitamin_a",
+  },
+  {
+    key: "qa_rules",
+    label: "QA Rules",
+    type: "json",
+    showInDetail: true,
+    showInEdit: false,
+    colSpan: 2,
+    section: "References & Meta",
+  },
+
+  // --- Content: Academic ---
   {
     key: "scientific_references",
     label: "Scientific References",
@@ -868,7 +949,7 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Academic",
   },
   {
     key: "scientific_papers",
@@ -877,8 +958,10 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Academic",
   },
+
+  // --- Content: Social ---
   {
     key: "social_content",
     label: "Social Content",
@@ -886,8 +969,10 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Social",
   },
+
+  // --- Content: All (images, videos, etc.) ---
   {
     key: "images",
     label: "Image Gallery",
@@ -895,7 +980,7 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: All",
   },
   {
     key: "videos",
@@ -904,7 +989,7 @@ const elementsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: All",
   },
 ];
 
@@ -1436,7 +1521,7 @@ const ingredientsFields: FieldConfig[] = [
     section: "References & Meta",
   },
 
-  // --- Content ---
+  // --- Content: Academic ---
   {
     key: "scientific_papers",
     label: "Scientific Papers",
@@ -1444,8 +1529,10 @@ const ingredientsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Academic",
   },
+
+  // --- Content: Social ---
   {
     key: "social_content",
     label: "Social Content",
@@ -1453,7 +1540,7 @@ const ingredientsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Social",
   },
 ];
 
@@ -1885,7 +1972,7 @@ const recipesFields: FieldConfig[] = [
     section: "References & Meta",
   },
 
-  // --- Content ---
+  // --- Content: Academic ---
   {
     key: "scientific_papers",
     label: "Scientific Papers",
@@ -1893,8 +1980,10 @@ const recipesFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Academic",
   },
+
+  // --- Content: Social ---
   {
     key: "social_content",
     label: "Social Content",
@@ -1902,7 +1991,7 @@ const recipesFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Social",
   },
 ];
 
@@ -2181,7 +2270,7 @@ const productsFields: FieldConfig[] = [
     section: "References & Meta",
   },
 
-  // --- Content ---
+  // --- Content: Academic ---
   {
     key: "scientific_papers",
     label: "Scientific Papers",
@@ -2189,8 +2278,10 @@ const productsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Academic",
   },
+
+  // --- Content: Social ---
   {
     key: "social_content",
     label: "Social Content",
@@ -2198,7 +2289,7 @@ const productsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    section: "Content",
+    section: "Content: Social",
   },
 ];
 
@@ -2585,7 +2676,7 @@ const cookingMethodsFields: FieldConfig[] = [
   {
     key: "equipment_ids",
     label: "Equipment Needed",
-    type: "array",
+    type: "cooking_method_equipment",
     showInList: false,
     showInDetail: true,
     showInEdit: true,

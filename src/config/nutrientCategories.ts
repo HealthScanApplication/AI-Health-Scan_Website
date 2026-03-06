@@ -32,7 +32,7 @@ export const NUTRIENT_CATEGORIES: NutrientCategory[] = [
       { id: 'carbohydrates_g', name: 'Carbohydrates', unit: 'g', rdi: '275' },
       { id: 'fiber_g', name: 'Fiber', unit: 'g', rdi: '28' },
       { id: 'sugars_g', name: 'Sugars', unit: 'g' },
-      { id: 'water_content_g', name: 'Water Content', unit: 'g' },
+      { id: 'water_g', name: 'Water Content', unit: 'g' },
     ],
   },
   {
