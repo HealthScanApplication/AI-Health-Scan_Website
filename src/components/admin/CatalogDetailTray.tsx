@@ -15,6 +15,7 @@ import {
 import { projectId, publicAnonKey } from '../../utils/supabase/info';
 import { ElementDetailView } from './ElementDetailView';
 import { LucideIconPreview } from './IconPickerField';
+import { IngredientCoverageSection } from './HealthScanCoverageSection';
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -181,6 +182,58 @@ export function CatalogDetailTray({
         {/* ── ELEMENTS TAB: Dedicated detail view ── */}
         {activeTab === 'elements' ? (
           <ElementDetailView record={record} accessToken={accessToken} />
+        ) : activeTab === 'ingredients' ? (
+          <>
+            {descFields.length > 0 && (
+              <div className="space-y-2">
+                {descFields.map((df) => (
+                  <div key={df.key} className="bg-gray-50 rounded-xl p-4">
+                    {descFields.length > 1 && (
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{df.label}</div>
+                    )}
+                    <div className="text-sm text-gray-700 leading-relaxed">{record[df.key]}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sections.map((section) => (
+              <SectionBlock
+                key={section}
+                section={section}
+                fields={sectionedFields.filter((f) => f.section === section)}
+                record={record}
+                ipGeoData={ipGeoData}
+                resolvedLinked={resolvedLinked}
+                linkedLoading={linkedLoading}
+              />
+            ))}
+            {unsectionedFields.length > 0 && (
+              <CollapsibleSection
+                title="Details"
+                itemCount={unsectionedFields.length}
+                previewCount={6}
+                totalItems={unsectionedFields.length}
+              >
+                {(expanded: boolean) => (
+                  <div className="grid grid-cols-2 gap-2">
+                    {(expanded ? unsectionedFields : unsectionedFields.slice(0, 6)).map((field) => {
+                      const val = record[field.key];
+                      const span = field.colSpan === 2 || field.type === 'textarea' || field.type === 'json' || field.type === 'array' ? 'col-span-2' : '';
+                      return (
+                        <div key={field.key} className={`bg-gray-50 rounded-lg p-3 ${span}`}>
+                          <div className="text-[10px] text-gray-400 font-medium uppercase">{field.label}</div>
+                          <div className="text-sm text-gray-900 mt-0.5 break-all">
+                            <FieldValue field={field} value={val} ipGeoData={ipGeoData} resolvedLinked={resolvedLinked} linkedLoading={linkedLoading} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CollapsibleSection>
+            )}
+            <IngredientCoverageSection record={record} accessToken={accessToken} />
+          </>
         ) : (
           <>
             {/* Description(s) */}

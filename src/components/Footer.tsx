@@ -13,8 +13,8 @@ import {
   Coffee,
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner@2.0.3";
-import healthScanLogo from 'figma:asset/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png';
+import { toast } from "sonner";
+import healthScanLogo from '../assets/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png';
 
 interface FooterProps {}
 

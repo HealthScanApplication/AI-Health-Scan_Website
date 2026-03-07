@@ -3287,6 +3287,165 @@ const symptomsFields: FieldConfig[] = [
 
 /**
  * ============================================================
+ *  HS_TESTS TAB — HealthScan test catalog
+ * ============================================================
+ */
+const hsTestsFields: FieldConfig[] = [
+  // ── Identity ───────────────────────────────────────────────────────
+  { key: "name",            label: "Test Name",       type: "text",    showInList: true,  showInDetail: true, showInEdit: true,  placeholder: "e.g. Vitamin D Test", section: "Identity" },
+  { key: "slug",            label: "Slug",            type: "text",    showInList: true,  showInDetail: true, showInEdit: true,  placeholder: "e.g. vitamin-d-test", section: "Identity" },
+  { key: "category",        label: "Category",        type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["Vitamins","Minerals","Essential Fatty Acids","Amino Acids","Metabolic & Hormones","Toxins & Hazards","DNA Tests","Microbiome"] },
+  { key: "element_key",     label: "Element Key",     type: "text",    showInList: true,  showInDetail: true, showInEdit: true,  placeholder: "e.g. vitamin-d", section: "Identity" },
+  { key: "sample_type",     label: "Sample Type",     type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["BLOOD_FINGER_PRICK","URINE","SALIVA","STOOL","DRIED_URINE"] },
+  { key: "turnaround_days", label: "TAT (days)",      type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "is_active",       label: "Active",          type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "is_featured",     label: "Featured",        type: "badge",   showInList: false, showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "description",     label: "Description",     type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
+  // ── Media ──────────────────────────────────────────────────────────
+  { key: "icon_url",    label: "Icon",       type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url",   label: "Image",      type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "video_url",   label: "Video URL",  type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
+  // ── Pricing ─────────────────────────────────────────────────────────
+  { key: "retail_price_eur",   label: "Retail €",     type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "wholesale_cost_eur", label: "Wholesale €",  type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "shipping_cost_eur",  label: "Shipping €",   type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "support_cost_eur",   label: "Support €",    type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "gross_margin_pct",   label: "Margin %",     type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  // ── Buy Links ───────────────────────────────────────────────────────
+  { key: "buy_url",          label: "Buy URL",           type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "https://..." },
+  { key: "sample_order_url", label: "Order Sample URL",  type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "https://..." },
+  { key: "link_type",        label: "Link Type", type: "select", showInList: true, showInDetail: true, showInEdit: true, section: "Buy Links",
+    options: ["dropship","affiliate","direct","mixed"] },
+  // ── Providers ───────────────────────────────────────────────────────
+  { key: "provider_eu",     label: "Provider EU Name",  type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  { key: "provider_eu_url", label: "Provider EU URL",   type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers", placeholder: "https://..." },
+  { key: "provider_eu_cost",label: "Provider EU Cost €",type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  { key: "provider_uk",     label: "Provider UK Name",  type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  { key: "provider_uk_url", label: "Provider UK URL",   type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers", placeholder: "https://..." },
+  { key: "provider_uk_cost",label: "Provider UK Cost",  type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  { key: "provider_us",     label: "Provider US Name",  type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  { key: "provider_us_url", label: "Provider US URL",   type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers", placeholder: "https://..." },
+  { key: "provider_us_cost",label: "Provider US Cost",  type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  { key: "provider_au",     label: "Provider AU Name",  type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  { key: "provider_au_url", label: "Provider AU URL",   type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Providers", placeholder: "https://..." },
+  { key: "provider_au_cost",label: "Provider AU Cost",  type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Providers" },
+  // ── API / Dropship ─────────────────────────────────────────────────
+  { key: "api_dropship_available",  label: "API Dropship Available",  type: "badge",    showInList: true,  showInDetail: true, showInEdit: true, section: "API & Setup" },
+  { key: "api_dropship_connected",  label: "API Dropship Connected",  type: "badge",    showInList: true,  showInDetail: true, showInEdit: true, section: "API & Setup" },
+  { key: "api_dropship_notes",      label: "API Dropship Notes",      type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "API & Setup", colSpan: 2 },
+  { key: "setup_notes",             label: "Setup Notes",             type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "API & Setup", colSpan: 2 },
+  { key: "supplier_website",        label: "Supplier Website",        type: "text",     showInList: false, showInDetail: true, showInEdit: true, section: "API & Setup", placeholder: "https://supplier.com" },
+  { key: "supplier_email",          label: "Supplier Contact Email",  type: "text",     showInList: false, showInDetail: true, showInEdit: true, section: "API & Setup", placeholder: "support@supplier.com" },
+  // ── Shopify Webstore ──────────────────────────────────────────────────────
+  { key: "shopify_product_url", label: "Shopify Public URL", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "https://healthscan.myshopify.com/products/..." },
+  { key: "shopify_product_id",  label: "Shopify Product ID", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "gid://shopify/Product/..." },
+  // ── Meta ───────────────────────────────────────────────────────────
+  { key: "notes",      label: "Internal Notes", type: "textarea", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2 },
+  { key: "created_at", label: "Created",         type: "date",    showInDetail: true },
+];
+
+/**
+ * ============================================================
+ *  HS_SUPPLEMENTS TAB — HealthScan supplement products
+ * ============================================================
+ */
+const hsSupplementsFields: FieldConfig[] = [
+  // ── Identity ───────────────────────────────────────────────────────
+  { key: "name",           label: "Supplement Name", type: "text",    showInList: true,  showInDetail: true, showInEdit: true, placeholder: "e.g. Vitamin D3", section: "Identity" },
+  { key: "slug",           label: "Slug",            type: "text",    showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "element_key",    label: "Element Key",     type: "text",    showInList: true,  showInDetail: true, showInEdit: true, placeholder: "e.g. vitamin-d", section: "Identity" },
+  { key: "category",       label: "Category",        type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["Vitamin","Mineral","Omega","Herb","Probiotic","Other"] },
+  { key: "region",         label: "Region",          type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["EU","UK","US","AU","ROW"] },
+  { key: "currency",       label: "Currency",        type: "text",    showInList: true,  showInDetail: true, showInEdit: true, placeholder: "EUR", section: "Identity" },
+  { key: "is_active",      label: "Active",          type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "published",      label: "Published",       type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  // ── Media ──────────────────────────────────────────────────────────
+  { key: "icon_url",   label: "Supplier Logo",      type: "image", showInList: true, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url",  label: "Product Image",     type: "image", showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "video_url",  label: "Video URL", type: "text",  showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
+  // ── Pricing ─────────────────────────────────────────────────────────
+  { key: "retail_price",   label: "Retail Price",  type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "estimated_cost", label: "Cost",     type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "margin_pct",     label: "Margin %",      type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "supplier",       label: "Supplier",      type: "text",   showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  // ── Buy Links ───────────────────────────────────────────────────────
+  { key: "buy_url",       label: "Buy URL",       type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "https://..." },
+  { key: "affiliate_url", label: "Affiliate URL", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "https://..." },
+  { key: "amazon_url",    label: "Amazon URL",    type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "https://amazon.com/..." },
+  { key: "iherb_url",     label: "iHerb URL",     type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "https://iherb.com/..." },
+  { key: "link_type",     label: "Link Type", type: "select", showInList: true, showInDetail: true, showInEdit: true, section: "Buy Links",
+    options: ["affiliate","direct","mixed"] },
+  { key: "supplier_website", label: "Supplier Website",    type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "https://supplier.com" },
+  { key: "supplier_email",   label: "Supplier Contact Email", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Buy Links", placeholder: "support@supplier.com" },
+  // ── Setup ──────────────────────────────────────────────────────────
+  { key: "setup_notes", label: "Setup Notes", type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "Setup", colSpan: 2 },
+  // ── Shopify Webstore ──────────────────────────────────────────────────────
+  { key: "shopify_product_url", label: "Shopify Public URL", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "https://healthscan.myshopify.com/products/..." },
+  { key: "shopify_product_id",  label: "Shopify Product ID", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "gid://shopify/Product/..." },
+  // ── Meta ──────────────────────────────────────────────────────────
+  { key: "notes",       label: "Internal Notes", type: "textarea", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2 },
+  { key: "created_at",  label: "Created",         type: "date",    showInDetail: true },
+];
+
+/**
+ * ============================================================
+ *  HS_PRODUCTS TAB — HealthScan physical products (filters, devices)
+ * ============================================================
+ */
+const hsProductsFields: FieldConfig[] = [
+  // ── Identity ───────────────────────────────────────────────────────
+  { key: "name",         label: "Product Name",  type: "text",   showInList: true,  showInDetail: true, showInEdit: true,  placeholder: "e.g. Desktop HEPA Air Purifier", section: "Identity" },
+  { key: "slug",         label: "Slug",           type: "text",   showInList: true,  showInDetail: true, showInEdit: true,  section: "Identity" },
+  { key: "product_type", label: "Type",           type: "select", showInList: true,  showInDetail: true, showInEdit: true,  section: "Identity",
+    options: ["filter","monitor","device","kit","accessory","supplement","other"] },
+  { key: "category",     label: "Category",       type: "select", showInList: true,  showInDetail: true, showInEdit: true,  section: "Identity",
+    options: ["Air Quality","Water Quality","Health Monitoring","Sleep & Light","Nutrition","Lab Kit","Other"] },
+  { key: "element_key",  label: "Element Key",    type: "text",   showInList: false, showInDetail: true, showInEdit: true,  placeholder: "optional element link", section: "Identity" },
+  { key: "is_active",    label: "Active",         type: "badge",  showInList: true,  showInDetail: true, showInEdit: true,  section: "Identity" },
+  { key: "is_featured",  label: "Featured",       type: "badge",  showInList: false, showInDetail: true, showInEdit: true,  section: "Identity" },
+  { key: "description",  label: "Description",    type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
+  // ── Media ──────────────────────────────────────────────────────────
+  { key: "icon_url",    label: "Icon",       type: "image",  showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url",   label: "Image 1",    type: "image",  showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url_2", label: "Image 2",    type: "image",  showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url_3", label: "Image 3",    type: "image",  showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "video_url",   label: "Video URL",  type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
+  // ── Source & Buying ─────────────────────────────────────────────────
+  { key: "source_platform", label: "Source Platform", type: "select", showInList: true,  showInDetail: true, showInEdit: true, section: "Source & Buy",
+    options: ["temu","amazon","iherb","aliexpress","shopify","direct","other"] },
+  { key: "source_url",       label: "Supplier Product URL",       type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Source & Buy", placeholder: "Original supplier product page" },
+  { key: "buy_url",          label: "Buy / Affiliate URL", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Source & Buy", placeholder: "Customer purchase link" },
+  { key: "link_type",        label: "Link Type", type: "select", showInList: true, showInDetail: true, showInEdit: true, section: "Source & Buy",
+    options: ["dropship","affiliate","direct","mixed"] },
+  { key: "supplier",         label: "Supplier Name",       type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Source & Buy" },
+  { key: "supplier_website", label: "Supplier Website",    type: "text",   showInList: false, showInDetail: true, showInEdit: true, section: "Source & Buy", placeholder: "https://supplier.com" },
+  { key: "supplier_email",   label: "Supplier Contact Email", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Source & Buy", placeholder: "support@supplier.com" },
+  // ── Pricing ─────────────────────────────────────────────────────────
+  { key: "retail_price",   label: "Retail Price",  type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "currency",       label: "Currency",       type: "text",   showInList: false, showInDetail: true, showInEdit: true, placeholder: "EUR", section: "Pricing" },
+  { key: "region",         label: "Region",         type: "select", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing",
+    options: ["EU","UK","US","AU","ROW","GLOBAL"] },
+  { key: "estimated_cost", label: "Est. Cost (Dropship/Wholesale)",      type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "margin_pct",     label: "Margin % (Retail - Cost)",       type: "number", showInList: true, showInDetail: true, showInEdit: true, section: "Pricing" },
+  // ── Affiliate & Dropship ──────────────────────────────────────────────────────
+  { key: "affiliate_available", label: "Affiliate Program Available", type: "badge",    showInList: true,  showInDetail: true, showInEdit: true, section: "Affiliate & Dropship" },
+  { key: "affiliate_connected", label: "Affiliate Program Connected", type: "badge",    showInList: true,  showInDetail: true, showInEdit: true, section: "Affiliate & Dropship" },
+  { key: "affiliate_notes",     label: "Affiliate/Dropship Notes",     type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "Affiliate & Dropship", colSpan: 2, placeholder: "Commission rate, dropship terms, API details" },
+  { key: "setup_notes",         label: "Product Setup/Usage Notes",         type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "Affiliate & Dropship", colSpan: 2 },
+  // ── Shopify Webstore ──────────────────────────────────────────────────────
+  { key: "shopify_product_url", label: "Shopify Public URL", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "https://healthscan.myshopify.com/products/..." },
+  { key: "shopify_product_id",  label: "Shopify Product ID", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "gid://shopify/Product/..." },
+  // ── Meta ───────────────────────────────────────────────────────────
+  { key: "notes",      label: "Internal Notes", type: "textarea", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2 },
+  { key: "created_at", label: "Created",         type: "date",    showInDetail: true },
+];
+
+/**
+ * ============================================================
  *  MASTER CONFIG - exported for use in SimplifiedAdminPanel
  * ============================================================
  */
@@ -3356,6 +3515,27 @@ export const adminFieldConfig: Record<string, TabFieldConfig> = {
     nameField: "name",
     secondaryField: "category",
     fields: symptomsFields,
+  },
+  hs_products: {
+    tabId: "hs_products",
+    label: "HS Product",
+    nameField: "name",
+    secondaryField: "product_type",
+    fields: hsProductsFields,
+  },
+  hs_tests: {
+    tabId: "hs_tests",
+    label: "HS Test",
+    nameField: "name",
+    secondaryField: "category",
+    fields: hsTestsFields,
+  },
+  hs_supplements: {
+    tabId: "hs_supplements",
+    label: "HS Supplement",
+    nameField: "name",
+    secondaryField: "element_key",
+    fields: hsSupplementsFields,
   },
 };
 

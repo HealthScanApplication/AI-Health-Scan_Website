@@ -13,11 +13,10 @@ import {
   ChefHat,
   Brain
 } from 'lucide-react';
-
-const riskScreenshot = '';
-const needScreenshot = '';
-const productScanScreenshot = '';
-const mealAnalysisScreenshot = '';
+import productScanScreenshot from '../assets/04f4e7cf7c2e8ce76469148f946eda75769b45ee.png';
+import riskScreenshot from '../assets/0d90de2a9245f9d68e76a732655874812e689495.png';
+import needScreenshot from '../assets/95040abfc382a9000163603b0406e99ced704e94.png';
+import mealAnalysisScreenshot from '../assets/f103676152ae3299f7a7f1ac2b178b16e80fc270.png';
 
 export function AppFeaturesSection() {
   return (

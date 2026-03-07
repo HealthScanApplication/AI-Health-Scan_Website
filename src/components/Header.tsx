@@ -27,7 +27,7 @@ import {
 } from './ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { PageType } from '../types/app';
-const healthScanLogo = '';
+import healthScanLogo from '../assets/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png';
 
 interface HeaderProps {
   onNavigateToProfile?: () => void;

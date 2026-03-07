@@ -43,8 +43,10 @@ import {
   Dumbbell,
   HeartPulse,
   Copy,
+  Pill,
   Upload,
   Database,
+  User,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -58,6 +60,7 @@ import { WaitlistDetailTray } from './admin/WaitlistDetailTray';
 import { CatalogDetailTray } from './admin/CatalogDetailTray';
 import { AdminModal } from './ui/AdminModal';
 import { AdminDebugPanel } from './admin/AdminDebugPanel';
+import { HealthScanProductsOverview } from './admin/HealthScanProductsOverview';
 import { CookingToolsField, PROCESSING_METHODS, type EquipmentRecord } from './admin/fields/CookingToolsField';
 import { CookingMethodLinksSection } from './admin/fields/CookingMethodLinksSection';
 import { stripProcessing, cleanIngredientName } from '../utils/recipeProcessing';
@@ -1707,22 +1710,58 @@ function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId,
 export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanelProps) {
   const [activeTab, setActiveTab] = useState('waitlist');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeGroup, setActiveGroup] = useState('users');
   
-  // Define tabs first (needed for useAdminRecords hook)
-  const tabs = [
-    { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
-    { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
-    { id: 'ingredients', label: 'Ingredients', icon: <Leaf className="w-4 h-4" />, table: 'catalog_ingredients' },
-    { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
-    { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' },
-    { id: 'scans', label: 'Scans', icon: <ScanLine className="w-4 h-4" />, table: 'scans' },
-    { id: 'equipment', label: 'Equipment', icon: <Wrench className="w-4 h-4" />, table: 'catalog_equipment' },
-    { id: 'cooking_methods', label: 'Cooking Methods', icon: <Flame className="w-4 h-4" />, table: 'catalog_cooking_methods' },
-    { id: 'activities', label: 'Activities', icon: <Dumbbell className="w-4 h-4" />, table: 'catalog_activities' },
-    { id: 'symptoms', label: 'Symptoms', icon: <HeartPulse className="w-4 h-4" />, table: 'catalog_symptoms' },
-    { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" />, table: '' },
-    { id: 'sync', label: 'Sync', icon: <span className="text-xs">⇄</span>, table: '' },
+  // Define tab groups with sub-tabs
+  const tabGroups = [
+    {
+      id: 'users',
+      label: 'Users',
+      icon: <User className="w-4 h-4" />,
+      tabs: [
+        { id: 'waitlist', label: 'Waitlist', icon: <Clock className="w-4 h-4" />, table: 'waitlist' },
+        { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" />, table: '' },
+        { id: 'scans', label: 'User Scans', icon: <ScanLine className="w-4 h-4" />, table: 'scans' },
+      ]
+    },
+    {
+      id: 'health_records',
+      label: 'Health Records',
+      icon: <Database className="w-4 h-4" />,
+      tabs: [
+        { id: 'elements', label: 'Elements', icon: <FlaskConical className="w-4 h-4" />, table: 'catalog_elements' },
+        { id: 'ingredients', label: 'Ingredients', icon: <Leaf className="w-4 h-4" />, table: 'catalog_ingredients' },
+        { id: 'cooking_methods', label: 'Cooking Methods', icon: <Flame className="w-4 h-4" />, table: 'catalog_cooking_methods' },
+        { id: 'recipes', label: 'Recipes', icon: <UtensilsCrossed className="w-4 h-4" />, table: 'catalog_recipes' },
+        { id: 'products', label: 'Products', icon: <Package className="w-4 h-4" />, table: 'catalog_products' },
+        { id: 'equipment', label: 'Equipment', icon: <Wrench className="w-4 h-4" />, table: 'catalog_equipment' },
+        { id: 'activities', label: 'Activities', icon: <Dumbbell className="w-4 h-4" />, table: 'catalog_activities' },
+        { id: 'symptoms', label: 'Symptoms', icon: <HeartPulse className="w-4 h-4" />, table: 'catalog_symptoms' },
+      ]
+    },
+    {
+      id: 'healthscan',
+      label: 'HealthScan Products',
+      icon: <Sparkles className="w-4 h-4 text-teal-600" />,
+      tabs: [
+        { id: 'hs_overview', label: 'Overview', icon: <Eye className="w-4 h-4 text-teal-600" />, table: '' },
+        { id: 'hs_tests', label: 'Tests', icon: <FlaskConical className="w-4 h-4 text-teal-600" />, table: 'hs_tests' },
+        { id: 'hs_supplements', label: 'Supplements', icon: <Pill className="w-4 h-4 text-teal-600" />, table: 'hs_supplements' },
+        { id: 'hs_products', label: 'Products', icon: <Package className="w-4 h-4 text-teal-600" />, table: 'hs_products' },
+      ]
+    },
+    {
+      id: 'system',
+      label: 'System',
+      icon: <RefreshCw className="w-4 h-4" />,
+      tabs: [
+        { id: 'sync', label: 'Sync', icon: <RefreshCw className="w-4 h-4" />, table: '' },
+      ]
+    },
   ];
+  
+  // Flatten tabs for backward compatibility
+  const tabs = tabGroups.flatMap(g => g.tabs);
   
   // Use React Query for data fetching (eliminates duplicate requests)
   const currentTab = tabs.find(t => t.id === activeTab);
@@ -1740,6 +1779,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [uploadingImage, setUploadingImage] = useState(false);
   const [subFilter, setSubFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [regionFilter, setRegionFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
@@ -3594,6 +3634,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       }
     }
     
+    // Filter by region for HS products/supplements
+    if (regionFilter !== 'all' && (activeTab === 'hs_products' || activeTab === 'hs_supplements')) {
+      const reg = (record.region || '').toUpperCase();
+      if (reg !== regionFilter.toUpperCase()) return false;
+    }
+    
     return matchesSearch;
   }).map((record, index) => ({ ...record, _displayIndex: index }));
 
@@ -3972,15 +4018,42 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           <CardDescription>Manage waitlist, elements, ingredients, recipes, products, and scans</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); }} className="w-full">
-            <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1">
-              {tabs.map(tab => (
-                <TabsTrigger key={tab.id} value={tab.id} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md flex-shrink-0 ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-md font-semibold border border-blue-200' : ''} ${tab.id === 'sync' ? 'text-indigo-600' : ''}`}>
+          <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); setRegionFilter('all'); }} className="w-full">
+            {/* Main Group Tabs */}
+            <div className="flex gap-2 mb-3 border-b pb-2">
+              {tabGroups.map(group => (
+                <button
+                  key={group.id}
+                  onClick={() => { setActiveGroup(group.id); setActiveTab(group.tabs[0].id); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium text-sm transition-all ${
+                    activeGroup === group.id
+                      ? 'bg-white text-blue-700 shadow-sm border-t border-x border-blue-200 -mb-[1px]'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  {group.icon}
+                  <span>{group.label}</span>
+                  <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0">
+                    {group.tabs.length}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+            
+            {/* Sub-tabs for active group */}
+            <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1 bg-gray-50">
+              {tabGroups.find(g => g.id === activeGroup)?.tabs.map(tab => (
+                <TabsTrigger key={tab.id} value={tab.id} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md flex-shrink-0 ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-md font-semibold border border-blue-200' : ''}`}>
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
+
+            {/* ── HS Overview Tab ── */}
+            <TabsContent value="hs_overview" className="space-y-6 pt-4">
+              <HealthScanProductsOverview accessToken={accessToken} />
+            </TabsContent>
 
             {/* ── Sync Tab ── */}
             <TabsContent value="sync" className="space-y-6 pt-2">

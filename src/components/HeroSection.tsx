@@ -17,8 +17,8 @@ import {
   publicAnonKey,
 } from "../utils/supabase/info";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import healthScanLogo from "figma:asset/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png";
-import heroBackground from "figma:asset/5f38caf68dd6b8af22362056b70854ea4cf4b933.png";
+import healthScanLogo from "../assets/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png";
+import heroBackground from "../assets/5f38caf68dd6b8af22362056b70854ea4cf4b933.png";
 
 interface HeroSectionProps {
   hasReferral?: boolean;
@@ -37,21 +37,25 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
 
   const [showCelebration, setShowCelebration] = useState(Math.random() > 0.7);
 
-  // Fetch videos from ingredients + recipes for background slideshow
+  // Fetch videos from meals, ingredients, and elements for background slideshow (randomized)
   useEffect(() => {
     const fetchVideos = async () => {
       try {
         const base = `https://${projectId}.supabase.co/rest/v1`;
         const headers = { 'apikey': publicAnonKey, 'Authorization': `Bearer ${publicAnonKey}` };
-        const [ingRes, recRes] = await Promise.all([
-          fetch(`${base}/catalog_ingredients?select=video_url&video_url=not.is.null&video_url=neq.&limit=6`, { headers }),
-          fetch(`${base}/catalog_recipes?select=video_url&video_url=not.is.null&video_url=neq.&limit=6`, { headers }),
+        const [ingRes, recRes, eleRes] = await Promise.all([
+          fetch(`${base}/catalog_ingredients?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
+          fetch(`${base}/catalog_recipes?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
+          fetch(`${base}/catalog_elements?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
         ]);
         const ingData = ingRes.ok ? await ingRes.json() : [];
         const recData = recRes.ok ? await recRes.json() : [];
+        const eleData = eleRes.ok ? await eleRes.json() : [];
         const ing = (ingData as any[]).map((r: any) => r.video_url).filter(Boolean);
         const rec = (recData as any[]).map((r: any) => r.video_url).filter(Boolean);
-        const all = [...ing, ...rec].slice(0, 9);
+        const ele = (eleData as any[]).map((r: any) => r.video_url).filter(Boolean);
+        // Combine all videos and randomize order
+        const all = [...ing, ...rec, ...ele].sort(() => Math.random() - 0.5).slice(0, 12);
         if (all.length > 0) setBackgroundVideos(all);
       } catch {
         // silently ignore — background is optional

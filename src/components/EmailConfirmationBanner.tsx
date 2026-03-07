@@ -6,7 +6,7 @@ import { X, Mail, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
-import healthScanLogo from 'figma:asset/1debfa3241af40447f297e52b30a6022740a996d.png';
+import healthScanLogo from '../assets/1debfa3241af40447f297e52b30a6022740a996d.png';
 
 interface EmailConfirmationBannerProps {
   userEmail: string;

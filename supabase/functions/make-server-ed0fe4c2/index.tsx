@@ -1057,7 +1057,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, id, updates } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms', 'hs_tests', 'hs_supplements', 'hs_products']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
     if (table === 'catalog_products') {
@@ -1306,7 +1306,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, id } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms', 'hs_tests', 'hs_supplements', 'hs_products']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
     if (table === 'catalog_products') { await kv.del(id); return c.json({ success: true }) }
@@ -2123,7 +2123,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, record } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms', 'hs_tests', 'hs_supplements', 'hs_products']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!record || typeof record !== 'object') return c.json({ success: false, error: 'Record data is required' }, 400)
 
@@ -2205,6 +2205,40 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'icon_name','icon_url','image_url','video_url','tags',
         'health_score_impact','scientific_references',
         'is_active','sort_order','ai_enriched_at','created_at','updated_at',
+      ]),
+      hs_tests: new Set([
+        'id','slug','name','category','element_key','sample_type','turnaround_days',
+        'retail_price_eur','wholesale_cost_eur','shipping_cost_eur','support_cost_eur','gross_margin_pct',
+        'provider_eu','provider_eu_url','provider_eu_cost',
+        'provider_uk','provider_uk_url','provider_uk_cost',
+        'provider_us','provider_us_url','provider_us_cost',
+        'provider_au','provider_au_url','provider_au_cost',
+        'icon_url','image_url','video_url',
+        'buy_url','sample_order_url','link_type',
+        'supplier_website','supplier_email',
+        'api_dropship_available','api_dropship_connected','api_dropship_notes',
+        'shopify_product_url','shopify_product_id',
+        'setup_notes','is_active','is_featured','description','notes','created_at','updated_at',
+      ]),
+      hs_supplements: new Set([
+        'id','slug','name','element_key','category','region','currency',
+        'retail_price','estimated_cost','margin_pct',
+        'supplier','supplier_website','supplier_email','link_type',
+        'affiliate_url','amazon_url','iherb_url','buy_url',
+        'icon_url','image_url','video_url',
+        'shopify_product_url','shopify_product_id',
+        'setup_notes','is_active','notes','created_at','updated_at',
+      ]),
+      hs_products: new Set([
+        'id','slug','name','product_type','category','element_key',
+        'description','setup_notes',
+        'icon_url','image_url','image_url_2','image_url_3','video_url',
+        'source_url','source_platform','buy_url','link_type',
+        'supplier','supplier_website','supplier_email',
+        'retail_price','currency','region','estimated_cost','margin_pct',
+        'affiliate_available','affiliate_connected','affiliate_notes',
+        'shopify_product_url','shopify_product_id',
+        'is_active','is_featured','notes','created_at','updated_at',
       ]),
     }
 

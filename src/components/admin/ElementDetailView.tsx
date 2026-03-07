@@ -9,6 +9,7 @@ import {
 import { type AdminRecord } from '../../utils/adminHelpers';
 import { DRVWidget } from './DRVWidget';
 import { TopFoodSources } from './TopFoodSources';
+import { HealthScanCoverageSection } from './HealthScanCoverageSection';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -699,6 +700,14 @@ export function ElementDetailView({ record, accessToken }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── HEALTHSCAN COVERAGE ──────────────────────────── */}
+      {r.nutrient_key && (
+        <HealthScanCoverageSection
+          elementKey={r.nutrient_key}
+          accessToken={accessToken}
+        />
+      )}
     </div>
   );
 }
