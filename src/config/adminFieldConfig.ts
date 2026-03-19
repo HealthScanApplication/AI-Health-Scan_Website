@@ -331,7 +331,7 @@ const elementsFields: FieldConfig[] = [
     required: true,
     section: "Identity",
     colSpan: 1,
-    options: ["beneficial", "hazardous", "both", "conditional"],
+    options: ["beneficial", "hazardous", "both"],
     colorMap: {
       beneficial: "bg-green-100 text-green-800",
       hazardous: "bg-red-100 text-red-800",
@@ -353,44 +353,41 @@ const elementsFields: FieldConfig[] = [
       // Beneficial
       "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
       "probiotic", "prebiotic", "enzyme", "phytonutrient",
+      "fiber", "organic acid", "carbohydrate", "protein", "water quality",
       // Hazardous
-      "natural toxin", "antinutrient", "mycotoxin",
-      "heavy metal", "environmental contaminant",
-      "pesticide", "herbicide", "insecticide",
-      "processing byproduct", "food additive", "preservative", "artificial sweetener",
-      "veterinary drug", "hormone", "antibiotic",
-      "endocrine disruptor", "plasticizer",
-      "microorganism", "parasite",
+      "heavy metal", "pesticide", "herbicide", "insecticide",
+      "mycotoxin", "natural toxin", "antinutrient",
+      "environmental contaminant", "industrial chemical", "PAH", "VOC", "PFAS",
+      "processing byproduct", "cooking byproduct", "food additive", "food coloring", "preservative",
+      "artificial sweetener", "emulsifier",
+      "endocrine disruptor", "plasticizer", "solvent",
+      "pharmaceutical residue", "veterinary drug", "hormone", "antibiotic",
+      "disinfectant", "disinfection byproduct", "radioactive contaminant",
+      "bacteria", "virus", "parasite",
     ],
     dynamicOptionsMap: {
       beneficial: [
         "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
         "probiotic", "prebiotic", "enzyme", "phytonutrient",
+        "fiber", "organic acid", "carbohydrate", "protein", "water quality",
       ],
       hazardous: [
-        "natural toxin", "antinutrient", "mycotoxin",
-        "heavy metal", "environmental contaminant",
-        "pesticide", "herbicide", "insecticide",
-        "processing byproduct", "food additive", "preservative", "artificial sweetener",
-        "veterinary drug", "hormone", "antibiotic",
-        "endocrine disruptor", "plasticizer",
-        "microorganism", "parasite",
+        "heavy metal", "pesticide", "herbicide", "insecticide",
+        "mycotoxin", "natural toxin",
+        "environmental contaminant", "industrial chemical", "PAH", "VOC", "PFAS",
+        "processing byproduct", "cooking byproduct", "food additive", "food coloring", "preservative",
+        "artificial sweetener", "emulsifier",
+        "endocrine disruptor", "plasticizer", "solvent",
+        "pharmaceutical residue", "veterinary drug", "hormone", "antibiotic",
+        "disinfectant", "disinfection byproduct", "radioactive contaminant",
+        "bacteria", "virus", "parasite",
       ],
       both: [
         "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
         "probiotic", "prebiotic", "enzyme", "phytonutrient",
-        "natural toxin", "antinutrient", "mycotoxin",
-        "heavy metal", "environmental contaminant",
-        "pesticide", "herbicide", "insecticide",
-        "processing byproduct", "food additive", "preservative", "artificial sweetener",
-        "veterinary drug", "hormone", "antibiotic",
-        "endocrine disruptor", "plasticizer",
-        "microorganism", "parasite",
-      ],
-      conditional: [
-        "vitamin", "mineral", "amino acid", "fatty acid", "antioxidant",
-        "probiotic", "prebiotic", "enzyme", "phytonutrient",
-        "food additive", "preservative", "hormone", "antinutrient",
+        "fiber", "organic acid", "carbohydrate", "protein",
+        "natural toxin", "antinutrient",
+        "food additive", "preservative", "hormone",
       ],
     },
   },
@@ -2687,6 +2684,36 @@ const cookingMethodsFields: FieldConfig[] = [
       "Query catalog_equipment table for this cooking method '{name}'. Return array of equipment UUIDs needed. Match by: 1) Equipment name/category matches method needs (e.g., 'Grilling' needs 'Grill', 'Tongs'), 2) Equipment use_case includes 'Cooking', 3) Consider temperature ({temperature}) and medium ({medium}). Format: ['uuid-1','uuid-2']. List equipment names if UUIDs unavailable.",
   },
   {
+    key: "elements_hazardous",
+    label: "Hazardous Elements",
+    type: "linked_elements",
+    linkedTable: "catalog_elements",
+    linkedCategory: "hazardous",
+    showInList: false,
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "Elements produced/increased by this cooking method",
+    aiSuggest: true,
+    aiPrompt:
+      "For the cooking method '{name}' ({category}, {temperature}), identify hazardous elements/compounds produced. Consider: 1) Heterocyclic amines (HCAs) from high-heat protein cooking, 2) Polycyclic aromatic hydrocarbons (PAHs) from smoke/charring, 3) Acrylamide from starchy foods at high heat, 4) Advanced glycation end products (AGEs), 5) Nitrosamines, 6) Acrolein from overheated oils. Return as JSON object: {\"element_slug\": {\"severity\": \"high/moderate/low\", \"mechanism\": \"brief explanation\"}}",
+  },
+  {
+    key: "elements_beneficial",
+    label: "Beneficial Elements",
+    type: "linked_elements",
+    linkedTable: "catalog_elements",
+    linkedCategory: "beneficial",
+    showInList: false,
+    showInDetail: true,
+    showInEdit: true,
+    colSpan: 2,
+    placeholder: "Elements preserved/enhanced by this cooking method",
+    aiSuggest: true,
+    aiPrompt:
+      "For the cooking method '{name}' ({category}, {temperature}), identify beneficial elements that are preserved or enhanced. Consider: 1) Lycopene enhanced by cooking tomatoes, 2) Beta-carotene made more bioavailable, 3) Minerals retained in steaming vs boiling. Return as JSON object: {\"element_slug\": {\"effect\": \"preserves/enhances/increases_bioavailability\", \"mechanism\": \"brief explanation\"}}",
+  },
+  {
     key: "image_url",
     label: "Image",
     type: "image",
@@ -3302,10 +3329,12 @@ const hsTestsFields: FieldConfig[] = [
   { key: "turnaround_days", label: "TAT (days)",      type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
   { key: "is_active",       label: "Active",          type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
   { key: "is_featured",     label: "Featured",        type: "badge",   showInList: false, showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "published",       label: "Published",       type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
   { key: "description",     label: "Description",     type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
   // ── Media ──────────────────────────────────────────────────────────
   { key: "icon_url",    label: "Icon",       type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
   { key: "image_url",   label: "Image",      type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "element_image_url", label: "Element Image", type: "image", showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
   { key: "video_url",   label: "Video URL",  type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
   // ── Pricing ─────────────────────────────────────────────────────────
   { key: "retail_price_eur",   label: "Retail €",     type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
@@ -3366,6 +3395,7 @@ const hsSupplementsFields: FieldConfig[] = [
   // ── Media ──────────────────────────────────────────────────────────
   { key: "icon_url",   label: "Supplier Logo",      type: "image", showInList: true, showInDetail: true, showInEdit: true, section: "Media" },
   { key: "image_url",  label: "Product Image",     type: "image", showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "element_image_url", label: "Element Image", type: "image", showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
   { key: "video_url",  label: "Video URL", type: "text",  showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
   // ── Pricing ─────────────────────────────────────────────────────────
   { key: "retail_price",   label: "Retail Price",  type: "number", showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
@@ -3407,6 +3437,7 @@ const hsProductsFields: FieldConfig[] = [
   { key: "element_key",  label: "Element Key",    type: "text",   showInList: false, showInDetail: true, showInEdit: true,  placeholder: "optional element link", section: "Identity" },
   { key: "is_active",    label: "Active",         type: "badge",  showInList: true,  showInDetail: true, showInEdit: true,  section: "Identity" },
   { key: "is_featured",  label: "Featured",       type: "badge",  showInList: false, showInDetail: true, showInEdit: true,  section: "Identity" },
+  { key: "published",    label: "Published",      type: "badge",  showInList: true,  showInDetail: true, showInEdit: true,  section: "Identity" },
   { key: "description",  label: "Description",    type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
   // ── Media ──────────────────────────────────────────────────────────
   { key: "icon_url",    label: "Icon",       type: "image",  showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
@@ -3436,12 +3467,165 @@ const hsProductsFields: FieldConfig[] = [
   { key: "affiliate_connected", label: "Affiliate Program Connected", type: "badge",    showInList: true,  showInDetail: true, showInEdit: true, section: "Affiliate & Dropship" },
   { key: "affiliate_notes",     label: "Affiliate/Dropship Notes",     type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "Affiliate & Dropship", colSpan: 2, placeholder: "Commission rate, dropship terms, API details" },
   { key: "setup_notes",         label: "Product Setup/Usage Notes",         type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "Affiliate & Dropship", colSpan: 2 },
+  // ── Dropship Sourcing ──────────────────────────────────────────────────────
+  { key: "dropship_status", label: "Dropship Status", type: "select", showInList: true, showInDetail: true, showInEdit: true, section: "Dropship Sourcing",
+    options: ["not_sourced","sourcing","sourced","ordered","in_stock"],
+    colorMap: { not_sourced: "bg-gray-100 text-gray-600", sourcing: "bg-yellow-100 text-yellow-700", sourced: "bg-blue-100 text-blue-700", ordered: "bg-purple-100 text-purple-700", in_stock: "bg-green-100 text-green-700" } },
+  { key: "temu_search_url",      label: "Temu Search URL",      type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing", placeholder: "https://www.temu.com/search_result.html?search_key=..." },
+  { key: "temu_product_url",     label: "Temu Product URL",     type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing", placeholder: "https://www.temu.com/..." },
+  { key: "alibaba_search_url",   label: "Alibaba Search URL",   type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing", placeholder: "https://www.alibaba.com/trade/search?SearchText=..." },
+  { key: "alibaba_product_url",  label: "Alibaba Product URL",  type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing", placeholder: "https://www.alibaba.com/product-detail/..." },
+  { key: "aliexpress_search_url",label: "AliExpress Search URL", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing", placeholder: "https://www.aliexpress.com/wholesale?SearchText=..." },
+  { key: "aliexpress_product_url",label: "AliExpress Product URL",type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing", placeholder: "https://www.aliexpress.com/item/..." },
+  { key: "dropship_moq",         label: "Min Order Qty (MOQ)",  type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing" },
+  { key: "dropship_lead_days",   label: "Lead Time (days)",     type: "number", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing" },
+  { key: "dropship_notes",       label: "Dropship Notes",       type: "textarea", showInList: false, showInDetail: true, showInEdit: true, section: "Dropship Sourcing", colSpan: 2, placeholder: "Supplier MOQ, shipping method, quality notes..." },
   // ── Shopify Webstore ──────────────────────────────────────────────────────
   { key: "shopify_product_url", label: "Shopify Public URL", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "https://healthscan.myshopify.com/products/..." },
   { key: "shopify_product_id",  label: "Shopify Product ID", type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Shopify Webstore", placeholder: "gid://shopify/Product/..." },
   // ── Meta ───────────────────────────────────────────────────────────
   { key: "notes",      label: "Internal Notes", type: "textarea", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2 },
   { key: "created_at", label: "Created",         type: "date",    showInDetail: true },
+];
+
+/**
+ * ============================================================
+ *  HS_SERVICES TAB — coaching calls, consultations, workshops
+ * ============================================================
+ */
+const hsServicesFields: FieldConfig[] = [
+  // ── Identity ───────────────────────────────────────────────────────
+  { key: "name",             label: "Service Name",     type: "text",    showInList: true,  showInDetail: true, showInEdit: true, placeholder: "e.g. 1-Hour Nutrition Coaching Call", section: "Identity" },
+  { key: "slug",             label: "Slug",             type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "service_type",     label: "Service Type",     type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["coaching_call","consultation","workshop","program","assessment"] },
+  { key: "category",         label: "Category",         type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["General","Nutrition","Fitness","Mental Health","Sleep","Detox","Weight Management","Longevity"] },
+  { key: "duration_minutes", label: "Duration (min)",   type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity", placeholder: "60" },
+  { key: "delivery_method",  label: "Delivery",         type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["video_call","in_person","phone","chat","hybrid"] },
+  { key: "description",      label: "Description",      type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
+  { key: "is_active",        label: "Active",           type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "published",        label: "Published",        type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  // ── Expert ─────────────────────────────────────────────────────────
+  { key: "expert_id",        label: "Expert ID",        type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Expert", placeholder: "Link to hs_experts record" },
+  // ── Media ──────────────────────────────────────────────────────────
+  { key: "icon_url",         label: "Icon",             type: "image",   showInList: true,  showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url",        label: "Image",            type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "video_url",        label: "Video URL",        type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
+  // ── Pricing ────────────────────────────────────────────────────────
+  { key: "retail_price",     label: "Retail Price",     type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "currency",         label: "Currency",         type: "text",    showInList: false, showInDetail: true, showInEdit: true, placeholder: "EUR", section: "Pricing" },
+  { key: "region",           label: "Region",           type: "select",  showInList: false, showInDetail: true, showInEdit: true, section: "Pricing",
+    options: ["EU","UK","US","AU","ROW","GLOBAL"] },
+  { key: "estimated_cost",   label: "Cost",             type: "number",  showInList: false, showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "margin_pct",       label: "Margin %",         type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  // ── Booking ────────────────────────────────────────────────────────
+  { key: "buy_url",          label: "Buy URL",          type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Booking", placeholder: "https://..." },
+  { key: "booking_url",      label: "Booking URL",      type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Booking", placeholder: "https://calendly.com/..." },
+  { key: "calendly_url",     label: "Calendly URL",     type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Booking", placeholder: "https://calendly.com/..." },
+  // ── Shopify ────────────────────────────────────────────────────────
+  { key: "shopify_product_url", label: "Shopify URL",   type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Shopify" },
+  { key: "shopify_product_id",  label: "Shopify ID",    type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Shopify" },
+  // ── Meta ───────────────────────────────────────────────────────────
+  { key: "tags",             label: "Tags",             type: "multi_tags", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2,
+    options: ["nutrition","fitness","mental-health","sleep","detox","weight","longevity","coaching","assessment"] },
+  { key: "notes",            label: "Internal Notes",   type: "textarea", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2 },
+  { key: "created_at",       label: "Created",          type: "date",    showInDetail: true },
+];
+
+/**
+ * ============================================================
+ *  HS_EXPERTS TAB — coaches, nutritionists, specialists
+ * ============================================================
+ */
+const hsExpertsFields: FieldConfig[] = [
+  // ── Identity ───────────────────────────────────────────────────────
+  { key: "name",             label: "Expert Name",      type: "text",    showInList: true,  showInDetail: true, showInEdit: true, placeholder: "e.g. Dr. Jane Smith", section: "Identity" },
+  { key: "slug",             label: "Slug",             type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "title",            label: "Title / Role",     type: "text",    showInList: true,  showInDetail: true, showInEdit: true, placeholder: "e.g. Certified Nutritionist", section: "Identity" },
+  { key: "description",      label: "Short Bio",        type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
+  { key: "bio",              label: "Full Bio",         type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
+  { key: "is_active",        label: "Active",           type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "published",        label: "Published",        type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "is_verified",      label: "Verified",         type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  // ── Media ──────────────────────────────────────────────────────────
+  { key: "avatar_url",       label: "Avatar",           type: "image",   showInList: true,  showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url",        label: "Cover Image",      type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "video_intro_url",  label: "Intro Video URL",  type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
+  // ── Contact & Links ────────────────────────────────────────────────
+  { key: "email",            label: "Email",            type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Contact & Links", placeholder: "expert@email.com" },
+  { key: "whatsapp",         label: "WhatsApp Number",  type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Contact & Links", placeholder: "+351 912 345 678" },
+  { key: "website_url",      label: "Website",          type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Contact & Links", placeholder: "https://..." },
+  { key: "linkedin_url",     label: "LinkedIn",         type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Contact & Links", placeholder: "https://linkedin.com/in/..." },
+  { key: "instagram_url",    label: "Instagram",        type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Contact & Links", placeholder: "https://instagram.com/..." },
+  { key: "tiktok_url",       label: "TikTok",           type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Contact & Links", placeholder: "https://tiktok.com/@..." },
+  // ── Booking ───────────────────────────────────────────────────────
+  { key: "booking_url",          label: "Booking Link (Payment)",    type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Booking", placeholder: "https://stripe.com/pay/..." },
+  { key: "google_schedule_url",  label: "Google Schedule Link",      type: "text", showInList: false, showInDetail: true, showInEdit: true, section: "Booking", placeholder: "https://calendar.google.com/..." },
+  // ── Expertise ──────────────────────────────────────────────────────
+  { key: "expertise_tags",   label: "Expertise",        type: "multi_tags", showInList: true, showInDetail: true, showInEdit: true, section: "Expertise", colSpan: 2,
+    options: ["nutrition","gut-health","weight-loss","weight-gain","detox","hormones","sleep","mental-health","fitness","longevity","skin","autoimmune","functional-medicine","ayurveda","tcm"] },
+  { key: "certifications",   label: "Certifications",   type: "multi_tags", showInList: false, showInDetail: true, showInEdit: true, section: "Expertise", colSpan: 2,
+    options: ["CNS","RD","CPT","PhD","MD","DO","ND","LAc","CHC","CSCS","RYT"] },
+  { key: "languages",        label: "Languages",        type: "multi_tags", showInList: false, showInDetail: true, showInEdit: true, section: "Expertise",
+    options: ["en","es","fr","de","pt","it","nl","ar","zh","ja","ko","hi"] },
+  // ── Rating ─────────────────────────────────────────────────────────
+  { key: "user_rating",      label: "Rating (0-5)",     type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Rating" },
+  { key: "rating_count",     label: "# Ratings",        type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Rating" },
+  // ── Availability ───────────────────────────────────────────────────
+  { key: "region",           label: "Region",           type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Availability",
+    options: ["EU","UK","US","AU","ROW","GLOBAL"] },
+  { key: "timezone",         label: "Timezone",         type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Availability", placeholder: "e.g. Europe/London" },
+  { key: "available_hours",  label: "Available Hours",  type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Availability", placeholder: "Mon-Fri 9am-5pm CET" },
+  // ── Meta ───────────────────────────────────────────────────────────
+  { key: "notes",            label: "Internal Notes",   type: "textarea", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2 },
+  { key: "created_at",       label: "Created",          type: "date",    showInDetail: true },
+];
+
+/**
+ * ============================================================
+ *  HS_PACKAGES TAB — bundles of supplements + tests + products + services
+ * ============================================================
+ */
+const hsPackagesFields: FieldConfig[] = [
+  // ── Identity ───────────────────────────────────────────────────────
+  { key: "name",              label: "Package Name",     type: "text",    showInList: true,  showInDetail: true, showInEdit: true, placeholder: "e.g. Clean Home Starter", section: "Identity" },
+  { key: "slug",              label: "Slug",             type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "short_description", label: "Short Desc",       type: "text",    showInList: true,  showInDetail: true, showInEdit: true, section: "Identity", placeholder: "One-liner for cards" },
+  { key: "description",       label: "Full Description", type: "textarea",showInList: false, showInDetail: true, showInEdit: true, section: "Identity", colSpan: 2 },
+  { key: "category",          label: "Category",         type: "select",  showInList: true,  showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["General","Home","Performance","Weight","Longevity","Detox","Recovery","Gut Health","Sleep","Skin","Hormones"] },
+  { key: "goal",              label: "Goal / Outcome",   type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Identity", placeholder: "e.g. Clean home air" },
+  { key: "target_audience",   label: "Target Audience",  type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Identity", placeholder: "e.g. Adults 25-45" },
+  { key: "difficulty_level",  label: "Difficulty",       type: "select",  showInList: false, showInDetail: true, showInEdit: true, section: "Identity",
+    options: ["beginner","intermediate","advanced"] },
+  { key: "duration_weeks",    label: "Duration (weeks)", type: "number",  showInList: false, showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "is_active",         label: "Active",           type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "is_featured",       label: "Featured",         type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "published",         label: "Published",        type: "badge",   showInList: true,  showInDetail: true, showInEdit: true, section: "Identity" },
+  { key: "sort_order",        label: "Sort Order",       type: "number",  showInList: false, showInDetail: true, showInEdit: true, section: "Identity" },
+  // ── Media ──────────────────────────────────────────────────────────
+  { key: "icon_url",          label: "Icon",             type: "image",   showInList: true,  showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url",         label: "Image 1",          type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "image_url_2",       label: "Image 2",          type: "image",   showInList: false, showInDetail: true, showInEdit: true, section: "Media" },
+  { key: "video_url",         label: "Video URL",        type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "https://youtube.com/..." },
+  { key: "color_hex",         label: "Brand Color",      type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Media", placeholder: "#4CAF50" },
+  // ── Pricing ────────────────────────────────────────────────────────
+  { key: "retail_price",      label: "Bundle Price",     type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "compare_at_price",  label: "Compare At Price", type: "number",  showInList: false, showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "discount_pct",      label: "Bundle Discount %",type: "number",  showInList: true,  showInDetail: true, showInEdit: true, section: "Pricing" },
+  { key: "currency",          label: "Currency",         type: "text",    showInList: false, showInDetail: true, showInEdit: true, placeholder: "EUR", section: "Pricing" },
+  { key: "region",            label: "Region",           type: "select",  showInList: false, showInDetail: true, showInEdit: true, section: "Pricing",
+    options: ["EU","UK","US","AU","ROW","GLOBAL"] },
+  // ── Shopify ────────────────────────────────────────────────────────
+  { key: "shopify_product_url", label: "Shopify URL",   type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Shopify" },
+  { key: "shopify_product_id",  label: "Shopify ID",    type: "text",    showInList: false, showInDetail: true, showInEdit: true, section: "Shopify" },
+  // ── Meta ───────────────────────────────────────────────────────────
+  { key: "tags",              label: "Tags",             type: "multi_tags", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2,
+    options: ["home","air","water","toxins","longevity","performance","weight-loss","weight-gain","gut","sleep","detox","skin","hormones","starter","advanced"] },
+  { key: "notes",             label: "Internal Notes",   type: "textarea", showInList: false, showInDetail: true, showInEdit: true, colSpan: 2 },
+  { key: "created_at",        label: "Created",          type: "date",    showInDetail: true },
 ];
 
 /**
@@ -3537,6 +3721,27 @@ export const adminFieldConfig: Record<string, TabFieldConfig> = {
     secondaryField: "element_key",
     fields: hsSupplementsFields,
   },
+  hs_services: {
+    tabId: "hs_services",
+    label: "HS Service",
+    nameField: "name",
+    secondaryField: "service_type",
+    fields: hsServicesFields,
+  },
+  hs_experts: {
+    tabId: "hs_experts",
+    label: "HS Expert",
+    nameField: "name",
+    secondaryField: "title",
+    fields: hsExpertsFields,
+  },
+  hs_packages: {
+    tabId: "hs_packages",
+    label: "HS Package",
+    nameField: "name",
+    secondaryField: "category",
+    fields: hsPackagesFields,
+  },
 };
 
 /**
@@ -3569,3 +3774,32 @@ export function getAiSuggestFields(tabId: string): FieldConfig[] {
   if (!config) return [];
   return config.fields.filter((f) => f.aiSuggest);
 }
+
+/**
+ * Helper: derive kingdom (parent) from a category value using the tab's categoryTree.
+ * Returns { kingdom, category, subs } for display.
+ */
+export function getCategoryHierarchy(
+  tabId: string,
+  categoryValue: string | undefined | null,
+  categorySub?: string[] | null,
+): { kingdom: string | null; category: string | null; subs: string[] } {
+  if (!categoryValue) return { kingdom: null, category: null, subs: [] };
+  const config = adminFieldConfig[tabId];
+  if (!config) return { kingdom: null, category: categoryValue, subs: categorySub || [] };
+  const treeField = config.fields.find((f) => f.type === "category_tree" && f.categoryTree);
+  if (!treeField?.categoryTree) return { kingdom: null, category: categoryValue, subs: categorySub || [] };
+  for (const [kingdom, types] of Object.entries(treeField.categoryTree)) {
+    if (Object.keys(types).includes(categoryValue)) {
+      return { kingdom, category: categoryValue, subs: categorySub || [] };
+    }
+  }
+  return { kingdom: null, category: categoryValue, subs: categorySub || [] };
+}
+
+export const kingdomColorMap: Record<string, string> = {
+  plant: "bg-green-50 text-green-700 border border-green-200",
+  animal: "bg-red-50 text-red-700 border border-red-200",
+  fungi: "bg-purple-50 text-purple-700 border border-purple-200",
+  processed: "bg-orange-50 text-orange-700 border border-orange-200",
+};

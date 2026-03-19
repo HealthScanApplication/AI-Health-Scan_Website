@@ -76,10 +76,13 @@
       "emoji": "🔥",
       "color": "orange",
       "element_ids": [
-        "acrylamide", "anthracene", "benzo_a_pyrene", "benzo_b_fluoranthene",
+        "3_mcpd_esters", "4_hne", "acetaldehyde", "acrylamide", "aldehydes",
+        "anthracene", "benzo_a_pyrene", "benzo_b_fluoranthene",
         "benzo_k_fluoranthene", "dibenz_a_h_anthracene", "fluoranthene",
-        "indeno_1_2_3_cd_pyrene", "naphthalene", "nitrosamines",
-        "phenanthrene", "pyrene"
+        "glycidyl_esters", "hcas", "indeno_1_2_3_cd_pyrene",
+        "lipid_peroxidation", "mda", "naphthalene", "nitrosamines",
+        "oxidation", "phenanthrene", "polar_compounds", "polymerization",
+        "potassium_bromate", "pyrene", "trans_isomers"
       ]
     },
     {

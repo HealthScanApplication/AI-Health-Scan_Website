@@ -1057,7 +1057,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, id, updates } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms', 'hs_tests', 'hs_supplements', 'hs_products']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms', 'hs_tests', 'hs_supplements', 'hs_products', 'hs_services', 'hs_experts', 'hs_packages']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!id) return c.json({ success: false, error: 'Record ID is required' }, 400)
     if (table === 'catalog_products') {
@@ -1132,7 +1132,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','cooking_methods_used_with','updated_at',
       ]),
       catalog_cooking_methods: new Set([
-        'name','slug','category','description','temperature','medium','typical_time','health_impact','nutrient_effect','best_for','equipment_ids','image_url','updated_at',
+        'name','slug','category','description','temperature','medium','typical_time','health_impact','nutrient_effect','best_for','equipment_ids','elements_hazardous','elements_beneficial','image_url','updated_at',
       ]),
       catalog_products: new Set([
         'name_common','name','name_brand','brand','manufacturer','category','category_sub','subcategory','barcode','quantity',
@@ -1164,6 +1164,33 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'health_score_impact','scientific_references',
         'is_active','sort_order','ai_enriched_at','updated_at',
       ]),
+      hs_services: new Set([
+        'name','slug','description','service_type','duration_minutes','delivery_method','category',
+        'retail_price','currency','region','estimated_cost','margin_pct',
+        'expert_id','icon_url','image_url','video_url',
+        'buy_url','booking_url','calendly_url',
+        'is_active','published','shopify_product_url','shopify_product_id',
+        'notes','tags','updated_at',
+      ]),
+      hs_experts: new Set([
+        'name','slug','title','description','bio',
+        'website_url','linkedin_url','instagram_url','tiktok_url','email','whatsapp',
+        'booking_url','google_schedule_url',
+        'avatar_url','image_url','video_intro_url',
+        'expertise_tags','certifications','languages',
+        'user_rating','rating_count',
+        'region','timezone','available_hours',
+        'is_active','published','is_verified','notes','updated_at',
+      ]),
+      hs_packages: new Set([
+        'name','slug','description','short_description',
+        'category','goal','target_audience','difficulty_level','duration_weeks',
+        'retail_price','compare_at_price','currency','region','discount_pct',
+        'icon_url','image_url','image_url_2','video_url','color_hex',
+        'is_active','is_featured','published','sort_order',
+        'shopify_product_url','shopify_product_id',
+        'notes','tags','updated_at',
+      ]),
     }
     const allowedCols = TABLE_COLUMNS[table]
     const cleanUpdates: Record<string, any> = {}
@@ -1175,7 +1202,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
       if (!allowedCols || allowedCols.has(k)) {
         if (v !== undefined && !['_displayIndex','id','created_at','imported_at','api_source','external_id'].includes(k)) {
           // Validate UUID arrays (equipment_ids, cooking_method_ids, linked_ingredients, cooking_methods_used_with, etc.)
-          const UUID_ARRAY_COLS = new Set(['linked_ingredients', 'linked_elements_deficiency', 'linked_elements_excess'])
+          const UUID_ARRAY_COLS = new Set(['linked_ingredients'])
           if (Array.isArray(v) && (k.includes('_ids') || k.includes('_used_with') || UUID_ARRAY_COLS.has(k))) {
             const validUUIDs = v.filter((uuid: any) => {
               if (typeof uuid !== 'string') return false
@@ -1221,6 +1248,28 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
       console.log(`[Admin INSERT FALLBACK SUCCESS] ${table}/${id} (${fieldCount} fields)`)
     } else {
       console.log(`[Admin UPDATE SUCCESS] ${table}/${id} (${fieldCount} fields)`)
+    }
+    // ── Junction table sync (best-effort) ──
+    // After saving JSONB/array fields, sync to proper junction tables via SQL functions
+    const JUNCTION_SYNC_RPCS: Record<string, string> = {
+      catalog_ingredients: 'sync_ingredient_elements',
+      catalog_recipes: 'sync_recipe_junctions',
+      catalog_cooking_methods: 'sync_cooking_method_junctions',
+      catalog_symptoms: 'sync_symptom_junctions',
+      catalog_activities: 'sync_activity_junctions',
+    }
+    const syncRpc = JUNCTION_SYNC_RPCS[table]
+    if (syncRpc) {
+      try {
+        const { data: syncResult, error: syncErr } = await supabase.rpc(syncRpc, { p_id: id })
+        if (syncErr) {
+          console.warn(`[Admin] Junction sync (${syncRpc}): ${syncErr.message}`)
+        } else {
+          console.log(`[Admin] Junction sync OK (${syncRpc}):`, JSON.stringify(syncResult))
+        }
+      } catch (e: any) {
+        console.warn(`[Admin] Junction sync error: ${e?.message}`)
+      }
     }
     return c.json({ success: true })
   } catch (error: any) {
@@ -2123,7 +2172,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
     const { table, record } = await c.req.json()
-    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms', 'hs_tests', 'hs_supplements', 'hs_products']
+    const allowedTables = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes', 'catalog_products', 'catalog_equipment', 'catalog_cooking_methods', 'catalog_activities', 'catalog_symptoms', 'hs_tests', 'hs_supplements', 'hs_products', 'hs_services', 'hs_experts', 'hs_packages']
     if (!allowedTables.includes(table)) return c.json({ success: false, error: `Invalid table: ${table}` }, 400)
     if (!record || typeof record !== 'object') return c.json({ success: false, error: 'Record data is required' }, 400)
 
@@ -2175,7 +2224,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'id','name','category','description','image_url','brand','material','size_notes','use_case','affiliate_url','cooking_methods_used_with','created_at','updated_at',
       ]),
       catalog_cooking_methods: new Set([
-        'id','name','slug','category','description','temperature','medium','typical_time','health_impact','nutrient_effect','best_for','equipment_ids','image_url','created_at','updated_at',
+        'id','name','slug','category','description','temperature','medium','typical_time','health_impact','nutrient_effect','best_for','equipment_ids','elements_hazardous','elements_beneficial','image_url','created_at','updated_at',
       ]),
       catalog_activities: new Set([
         'id','name','description','category','icon_name','icon_svg_path','icon_url','image_url','video_url',
@@ -2213,21 +2262,21 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'provider_uk','provider_uk_url','provider_uk_cost',
         'provider_us','provider_us_url','provider_us_cost',
         'provider_au','provider_au_url','provider_au_cost',
-        'icon_url','image_url','video_url',
+        'icon_url','image_url','element_image_url','element_images','video_url',
         'buy_url','sample_order_url','link_type',
         'supplier_website','supplier_email',
         'api_dropship_available','api_dropship_connected','api_dropship_notes',
         'shopify_product_url','shopify_product_id',
-        'setup_notes','is_active','is_featured','description','notes','created_at','updated_at',
+        'setup_notes','is_active','is_featured','published','description','notes','created_at','updated_at',
       ]),
       hs_supplements: new Set([
         'id','slug','name','element_key','category','region','currency',
         'retail_price','estimated_cost','margin_pct',
         'supplier','supplier_website','supplier_email','link_type',
         'affiliate_url','amazon_url','iherb_url','buy_url',
-        'icon_url','image_url','video_url',
+        'icon_url','image_url','element_image_url','element_images','video_url',
         'shopify_product_url','shopify_product_id',
-        'setup_notes','is_active','notes','created_at','updated_at',
+        'setup_notes','is_active','published','notes','created_at','updated_at',
       ]),
       hs_products: new Set([
         'id','slug','name','product_type','category','element_key',
@@ -2238,7 +2287,34 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'retail_price','currency','region','estimated_cost','margin_pct',
         'affiliate_available','affiliate_connected','affiliate_notes',
         'shopify_product_url','shopify_product_id',
-        'is_active','is_featured','notes','created_at','updated_at',
+        'is_active','is_featured','published','notes','created_at','updated_at',
+      ]),
+      hs_services: new Set([
+        'id','name','slug','description','service_type','duration_minutes','delivery_method','category',
+        'retail_price','currency','region','estimated_cost','margin_pct',
+        'expert_id','icon_url','image_url','video_url',
+        'buy_url','booking_url','calendly_url',
+        'is_active','published','shopify_product_url','shopify_product_id',
+        'notes','tags','created_at','updated_at',
+      ]),
+      hs_experts: new Set([
+        'id','name','slug','title','description','bio',
+        'website_url','linkedin_url','instagram_url','tiktok_url','email','whatsapp',
+        'booking_url','google_schedule_url',
+        'avatar_url','image_url','video_intro_url',
+        'expertise_tags','certifications','languages',
+        'user_rating','rating_count',
+        'region','timezone','available_hours',
+        'is_active','published','is_verified','notes','created_at','updated_at',
+      ]),
+      hs_packages: new Set([
+        'id','name','slug','description','short_description',
+        'category','goal','target_audience','difficulty_level','duration_weeks',
+        'retail_price','compare_at_price','currency','region','discount_pct',
+        'icon_url','image_url','image_url_2','video_url','color_hex',
+        'is_active','is_featured','published','sort_order',
+        'shopify_product_url','shopify_product_id',
+        'notes','tags','created_at','updated_at',
       ]),
     }
 
@@ -3154,7 +3230,21 @@ app.get('/make-server-ed0fe4c2/blog/service-health', (c) => {
 const PROD_URL = 'https://ermbkttsyvpenjjxaxcf.supabase.co'
 const PROD_SERVICE_KEY = Deno.env.get('PROD_SUPABASE_SERVICE_ROLE_KEY') || ''
 
-const SYNC_TABLES = ['catalog_elements', 'catalog_ingredients', 'catalog_recipes'] as const
+// Parent tables first (order matters for FK constraints), then junction tables
+const SYNC_TABLES = [
+  // ── Parent catalog tables ──
+  'catalog_elements', 'catalog_ingredients', 'catalog_recipes',
+  'catalog_cooking_methods', 'catalog_equipment', 'catalog_activities', 'catalog_symptoms',
+  // ── HS tables ──
+  'hs_tests', 'hs_supplements', 'hs_products', 'hs_experts', 'hs_services', 'hs_packages',
+  // ── Junction tables (depend on parents above) ──
+  'catalog_ingredient_elements',
+  'element_supplements', 'element_tests', 'element_products',
+  'cooking_method_elements',
+  'recipe_ingredients', 'recipe_cooking_methods', 'recipe_equipment', 'recipe_elements',
+  'symptom_elements', 'activity_elements',
+  'package_items',
+] as const
 type SyncTable = typeof SYNC_TABLES[number]
 
 async function fetchAllFromSupabase(baseUrl: string, serviceKey: string, table: string): Promise<any[]> {

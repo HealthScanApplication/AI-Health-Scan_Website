@@ -21,6 +21,7 @@ import {
   UtensilsCrossed,
   CheckSquare,
   Eye,
+  ExternalLink,
   RefreshCw,
   FlaskConical,
   Package,
@@ -47,10 +48,17 @@ import {
   Upload,
   Database,
   User,
+  Briefcase,
+  UserCheck,
+  Gift,
+  Star,
+  ImageOff,
+  Users,
+  Filter,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
-import { adminFieldConfig, getFieldsForView, type FieldConfig } from '../config/adminFieldConfig';
+import { adminFieldConfig, getFieldsForView, getCategoryHierarchy, kingdomColorMap, type FieldConfig } from '../config/adminFieldConfig';
 import { RISK_CATEGORIES, HAZARD_LEVELS, HAZARD_LEVEL_COLORS, CATEGORY_HEADER_COLORS } from '../config/riskCategories';
 import { NUTRIENT_CATEGORIES, SERVING_PRESETS } from '../config/nutrientCategories';
 import { WaitlistFunnelDashboard } from './admin/WaitlistFunnelDashboard';
@@ -1748,6 +1756,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         { id: 'hs_tests', label: 'Tests', icon: <FlaskConical className="w-4 h-4 text-teal-600" />, table: 'hs_tests' },
         { id: 'hs_supplements', label: 'Supplements', icon: <Pill className="w-4 h-4 text-teal-600" />, table: 'hs_supplements' },
         { id: 'hs_products', label: 'Products', icon: <Package className="w-4 h-4 text-teal-600" />, table: 'hs_products' },
+        { id: 'hs_services', label: 'Services', icon: <Briefcase className="w-4 h-4 text-teal-600" />, table: 'hs_services' },
+        { id: 'hs_experts', label: 'Experts', icon: <UserCheck className="w-4 h-4 text-teal-600" />, table: 'hs_experts' },
+        { id: 'hs_packages', label: 'Packages', icon: <Gift className="w-4 h-4 text-teal-600" />, table: 'hs_packages' },
       ]
     },
     {
@@ -1777,9 +1788,12 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [listUploadingId, setListUploadingId] = useState<string | null>(null);
   const [subFilter, setSubFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [showNoImage, setShowNoImage] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
@@ -3623,7 +3637,19 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     
     // Filter by second-level category/type filter
     if (categoryFilter !== 'all') {
-      if (activeTab === 'recipes') {
+      if (activeTab === 'elements') {
+        // Elements second-level: filter by type_label (mineral, vitamin, etc.)
+        // Handle mixed formats: plain "vitamin", bracket '["vitamin"]', or array ["vitamin"]
+        const tl = record.type_label;
+        let typeLabels: string[] = [];
+        if (Array.isArray(tl)) {
+          typeLabels = tl.map((t: string) => t.toLowerCase());
+        } else if (typeof tl === 'string') {
+          const stripped = tl.replace(/^\["|"\]$/g, '').toLowerCase();
+          typeLabels = [stripped];
+        }
+        if (!typeLabels.includes(categoryFilter.toLowerCase())) return false;
+      } else if (activeTab === 'recipes') {
         // Recipes second-level: filter by type column (breakfast, lunch, etc.)
         const t = (record.type || '').toLowerCase();
         if (t !== categoryFilter.toLowerCase()) return false;
@@ -3639,12 +3665,33 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       const reg = (record.region || '').toUpperCase();
       if (reg !== regionFilter.toUpperCase()) return false;
     }
+
+    // Filter: show only records without image
+    if (showNoImage) {
+      const hasImage = !!(record.image_url || record.icon_url || record.avatar_url);
+      if (hasImage) return false;
+    }
     
     return matchesSearch;
   }).map((record, index) => ({ ...record, _displayIndex: index }));
 
+  // Filter: show only duplicate names (records sharing the same name/name_common)
+  const displayRecords = (() => {
+    if (!showDuplicates) return filteredRecords;
+    const nameKey = activeTab === 'waitlist' ? 'email' : (activeTab === 'hs_tests' || activeTab === 'hs_supplements' || activeTab === 'hs_products' || activeTab === 'hs_services' || activeTab === 'hs_experts' || activeTab === 'hs_packages' || activeTab === 'equipment' || activeTab === 'cooking_methods' || activeTab === 'activities' || activeTab === 'symptoms') ? 'name' : 'name_common';
+    const nameCounts: Record<string, number> = {};
+    for (const r of filteredRecords) {
+      const n = (r[nameKey as keyof typeof r] as string || '').toLowerCase().trim();
+      if (n) nameCounts[n] = (nameCounts[n] || 0) + 1;
+    }
+    return filteredRecords.filter(r => {
+      const n = (r[nameKey as keyof typeof r] as string || '').toLowerCase().trim();
+      return n && nameCounts[n] > 1;
+    });
+  })();
+
   // Sort records
-  const sortedRecords = [...filteredRecords].sort((a, b) => {
+  const sortedRecords = [...displayRecords].sort((a, b) => {
     if (!sortField) return 0;
     let aVal = (a as any)[sortField];
     let bVal = (b as any)[sortField];
@@ -3690,6 +3737,18 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   };
 
   const getImageUrl = (record: AdminRecord) => {
+    // For HealthScan products, prioritize icon_url (supplier logo) over image_url
+    if (activeTab === 'hs_supplements' || activeTab === 'hs_tests' || activeTab === 'hs_products') {
+      const imageUrl = record.icon_url || record.image_url || record.avatar_url;
+      const base = imageUrl || PLACEHOLDER_IMAGE;
+      // Cache-bust Supabase storage URLs using updated_at
+      if (base && base.includes('supabase.co/storage') && record.updated_at) {
+        const ts = new Date(record.updated_at).getTime();
+        return `${base}?v=${ts}`;
+      }
+      return base;
+    }
+    
     // Try multiple possible image field names
     let imageUrl = record.image_url || record.avatar_url;
     
@@ -3761,7 +3820,25 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             />
           </div>
         ) : (
-          <div className="flex-shrink-0">
+          <div
+            className="flex-shrink-0 relative"
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('ring-2', 'ring-blue-400', 'scale-110'); }}
+            onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('ring-2', 'ring-blue-400', 'scale-110'); }}
+            onDrop={async (e) => {
+              e.preventDefault(); e.stopPropagation();
+              e.currentTarget.classList.remove('ring-2', 'ring-blue-400', 'scale-110');
+              const file = e.dataTransfer.files?.[0];
+              if (!file || !file.type.startsWith('image/') || !currentTab) return;
+              setListUploadingId(record.id);
+              try {
+                const publicUrl = await uploadFileToStorage(file, 'catalog-media', accessToken);
+                await saveRecordToDB(currentTab.table, record.id, { image_url: publicUrl });
+                fetchRecords();
+                toast.success('Image saved!');
+              } catch (err: any) { toast.error(`Upload failed: ${(err?.message || '').slice(0, 80)}`); }
+              finally { setListUploadingId(null); }
+            }}
+          >
             {record.icon_name && (activeTab === 'activities' || activeTab === 'symptoms') ? (
               <div
                 className="w-16 h-16 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 flex items-center justify-center hover:shadow-lg cursor-pointer transition-all hover:scale-105"
@@ -3773,10 +3850,15 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               <img
                 src={imageUrl}
                 alt={displayName}
-                className="w-16 h-16 rounded-lg object-cover hover:shadow-lg cursor-pointer transition-shadow"
+                className="w-16 h-16 rounded-lg object-cover hover:shadow-lg cursor-pointer transition-all"
                 onClick={() => handleEdit(record)}
                 loading="lazy"
               />
+            )}
+            {listUploadingId === record.id && (
+              <div className="absolute inset-0 bg-white/70 rounded-lg flex items-center justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              </div>
             )}
           </div>
         )}
@@ -3826,6 +3908,16 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               )}
               {!isWaitlist && (
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {/* Published status for HealthScan products */}
+                  {(activeTab === 'hs_supplements' || activeTab === 'hs_tests' || activeTab === 'hs_products') && (
+                    <Badge className={`text-[10px] px-1.5 py-0 ${
+                      record.published 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {record.published ? '✓ Published' : 'Unpublished'}
+                    </Badge>
+                  )}
                   {/* Elements: show health_role • type_label as underline */}
                   {activeTab === 'elements' && (record.health_role || record.type_label) && (
                     <span className="text-[10px] text-gray-500 font-medium">
@@ -3834,38 +3926,30 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       {record.type_label && <span>{record.type_label}</span>}
                     </span>
                   )}
-                  {/* Other tabs: show category/type badges */}
+                  {/* Other tabs: show kingdom > category > subcategory badges */}
                   {activeTab !== 'elements' && (() => {
-                    // Parse category if it's a JSON object
-                    let categoryValue = record.category;
-                    let categoryMain = null;
-                    let categorySub = null;
-                    
-                    if (typeof categoryValue === 'string' && categoryValue.startsWith('{')) {
-                      try {
-                        const parsed = JSON.parse(categoryValue);
-                        categoryMain = parsed.main;
-                        categorySub = parsed.sub;
-                      } catch (e) {
-                        // If parsing fails, use as-is
-                      }
-                    } else if (typeof categoryValue === 'object' && categoryValue) {
-                      categoryMain = (categoryValue as any).main;
-                      categorySub = (categoryValue as any).sub;
-                    }
+                    const catRaw = typeof record.category === 'string' ? record.category : '';
+                    const subRaw = record.category_sub;
+                    const subs = Array.isArray(subRaw) ? subRaw : [];
+                    const { kingdom, category: cat } = getCategoryHierarchy(activeTab, catRaw, subs);
                     
                     return (
                       <>
-                        {(categoryMain || categoryValue) && (
-                          <Badge className={`text-[10px] px-1.5 py-0 ${categoryColorMap[(categoryMain || categoryValue)?.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
-                            {categoryMain || categoryValue}
+                        {kingdom && (
+                          <Badge className={`text-[10px] px-1.5 py-0 ${kingdomColorMap[kingdom.toLowerCase()] || 'bg-gray-100 text-gray-600'}`}>
+                            {kingdom}
                           </Badge>
                         )}
-                        {categorySub && (
-                          <Badge className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-600">
-                            {categorySub}
+                        {cat && (
+                          <Badge className={`text-[10px] px-1.5 py-0 ${categoryColorMap[cat.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+                            {cat}
                           </Badge>
                         )}
+                        {subs.length > 0 && subs.map((s: string) => (
+                          <Badge key={s} className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-600">
+                            {s}
+                          </Badge>
+                        ))}
                       </>
                     );
                   })()}
@@ -3962,6 +4046,26 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
               )}
               {/* Action buttons */}
               <div className="flex items-center gap-1">
+                {/* View Public Page button for HealthScan products */}
+                {(activeTab === 'hs_supplements' || activeTab === 'hs_tests' || activeTab === 'hs_products') && record.slug && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const baseUrl = window.location.origin;
+                      const publicPath = activeTab === 'hs_supplements' 
+                        ? `/supplements/${record.slug}` 
+                        : activeTab === 'hs_tests'
+                        ? `/tests/${record.slug}`
+                        : `/products/${record.slug}`;
+                      window.open(baseUrl + publicPath, '_blank');
+                    }}
+                    className="h-8 w-8 p-0 text-gray-400 hover:text-green-600"
+                    title="View public page"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                )}
                 {isWaitlist && !record.confirmed && (
                   <Button
                     size="sm"
@@ -4018,7 +4122,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
           <CardDescription>Manage waitlist, elements, ingredients, recipes, products, and scans</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); setRegionFilter('all'); }} className="w-full">
+          <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); setRegionFilter('all'); setShowDuplicates(false); setShowNoImage(false); }} className="w-full">
             {/* Main Group Tabs */}
             <div className="flex gap-2 mb-3 border-b pb-2">
               {tabGroups.map(group => (
@@ -4284,11 +4388,37 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                       })}
                     </div>
 
+                    {/* Second-level type filter for Elements (mineral, vitamin, etc.) */}
+                    {tab.id === 'elements' && (() => {
+                      const beneficialTypes = ['vitamin', 'mineral', 'amino acid', 'fatty acid', 'antioxidant', 'probiotic', 'prebiotic', 'enzyme', 'phytonutrient', 'fiber', 'organic acid', 'carbohydrate', 'protein', 'water quality'];
+                      const hazardousTypes = ['heavy metal', 'pesticide', 'herbicide', 'insecticide', 'mycotoxin', 'natural toxin', 'antinutrient', 'environmental contaminant', 'industrial chemical', 'PAH', 'VOC', 'PFAS', 'processing byproduct', 'cooking byproduct', 'food additive', 'food coloring', 'preservative', 'artificial sweetener', 'endocrine disruptor', 'plasticizer', 'solvent', 'pharmaceutical residue', 'veterinary drug', 'hormone', 'antibiotic', 'disinfectant', 'disinfection byproduct', 'radioactive contaminant', 'bacteria', 'virus', 'parasite'];
+                      const bothTypes = [...beneficialTypes, 'natural toxin', 'antinutrient', 'food additive', 'preservative', 'hormone'];
+                      const types = subFilter === 'beneficial' ? beneficialTypes : subFilter === 'hazardous' ? hazardousTypes : subFilter === 'both' ? bothTypes : [...beneficialTypes, ...hazardousTypes];
+                      return (
+                        <div className="inline-flex flex-wrap gap-1 p-1 bg-gray-50 rounded-lg justify-center max-w-3xl">
+                          <button
+                            onClick={() => { setCategoryFilter('all'); setCurrentPage(1); }}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                              categoryFilter === 'all' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                            }`}
+                          >All Types</button>
+                          {types.map(t => (
+                            <button
+                              key={t}
+                              onClick={() => { setCategoryFilter(t); setCurrentPage(1); }}
+                              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${
+                                categoryFilter === t ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                              }`}
+                            >{t}</button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
                     {/* Second-level category filter for Ingredients */}
-                    {tab.id === 'ingredients' && subFilter !== 'all' && (() => {
-                      const rawCategories = ['vegetable', 'fruit', 'grain', 'legume', 'nut', 'seed', 'herb', 'spice', 'protein'];
-                      const processedCategories = ['dairy', 'oil', 'sweetener', 'additive'];
-                      const cats = subFilter === 'raw' ? rawCategories : processedCategories;
+                    {tab.id === 'ingredients' && (() => {
+                      const allCategories = ['grain', 'vegetable', 'fruit', 'mushroom', 'legume', 'nut', 'seed', 'herb', 'spice', 'meat', 'poultry', 'seafood', 'dairy', 'plant oil', 'water', 'beverage', 'alcohol', 'condiment', 'sweetener', 'additive', 'plant', 'starch'];
+                      const cats = allCategories;
                       return (
                         <div className="inline-flex flex-wrap gap-1 p-1 bg-gray-50 rounded-lg justify-center">
                           <button
@@ -4766,6 +4896,48 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     )}
                   </div>
 
+                  {/* Quick Filter Buttons: Duplicates + No Image */}
+                  {activeTab !== 'waitlist' && activeTab !== 'scans' && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-500 mr-1">Filters:</span>
+                      <button
+                        onClick={() => { setShowDuplicates(!showDuplicates); setCurrentPage(1); }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                          showDuplicates
+                            ? 'bg-orange-100 text-orange-700 border border-orange-300'
+                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
+                        }`}
+                        title="Show records with duplicate names"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        Duplicates
+                        {showDuplicates && <span className="text-[10px] text-orange-500 font-semibold">({displayRecords.length})</span>}
+                      </button>
+                      <button
+                        onClick={() => { setShowNoImage(!showNoImage); setCurrentPage(1); }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                          showNoImage
+                            ? 'bg-rose-100 text-rose-700 border border-rose-300'
+                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
+                        }`}
+                        title="Show records without an image"
+                      >
+                        <ImageOff className="w-3.5 h-3.5" />
+                        No Image
+                        {showNoImage && <span className="text-[10px] text-rose-500 font-semibold">({sortedRecords.length})</span>}
+                      </button>
+                      {(showDuplicates || showNoImage) && (
+                        <button
+                          onClick={() => { setShowDuplicates(false); setShowNoImage(false); setCurrentPage(1); }}
+                          className="px-1.5 py-1 rounded text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                          title="Clear all filters"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Bulk Actions Bar */}
                   {bulkMode && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
@@ -5125,10 +5297,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const cloned = { ...editingRecord };
-                  delete cloned.id;
-                  delete cloned.created_at;
-                  delete cloned.updated_at;
+                  const { id: _id, created_at: _ca, updated_at: _ua, ...cloned } = editingRecord as any;
                   const nameKey = cloned.name_common ? 'name_common' : 'name';
                   cloned[nameKey] = `${cloned[nameKey] || ''} (Copy)`;
                   if (cloned.slug) cloned.slug = `${cloned.slug}-copy`;
@@ -5326,7 +5495,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     try {
                       const res = await fetch(
                         `https://${projectId}.supabase.co/rest/v1/element_foods?element_id=eq.${editingRecord.id}&order=rank.asc&limit=10`,
-                        { headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` } }
+                        { headers: { 'apikey': publicAnonKey, 'Authorization': `Bearer ${publicAnonKey}` } }
                       );
                       if (res.ok) {
                         const data = await res.json();
@@ -7262,10 +7431,6 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   </div>{/* end grid */}
                 </div>
               );
-            }
-
-            if (field.type === 'cooking_tools') {
-              return null; // rendered inside grouped_ingredients 3-col layout above
             }
 
             if (field.type === 'cooking_steps') {

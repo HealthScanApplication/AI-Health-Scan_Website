@@ -4,7 +4,7 @@ import { Badge } from '../ui/badge';
 import { Trash2, Edit, Image as ImageIcon, Loader2, Flame, Beef, Wheat, Droplets, ChevronDown, ChevronRight } from 'lucide-react';
 import { AdminModal } from '../ui/AdminModal';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
-import { getFieldsForView, adminFieldConfig, badgeColorMap, type FieldConfig } from '../../config/adminFieldConfig';
+import { getFieldsForView, adminFieldConfig, badgeColorMap, getCategoryHierarchy, kingdomColorMap, type FieldConfig } from '../../config/adminFieldConfig';
 import {
   type AdminRecord,
   type GeoInfo,
@@ -16,6 +16,10 @@ import { projectId, publicAnonKey } from '../../utils/supabase/info';
 import { ElementDetailView } from './ElementDetailView';
 import { LucideIconPreview } from './IconPickerField';
 import { IngredientCoverageSection } from './HealthScanCoverageSection';
+import { LinkedElementsSection } from './LinkedElementsSection';
+import { IngredientRelationsPanel } from './IngredientRelationsPanel';
+import { PackageItemsPanel } from './PackageItemsPanel';
+import { MidjourneyPromptGenerator } from './MidjourneyPromptGenerator';
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -177,7 +181,10 @@ export function CatalogDetailTray({
       {/* Content with padding */}
       <div className="px-6 py-5 space-y-4">
         {/* Badges */}
-        <BadgeRow record={record} />
+        <BadgeRow record={record} activeTab={activeTab} />
+
+        {/* Midjourney Prompt Generator */}
+        <MidjourneyPromptGenerator record={record} activeTab={activeTab} />
 
         {/* ── ELEMENTS TAB: Dedicated detail view ── */}
         {activeTab === 'elements' ? (
@@ -233,6 +240,41 @@ export function CatalogDetailTray({
               </CollapsibleSection>
             )}
             <IngredientCoverageSection record={record} accessToken={accessToken} />
+            
+            {/* Ingredient Relations: Elements, Sub-ingredients, Recipes, Products */}
+            <IngredientRelationsPanel record={record} accessToken={accessToken} />
+          </>
+        ) : activeTab === 'hs_packages' ? (
+          <>
+            {/* Description(s) */}
+            {descFields.length > 0 && (
+              <div className="space-y-2">
+                {descFields.map((df) => (
+                  <div key={df.key} className="bg-gray-50 rounded-xl p-4">
+                    {descFields.length > 1 && (
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{df.label}</div>
+                    )}
+                    <div className="text-sm text-gray-700 leading-relaxed">{record[df.key]}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Sectioned fields */}
+            {sections.map((section) => (
+              <SectionBlock
+                key={section}
+                section={section}
+                fields={sectionedFields.filter((f) => f.section === section)}
+                record={record}
+                ipGeoData={ipGeoData}
+                resolvedLinked={resolvedLinked}
+                linkedLoading={linkedLoading}
+              />
+            ))}
+
+            {/* Package Contents: Supplements, Tests, Products, Services */}
+            <PackageItemsPanel record={record} accessToken={accessToken} />
           </>
         ) : (
           <>
@@ -299,6 +341,16 @@ export function CatalogDetailTray({
                 )}
               </CollapsibleSection>
             )}
+
+            {/* Linked Elements — show on hs_supplements, hs_tests, hs_products */}
+            {(activeTab === 'hs_supplements' || activeTab === 'hs_tests' || activeTab === 'hs_products') && (
+              <LinkedElementsSection
+                elementKey={record.element_key}
+                recordId={record.id}
+                hsTable={activeTab as 'hs_supplements' | 'hs_tests' | 'hs_products'}
+                accessToken={accessToken}
+              />
+            )}
           </>
         )}
       </div>
@@ -347,16 +399,29 @@ function HeroImage({
   );
 }
 
-function BadgeRow({ record }: { record: AdminRecord }) {
+function BadgeRow({ record, activeTab }: { record: AdminRecord; activeTab?: string }) {
+  const catRaw = typeof record.category === 'string' ? record.category : '';
+  const subRaw = record.category_sub;
+  const subs: string[] = Array.isArray(subRaw) ? subRaw : [];
+  const { kingdom, category: cat } = getCategoryHierarchy(activeTab || '', catRaw, subs);
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {record.category && (
-        <Badge
-          className={`text-xs ${badgeColorMap[record.category.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}
-        >
-          {record.category}
+      {kingdom && (
+        <Badge className={`text-xs ${kingdomColorMap[kingdom.toLowerCase()] || 'bg-gray-100 text-gray-600'}`}>
+          {kingdom}
         </Badge>
       )}
+      {cat && (
+        <Badge className={`text-xs ${badgeColorMap[cat.toLowerCase()] || 'bg-blue-100 text-blue-800'}`}>
+          {cat}
+        </Badge>
+      )}
+      {subs.length > 0 && subs.map((s: string) => (
+        <Badge key={s} className="text-xs bg-blue-50 text-blue-600">
+          {s}
+        </Badge>
+      ))}
       {record.type && (
         <Badge
           className={`text-xs ${badgeColorMap[record.type.toLowerCase()] || 'bg-gray-100 text-gray-700'}`}

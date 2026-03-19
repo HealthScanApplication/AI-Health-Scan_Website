@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FlaskConical, Pill, ExternalLink, CheckCircle, XCircle, ChevronDown, ChevronRight, ShoppingCart, Package } from 'lucide-react';
+import { FlaskConical, Pill, ExternalLink, CheckCircle, XCircle, ChevronDown, ChevronRight, ShoppingCart, Package, Box, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { projectId, publicAnonKey } from '../../utils/supabase/info';
 
@@ -42,6 +42,23 @@ interface HsSupplement {
   is_active: boolean;
 }
 
+interface HsProduct {
+  id: string;
+  slug: string;
+  name: string;
+  product_type: string;
+  category: string;
+  element_key: string;
+  retail_price: number;
+  currency: string;
+  region: string;
+  supplier: string;
+  buy_url?: string;
+  image_url?: string;
+  icon_url?: string;
+  is_active: boolean;
+}
+
 interface Props {
   /** Single element key (for element detail view) */
   elementKey?: string;
@@ -50,6 +67,7 @@ interface Props {
   accessToken?: string;
   onOpenTest?: (testId: string) => void;
   onOpenSupplement?: (supplementId: string) => void;
+  onOpenProduct?: (productId: string) => void;
 }
 
 const REGION_FLAGS: Record<string, string> = { EU: '🇪🇺', UK: '🇬🇧', US: '🇺🇸', AU: '🇦🇺', ROW: '🌍' };
@@ -62,9 +80,10 @@ const SAMPLE_LABELS: Record<string, string> = {
   DRIED_URINE: 'Dried Urine',
 };
 
-export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken, onOpenTest, onOpenSupplement }: Props) {
+export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken, onOpenTest, onOpenSupplement, onOpenProduct }: Props) {
   const [tests, setTests] = useState<HsTest[]>([]);
   const [supplements, setSupplements] = useState<HsSupplement[]>([]);
+  const [products, setProducts] = useState<HsProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(true);
 
@@ -86,10 +105,12 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
     Promise.all([
       fetch(`https://${projectId}.supabase.co/rest/v1/hs_tests?element_key=in.(${keyFilter})&order=category.asc,name.asc`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`https://${projectId}.supabase.co/rest/v1/hs_supplements?element_key=in.(${keyFilter})&order=region.asc,name.asc`, { headers }).then(r => r.ok ? r.json() : []),
-    ]).then(([t, s]) => {
+      fetch(`https://${projectId}.supabase.co/rest/v1/hs_products?element_key=in.(${keyFilter})&order=category.asc,name.asc`, { headers }).then(r => r.ok ? r.json() : []),
+    ]).then(([t, s, p]) => {
       if (!cancelled) {
         setTests(Array.isArray(t) ? t : []);
         setSupplements(Array.isArray(s) ? s : []);
+        setProducts(Array.isArray(p) ? p : []);
         setLoading(false);
       }
     }).catch(() => { if (!cancelled) setLoading(false); });
@@ -99,7 +120,8 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
 
   const hasTests = tests.length > 0;
   const hasSupplements = supplements.length > 0;
-  const hasCoverage = hasTests || hasSupplements;
+  const hasProducts = products.length > 0;
+  const hasCoverage = hasTests || hasSupplements || hasProducts;
 
   return (
     <div className="border border-teal-200 rounded-xl overflow-hidden">
@@ -120,7 +142,7 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
                 <XCircle className="w-3.5 h-3.5 text-gray-400" />
               )}
               <span className="text-xs text-teal-600">
-                {tests.length} test{tests.length !== 1 ? 's' : ''} · {supplements.length} supplement{supplements.length !== 1 ? 's' : ''}
+                {tests.length} test{tests.length !== 1 ? 's' : ''} · {supplements.length} supplement{supplements.length !== 1 ? 's' : ''}{products.length > 0 ? ` · ${products.length} product${products.length !== 1 ? 's' : ''}` : ''}
               </span>
             </div>
           )}
@@ -265,11 +287,56 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
             )}
           </div>
 
+          {/* Products */}
+          {hasProducts && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Box className="w-3.5 h-3.5 text-teal-500" />
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Products</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {products.map(prod => (
+                  <div
+                    key={prod.id}
+                    className="flex flex-col gap-1.5 bg-teal-50 border border-teal-200 hover:border-teal-300 rounded-lg p-2.5 transition-colors min-w-[160px] max-w-[200px]"
+                  >
+                    <button
+                      onClick={() => onOpenProduct?.(prod.id)}
+                      className="flex items-start gap-1.5 text-left group"
+                    >
+                      {prod.icon_url || prod.image_url ? (
+                        <img src={prod.icon_url || prod.image_url} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
+                      ) : (
+                        <ImageIcon className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-teal-800 leading-tight">{prod.name}</div>
+                        <div className="text-[10px] text-teal-600 mt-0.5">
+                          {prod.currency} {prod.retail_price}
+                          {prod.supplier ? ` · ${prod.supplier}` : ''}
+                        </div>
+                      </div>
+                      {onOpenProduct && <ExternalLink className="w-3 h-3 text-teal-300 group-hover:text-teal-500 flex-shrink-0 ml-auto" />}
+                    </button>
+                    {prod.buy_url && (
+                      <div className="flex gap-1">
+                        <a href={prod.buy_url} target="_blank" rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-0.5 bg-teal-600 hover:bg-teal-700 text-white text-[10px] font-semibold py-1 px-1.5 rounded transition-colors">
+                          <ShoppingCart className="w-2.5 h-2.5" />Buy
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Coverage summary badge */}
           {!hasCoverage && (
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-300">
               <XCircle className="w-4 h-4 text-gray-400" />
-              <span className="text-xs text-gray-500">This element is not yet covered by HealthScan tests or supplements. Add via the HS Tests / HS Supplements tabs.</span>
+              <span className="text-xs text-gray-500">This element is not yet covered by HealthScan tests, supplements or products. Add via the HS tabs.</span>
             </div>
           )}
         </div>
