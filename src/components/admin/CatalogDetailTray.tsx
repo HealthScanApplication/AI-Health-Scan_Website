@@ -20,6 +20,7 @@ import { LinkedElementsSection } from './LinkedElementsSection';
 import { IngredientRelationsPanel } from './IngredientRelationsPanel';
 import { PackageItemsPanel } from './PackageItemsPanel';
 import { MidjourneyPromptGenerator } from './MidjourneyPromptGenerator';
+import { JunctionRecordsPanel } from './JunctionRecordsPanel';
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -59,6 +60,11 @@ export function CatalogDetailTray({
   accessToken,
 }: CatalogDetailTrayProps) {
   const detailFields = getFieldsForView(activeTab, 'detail');
+  
+  // Adapter for JunctionRecordsPanel callback
+  const handleJunctionEdit = (rec: Record<string, any>, tab: string) => {
+    onEdit(rec as AdminRecord);
+  };
 
   // Resolve linked ingredient/element IDs to names
   const [resolvedLinked, setResolvedLinked] = useState<Record<string, ResolvedLinkedItem[]>>({});
@@ -188,7 +194,10 @@ export function CatalogDetailTray({
 
         {/* ── ELEMENTS TAB: Dedicated detail view ── */}
         {activeTab === 'elements' ? (
-          <ElementDetailView record={record} accessToken={accessToken} />
+          <>
+            <ElementDetailView record={record} accessToken={accessToken} />
+            <JunctionRecordsPanel record={record} activeTab={activeTab} accessToken={accessToken} onEditRecord={handleJunctionEdit} />
+          </>
         ) : activeTab === 'ingredients' ? (
           <>
             {descFields.length > 0 && (
@@ -243,6 +252,9 @@ export function CatalogDetailTray({
             
             {/* Ingredient Relations: Elements, Sub-ingredients, Recipes, Products */}
             <IngredientRelationsPanel record={record} accessToken={accessToken} />
+            
+            {/* Junction Records */}
+            <JunctionRecordsPanel record={record} activeTab={activeTab} accessToken={accessToken} onEditRecord={handleJunctionEdit} />
           </>
         ) : activeTab === 'hs_packages' ? (
           <>
@@ -275,6 +287,9 @@ export function CatalogDetailTray({
 
             {/* Package Contents: Supplements, Tests, Products, Services */}
             <PackageItemsPanel record={record} accessToken={accessToken} />
+            
+            {/* Junction Records */}
+            <JunctionRecordsPanel record={record} activeTab={activeTab} accessToken={accessToken} onEditRecord={handleJunctionEdit} />
           </>
         ) : (
           <>
@@ -351,6 +366,9 @@ export function CatalogDetailTray({
                 accessToken={accessToken}
               />
             )}
+            
+            {/* Junction Records */}
+            <JunctionRecordsPanel record={record} activeTab={activeTab} accessToken={accessToken} onEditRecord={handleJunctionEdit} />
           </>
         )}
       </div>

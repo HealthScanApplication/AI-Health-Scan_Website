@@ -478,16 +478,7 @@ export function EnhancedUserManagement({ accessToken }: EnhancedUserManagementPr
     }
   }
 
-  // Helper functions
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+  // Helper functions moved to utils/formatters.ts
 
   const getStatusBadge = (user: User) => {
     if (user.email_confirmed_at) {

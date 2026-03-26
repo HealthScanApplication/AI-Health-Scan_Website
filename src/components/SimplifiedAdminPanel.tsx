@@ -55,6 +55,7 @@ import {
   ImageOff,
   Users,
   Filter,
+  ClipboardList,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -1745,6 +1746,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         { id: 'equipment', label: 'Equipment', icon: <Wrench className="w-4 h-4" />, table: 'catalog_equipment' },
         { id: 'activities', label: 'Activities', icon: <Dumbbell className="w-4 h-4" />, table: 'catalog_activities' },
         { id: 'symptoms', label: 'Symptoms', icon: <HeartPulse className="w-4 h-4" />, table: 'catalog_symptoms' },
+        { id: 'protocols', label: 'Protocols', icon: <ClipboardList className="w-4 h-4" />, table: 'catalog_protocols' },
       ]
     },
     {

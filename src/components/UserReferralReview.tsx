@@ -5,11 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "./ui/table";
 import { ScrollArea } from "./ui/scroll-area";
 import { toast } from "sonner@2.0.3";
 import { Search, Users, Trophy, Mail, Calendar, ExternalLink, RefreshCw, Download } from "lucide-react";
 import { projectId, publicAnonKey } from "../utils/supabase/info";
+import { formatDate } from '../utils/formatters';
 
 interface UserReferralData {
   id: string;
@@ -218,21 +219,6 @@ export function UserReferralReview() {
     } catch (error) {
       console.error("Export error:", error);
       toast.error("Failed to export CSV. Please try again.");
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
-    try {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-    } catch (error) {
-      return "Invalid Date";
     }
   };
 
