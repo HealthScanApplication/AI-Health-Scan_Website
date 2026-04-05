@@ -291,6 +291,8 @@ export function CatalogDetailTray({
             {/* Junction Records */}
             <JunctionRecordsPanel record={record} activeTab={activeTab} accessToken={accessToken} onEditRecord={handleJunctionEdit} />
           </>
+        ) : activeTab === 'protocols' ? (
+          <ProtocolDetailView record={record} />
         ) : (
           <>
             {/* Description(s) */}
@@ -1048,4 +1050,172 @@ function FieldValue({
   }
 
   return <span>{String(value)}</span>;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Protocol Detail View                                               */
+/* ------------------------------------------------------------------ */
+
+const PROTOCOL_TIME_BLOCKS: { key: string; label: string; emoji: string }[] = [
+  { key: 'night_before', label: 'Night Before', emoji: '🌙' },
+  { key: 'wake_up',      label: 'Wake Up',      emoji: '☀️' },
+  { key: 'morning',      label: 'Morning',       emoji: '🌅' },
+  { key: 'breakfast',    label: 'Breakfast',     emoji: '🥗' },
+  { key: 'mid_morning',  label: 'Mid Morning',   emoji: '🍵' },
+  { key: 'lunch',        label: 'Lunch',         emoji: '🥙' },
+  { key: 'afternoon',    label: 'Afternoon',     emoji: '⚡' },
+  { key: 'pre_dinner',   label: 'Pre-Dinner',    emoji: '🧘' },
+  { key: 'dinner',       label: 'Dinner',        emoji: '🍽️' },
+  { key: 'evening',      label: 'Evening',       emoji: '🌆' },
+  { key: 'sleep',        label: 'Sleep',         emoji: '💤' },
+];
+
+function ProtocolDetailView({ record }: { record: AdminRecord }) {
+  const categoryColorMap: Record<string, string> = {
+    detox:       'bg-cyan-500',
+    recovery:    'bg-green-500',
+    performance: 'bg-orange-500',
+    sleep:       'bg-purple-500',
+    immune:      'bg-red-500',
+    gut_health:  'bg-amber-500',
+    fasting:     'bg-lime-500',
+    general:     'bg-blue-500',
+  };
+  const accentColor = categoryColorMap[record.category?.toLowerCase() || ''] || 'bg-green-500';
+
+  const activeBlocks = PROTOCOL_TIME_BLOCKS.filter(({ key }) => {
+    const block = record[key];
+    return block && typeof block === 'object' && Object.keys(block).length > 0;
+  });
+
+  const keyBenefits: string[] = Array.isArray(record.key_benefits) ? record.key_benefits : [];
+  const targetSymptoms: string[] = Array.isArray(record.target_symptoms) ? record.target_symptoms : [];
+
+  return (
+    <div className="space-y-4">
+      {/* Description */}
+      {record.description && (
+        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#2a2a2a]">
+          <p className="text-sm text-gray-300 leading-relaxed">{record.description}</p>
+        </div>
+      )}
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2">
+        {record.difficulty && (
+          <div className="bg-[#1a1a1a] rounded-xl p-3 border border-[#2a2a2a] text-center">
+            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Difficulty</div>
+            <div className="text-sm font-semibold text-white capitalize">{record.difficulty}</div>
+          </div>
+        )}
+        {record.duration_days != null && (
+          <div className="bg-[#1a1a1a] rounded-xl p-3 border border-[#2a2a2a] text-center">
+            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Duration</div>
+            <div className="text-sm font-semibold text-white">{record.duration_days}d</div>
+          </div>
+        )}
+        {record.total_calories != null && (
+          <div className="bg-[#1a1a1a] rounded-xl p-3 border border-[#2a2a2a] text-center">
+            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Calories</div>
+            <div className="text-sm font-semibold text-white">{record.total_calories} kcal</div>
+          </div>
+        )}
+      </div>
+
+      {/* Key benefits */}
+      {keyBenefits.length > 0 && (
+        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#2a2a2a]">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Key Benefits</div>
+          <div className="flex flex-wrap gap-1.5">
+            {keyBenefits.map((b: string, i: number) => (
+              <span key={i} className={`text-xs px-2 py-1 rounded-full text-white ${accentColor} bg-opacity-80`}>{b}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Target symptoms */}
+      {targetSymptoms.length > 0 && (
+        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#2a2a2a]">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Targets</div>
+          <div className="flex flex-wrap gap-1.5">
+            {targetSymptoms.map((s: string, i: number) => (
+              <span key={i} className="text-xs px-2 py-1 rounded-full bg-[#2a2a2a] text-gray-300">{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Time blocks */}
+      {activeBlocks.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Schedule</div>
+          {activeBlocks.map(({ key, label, emoji }) => {
+            const block = record[key] as Record<string, any>;
+            const activities: string[] = Array.isArray(block.activities) ? block.activities : [];
+            const recipes: string[] = Array.isArray(block.recipes) ? block.recipes : [];
+            const supplements: string[] = Array.isArray(block.supplements) ? block.supplements : [];
+
+            return (
+              <div key={key} className="bg-[#1a1a1a] rounded-xl border border-[#2a2a2a] overflow-hidden">
+                {/* Block header */}
+                <div className={`flex items-center gap-2 px-4 py-2.5 ${accentColor} bg-opacity-20 border-b border-[#2a2a2a]`}>
+                  <span className="text-base leading-none">{emoji}</span>
+                  <span className="text-sm font-semibold text-white">{label}</span>
+                  {block.duration_min && (
+                    <span className="ml-auto text-xs text-gray-400">{block.duration_min} min</span>
+                  )}
+                </div>
+
+                <div className="px-4 py-3 space-y-2.5">
+                  {/* Instructions */}
+                  {block.instructions && (
+                    <p className="text-xs text-gray-300 leading-relaxed">{block.instructions}</p>
+                  )}
+
+                  {/* Activities */}
+                  {activities.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {activities.map((a: string, i: number) => (
+                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-blue-900/50 text-blue-300 border border-blue-800/50">
+                          🏃 {a.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Recipes */}
+                  {recipes.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {recipes.map((r: string, i: number) => (
+                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-green-900/50 text-green-300 border border-green-800/50">
+                          🥗 {r.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Supplements */}
+                  {supplements.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {supplements.map((s: string, i: number) => (
+                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-purple-900/50 text-purple-300 border border-purple-800/50">
+                          💊 {s.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {block.notes && (
+                    <p className="text-[11px] text-gray-500 italic border-t border-[#2a2a2a] pt-2">{block.notes}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }

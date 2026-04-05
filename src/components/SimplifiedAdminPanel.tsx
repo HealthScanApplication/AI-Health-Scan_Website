@@ -58,6 +58,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { getCurrentEnvironment, setCurrentEnvironment, getCurrentEnvironmentConfig, ENVIRONMENTS, type Environment } from '../utils/supabase/environments';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
 import { adminFieldConfig, getFieldsForView, getCategoryHierarchy, kingdomColorMap, type FieldConfig } from '../config/adminFieldConfig';
 import { RISK_CATEGORIES, HAZARD_LEVELS, HAZARD_LEVEL_COLORS, CATEGORY_HEADER_COLORS } from '../config/riskCategories';
@@ -2147,6 +2148,17 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
       { label: 'Processing', value: 'processing', color: 'amber' },
       { label: 'Failed', value: 'failed', color: 'red' },
     ],
+    protocols: [
+      { label: 'All', value: 'all', color: 'blue' },
+      { label: 'Detox', value: 'detox', color: 'cyan' },
+      { label: 'Recovery', value: 'recovery', color: 'green' },
+      { label: 'Performance', value: 'performance', color: 'orange' },
+      { label: 'Sleep', value: 'sleep', color: 'purple' },
+      { label: 'Immune', value: 'immune', color: 'red' },
+      { label: 'Gut Health', value: 'gut_health', color: 'amber' },
+      { label: 'Fasting', value: 'fasting', color: 'lime' },
+      { label: 'General', value: 'general', color: 'blue' },
+    ],
   };
 
   // Color map for category badges
@@ -3634,6 +3646,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         // Scans: filter by status
         const status = record.status?.toLowerCase() || '';
         if (status !== filterVal) return false;
+      } else if (activeTab === 'protocols') {
+        // Protocols: filter by category column
+        if (category !== filterVal) return false;
       }
     }
     
@@ -4361,7 +4376,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                 {/* Sub-category Filter Tabs — centered */}
                 {subFilters[tab.id] && (
                   <div className="flex flex-col items-center gap-2">
-                    <div className="inline-flex gap-1 p-1 bg-gray-100 rounded-lg">
+                    <div className="flex flex-wrap justify-center gap-1 p-1 bg-gray-100 rounded-lg">
                       {subFilters[tab.id].map((sf) => {
                         const isActive = subFilter === sf.value;
                         const colorMap: Record<string, string> = {
