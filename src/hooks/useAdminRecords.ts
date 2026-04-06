@@ -86,14 +86,28 @@ export function useAdminRecords({ activeTab, table, accessToken, enabled = true 
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.warn(`[Admin] Failed to fetch ${activeTab}:`, response.status, response.statusText);
-        console.warn(`[Admin] Error:`, errorText);
-        throw new Error(`Failed to fetch ${activeTab}: ${response.status}`);
+        console.error(`[Admin] ❌ Failed to fetch ${activeTab} from ${table}:`, response.status, response.statusText);
+        console.error(`[Admin] Error response:`, errorText);
+        
+        // Provide helpful error messages
+        if (response.status === 404) {
+          console.error(`[Admin] ⚠️ Table "${table}" not found. Did you apply the migration? Run: supabase db push`);
+        } else if (response.status === 401 || response.status === 403) {
+          console.error(`[Admin] ⚠️ Authentication failed. Check your access token and RLS policies.`);
+        }
+        
+        throw new Error(`Failed to fetch ${activeTab}: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log(`[Admin] Loaded ${data?.length || 0} ${activeTab}`);
-      return Array.isArray(data) ? data : [];
+      console.log(`[Admin] ✅ Loaded ${data?.length || 0} ${activeTab} from ${table}`);
+      
+      if (!Array.isArray(data)) {
+        console.warn(`[Admin] ⚠️ Expected array but got:`, typeof data, data);
+        return [];
+      }
+      
+      return data;
     },
     enabled: enabled && !!accessToken && !!table,
     staleTime: 30 * 1000, // Consider data fresh for 30 seconds
