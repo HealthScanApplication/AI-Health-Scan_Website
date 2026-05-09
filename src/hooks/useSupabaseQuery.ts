@@ -1,6 +1,5 @@
 import { useQuery, UseQueryOptions } from '@tanstack/react-query';
-
-const projectId = 'mofhvoudjxinvpplsytd';
+import { getCurrentEnvironmentConfig } from '../utils/supabase/environments';
 
 interface SupabaseQueryOptions {
   select?: string;
@@ -21,8 +20,9 @@ export function useSupabaseQuery<T = any>(
   queryOptions?: Omit<UseQueryOptions<T[], Error>, 'queryKey' | 'queryFn'>
 ) {
   const metaEnv = (import.meta as any).env || {};
-  const baseUrl = metaEnv.VITE_SUPABASE_URL || `https://${projectId}.supabase.co`;
-  const anonKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+  const envConfig = getCurrentEnvironmentConfig();
+  const baseUrl = metaEnv.VITE_SUPABASE_URL || `https://${envConfig.projectId}.supabase.co`;
+  const anonKey = metaEnv.VITE_SUPABASE_ANON_KEY || envConfig.publicAnonKey;
 
   const queryKey = ['supabase', table, options];
 

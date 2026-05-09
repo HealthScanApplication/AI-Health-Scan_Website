@@ -20,8 +20,8 @@ export const ENVIRONMENTS: Record<Environment, EnvironmentConfig> = {
     label: 'Staging',
   },
   production: {
-    projectId: 'mofhvoudjxinvpplsytd', // TODO: Update with production project ID when available
-    publicAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vZmh2b3VkanhpbnZwcGxzeXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA0NDM5MjAsImV4cCI6MjA1NjAxOTkyMH0.zZWhLMur9uKko-3PSQp3aRoMvOt0Ig-GzBsMblelAp0', // TODO: Update with production key
+    projectId: 'ermbkttsyvpenjjxaxcf',
+    publicAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVybWJrdHRzeXZwZW5qanhheGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTc5NTcsImV4cCI6MjA3OTczMzk1N30.PuA1AXHx7TrCMYUaP00O1eYZRAjYY_UzRQztfCnkUA0',
     name: 'production',
     label: 'Production',
   },
