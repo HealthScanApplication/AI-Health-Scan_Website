@@ -11,6 +11,8 @@ import { BlogPreviewSection } from './BlogPreviewSection'
 import { DiscordCommunitySection } from './DiscordCommunitySection'
 import { isAdminUser } from '../utils/adminUtils'
 import { useAdminAuth, getAccessTokenDirect } from '../contexts/AuthContext'
+import { EnvironmentToggle } from './admin/EnvironmentToggle'
+import { EnvironmentBanner } from './admin/EnvironmentBanner'
 
 // Lazy-loaded pages (not needed on initial landing page load)
 const ProfilePage = React.lazy(() => import('./ProfilePage').then(m => ({ default: m.ProfilePage })))
@@ -238,9 +240,21 @@ export function PageRenderer({
       return (
         <Suspense fallback={<PageLoadingFallback />}>
           <div className="min-h-screen bg-gray-50">
+            {/* Persistent production warning (only renders when on Production) */}
+            <EnvironmentBanner />
+            {/* Admin header with global environment switch */}
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
+              <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-2 flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-900">Admin</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wide hidden sm:inline">Data source</span>
+                  <EnvironmentToggle />
+                </div>
+              </div>
+            </div>
             {/* Mobile-optimized container with better padding */}
             <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 lg:py-8">
-              <SimplifiedAdminPanel 
+              <SimplifiedAdminPanel
                 user={user}
                 accessToken={finalAccessToken}
               />

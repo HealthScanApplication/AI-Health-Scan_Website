@@ -16,9 +16,20 @@ export function EnvironmentToggle() {
   }, []);
 
   const handleSwitch = (env: Environment) => {
-    if (env !== currentEnv) {
-      setCurrentEnvironment(env);
+    if (env === currentEnv) return;
+
+    // Guardrail: require explicit confirmation before connecting to Production,
+    // since the admin panel can edit live data.
+    if (env === 'production') {
+      const confirmed = window.confirm(
+        '⚠️ Switch to PRODUCTION?\n\n' +
+        'You will be editing LIVE production data. Changes here affect real users immediately.\n\n' +
+        'Click OK to connect to Production, or Cancel to stay on Staging.'
+      );
+      if (!confirmed) return;
     }
+
+    setCurrentEnvironment(env);
   };
 
   return (

@@ -195,7 +195,8 @@ async function uploadFileToStorage(
 
 // ── Notification Tester Component ──
 function NotificationTester({ accessToken }: { accessToken: string }) {
-  const [environment, setEnvironment] = useState<'staging' | 'production'>('staging');
+  // Default the test-notification target to the globally selected environment.
+  const [environment, setEnvironment] = useState<'staging' | 'production'>(getCurrentEnvironment());
   const [userEmail, setUserEmail] = useState('');
   const [notificationType, setNotificationType] = useState<'push' | 'email' | 'both'>('push');
   const [title, setTitle] = useState('');
