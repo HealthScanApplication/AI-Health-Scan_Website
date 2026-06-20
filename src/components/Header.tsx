@@ -321,27 +321,25 @@ export function Header({
   return (
     <>
       <header
-        style={{
-          background: 'transparent',
-          paddingTop: 14,
-          paddingLeft: 'clamp(12px, 3vw, 28px)',
-          paddingRight: 'clamp(12px, 3vw, 28px)',
-        }}
+        style={{ background: 'transparent', paddingTop: 14 }}
         className={`fixed left-0 right-0 z-40 header-transition ${
           hasEmailBanner ? 'top-[var(--email-banner-height)]' : 'top-0'
         } ${getHeaderAnimationClasses()}`}
       >
-        <div
-          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-          style={{
-            background: 'rgba(244,241,234,0.92)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            border: '1px solid rgba(22,20,15,0.14)',
-            borderRadius: 16,
-            boxShadow: '0 10px 34px -16px rgba(22,20,15,0.28)',
-          }}
-        >
+        {/* Same container as the hero so the bar spans the hero width */}
+        <div style={{ maxWidth: 1440, margin: '0 auto', paddingLeft: 'clamp(20px, 5vw, 72px)', paddingRight: 'clamp(20px, 5vw, 72px)' }}>
+          <div
+            style={{
+              background: 'rgba(244,241,234,0.92)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: '1px solid rgba(22,20,15,0.14)',
+              borderRadius: 16,
+              boxShadow: '0 10px 34px -16px rgba(22,20,15,0.28)',
+              paddingLeft: 'clamp(16px, 2vw, 28px)',
+              paddingRight: 'clamp(16px, 2vw, 28px)',
+            }}
+          >
           <div className="flex justify-between items-center h-16 md:flex-row">
             {/* Logo & App Name */}
             <div className="flex items-center cursor-pointer flex-shrink-0 md:justify-start justify-center md:flex-none flex-1" onClick={handleHomeNavigation}>
@@ -687,6 +685,7 @@ export function Header({
               </div>
             </div>
           )}
+          </div>
         </div>
       </header>
 
