@@ -172,8 +172,10 @@
         text-transform: uppercase;
         letter-spacing: 0.12em;
         line-height: 1;
+        height: 42px;
+        box-sizing: border-box;
         border-radius: 2px;
-        padding: 12px 22px;
+        padding: 0 20px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -185,11 +187,15 @@
         white-space: nowrap;
         transition: background-color .2s ease, color .2s ease, border-color .2s ease;
       }
+      /* font-size !important: beats the global `button { font-size:16px !important }` iOS anti-zoom rule */
+      .ed-cta, .ed-cta-dark { font-size: 12px !important; }
       .ed-cta { color: #16140F; border-color: #16140F; }
       .ed-cta:hover { background: #16140F; color: #F4F1EA; }
       .ed-cta-dark { color: #F4F1EA; border-color: rgba(244,241,234,0.5); }
       .ed-cta-dark:hover { background: #F4F1EA; color: #16140F; border-color: #F4F1EA; }
       .ed-cta:disabled, .ed-cta-dark:disabled { opacity: .5; cursor: default; }
+      /* editorial submit button (shadcn <button>) — un-force the size + keep text centered */
+      .ed-cta-sub { font-size: 11px !important; line-height: 1 !important; }
     </style>
   </head>
 

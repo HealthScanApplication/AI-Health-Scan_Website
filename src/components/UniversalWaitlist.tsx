@@ -45,33 +45,41 @@ export function UniversalWaitlist({
 }: UniversalWaitlistProps) {
   const isHero = variant === 'hero';
   const isEditorial = variant === 'editorial';
+  // Rectangle input, JOINED to the submit button (shares the seam, left-rounded only).
   const editorialInputStyle: any = {
     flex: 1,
-    minWidth: 180,
-    maxWidth: 320,
+    minWidth: 150,
+    maxWidth: 260,
+    height: 42,
+    boxSizing: 'border-box',
     fontFamily: '"Archivo", "Inter", sans-serif',
-    fontSize: 16,
-    color: '#16140F',
-    background: 'transparent',
-    border: 'none',
-    borderBottom: '1px solid #16140F',
-    borderRadius: 0,
-    padding: '8px 0',
-    outline: 'none',
-  };
-  // Editorial submit = the unified outlined CTA (matches .ed-cta).
-  const editorialButtonStyle: any = {
-    fontFamily: '"Archivo", "Inter", sans-serif',
-    fontSize: 12,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
+    fontSize: 14,
     color: '#16140F',
     background: 'transparent',
     border: '1px solid #16140F',
-    borderRadius: 2,
-    padding: '12px 22px',
+    borderRight: 'none',
+    borderRadius: '2px 0 0 2px',
+    padding: '0 14px',
+    outline: 'none',
+  };
+  // Editorial submit = compact button JOINED to the input (right-rounded only).
+  const editorialButtonStyle: any = {
+    fontFamily: '"Archivo", "Inter", sans-serif',
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    color: '#16140F',
+    background: 'transparent',
+    border: '1px solid #16140F',
+    borderRadius: '0 2px 2px 0',
+    height: 42,
+    boxSizing: 'border-box',
+    padding: '0 16px',
     lineHeight: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     boxShadow: 'none',
@@ -436,7 +444,7 @@ export function UniversalWaitlist({
       <form onSubmit={handleSubmit} className="w-full mx-auto" style={isEditorial ? { maxWidth: 460 } : isHero ? { maxWidth: 460 } : { maxWidth: 448 }}>
         <div
           className={`flex w-full ${isHero ? 'hero-waitlist-row' : ''}`}
-          style={{ gap: isEditorial ? 16 : isHero ? 8 : 12, alignItems: isEditorial ? 'center' : 'stretch' }}
+          style={{ gap: isEditorial ? 0 : isHero ? 8 : 12, alignItems: isEditorial ? 'center' : 'stretch' }}
         >
           <Input
             ref={emailInputRef}
@@ -464,7 +472,7 @@ export function UniversalWaitlist({
             onMouseLeave={isEditorial ? (e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#16140F'; } : undefined}
             style={isEditorial ? editorialButtonStyle : isHero ? heroButtonStyle : undefined}
             className={isEditorial
-              ? ""
+              ? "ed-cta-sub"
               : isHero
               ? `hero-cta ${isShaking ? 'animate-button-shake' : ''}`
               : `h-12 px-6 bg-[var(--healthscan-green)] hover:bg-[var(--healthscan-light-green)] text-white font-semibold rounded-xl shadow-sm transition-all duration-200 whitespace-nowrap ${

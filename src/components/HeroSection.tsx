@@ -248,27 +248,19 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
         {/* Bottom: waitlist (left) + cover credit (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 28, marginTop: "clamp(44px, 7vh, 88px)" }}>
           <div>
-            <p style={{ ...overline, color: ed.accent, marginBottom: 14 }}>Out now on iOS — Android coming soon</p>
-            <a
-              href={APP_STORE_URL || undefined}
-              target={APP_STORE_URL ? "_blank" : undefined}
-              rel="noopener noreferrer"
-              className="ed-cta"
-            >
-              <AppleMark />Try HealthScan&nbsp;→
-            </a>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginTop: 22 }}>
-              <span style={{ ...overline, color: ed.inkSoft }}>The dispatch</span>
+            <p style={{ ...overline, color: ed.accent, marginBottom: 16 }}>Out now on iOS — Android coming soon</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+              <a
+                href={APP_STORE_URL || undefined}
+                target={APP_STORE_URL ? "_blank" : undefined}
+                rel="noopener noreferrer"
+                className="ed-cta"
+              >
+                <AppleMark />Try HealthScan&nbsp;→
+              </a>
               <UniversalWaitlist variant="editorial" submitLabel="Subscribe →" placeholder="you@email.com" />
             </div>
           </div>
-          {!isNarrow && (
-            <p style={{ fontFamily: GRO, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: ed.inkSoft, textAlign: "right", lineHeight: 1.8, margin: 0 }}>
-              Photography — Studio HealthScan
-              <br />
-              Words — The Editors
-            </p>
-          )}
         </div>
       </div>
 

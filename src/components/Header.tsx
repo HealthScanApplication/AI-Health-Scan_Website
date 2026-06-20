@@ -322,14 +322,26 @@ export function Header({
     <>
       <header
         style={{
-          background: 'rgba(244,241,234,0.9)',
-          borderBottom: '1px solid rgba(22,20,15,0.14)',
+          background: 'transparent',
+          paddingTop: 14,
+          paddingLeft: 'clamp(12px, 3vw, 28px)',
+          paddingRight: 'clamp(12px, 3vw, 28px)',
         }}
-        className={`fixed left-0 right-0 z-40 backdrop-blur-sm header-transition ${
+        className={`fixed left-0 right-0 z-40 header-transition ${
           hasEmailBanner ? 'top-[var(--email-banner-height)]' : 'top-0'
         } ${getHeaderAnimationClasses()}`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+          style={{
+            background: 'rgba(244,241,234,0.92)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            border: '1px solid rgba(22,20,15,0.14)',
+            borderRadius: 16,
+            boxShadow: '0 10px 34px -16px rgba(22,20,15,0.28)',
+          }}
+        >
           <div className="flex justify-between items-center h-16 md:flex-row">
             {/* Logo & App Name */}
             <div className="flex items-center cursor-pointer flex-shrink-0 md:justify-start justify-center md:flex-none flex-1" onClick={handleHomeNavigation}>
@@ -526,7 +538,7 @@ export function Header({
 
                   {/* Subscribe — unified outlined CTA */}
                   <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, padding: '9px 18px' }}>
+                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px' }}>
                       Subscribe
                     </button>
                   </div>
