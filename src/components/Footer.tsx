@@ -1,392 +1,381 @@
 import {
-  Heart,
-  Mail,
   Twitter,
   Instagram,
   Facebook,
-  ExternalLink,
-  TreePine,
-  Shield,
-  Users,
-  Zap,
-  Target,
-  Coffee,
+  ArrowUpRight,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import healthScanLogo from '../assets/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png';
+import { ed, GRO, DISPLAY } from "../config/editorialTheme";
+import { APP_STORE_URL } from "../config/appLinks";
 
 interface FooterProps {}
 
-// Brand logo SVG components
-const TikTokLogo = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+// Brass — the editorial ochre, lifted for legibility on the dark ink spread.
+const brass = "#C49A5E";
+
+// ---- brand glyphs ----
+function AppleMark({ size = 14 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" style={{ marginBottom: -2 }}>
+      <path d="M17.05 12.54c-.02-2.06 1.68-3.05 1.76-3.1-.96-1.4-2.46-1.6-3-1.62-1.27-.13-2.49.75-3.14.75-.65 0-1.65-.73-2.71-.71-1.39.02-2.68.81-3.4 2.06-1.45 2.52-.37 6.25 1.04 8.3.69 1 1.51 2.13 2.58 2.09 1.04-.04 1.43-.67 2.69-.67 1.25 0 1.61.67 2.71.65 1.12-.02 1.83-1.02 2.51-2.03.79-1.16 1.12-2.29 1.13-2.35-.02-.01-2.17-.83-2.19-3.3zM15 5.88c.57-.69.96-1.65.85-2.61-.83.03-1.83.55-2.42 1.24-.53.61-.99 1.59-.87 2.53.93.07 1.87-.47 2.44-1.16z" />
+    </svg>
+  );
+}
+
+const TikTokLogo = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
   </svg>
 );
 
-const DiscordLogo = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+const DiscordLogo = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
   </svg>
 );
 
-const LinktreeLogo = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor" strokeWidth="2">
-    <path d="M12 3L20 12L12 21L4 12L12 3Z" stroke="currentColor" fill="none"/>
-    <path d="M8 12H16" stroke="currentColor" strokeWidth="2"/>
-    <path d="M12 8V16" stroke="currentColor" strokeWidth="2"/>
-    <circle cx="12" cy="12" r="2" fill="currentColor"/>
+const TelegramLogo = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.568 8.16l-1.58 7.44c-.12.539-.432.667-.864.416l-2.388-1.764-1.152 1.116c-.128.128-.236.236-.484.236l.172-2.436 4.456-4.028c.196-.172-.04-.268-.308-.096L9.788 13.22l-2.304-.724c-.5-.156-.508-.5.108-.74L19.544 7.368c.42-.156.78.096.656.792z" />
   </svg>
 );
 
-const TelegramLogo = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.568 8.16l-1.58 7.44c-.12.539-.432.667-.864.416l-2.388-1.764-1.152 1.116c-.128.128-.236.236-.484.236l.172-2.436 4.456-4.028c.196-.172-.04-.268-.308-.096L9.788 13.22l-2.304-.724c-.5-.156-.508-.5.108-.74L19.544 7.368c.42-.156.78.096.656.792z"/>
+const LinktreeLogo = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <path d="M12 3L20 12L12 21L4 12L12 3Z" />
+    <path d="M8 12H16" />
+    <path d="M12 8V16" />
   </svg>
 );
 
-const WhatsAppLogo = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.488"/>
-  </svg>
-);
+const QUICK_LINKS = [
+  { label: "Routines", href: "#routines" },
+  { label: "Features", href: "#features" },
+  { label: "How it works", href: "#how-it-works" },
+  { label: "Leaderboard", href: "#leaderboard" },
+  { label: "FAQ", href: "#faq" },
+];
+
+const SOCIALS = [
+  { label: "Discord", href: "https://discord.gg/4QJpFyTD44", Icon: DiscordLogo },
+  { label: "TikTok", href: "https://www.tiktok.com/@healthscan.live", Icon: TikTokLogo },
+  { label: "Telegram", href: "https://t.me/healthscanai", Icon: TelegramLogo },
+  { label: "X / Twitter", href: "https://twitter.com/healthscanlive", Icon: Twitter },
+  { label: "Instagram", href: "https://www.instagram.com/healthscan.live/", Icon: Instagram },
+  { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61579058123361", Icon: Facebook },
+  { label: "Linktree", href: "https://linktr.ee/healthscan", Icon: LinktreeLogo },
+];
+
+// shared editorial type fragments (on the dark spread)
+const kicker: React.CSSProperties = {
+  fontFamily: GRO,
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.2em",
+  color: brass,
+  margin: 0,
+};
+const colHead: React.CSSProperties = {
+  fontFamily: GRO,
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.18em",
+  color: ed.onDarkSoft,
+  margin: "0 0 20px",
+};
+const folio: React.CSSProperties = {
+  fontFamily: GRO,
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.2em",
+  color: "rgba(244,241,234,0.4)",
+  margin: 0,
+};
+
+// underline-on-hover for list links
+const hoverOn = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  e.currentTarget.style.color = ed.onDark;
+  e.currentTarget.style.textDecorationColor = brass;
+};
+const hoverOff = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  e.currentTarget.style.color = ed.onDarkSoft;
+  e.currentTarget.style.textDecorationColor = "transparent";
+};
+
+const listLink: React.CSSProperties = {
+  fontFamily: GRO,
+  fontSize: 15,
+  color: ed.onDarkSoft,
+  textDecoration: "underline",
+  textDecorationColor: "transparent",
+  textUnderlineOffset: 4,
+  transition: "color 200ms ease, text-decoration-color 200ms ease",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 11,
+};
 
 export function Footer({}: FooterProps = {}) {
-  const [contactForm, setContactForm] = useState({ email: '', message: '' });
+  const [contactForm, setContactForm] = useState({ email: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleDonateClick = () => {
-    window.open(
-      "https://healthscan.gumroad.com/coffee",
-      "_blank",
-      "noopener,noreferrer",
-    );
-  };
+  const year = new Date().getFullYear();
 
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactForm.email || !contactForm.message) {
-      toast.error('Please fill in all fields');
+      toast.error("Please add your email and a message");
       return;
     }
-
     setIsSubmitting(true);
     try {
-      // Create mailto link as fallback since we don't have a backend endpoint for contact form
-      const subject = encodeURIComponent('Contact from HealthScan Website');
+      const subject = encodeURIComponent("Contact from HealthScan");
       const body = encodeURIComponent(`From: ${contactForm.email}\n\nMessage:\n${contactForm.message}`);
-      const mailtoLink = `mailto:hello@healthscan.live?subject=${subject}&body=${body}`;
-      
-      window.open(mailtoLink);
-      toast.success('Opening your email client...');
-      setContactForm({ email: '', message: '' });
-    } catch (error) {
-      toast.error('Something went wrong. Please try again.');
+      window.open(`mailto:hello@healthscan.live?subject=${subject}&body=${body}`);
+      toast.success("Opening your email client…");
+      setContactForm({ email: "", message: "" });
+    } catch {
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const underInput: React.CSSProperties = {
+    width: "100%",
+    fontFamily: GRO,
+    fontSize: 15,
+    color: ed.onDark,
+    background: "transparent",
+    border: "none",
+    borderBottom: `1px solid ${ed.onDarkHair}`,
+    borderRadius: 0,
+    padding: "10px 0",
+    outline: "none",
+  };
+
   return (
-    <footer className="relative bg-gradient-to-br from-gray-800 via-gray-900 to-slate-900 text-white py-16 px-4 overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0">
-        {/* Floating blobs with darker tones for footer */}
-        <div className="absolute w-80 h-80 rounded-full opacity-3 animate-blob-float-1"
-             style={{
-               background: `radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.08) 50%, transparent 70%)`,
-               top: "10%",
-               right: "5%",
-               filter: "blur(40px)",
-             }}></div>
-        
-        <div className="absolute w-64 h-64 rounded-full opacity-4 animate-blob-float-3"
-             style={{
-               background: `radial-gradient(circle, rgba(251, 146, 60, 0.12) 0%, rgba(249, 115, 22, 0.06) 50%, transparent 70%)`,
-               bottom: "20%",
-               left: "10%",
-               filter: "blur(35px)",
-             }}></div>
-        
-        <div className="absolute w-56 h-56 rounded-full opacity-5 animate-blob-float-5"
-             style={{
-               background: `radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, rgba(79, 70, 229, 0.09) 50%, transparent 70%)`,
-               top: "50%",
-               left: "50%",
-               filter: "blur(30px)",
-             }}></div>
-        
-        <div className="absolute w-44 h-44 rounded-full opacity-6 animate-blob-float-7"
-             style={{
-               background: `radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)`,
-               bottom: "10%",
-               right: "30%",
-               filter: "blur(25px)",
-             }}></div>
-      </div>
-      
-      <div className="relative z-10 max-w-6xl mx-auto">
-        {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 items-start">
-          
-          {/* Brand Section with Mission */}
-          <div className="md:col-span-1 pb-4 md:pb-0 border-b md:border-b-0 border-gray-700/50 flex flex-col justify-center min-h-[240px]">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left">
-              <div className="flex items-center mb-4">
-                <img 
-                  src={healthScanLogo} 
-                  alt="HealthScan" 
-                  className="h-8 w-auto mr-3"
-                />
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold text-white">
-                    HealthScan
-                  </h3>
-                  <span className="px-1 py-0.5 bg-gray-600 text-gray-300 text-[10px] font-medium rounded-sm opacity-60">
-                    BETA
-                  </span>
-                </div>
-              </div>
-              
-              {/* Mission Statement */}
-              <div className="space-y-3">
+    <footer
+      style={{
+        background: ed.dark,
+        color: ed.onDark,
+        paddingTop: "clamp(72px, 9vw, 128px)",
+        paddingBottom: "clamp(36px, 5vw, 64px)",
+        paddingLeft: "clamp(20px, 5vw, 72px)",
+        paddingRight: "clamp(20px, 5vw, 72px)",
+      }}
+    >
+      <div style={{ maxWidth: 1320, margin: "0 auto" }}>
+        {/* Masthead band */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            borderTop: `1px solid ${ed.onDarkHair}`,
+            paddingTop: 16,
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <p style={kicker}>The Routine Issue — Issue 01</p>
+          <p style={folio}>Colophon · 08 / 08</p>
+        </div>
 
-                
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2 text-sm text-gray-300">
-                    <Shield className="w-4 h-4 mt-0.5 text-[var(--healthscan-green)] flex-shrink-0" />
-                    <span>Protect your health with real-time ingredient analysis</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm text-gray-300">
-                    <Users className="w-4 h-4 mt-0.5 text-[var(--healthscan-green)] flex-shrink-0" />
-                    <span>Empower families to make informed food choices</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm text-gray-300">
-                    <Target className="w-4 h-4 mt-0.5 text-[var(--healthscan-green)] flex-shrink-0" />
-                    <span>Create transparency in the food industry</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm text-gray-300">
-                    <TreePine className="w-4 h-4 mt-0.5 text-[var(--healthscan-green)] flex-shrink-0" />
-                    <span>Build a healthier world for future generations</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Sign-off + primary CTAs */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+            gap: 32,
+            marginTop: "clamp(40px, 6vw, 72px)",
+            marginBottom: "clamp(56px, 7vw, 96px)",
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: DISPLAY,
+              fontWeight: 380,
+              fontSize: "clamp(2.4rem, 5vw, 4.4rem)",
+              lineHeight: 0.98,
+              letterSpacing: "-0.03em",
+              color: ed.onDark,
+              margin: 0,
+              maxWidth: "16ch",
+            }}
+          >
+            Build a routine for <span style={{ fontStyle: "italic", color: brass }}>any goal</span>.
+          </h2>
 
-          {/* Contact Form Section */}
-          <div className="pb-4 md:pb-0 border-b md:border-b-0 border-gray-700/50 flex flex-col justify-center min-h-[240px]">
-            <div className="flex flex-col items-center">
-              <h4 className="font-semibold text-gray-200 mb-4 text-center">Contact Us</h4>
-              
-              {/* Contact Form with Connected Inputs */}
-              <div className="w-full max-w-sm">
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <form onSubmit={handleContactSubmit} className="space-y-0">
-                    <div>
-                      <input
-                        type="email"
-                        id="contact-email"
-                        value={contactForm.email}
-                        onChange={(e) => setContactForm(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="your@email.com"
-                        className="w-full h-12 px-3 bg-gray-700/50 border border-gray-600 rounded-t-md text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--healthscan-green)] focus:border-transparent text-center border-b-0"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <textarea
-                        id="contact-message"
-                        value={contactForm.message}
-                        onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
-                        rows={2}
-                        placeholder="How can we help you?"
-                        className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--healthscan-green)] focus:border-transparent resize-none text-center border-b-0"
-                        required
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full h-12 flex items-center justify-center gap-2 px-3 bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-b-md transition-colors"
-                    >
-                      <Mail className="w-4 h-4" />
-                      {isSubmitting ? 'Sending...' : 'Send Message'}
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="pb-4 md:pb-0 flex flex-col justify-center min-h-[240px]">
-            <div className="flex flex-col items-center">
-              <h4 className="font-semibold text-gray-200 mb-4 text-center">Quick Links</h4>
-              <ul className="space-y-2 text-gray-300 text-sm text-center">
-                <li>
-                  <a href="#features" className="hover:text-white transition-colors">
-                    Features
-                  </a>
-                </li>
-                <li>
-                  <a href="#how-it-works" className="hover:text-white transition-colors">
-                    How It Works
-                  </a>
-                </li>
-                <li>
-                  <a href="#leaderboard" className="hover:text-white transition-colors">
-                    Leaderboard
-                  </a>
-                </li>
-                <li>
-                  <a href="#faq" className="hover:text-white transition-colors">
-                    FAQ
-                  </a>
-                </li>
-                <li>
-                  <a href="mailto:hello@healthscan.live" className="hover:text-white transition-colors">
-                    Contact
-                  </a>
-                </li>
-              </ul>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, alignItems: "flex-start" }}>
+            <p style={{ ...kicker, color: "rgba(244,241,234,0.46)" }}>Out now on iOS — Android coming soon</p>
+            <a
+              href={APP_STORE_URL || undefined}
+              target={APP_STORE_URL ? "_blank" : undefined}
+              rel="noopener noreferrer"
+              className="ed-cta-dark"
+            >
+              <AppleMark />Try HealthScan&nbsp;→
+            </a>
+            <a
+              href="https://healthscan.gumroad.com/coffee"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ed-cta-dark"
+            >
+              Back the project <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={2} />
+            </a>
           </div>
         </div>
 
-        {/* Major CTA Section - Back Project */}
-        <div className="border-t border-gray-700/50 pt-6 mb-6">
-          <div className="text-center">
-            <h4 className="text-xl font-bold text-white mb-2">Support Our Mission</h4>
-            <p className="text-gray-300 text-sm mb-4 max-w-2xl mx-auto">
-              Help us build the future of food transparency.
-            </p>
-            
-            {/* Major CTA Button with Green Theme and Quick Wobble Animation */}
-            <div className="flex justify-center">
-              <button
-                onClick={handleDonateClick}
-                className="btn-major w-80 bg-gradient-to-r from-[var(--healthscan-green)] to-[var(--healthscan-light-green)] hover:from-[var(--healthscan-light-green)] hover:to-[var(--healthscan-green)] text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 hover:animate-button-shake group"
-                aria-label="Back Our Project"
+        {/* Colophon columns */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "48px 56px",
+            borderTop: `1px solid ${ed.onDarkHair}`,
+            paddingTop: "clamp(40px, 5vw, 64px)",
+          }}
+        >
+          {/* Brand + manifesto */}
+          <div style={{ flex: "2.2 1 320px", minWidth: 280 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+              <span style={{ fontFamily: DISPLAY, fontSize: "1.85rem", fontWeight: 400, letterSpacing: "-0.02em", color: ed.onDark }}>
+                HealthScan
+              </span>
+              <span
+                style={{
+                  fontFamily: GRO,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: brass,
+                  border: `1px solid ${ed.onDarkHair}`,
+                  borderRadius: 1,
+                  padding: "3px 7px",
+                }}
               >
-                <div className="flex items-center justify-center gap-3">
-                  <span className="text-lg">Back Project</span>
-                  <ExternalLink className="w-4 h-4 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </button>
+                Beta
+              </span>
             </div>
+            <p
+              style={{
+                fontFamily: DISPLAY,
+                fontStyle: "italic",
+                fontSize: "clamp(1.15rem, 1.6vw, 1.4rem)",
+                lineHeight: 1.4,
+                color: "rgba(244,241,234,0.8)",
+                margin: "0 0 22px",
+                maxWidth: "30ch",
+              }}
+            >
+              A personalized routine for any goal — habits, meals and activity in one place, with a food scanner that knows what fits.
+            </p>
+            <p style={{ fontFamily: GRO, fontSize: 14, lineHeight: 1.6, color: ed.onDarkSoft, margin: 0, maxWidth: "42ch" }}>
+              Pick a goal, follow the daily to-dos, scan any food to see what helps, and shop everything your routine needs in one tap.
+            </p>
+          </div>
+
+          {/* Index */}
+          <div style={{ flex: "1 1 150px", minWidth: 140 }}>
+            <h3 style={colHead}>Index</h3>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 13 }}>
+              {QUICK_LINKS.map((l) => (
+                <li key={l.label}>
+                  <a href={l.href} style={listLink} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Connect */}
+          <div style={{ flex: "1 1 170px", minWidth: 150 }}>
+            <h3 style={colHead}>Connect</h3>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 13 }}>
+              {SOCIALS.map(({ label, href, Icon }) => (
+                <li key={label}>
+                  <a href={href} target="_blank" rel="noopener noreferrer" style={listLink} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
+                    <span style={{ color: brass, display: "inline-flex", width: 16, justifyContent: "center" }}>
+                      <Icon size={16} />
+                    </span>
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Write to us */}
+          <div style={{ flex: "1.6 1 260px", minWidth: 240 }}>
+            <h3 style={colHead}>Write to us</h3>
+            <form onSubmit={handleContactSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <input
+                type="email"
+                value={contactForm.email}
+                onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))}
+                placeholder="you@email.com"
+                style={underInput}
+                required
+              />
+              <textarea
+                value={contactForm.message}
+                onChange={(e) => setContactForm((p) => ({ ...p, message: e.target.value }))}
+                placeholder="How can we help?"
+                rows={2}
+                style={{ ...underInput, resize: "none" }}
+                required
+              />
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="ed-cta-dark"
+                style={{ alignSelf: "flex-start", marginTop: 4 }}
+              >
+                {isSubmitting ? "Sending…" : "Send message →"}
+              </button>
+            </form>
           </div>
         </div>
 
-        {/* Social Media Section */}
-        <div className="border-t border-gray-700/50 pt-6 pb-6">
-          {/* Social Links Grid */}
-          <div className="flex flex-wrap gap-4 justify-center items-center max-w-6xl mx-auto">
-            {/* Discord */}
-            <a
-              href="https://discord.gg/4QJpFyTD44"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-all duration-300 rounded-lg group"
-              aria-label="Join Discord"
-            >
-              <DiscordLogo className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Discord</span>
-            </a>
-            
-            {/* TikTok */}
-            <a
-              href="https://www.tiktok.com/@healthscan.live"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-all duration-300 rounded-lg group"
-              aria-label="Follow on TikTok"
-            >
-              <TikTokLogo className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">TikTok</span>
-            </a>
-
-            {/* Telegram */}
-            <a
-              href="https://t.me/healthscanai"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-all duration-300 rounded-lg group"
-              aria-label="Join Telegram"
-            >
-              <TelegramLogo className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Telegram</span>
-            </a>
-
-            {/* Twitter */}
-            <a
-              href="https://twitter.com/healthscanlive"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-all duration-300 rounded-lg group"
-              aria-label="Follow on Twitter"
-            >
-              <Twitter className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Twitter</span>
-            </a>
-
-            {/* Instagram */}
-            <a
-              href="https://www.instagram.com/healthscan.live/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-all duration-300 rounded-lg group"
-              aria-label="Follow on Instagram"
-            >
-              <Instagram className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Instagram</span>
-            </a>
-
-            {/* Facebook */}
-            <a
-              href="https://www.facebook.com/profile.php?id=61579058123361"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-all duration-300 rounded-lg group"
-              aria-label="Follow on Facebook"
-            >
-              <Facebook className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Facebook</span>
-            </a>
-
-            {/* Linktree */}
-            <a
-              href="https://linktr.ee/healthscan"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-gray-800/50 hover:bg-gray-700 text-gray-300 hover:text-white transition-all duration-300 rounded-lg group"
-              aria-label="All Our Links"
-            >
-              <LinktreeLogo className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Linktree</span>
-            </a>
-          </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="border-t border-gray-800 pt-4 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-400">
-          <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-            <a href="#privacy" className="hover:text-gray-200 transition-colors">Privacy</a>
-            <a href="#terms" className="hover:text-gray-200 transition-colors">Terms</a>
-            <a href="#cookies" className="hover:text-gray-200 transition-colors">Cookies</a>
+        {/* Bottom bar / colophon line */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            flexWrap: "wrap",
+            gap: "16px 28px",
+            borderTop: `1px solid ${ed.onDarkHair}`,
+            marginTop: "clamp(48px, 6vw, 80px)",
+            paddingTop: 24,
+          }}
+        >
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 18 }}>
+            {["Privacy", "Terms", "Cookies"].map((l) => (
+              <a
+                key={l}
+                href={`#${l.toLowerCase()}`}
+                style={{ ...listLink, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}
+                onMouseEnter={hoverOn}
+                onMouseLeave={hoverOff}
+              >
+                {l}
+              </a>
+            ))}
           </div>
 
-          <div className="text-center md:text-right">
-            <p className="text-gray-400 text-sm flex items-center justify-center md:justify-end gap-2">
-              Made with{" "}
-              <Heart className="w-4 h-4 text-red-500" /> for a
-              healthier world
-            </p>
-            <p className="text-gray-500 text-xs mt-2">
-              © 2025 HealthScan. All rights reserved.
-            </p>
-          </div>
+          <p style={{ fontFamily: GRO, fontSize: 12, color: "rgba(244,241,234,0.4)", margin: 0, letterSpacing: "0.02em" }}>
+            {`© ${year} HealthScan — Set in Fraunces & Archivo. Made for a healthier world.`}
+          </p>
         </div>
       </div>
     </footer>

@@ -1,215 +1,93 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { UniversalWaitlist } from "./UniversalWaitlist";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Mail, Bell, Gift, Zap } from "lucide-react";
-import { motion } from "motion/react";
 import { ConfettiCelebration } from "./ConfettiCelebration";
-import heroBackground from "figma:asset/5f38caf68dd6b8af22362056b70854ea4cf4b933.png";
+import { ed, GRO, DISPLAY, kickerStyle, folioStyle, h2Style, deckStyle } from "../config/editorialTheme";
+import { APP_STORE_URL } from "../config/appLinks";
 
-interface Benefit {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}
-
-const benefits: Benefit[] = [
-  {
-    icon: <Gift className="h-6 w-6 text-green-600" />,
-    title: "Free Weeks Access",
-    description: "Earn free weeks of access when you join our waitlist and refer friends"
-  },
-  {
-    icon: <Bell className="h-6 w-6 text-blue-600" />,
-    title: "Early Access",
-    description: "Be the first to access HealthScan before the public launch"
-  },
-  {
-    icon: <Zap className="h-6 w-6 text-purple-600" />,
-    title: "Exclusive Features",
-    description: "Access premium scanning features not available to regular users"
-  },
-  {
-    icon: <Mail className="h-6 w-6 text-orange-600" />,
-    title: "Launch Updates",
-    description: "Get insider updates and tips directly to your inbox"
-  }
+const DISPATCH = [
+  { no: "01", title: "New protocols", desc: "Fresh routines for new goals as we publish them." },
+  { no: "02", title: "Scanner findings", desc: "What the camera is learning about everyday foods." },
+  { no: "03", title: "Routine tips", desc: "Small, practical ways to actually stick with it." },
 ];
+
+function AppleMark({ size = 14 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" style={{ marginBottom: -2 }}>
+      <path d="M17.05 12.54c-.02-2.06 1.68-3.05 1.76-3.1-.96-1.4-2.46-1.6-3-1.62-1.27-.13-2.49.75-3.14.75-.65 0-1.65-.73-2.71-.71-1.39.02-2.68.81-3.4 2.06-1.45 2.52-.37 6.25 1.04 8.3.69 1 1.51 2.13 2.58 2.09 1.04-.04 1.43-.67 2.69-.67 1.25 0 1.61.67 2.71.65 1.12-.02 1.83-1.02 2.51-2.03.79-1.16 1.12-2.29 1.13-2.35-.02-.01-2.17-.83-2.19-3.3zM15 5.88c.57-.69.96-1.65.85-2.61-.83.03-1.83.55-2.42 1.24-.53.61-.99 1.59-.87 2.53.93.07 1.87-.47 2.44-1.16z" />
+    </svg>
+  );
+}
 
 export function EmailSubscribeSection() {
   const [showConfetti, setShowConfetti] = useState(false);
-  const [waitlistPosition, setWaitlistPosition] = useState<string | null>(null);
-
   const handleSignupSuccess = () => {
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3000);
-    
-    // Update waitlist position after successful signup
-    setTimeout(() => {
-      const storedPosition = localStorage.getItem('healthscan_user_position');
-      if (storedPosition && storedPosition !== '0') {
-        setWaitlistPosition(storedPosition);
-      }
-    }, 100);
   };
 
-  // Get user's waitlist position from localStorage
-  useEffect(() => {
-    const updateWaitlistPosition = () => {
-      const userEmail = localStorage.getItem('healthscan_user_email');
-      const storedPosition = localStorage.getItem('healthscan_user_position');
-      
-      if (userEmail && storedPosition && storedPosition !== '0') {
-        setWaitlistPosition(storedPosition);
-      } else {
-        setWaitlistPosition(null);
-      }
-    };
-
-    // Update on mount
-    updateWaitlistPosition();
-
-    // Listen for waitlist signup events
-    const handleUserSignedUp = () => {
-      updateWaitlistPosition();
-    };
-
-    window.addEventListener('userSignedUp', handleUserSignedUp);
-    return () => window.removeEventListener('userSignedUp', handleUserSignedUp);
-  }, []);
-
   return (
-    <section className="relative py-16 overflow-hidden">
+    <section style={{ background: ed.paper, width: "100%", position: "relative", overflow: "hidden" }}>
       {showConfetti && <ConfettiCelebration />}
-      
-      {/* Hero Background Image - Same as HeroSection */}
-      <div className="absolute inset-0 w-full h-full">
-        <img
-          src={heroBackground}
-          alt="HealthScan Background"
-          className="absolute top-0 left-0 w-full h-full object-cover"
-        />
-
-        {/* White transparent overlay with animated gradient */}
-        <div className="absolute inset-0 bg-white/15"></div>
-        
-        {/* Animated luminosity gradient overlay */}
-        <div 
-          className="absolute inset-0 opacity-30 animate-pulse"
-          style={{
-            background: `
-              linear-gradient(45deg, 
-                rgba(255, 255, 255, 0.2) 0%, 
-                rgba(255, 255, 255, 0.05) 25%, 
-                rgba(255, 255, 255, 0.3) 50%, 
-                rgba(255, 255, 255, 0.1) 75%, 
-                rgba(255, 255, 255, 0.2) 100%
-              )
-            `,
-            backgroundSize: "400% 400%",
-            animation: "gradientLuminosity 8s ease-in-out infinite"
-          }}
-        />
-
-        {/* Subtle overlay for better text readability */}
-        <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px]"></div>
-      </div>
-      {/* Subtle enhancement overlay */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Light enhancement to complement the background image */}
-        {/* Vintage Noise Texture Overlay */}
-        <div
-          className="absolute inset-0 opacity-20 mix-blend-overlay"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.8'/%3E%3C/svg%3E")`,
-          }}
-        />
-
-        {/* Animated Gradient Overlay */}
-        <div
-          className="absolute inset-0 opacity-15 animate-gradient-flow"
-          style={{
-            background: `
-              linear-gradient(45deg, 
-                rgba(22, 163, 74, 0.1) 0%, 
-                rgba(34, 197, 94, 0.15) 25%, 
-                rgba(16, 185, 129, 0.1) 50%, 
-                rgba(6, 182, 212, 0.12) 75%, 
-                rgba(22, 163, 74, 0.08) 100%
-              ),
-              radial-gradient(ellipse at 30% 40%, rgba(255, 255, 255, 0.1) 0%, transparent 60%),
-              radial-gradient(ellipse at 70% 60%, rgba(22, 163, 74, 0.05) 0%, transparent 50%)
-            `,
-            backgroundSize: "400% 400%, 100% 100%, 100% 100%",
-          }}
-        />
-      </div>
-      
-      <div className="relative z-10 max-w-4xl mx-auto px-4">
-        {/* Section Header */}
-        <div className="text-center mb-12">
-          <Badge variant="secondary" className="mb-4 bg-green-100 text-green-800">
-            📧 Join the HealthScan Community
-          </Badge>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
-            Get Early Access + Earn Free Weeks
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Be among the first to experience HealthScan's revolutionary food scanning technology. 
-            Join our waitlist and get exclusive benefits when we launch.
-          </p>
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: "0 auto",
+          paddingLeft: "clamp(20px, 5vw, 72px)",
+          paddingRight: "clamp(20px, 5vw, 72px)",
+          paddingTop: "clamp(80px, 11vw, 168px)",
+          paddingBottom: "clamp(80px, 11vw, 168px)",
+        }}
+      >
+        {/* Header */}
+        <div style={{ borderTop: `1px solid ${ed.hair}`, paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <p style={kickerStyle}>The dispatch</p>
+          <p style={folioStyle}>Subscribe</p>
         </div>
 
-        {/* Benefits Grid */}
-        <div className="grid md:grid-cols-2 gap-6 mb-12">
-          {benefits.map((benefit, index) => (
-            <motion.div
-              key={benefit.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-            >
-              <Card className="bg-white border-green-100 hover:shadow-lg transition-all duration-300 hover:scale-105">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="p-2 bg-gray-50 rounded-lg">
-                      {benefit.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">{benefit.title}</h3>
-                      <p className="text-gray-600 text-sm">{benefit.description}</p>
-                    </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "48px 72px", marginTop: "clamp(28px, 4vw, 52px)", alignItems: "flex-start" }}>
+          {/* Left — the pitch + subscribe */}
+          <div style={{ flex: "1.3 1 380px", minWidth: 300 }}>
+            <h2 style={h2Style}>
+              Get the <span style={{ fontStyle: "italic", color: ed.accent }}>dispatch</span>.
+            </h2>
+            <p style={{ ...deckStyle, marginTop: 22, maxWidth: "40ch" }}>
+              An occasional note on routines, protocols and what the scanner is learning. No spam — unsubscribe anytime.
+            </p>
+
+            <div style={{ marginTop: "clamp(28px, 3vw, 40px)", display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+              <span style={{ ...kickerStyle, color: ed.inkSoft }}>Subscribe</span>
+              <UniversalWaitlist variant="editorial" submitLabel="Subscribe →" placeholder="you@email.com" onSignupSuccess={handleSignupSuccess} />
+            </div>
+
+            <div style={{ marginTop: 30, paddingTop: 24, borderTop: `1px solid ${ed.hair}` }}>
+              <p style={{ ...kickerStyle, color: ed.accent, marginBottom: 14 }}>Out now on iOS — Android coming soon</p>
+              <a
+                href={APP_STORE_URL || undefined}
+                target={APP_STORE_URL ? "_blank" : undefined}
+                rel="noopener noreferrer"
+                className="ed-cta"
+              >
+                <AppleMark />Try HealthScan&nbsp;→
+              </a>
+            </div>
+          </div>
+
+          {/* Right — what's inside */}
+          <div style={{ flex: "1 1 280px", minWidth: 260 }}>
+            <p style={{ ...kickerStyle, color: ed.inkSoft, marginBottom: 22 }}>In each issue</p>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {DISPATCH.map((d, i) => (
+                <div key={d.no} style={{ display: "flex", gap: 16, alignItems: "baseline", paddingTop: i === 0 ? 0 : 18, paddingBottom: 18, borderTop: i === 0 ? "none" : `1px solid ${ed.hair}` }}>
+                  <span style={{ fontFamily: DISPLAY, fontSize: "1.3rem", color: ed.accent, lineHeight: 1, flexShrink: 0 }}>{d.no}</span>
+                  <div>
+                    <div style={{ fontFamily: GRO, fontSize: 16, fontWeight: 600, color: ed.ink, marginBottom: 4 }}>{d.title}</div>
+                    <div style={{ fontFamily: GRO, fontSize: 14.5, lineHeight: 1.55, color: ed.inkSoft }}>{d.desc}</div>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-
-        {/* Email Capture */}
-        <motion.div 
-          className="max-w-md mx-auto"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <UniversalWaitlist 
-            onSignupSuccess={handleSignupSuccess} 
-            placeholder="Add your email"
-          />
-        </motion.div>
-
-        {/* Bottom note */}
-        <motion.div 
-          className="text-center mt-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
-          <p className="text-sm text-gray-500">
-            🔒 We respect your privacy. No spam, just updates about HealthScan.
-          </p>
-        </motion.div>
       </div>
     </section>
   );

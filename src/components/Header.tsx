@@ -18,6 +18,7 @@ import {
   Share2
 } from 'lucide-react';
 import { isAdminUser, getAdminUserInfo } from '../utils/adminUtils';
+import { oura, ouraButton } from '../config/ouraTheme';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,7 +127,7 @@ export function Header({
 
   const handleWaitlistSuccess = () => {
     setShowWaitlistModal(false);
-    toast.success('Welcome to the HealthScan waitlist!');
+    toast.success('Subscribed — welcome to HealthScan!');
     
     // Update waitlist position after successful signup
     setTimeout(() => {
@@ -319,8 +320,12 @@ export function Header({
 
   return (
     <>
-      <header 
-        className={`fixed left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 header-transition ${
+      <header
+        style={{
+          background: 'rgba(244,241,234,0.9)',
+          borderBottom: '1px solid rgba(22,20,15,0.14)',
+        }}
+        className={`fixed left-0 right-0 z-40 backdrop-blur-sm header-transition ${
           hasEmailBanner ? 'top-[var(--email-banner-height)]' : 'top-0'
         } ${getHeaderAnimationClasses()}`}
       >
@@ -335,10 +340,23 @@ export function Header({
               />
               <div className="ml-3 flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-gray-900 leading-tight">
+                  <span
+                    className="leading-tight"
+                    style={{ color: '#16140F', fontFamily: '"Fraunces", Georgia, serif', fontWeight: 400, fontSize: 23, letterSpacing: '-0.01em' }}
+                  >
                     HealthScan
                   </span>
-                  <span className="px-1.5 py-0.5 bg-white text-gray-400 text-[10px] font-medium rounded-sm border border-gray-200">
+                  <span
+                    className="px-1.5 py-0.5 text-[10px]"
+                    style={{
+                      background: 'transparent',
+                      color: oura.muted,
+                      fontWeight: 500,
+                      borderRadius: 999,
+                      border: `1px solid ${oura.hairline}`,
+                      letterSpacing: '0.08em',
+                    }}
+                  >
                     BETA
                   </span>
                 </div>
@@ -347,21 +365,39 @@ export function Header({
 
             {/* Desktop Navigation - Centered and Optimized */}
             <nav aria-label="Main navigation" className="hidden md:flex items-center justify-center flex-1 space-x-1">
-              <button 
+              <button
+                onClick={() => handleSectionScroll('routines')}
+                className="px-4 py-2"
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
+              >
+                Routines
+              </button>
+              <button
                 onClick={() => handleSectionScroll('features')}
-                className="px-4 py-2 rounded-lg text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 transition-all font-medium"
+                className="px-4 py-2"
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
                 Features
               </button>
-              <button 
+              <button
                 onClick={() => handleSectionScroll('how-it-works')}
-                className="px-4 py-2 rounded-lg text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 transition-all font-medium"
+                className="px-4 py-2"
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
                 How It Works
               </button>
-              <button 
+              <button
                 onClick={() => handleSectionScroll('faq')}
-                className="px-4 py-2 rounded-lg text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 transition-all font-medium"
+                className="px-4 py-2"
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
                 FAQ
               </button>
@@ -374,18 +410,19 @@ export function Header({
                   variant="ghost"
                   size="sm"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-gray-700 hover:text-[var(--healthscan-green)] p-1"
+                  className="p-1"
+                  style={{ color: oura.body }}
                 >
                   {mobileMenuOpen ? (
                     <X className="w-5 h-5" />
                   ) : (
                     <Avatar className="w-8 h-8 avatar-with-hover-effects">
-                      <AvatarImage 
-                        src={user.user_metadata?.avatar_url} 
+                      <AvatarImage
+                        src={user.user_metadata?.avatar_url}
                         alt="Profile picture"
                         className="object-cover"
                       />
-                      <AvatarFallback className="bg-[var(--healthscan-green)] text-white text-sm avatar-fallback">
+                      <AvatarFallback className="text-white text-sm avatar-fallback" style={{ background: oura.forest }}>
                         {getUserInitials(user.user_metadata?.name || user.email || 'U')}
                       </AvatarFallback>
                     </Avatar>
@@ -396,7 +433,7 @@ export function Header({
                   variant="ghost"
                   size="sm"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-gray-700 hover:text-[var(--healthscan-green)]"
+                  style={{ color: oura.body }}
                 >
                   {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </Button>
@@ -425,7 +462,7 @@ export function Header({
                           alt="Profile picture"
                           className="object-cover"
                         />
-                        <AvatarFallback className="bg-[var(--healthscan-green)] text-white text-sm avatar-fallback">
+                        <AvatarFallback className="text-white text-sm avatar-fallback" style={{ background: oura.forest }}>
                           {getUserInitials(user.user_metadata?.name || user.email || 'U')}
                         </AvatarFallback>
                       </Avatar>
@@ -464,48 +501,34 @@ export function Header({
                   </DropdownMenu>
                   
                   {/* Refer Friends Button - Moved to right */}
-                  <div className={`relative ${isShaking ? 'animate-button-shake' : ''}`}>
-                    {/* Black background base */}
-                    <div className="absolute inset-0 rounded-xl bg-black"></div>
-                    
-                    {/* Animated dark turquoise gradient overlay */}
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-[var(--healthscan-dark-turquoise)]/80 to-transparent animate-gradient-loop"></div>
-                    
-                    <Button 
+                  <div className={isShaking ? 'animate-button-shake' : ''}>
+                    <button
                       onClick={handleReferralModal}
-                      className="relative h-12 bg-transparent hover:bg-transparent border-0 text-white font-semibold px-6 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] z-10 consistent-text-size"
+                      style={{ fontFamily: '"Archivo","Inter",sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#16140F', background: 'none', border: 'none', padding: '8px 4px', textDecoration: 'underline', textUnderlineOffset: 4, textDecorationColor: '#9A6A2F', cursor: 'pointer', height: 'auto', boxShadow: 'none' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = oura.forestHover; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = oura.forest; }}
                     >
-                      <div className="flex items-center space-x-2">
-                        <Share2 className="w-4 h-4" />
-                        <span>Refer Friends</span>
-                      </div>
-                    </Button>
+                      <Share2 className="w-4 h-4" />
+                      <span>Refer Friends</span>
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center space-x-3">
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     onClick={handleSignIn}
-                    className="text-gray-700 hover:text-[var(--healthscan-green)] font-medium"
+                    className="font-medium"
+                    style={{ color: oura.ink }}
                   >
                     Sign In
                   </Button>
-                  
-                  {/* Animated Gradient Waitlist Button */}
-                  <div className={`relative ${isShaking ? 'animate-button-shake' : ''}`}>
-                    {/* Black background base */}
-                    <div className="absolute inset-0 rounded-xl bg-black"></div>
-                    
-                    {/* Animated dark turquoise gradient overlay */}
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-[var(--healthscan-dark-turquoise)]/80 to-transparent animate-gradient-loop"></div>
-                    
-                    <Button 
-                      onClick={handleWaitlistModal}
-                      className="relative h-12 bg-transparent hover:bg-transparent border-0 text-white font-semibold px-6 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] z-10 consistent-text-size"
-                    >
-                      Join Waitlist
-                    </Button>
+
+                  {/* Subscribe — unified outlined CTA */}
+                  <div className={isShaking ? 'animate-button-shake' : ''}>
+                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, padding: '9px 18px' }}>
+                      Subscribe
+                    </button>
                   </div>
                 </div>
               )}
@@ -514,29 +537,42 @@ export function Header({
 
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-gray-200 bg-white">
+            <div
+              className="md:hidden"
+              style={{ borderTop: `1px solid ${oura.hairline}`, background: oura.cream }}
+            >
               <div className="py-4">
                 {/* Navigation Section */}
                 <div className="px-4 mb-4">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                  <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: oura.muted, fontWeight: 600 }}>
                     Navigation
                   </h3>
                   <div className="space-y-1">
-                    <button 
+                    <button
+                      onClick={() => handleSectionScroll('routines')}
+                      className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
+                      style={{ color: oura.body }}
+                    >
+                      Routines
+                    </button>
+                    <button
                       onClick={() => handleSectionScroll('features')}
-                      className="block w-full text-left px-3 py-3 text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 rounded-lg font-medium transition-colors"
+                      className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
+                      style={{ color: oura.body }}
                     >
                       Features
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleSectionScroll('how-it-works')}
-                      className="block w-full text-left px-3 py-3 text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 rounded-lg font-medium transition-colors"
+                      className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
+                      style={{ color: oura.body }}
                     >
                       How It Works
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleSectionScroll('faq')}
-                      className="block w-full text-left px-3 py-3 text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 rounded-lg font-medium transition-colors"
+                      className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
+                      style={{ color: oura.body }}
                     >
                       FAQ
                     </button>
@@ -547,26 +583,29 @@ export function Header({
                   <>
                     {/* User Account Section */}
                     <div className="px-4 mb-4">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: oura.muted, fontWeight: 600 }}>
                         Account
                       </h3>
 
                       <div className="space-y-1">
-                        <button 
+                        <button
                           onClick={() => handleNavClick(onNavigateToProfile)}
-                          className="block w-full text-left px-3 py-3 text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 rounded-lg font-medium transition-colors"
+                          className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
+                          style={{ color: oura.body }}
                         >
                           Profile
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleNavClick(onNavigateToSettings)}
-                          className="block w-full text-left px-3 py-3 text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 rounded-lg font-medium transition-colors"
+                          className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
+                          style={{ color: oura.body }}
                         >
                           Settings
                         </button>
-                        <button 
+                        <button
                           onClick={handleSignOut}
-                          className="block w-full text-left px-3 py-3 text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors"
+                          className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
+                          style={{ color: oura.body }}
                         >
                           Sign Out
                         </button>
@@ -590,26 +629,20 @@ export function Header({
 
                     {/* Action Section */}
                     <div className="px-4">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: oura.muted, fontWeight: 600 }}>
                         Actions
                       </h3>
                       {/* Mobile Refer Friends Button */}
-                      <div className={`relative w-full ${isShaking ? 'animate-button-shake' : ''}`}>
-                        {/* Black background base */}
-                        <div className="absolute inset-0 rounded-xl bg-black"></div>
-                        
-                        {/* Animated dark turquoise gradient overlay */}
-                        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-[var(--healthscan-dark-turquoise)]/80 to-transparent animate-gradient-loop"></div>
-                        
-                        <Button 
+                      <div className={`w-full ${isShaking ? 'animate-button-shake' : ''}`}>
+                        <button
                           onClick={handleReferralModal}
-                          className="relative w-full h-12 bg-transparent hover:bg-transparent border-0 text-white font-semibold px-6 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] z-10 consistent-text-size"
+                          style={{ fontFamily: '"Archivo","Inter",sans-serif', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#16140F', background: 'none', border: 'none', padding: '10px 0', textDecoration: 'underline', textUnderlineOffset: 4, textDecorationColor: '#9A6A2F', cursor: 'pointer', width: '100%', height: 'auto', boxShadow: 'none', textAlign: 'left' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = oura.forestHover; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = oura.forest; }}
                         >
-                          <div className="flex items-center justify-center space-x-2">
-                            <Share2 className="w-4 h-4" />
-                            <span>Refer Friends</span>
-                          </div>
-                        </Button>
+                          <Share2 className="w-4 h-4" />
+                          <span>Refer Friends</span>
+                        </button>
                       </div>
                     </div>
                   </>
@@ -617,31 +650,23 @@ export function Header({
                   <>
                     {/* Guest Actions Section */}
                     <div className="px-4">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: oura.muted, fontWeight: 600 }}>
                         Get Started
                       </h3>
                       <div className="space-y-3">
-                        <button 
+                        <button
                           onClick={handleSignIn}
-                          className="block w-full text-center px-3 py-3 text-gray-700 hover:text-[var(--healthscan-green)] hover:bg-gray-50 rounded-lg font-medium border border-gray-200 transition-colors"
+                          className="block w-full text-center px-3 py-3 font-medium transition-colors"
+                          style={{ color: oura.ink, background: 'transparent', border: `1px solid ${oura.hairline}`, borderRadius: 999 }}
                         >
                           Sign In
                         </button>
-                        
-                        {/* Mobile Animated Gradient Waitlist Button */}
-                        <div className={`relative w-full ${isShaking ? 'animate-button-shake' : ''}`}>
-                          {/* Black background base */}
-                          <div className="absolute inset-0 rounded-xl bg-black"></div>
-                          
-                          {/* Animated dark turquoise gradient overlay */}
-                          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-[var(--healthscan-dark-turquoise)]/80 to-transparent animate-gradient-loop"></div>
-                          
-                          <Button 
-                            onClick={handleWaitlistModal}
-                            className="relative w-full h-12 bg-transparent hover:bg-transparent border-0 text-white font-semibold px-6 rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] z-10 consistent-text-size"
-                          >
-                            Join Waitlist
-                          </Button>
+
+                        {/* Mobile Subscribe — unified outlined CTA */}
+                        <div className={`w-full ${isShaking ? 'animate-button-shake' : ''}`}>
+                          <button onClick={handleWaitlistModal} className="ed-cta" style={{ width: '100%' }}>
+                            Subscribe
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -663,7 +688,7 @@ export function Header({
       {/* Waitlist Modal */}
       <Dialog open={showWaitlistModal} onOpenChange={setShowWaitlistModal}>
         <DialogContent className="max-w-2xl">
-          <DialogTitle className="sr-only">Join HealthScan Waitlist</DialogTitle>
+          <DialogTitle className="sr-only">Subscribe to HealthScan</DialogTitle>
           <DialogDescription className="sr-only">
             Sign up for early access to HealthScan
           </DialogDescription>

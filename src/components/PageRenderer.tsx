@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect, useState } from 'react'
 import { HeroSection } from './HeroSection'
+import { RoutinesSection } from './RoutinesSection'
 import { AppFeaturesSection } from './AppFeaturesSection'
 import { HowItWorksSection } from './HowItWorksSection'
 import { FeatureShowcase } from './FeatureShowcase'
@@ -110,11 +111,14 @@ export function PageRenderer({
           referralCode={referralCode}
         />
         
-        {/* App Features Section */}
-        <AppFeaturesSection />
-        
+        {/* Routines Section — pick a goal, get a routine */}
+        <RoutinesSection />
+
         {/* How It Works Section */}
         <HowItWorksSection />
+
+        {/* App Features Section — the camera that powers routines */}
+        <AppFeaturesSection />
         
         {/* Feature Showcase */}
         <FeatureShowcase />
@@ -173,11 +177,14 @@ export function PageRenderer({
               referralCode={referralCode}
             />
             
-            {/* App Features Section */}
-            <AppFeaturesSection />
-            
+            {/* Routines Section — pick a goal, get a routine */}
+            <RoutinesSection />
+
             {/* How It Works Section */}
             <HowItWorksSection />
+
+            {/* App Features Section — the camera that powers routines */}
+            <AppFeaturesSection />
             
             {/* Feature Showcase */}
             <FeatureShowcase />
@@ -320,11 +327,14 @@ export function PageRenderer({
             referralCode={referralCode}
           />
           
-          {/* App Features Section */}
-          <AppFeaturesSection />
-          
+          {/* Routines Section — pick a goal, get a routine */}
+          <RoutinesSection />
+
           {/* How It Works Section */}
           <HowItWorksSection />
+
+          {/* App Features Section — the camera that powers routines */}
+          <AppFeaturesSection />
           
           {/* Feature Showcase */}
           <FeatureShowcase />

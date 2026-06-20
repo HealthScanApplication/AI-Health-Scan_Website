@@ -1,461 +1,208 @@
-import React from 'react';
-import { 
-  Shield, 
-  Heart, 
-  Camera, 
-  AlertTriangle, 
-  CheckCircle, 
-  Zap,
-  Sparkles,
-  TrendingUp,
-  Search,
-  Users,
-  ChefHat,
-  Brain
-} from 'lucide-react';
-import productScanScreenshot from '../assets/04f4e7cf7c2e8ce76469148f946eda75769b45ee.png';
-import riskScreenshot from '../assets/0d90de2a9245f9d68e76a732655874812e689495.png';
-import needScreenshot from '../assets/95040abfc382a9000163603b0406e99ced704e94.png';
-import mealAnalysisScreenshot from '../assets/f103676152ae3299f7a7f1ac2b178b16e80fc270.png';
+import React from "react";
+// Asset hashes mapped to their ACTUAL screen content (the original names were swapped).
+import needScreenshot from "../assets/f103676152ae3299f7a7f1ac2b178b16e80fc270.png"; // "Need" — Vitamin A (green)
+import riskScreenshot from "../assets/95040abfc382a9000163603b0406e99ced704e94.png"; // "Risk" — Phthalate (red)
+import mealAnalysisScreenshot from "../assets/0d90de2a9245f9d68e76a732655874812e689495.png"; // Bulgar Salad meal result
+import { ed, GRO, DISPLAY, kickerStyle, folioStyle, h2Style, deckStyle } from "../config/editorialTheme";
+import { Reveal } from "./motion/Reveal";
+import { ScannerMockup } from "./mockups/ScannerMockup";
+import { PhoneFrame } from "./mockups/PhoneFrame";
+
+interface Bullet {
+  title: string;
+  desc: string;
+}
+interface Feature {
+  no: string;
+  label: string;
+  titleLead: string;
+  titleEm: string;
+  body: string;
+  bullets: Bullet[];
+  image?: string;
+  alt?: string;
+  fig: string;
+}
+
+const FEATURES: Feature[] = [
+  {
+    no: "01",
+    label: "Smart scanning",
+    titleLead: "Point, shoot, ",
+    titleEm: "know",
+    body: "Aim your camera at any meal or packaged product. HealthScan reads it in seconds — a health score, the nutrients that matter, and the ingredients worth watching — then logs it against your goal.",
+    bullets: [
+      { title: "Visual food recognition", desc: "AI identifies the dish, ingredients and portions straight from a photo." },
+      { title: "Health-score rating", desc: "An instant 0–100 score with the why behind it, tuned to your goal." },
+      { title: "Ingredient detection", desc: "Sees the specific ingredients inside and what each one does." },
+    ],
+    fig: "Fig. 01 — Live scan & result",
+  },
+  {
+    no: "02",
+    label: "Nutrition intelligence",
+    titleLead: "The nutrients you're ",
+    titleEm: "actually getting",
+    body: "HealthScan reads meals and products down to the ingredient, tracks what you take in over time, and surfaces where you run short — so your routine fills the gaps instead of guessing.",
+    bullets: [
+      { title: "Ingredient-level tracking", desc: "See which ingredients supply which nutrients, and how much." },
+      { title: "Intake over time", desc: "Spot patterns and deficiencies across days and weeks." },
+      { title: "Smart food pairing", desc: "Suggestions that help your body absorb more of what it needs." },
+    ],
+    image: needScreenshot,
+    alt: "HealthScan nutrition analysis screen",
+    fig: "Fig. 02 — Nutrient breakdown",
+  },
+  {
+    no: "03",
+    label: "Things to watch",
+    titleLead: "A quiet eye on the ",
+    titleEm: "fine print",
+    body: "Additives, certain preservatives, heavy metals — flagged from public food-safety data. See what to keep an eye on, how it trends over time, and make calmer choices for your routine.",
+    bullets: [
+      { title: "Ingredient-level detection", desc: "Identify exactly which ingredients carry the flag." },
+      { title: "Exposure over time", desc: "Track cumulative exposure rather than one-off scares." },
+      { title: "Your personal watch-list", desc: "Informational, built from your preferences and what you scan." },
+    ],
+    image: riskScreenshot,
+    alt: "HealthScan risk detection screen",
+    fig: "Fig. 03 — Watch-list",
+  },
+  {
+    no: "04",
+    label: "Recipe engine",
+    titleLead: "Meals the whole ",
+    titleEm: "table will eat",
+    body: "Build plans around everyone at once. HealthScan weighs each person's needs, preferences and goals, then suggests recipes that satisfy the table while keeping nutrition high and additives low.",
+    bullets: [
+      { title: "Family profiles", desc: "Needs, allergies and preferences tracked per person." },
+      { title: "Smart recipe matching", desc: "Dishes that meet everyone's nutrition and taste at once." },
+      { title: "Personalised plans", desc: "Weekly planning tuned to your household's goals." },
+    ],
+    image: mealAnalysisScreenshot,
+    alt: "HealthScan recipe analysis",
+    fig: "Fig. 04 — Recipe match",
+  },
+];
+
+function BulletList({ bullets }: { bullets: Bullet[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 26 }}>
+      {bullets.map((b) => (
+        <div key={b.title} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <span style={{ width: 14, height: 1, background: ed.accent, marginTop: 11, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontFamily: GRO, fontSize: 15, fontWeight: 600, color: ed.ink, marginBottom: 3 }}>{b.title}</div>
+            <div style={{ fontFamily: GRO, fontSize: 14.5, lineHeight: 1.55, color: ed.inkSoft }}>{b.desc}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NumberKicker({ no, label }: { no: string; label: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14 }}>
+      <span style={{ fontFamily: DISPLAY, fontSize: "2.2rem", fontWeight: 380, color: ed.accent, lineHeight: 0.9, letterSpacing: "-0.02em" }}>{no}</span>
+      <span style={{ ...kickerStyle, color: ed.inkSoft }}>{label}</span>
+    </div>
+  );
+}
+
+function Plate({ image, alt, fig }: { image: string; alt: string; fig: string }) {
+  // Real app screenshot inside the same phone frame as the built mockups.
+  return (
+    <figure style={{ margin: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <PhoneFrame notch={false} screenBg="#FFFFFF">
+        <img src={image} alt={alt} loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      </PhoneFrame>
+      <figcaption style={{ fontFamily: GRO, fontSize: 11, fontStyle: "italic", color: ed.inkSoft, marginTop: 18, letterSpacing: "0.02em", textAlign: "center" }}>{fig}</figcaption>
+    </figure>
+  );
+}
+
+function ScanFigure() {
+  return (
+    <figure style={{ margin: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <ScannerMockup />
+      <figcaption style={{ fontFamily: GRO, fontSize: 11, fontStyle: "italic", color: ed.inkSoft, marginTop: 18, letterSpacing: "0.02em", textAlign: "center" }}>
+        Fig. 01 — Point &amp; scan
+      </figcaption>
+    </figure>
+  );
+}
 
 export function AppFeaturesSection() {
   return (
-    <section id="features" className="relative py-24 overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0">
-        {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-green-50"></div>
-        
-        {/* Floating blobs */}
-        <div className="absolute w-80 h-80 rounded-full opacity-8 animate-blob-float-1"
-             style={{
-               background: `radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(22, 163, 74, 0.15) 50%, transparent 70%)`,
-               top: "15%",
-               right: "10%",
-               filter: "blur(35px)",
-             }}></div>
-        
-        <div className="absolute w-64 h-64 rounded-full opacity-6 animate-blob-float-2"
-             style={{
-               background: `radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.12) 50%, transparent 70%)`,
-               top: "50%",
-               left: "5%",
-               filter: "blur(30px)",
-             }}></div>
-        
-        <div className="absolute w-72 h-72 rounded-full opacity-7 animate-blob-float-3"
-             style={{
-               background: `radial-gradient(circle, rgba(251, 146, 60, 0.2) 0%, rgba(249, 115, 22, 0.1) 50%, transparent 70%)`,
-               bottom: "20%",
-               right: "20%",
-               filter: "blur(40px)",
-             }}></div>
-        
-        <div className="absolute w-48 h-48 rounded-full opacity-9 animate-blob-float-4"
-             style={{
-               background: `radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, transparent 70%)`,
-               top: "75%",
-               left: "15%",
-               filter: "blur(25px)",
-             }}></div>
-      </div>
-      
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Section Header */}
-        <div className="text-center mb-20">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium mb-6">
-            <Sparkles className="w-4 h-4" />
-            Powered by AI
-          </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
-            Your Personal Health
-            <span className="text-[var(--healthscan-green)]"> Scanner</span>
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Discover what's really in your food with instant AI-powered analysis. 
-            From ingredient tracking and nutritional insights to smart recipe suggestions 
-            for your entire family, get the complete picture in seconds.
+    <section id="features" style={{ background: ed.paper, width: "100%" }}>
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: "0 auto",
+          paddingLeft: "clamp(20px, 5vw, 72px)",
+          paddingRight: "clamp(20px, 5vw, 72px)",
+          paddingTop: "clamp(80px, 11vw, 168px)",
+          paddingBottom: "clamp(80px, 11vw, 168px)",
+        }}
+      >
+        {/* Section header */}
+        <div style={{ borderTop: `1px solid ${ed.hair}`, paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <p style={kickerStyle}>The Scanner</p>
+          <p style={folioStyle}>04 / 08</p>
+        </div>
+        <div style={{ marginTop: "clamp(28px, 4vw, 52px)", maxWidth: 920 }}>
+          <Reveal>
+            <h2 style={h2Style}>
+              The camera that <span style={{ fontStyle: "italic", color: ed.accent }}>reads your food</span>.
+            </h2>
+          </Reveal>
+          <Reveal as="p" delay={0.1} style={{ ...deckStyle, marginTop: 22, maxWidth: "44ch" }}>
+            Every routine runs on what you actually eat. Aim the camera; HealthScan checks it against your goal and logs it in seconds.
+          </Reveal>
+        </div>
+
+        {/* Feature rows */}
+        {FEATURES.map((f, i) => {
+          const figureFirst = i % 2 === 0; // 01 & 03 lead with the figure
+          const figure = f.image ? <Plate image={f.image} alt={f.alt!} fig={f.fig} /> : <ScanFigure />;
+          const copy = (
+            <Reveal>
+              <NumberKicker no={f.no} label={f.label} />
+              <h3 style={{ fontFamily: DISPLAY, fontWeight: 400, fontSize: "clamp(1.7rem, 3vw, 2.5rem)", lineHeight: 1.08, letterSpacing: "-0.02em", color: ed.ink, margin: 0 }}>
+                {f.titleLead}
+                <span style={{ fontStyle: "italic" }}>{f.titleEm}</span>
+              </h3>
+              <p style={{ fontFamily: GRO, fontSize: 17, lineHeight: 1.6, color: ed.ink, marginTop: 18, maxWidth: "46ch" }}>{f.body}</p>
+              <BulletList bullets={f.bullets} />
+            </Reveal>
+          );
+
+          return (
+            <div
+              key={f.no}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "48px 64px",
+                marginTop: i === 0 ? "clamp(56px, 8vw, 104px)" : "clamp(64px, 9vw, 120px)",
+                paddingTop: i === 0 ? 0 : "clamp(48px, 6vw, 80px)",
+                borderTop: i === 0 ? "none" : `1px solid ${ed.hair}`,
+              }}
+            >
+              <div style={{ flex: "1 1 340px", minWidth: 280, order: figureFirst ? 0 : 1, display: "flex", justifyContent: "center" }}>{figure}</div>
+              <div style={{ flex: "1 1 380px", minWidth: 300, order: figureFirst ? 1 : 0 }}>{copy}</div>
+            </div>
+          );
+        })}
+
+        {/* Disclaimer colophon */}
+        <div style={{ maxWidth: 680, marginTop: "clamp(64px, 8vw, 110px)", paddingTop: 24, borderTop: `1px solid ${ed.hair}` }}>
+          <p style={{ fontFamily: GRO, fontSize: 12, lineHeight: 1.6, color: ed.inkSoft, margin: 0 }}>
+            HealthScan provides informational estimates based on public food and nutrition data to help you make everyday choices. It is not a medical device and does not diagnose, treat, cure or prevent any disease. Always consult a qualified healthcare professional for medical advice.
           </p>
         </div>
-
-        {/* Feature 1: Meal Analysis (First) */}
-        <div className="mb-32 py-20 px-8 rounded-3xl bg-gradient-to-br from-blue-50 via-cyan-50 to-slate-50 relative overflow-hidden">
-          {/* Blue theme background elements */}
-          <div className="absolute inset-0">
-            <div className="absolute w-96 h-96 rounded-full opacity-20 animate-blob-float-1"
-                 style={{
-                   background: `radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.15) 50%, transparent 70%)`,
-                   top: "10%",
-                   right: "5%",
-                   filter: "blur(40px)",
-                 }}></div>
-            <div className="absolute w-64 h-64 rounded-full opacity-15 animate-blob-float-3"
-                 style={{
-                   background: `radial-gradient(circle, rgba(6, 182, 212, 0.25) 0%, transparent 70%)`,
-                   bottom: "15%",
-                   left: "10%",
-                   filter: "blur(30px)",
-                 }}></div>
-          </div>
-          <div className="relative z-10 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div className="flex justify-center">
-              <div className="relative">
-                <div className="absolute -inset-4 bg-gradient-to-r from-blue-200 to-cyan-200 rounded-3xl blur-2xl opacity-30 animate-pulse"></div>
-                <img 
-                  src={productScanScreenshot} 
-                  alt="HealthScan Product Scanning Interface"
-                  loading="lazy"
-                  className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:rotate-y-6 hover:rotate-x-3 hover:scale-105"
-                  style={{ transformStyle: 'preserve-3d' }}
-                />
-                <div className="absolute -top-4 -right-4 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center animate-bounce">
-                  <Camera className="w-4 h-4 text-white" />
-                </div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mb-6">
-                <Camera className="w-4 h-4" />
-                Smart Scanning
-              </div>
-              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
-                Instant Meal
-                <span className="text-blue-600"> Analysis</span>
-              </h3>
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                Simply point your camera at any meal or product and get comprehensive nutritional 
-                breakdown, ingredient analysis, and health insights. Know exactly what 
-                you're eating and how it impacts your wellness goals.
-              </p>
-              
-              <div className="space-y-4 mb-8">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Camera className="w-3 h-3 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Visual Food Recognition</h4>
-                    <p className="text-gray-600 text-sm">Advanced AI identifies ingredients and portions from photos</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Search className="w-3 h-3 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Ingredient Detection</h4>
-                    <p className="text-gray-600 text-sm">Identifies specific ingredients and their nutritional content</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <CheckCircle className="w-3 h-3 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Health Score Rating</h4>
-                    <p className="text-gray-600 text-sm">Instant wellness score with personalized improvement tips</p>
-                  </div>
-                </div>
-              </div>
-
-
-            </div>
-          </div>
-        </div>
-
-        {/* Feature 2: Nutrition Insights (Second) */}
-        <div className="mb-32 py-20 px-8 rounded-3xl bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 relative overflow-hidden">
-          {/* Green theme background elements */}
-          <div className="absolute inset-0">
-            <div className="absolute w-96 h-96 rounded-full opacity-20 animate-blob-float-2"
-                 style={{
-                   background: `radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(22, 163, 74, 0.15) 50%, transparent 70%)`,
-                   top: "15%",
-                   left: "5%",
-                   filter: "blur(40px)",
-                 }}></div>
-            <div className="absolute w-64 h-64 rounded-full opacity-15 animate-blob-float-4"
-                 style={{
-                   background: `radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%)`,
-                   bottom: "10%",
-                   right: "10%",
-                   filter: "blur(30px)",
-                 }}></div>
-          </div>
-          <div className="relative z-10 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div className="order-2 lg:order-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium mb-6">
-                <Heart className="w-4 h-4" />
-                Nutrition Intelligence
-              </div>
-              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
-                Personalized
-                <span className="text-[var(--healthscan-green)]"> Nutrition Tracking</span>
-              </h3>
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                Discover exactly what nutrients your body needs most. Our AI analyzes your 
-                meals and products to identify which ingredients provide specific nutrients, 
-                how much you're getting, and tracks your intake over time for personalized recommendations.
-              </p>
-              
-              <div className="space-y-4 mb-8">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Search className="w-3 h-3 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Ingredient-Level Tracking</h4>
-                    <p className="text-gray-600 text-sm">See which specific ingredients provide nutrients and in what amounts</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <TrendingUp className="w-3 h-3 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Consumption Over Time</h4>
-                    <p className="text-gray-600 text-sm">Track your nutrient intake patterns and identify deficiencies</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Sparkles className="w-3 h-3 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Smart Food Pairing</h4>
-                    <p className="text-gray-600 text-sm">AI-powered suggestions to maximize nutrient absorption from meals and products</p>
-                  </div>
-                </div>
-              </div>
-
-
-            </div>
-            
-            <div className="order-1 lg:order-2 flex justify-center">
-              <div className="relative">
-                <div className="absolute -inset-4 bg-gradient-to-r from-green-200 to-emerald-200 rounded-3xl blur-2xl opacity-30 animate-pulse"></div>
-                <img 
-                  src={needScreenshot} 
-                  alt="HealthScan Nutrition Analysis Screen"
-                  loading="lazy"
-                  className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:-rotate-y-6 hover:rotate-x-2 hover:scale-105"
-                  style={{ transformStyle: 'preserve-3d' }}
-                />
-                <div className="absolute -top-4 -right-4 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center animate-bounce">
-                  <Heart className="w-4 h-4 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Feature 3: Risk Detection (Third) */}
-        <div className="mb-32 py-20 px-8 rounded-3xl bg-gradient-to-br from-red-50 via-rose-50 to-pink-50 relative overflow-hidden">
-          {/* Red theme background elements */}
-          <div className="absolute inset-0">
-            <div className="absolute w-96 h-96 rounded-full opacity-20 animate-blob-float-1"
-                 style={{
-                   background: `radial-gradient(circle, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.12) 50%, transparent 70%)`,
-                   top: "10%",
-                   right: "5%",
-                   filter: "blur(40px)",
-                 }}></div>
-            <div className="absolute w-64 h-64 rounded-full opacity-15 animate-blob-float-3"
-                 style={{
-                   background: `radial-gradient(circle, rgba(251, 113, 133, 0.2) 0%, transparent 70%)`,
-                   bottom: "15%",
-                   left: "10%",
-                   filter: "blur(30px)",
-                 }}></div>
-          </div>
-          <div className="relative z-10 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div className="flex justify-center">
-              <div className="relative">
-                <div className="absolute -inset-4 bg-gradient-to-r from-red-200 to-pink-200 rounded-3xl blur-2xl opacity-30 animate-pulse"></div>
-                <img 
-                  src={riskScreenshot} 
-                  alt="HealthScan Risk Detection Screen"
-                  loading="lazy"
-                  className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:rotate-y-4 hover:-rotate-x-2 hover:scale-105"
-                  style={{ transformStyle: 'preserve-3d' }}
-                />
-                <div className="absolute -top-4 -right-4 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center animate-bounce">
-                  <AlertTriangle className="w-4 h-4 text-white" />
-                </div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium mb-6">
-                <AlertTriangle className="w-4 h-4" />
-                Risk Detection
-              </div>
-              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
-                Instant Toxin
-                <span className="text-red-600"> Tracking</span>
-              </h3>
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                Our AI instantly identifies harmful chemicals like phthalates, heavy metals, 
-                and endocrine disruptors from your meal and product scans. See which specific 
-                ingredients contain toxins, track your exposure levels over time, and get 
-                personalized safety recommendations.
-              </p>
-              
-              <div className="space-y-4 mb-8">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Search className="w-3 h-3 text-red-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Ingredient-Level Detection</h4>
-                    <p className="text-gray-600 text-sm">Identify which specific ingredients contain harmful substances</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <TrendingUp className="w-3 h-3 text-red-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Exposure Tracking Over Time</h4>
-                    <p className="text-gray-600 text-sm">Monitor your toxin consumption patterns and cumulative exposure</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Shield className="w-3 h-3 text-red-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Personalized Safety Limits</h4>
-                    <p className="text-gray-600 text-sm">Tailored recommendations based on your health profile and consumption history</p>
-                  </div>
-                </div>
-              </div>
-
-
-            </div>
-          </div>
-        </div>
-
-        {/* Feature 4: Smart Recipe Suggestions & Family Tracking (Fourth) */}
-        <div className="mb-16 py-20 px-8 rounded-3xl bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 relative overflow-hidden">
-          {/* Orange theme background elements */}
-          <div className="absolute inset-0">
-            <div className="absolute w-96 h-96 rounded-full opacity-20 animate-blob-float-2"
-                 style={{
-                   background: `radial-gradient(circle, rgba(251, 146, 60, 0.3) 0%, rgba(249, 115, 22, 0.15) 50%, transparent 70%)`,
-                   top: "15%",
-                   left: "5%",
-                   filter: "blur(40px)",
-                 }}></div>
-            <div className="absolute w-64 h-64 rounded-full opacity-15 animate-blob-float-4"
-                 style={{
-                   background: `radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, transparent 70%)`,
-                   bottom: "10%",
-                   right: "10%",
-                   filter: "blur(30px)",
-                 }}></div>
-          </div>
-          <div className="relative z-10 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div className="order-2 lg:order-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium mb-6">
-                <ChefHat className="w-4 h-4" />
-                Smart Recipe Engine
-              </div>
-              <h3 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
-                AI-Powered
-                <span className="text-orange-600"> Recipe Suggestions</span>
-              </h3>
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                Create personalized meal plans for your entire family. Our AI analyzes each 
-                family member's nutritional needs, dietary preferences, and health goals to 
-                suggest optimal recipes that satisfy everyone's requirements while maximizing 
-                nutrition and minimizing exposure to harmful ingredients.
-              </p>
-              
-              <div className="space-y-4 mb-8">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Users className="w-3 h-3 text-orange-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Family Member Profiles</h4>
-                    <p className="text-gray-600 text-sm">Track individual nutritional needs, allergies, and preferences for each family member</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Brain className="w-3 h-3 text-orange-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Smart Recipe Matching</h4>
-                    <p className="text-gray-600 text-sm">AI suggests recipes that meet everyone's nutritional needs and taste preferences</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <ChefHat className="w-3 h-3 text-orange-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Personalized Meal Plans</h4>
-                    <p className="text-gray-600 text-sm">Weekly meal planning optimized for your family's health goals and dietary requirements</p>
-                  </div>
-                </div>
-              </div>
-
-
-            </div>
-            
-            <div className="order-1 lg:order-2 flex justify-center">
-              <div className="relative">
-                <div className="absolute -inset-4 bg-gradient-to-r from-orange-200 to-yellow-200 rounded-3xl blur-2xl opacity-30 animate-pulse"></div>
-                {/* Meal analysis interface showing recipe breakdown and nutritional insights */}
-                <img 
-                  src={mealAnalysisScreenshot} 
-                  alt="HealthScan Bulgar Salad Recipe Analysis with Nutritional Breakdown"
-                  loading="lazy"
-                  className="relative w-80 sm:w-96 h-auto rounded-[40px] shadow-2xl border border-gray-200 transition-transform duration-300 ease-out hover:-rotate-y-6 hover:rotate-x-2 hover:scale-105"
-                  style={{ transformStyle: 'preserve-3d' }}
-                />
-                <div className="absolute -top-4 -right-4 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center animate-bounce">
-                  <ChefHat className="w-4 h-4 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* CTA Section */}
-        <div className="text-center mt-20 py-16 px-8 rounded-3xl relative overflow-hidden">
-          {/* Multi-layer gradient background */}
-          <div className="absolute inset-0">
-            {/* Base gradient */}
-            
-            
-
-            
-            {/* Animated floating blobs */}
-            <div className="absolute w-64 h-64 rounded-full opacity-20 animate-blob-float-1"
-                 style={{
-                   background: `radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(34, 197, 94, 0.2) 50%, transparent 70%)`,
-                   top: "10%",
-                   right: "10%",
-                   filter: "blur(30px)",
-                 }}></div>
-            
-            <div className="absolute w-48 h-48 rounded-full opacity-25 animate-blob-float-3"
-                 style={{
-                   background: `radial-gradient(circle, rgba(16, 185, 129, 0.5) 0%, transparent 70%)`,
-                   bottom: "20%",
-                   left: "15%",
-                   filter: "blur(25px)",
-                 }}></div>
-          </div>
-          
-          
-        </div>
-
       </div>
     </section>
   );

@@ -1,119 +1,99 @@
-import { Camera, Search, Heart, ArrowRight } from "lucide-react";
+import { ed, GRO, DISPLAY, kickerStyle, folioStyle, h2Style, deckStyle } from "../config/editorialTheme";
+import { Reveal, RevealGroup, RevealItem } from "./motion/Reveal";
+import { ProtocolMockup } from "./mockups/ProtocolMockup";
+
+const STEPS = [
+  {
+    number: "01",
+    title: "Pick your goal",
+    description: "Lose weight, clear your skin, build muscle, feed your kids better — choose what matters and HealthScan turns it into a plan.",
+  },
+  {
+    number: "02",
+    title: "Get your routine",
+    description: "Receive a personalised routine in seconds: daily to-dos, meals, habits, and the exact foods and products you'll need.",
+  },
+  {
+    number: "03",
+    title: "Track every day",
+    description: "Check off your tasks, log your activity, and scan any food with the camera to see if it fits your goal.",
+  },
+  {
+    number: "04",
+    title: "Hit your goal",
+    description: "Build streaks, watch progress grow, and let HealthScan adapt the routine as you go.",
+  },
+];
 
 export function HowItWorksSection() {
-  const steps = [
-    {
-      number: "01",
-      icon: <Camera className="w-8 h-8" />,
-      title: "Scan Any Food",
-      description: "Point your camera at any food product, ingredient, or nutrition label. Our AI instantly recognizes what you're scanning."
-    },
-    {
-      number: "02", 
-      icon: <Search className="w-8 h-8" />,
-      title: "Instant Analysis",
-      description: "Get comprehensive insights about nutrition, ingredients, allergens, and potential health impacts in seconds."
-    },
-    {
-      number: "03",
-      icon: <Heart className="w-8 h-8" />,
-      title: "Make Better Choices",
-      description: "Receive personalized recommendations and track your health goals with actionable insights."
-    }
-  ];
-
   return (
-    <section id="how-it-works" className="relative py-24 overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0">
-        {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white to-green-50/30"></div>
-        
-        {/* Floating blobs */}
-        <div className="absolute w-80 h-80 rounded-full opacity-8 animate-blob-float-1"
-             style={{
-               background: `radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(22, 163, 74, 0.15) 50%, transparent 70%)`,
-               top: "15%",
-               right: "10%",
-               filter: "blur(35px)",
-             }}></div>
-        
-        <div className="absolute w-64 h-64 rounded-full opacity-6 animate-blob-float-2"
-             style={{
-               background: `radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.12) 50%, transparent 70%)`,
-               top: "50%",
-               left: "5%",
-               filter: "blur(30px)",
-             }}></div>
-        
-        <div className="absolute w-72 h-72 rounded-full opacity-7 animate-blob-float-3"
-             style={{
-               background: `radial-gradient(circle, rgba(251, 146, 60, 0.2) 0%, rgba(249, 115, 22, 0.1) 50%, transparent 70%)`,
-               bottom: "20%",
-               right: "20%",
-               filter: "blur(40px)",
-             }}></div>
-      </div>
-      
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <div className="text-center mb-20">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium mb-6">
-            Simple Process
-          </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 text-gray-900">
-            How HealthScan Works
-          </h2>
-          <p className="text-xl text-[var(--healthscan-text-muted)] max-w-3xl mx-auto leading-relaxed">
-            Three simple steps to understanding what's really in your food and making healthier choices for you and your family.
-          </p>
+    <section id="how-it-works" style={{ background: ed.paperAlt, width: "100%" }}>
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: "0 auto",
+          paddingLeft: "clamp(20px, 5vw, 72px)",
+          paddingRight: "clamp(20px, 5vw, 72px)",
+          paddingTop: "clamp(80px, 11vw, 168px)",
+          paddingBottom: "clamp(80px, 11vw, 168px)",
+        }}
+      >
+        {/* Section header */}
+        <div style={{ borderTop: `1px solid ${ed.hair}`, paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <p style={kickerStyle}>How it works</p>
+          <p style={folioStyle}>03 / 08</p>
+        </div>
+        <div style={{ marginTop: "clamp(28px, 4vw, 52px)", maxWidth: 920 }}>
+          <Reveal>
+            <h2 style={h2Style}>
+              From goal to <span style={{ fontStyle: "italic", color: ed.accent }}>results</span>, in four steps.
+            </h2>
+          </Reveal>
+          <Reveal as="p" delay={0.1} style={{ ...deckStyle, marginTop: 22, maxWidth: "46ch" }}>
+            HealthScan turns whatever you want to achieve into a routine you can actually keep — and tracks every step with you.
+          </Reveal>
         </div>
 
-        {/* Steps */}
-        <div className="grid lg:grid-cols-3 gap-12 items-center">
-          {steps.map((step, index) => (
-            <div key={step.number} className="relative">
-              {/* Connection Line */}
-              {index < steps.length - 1 && (
-                <div className="hidden lg:block absolute top-20 left-full w-12 z-10">
-                  <ArrowRight className="w-8 h-8 text-[var(--healthscan-green)] mx-auto" />
-                </div>
-              )}
-              
-              {/* Step Card */}
-              <div className="text-center">
-                {/* Step Number */}
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-[var(--healthscan-green)] text-white rounded-2xl mb-6 text-2xl font-bold">
-                  {step.number}
-                </div>
-                
-                {/* Icon */}
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-[var(--healthscan-bg-light)] rounded-2xl mb-6 text-[var(--healthscan-green)]">
-                  {step.icon}
-                </div>
-                
-                {/* Content */}
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                  {step.title}
-                </h3>
-                
-                <p className="text-[var(--healthscan-text-muted)] leading-relaxed max-w-sm mx-auto">
-                  {step.description}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom CTA */}
-        <div className="text-center mt-20">
-          <div className="inline-flex items-center gap-2 px-6 py-3 bg-green-100 text-green-800 rounded-full text-sm font-medium mb-4">
-            <Heart className="w-4 h-4" />
-            Join our growing community
+        {/* Steps + phone */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "56px 72px", marginTop: "clamp(48px, 7vw, 96px)", alignItems: "flex-start" }}>
+          {/* Steps */}
+          <div style={{ flex: "1.3 1 380px", minWidth: 300 }}>
+            <RevealGroup>
+              {STEPS.map((step, index) => (
+                <RevealItem
+                  key={step.number}
+                  style={{
+                    display: "flex",
+                    gap: "clamp(18px, 3vw, 36px)",
+                    alignItems: "flex-start",
+                    paddingTop: index === 0 ? 0 : "clamp(24px, 3vw, 36px)",
+                    paddingBottom: index === STEPS.length - 1 ? 0 : "clamp(24px, 3vw, 36px)",
+                    borderTop: index === 0 ? "none" : `1px solid ${ed.hair}`,
+                  }}
+                >
+                  <span style={{ fontFamily: DISPLAY, fontSize: "clamp(2.2rem, 4vw, 3.2rem)", fontWeight: 360, color: ed.accent, lineHeight: 0.85, letterSpacing: "-0.03em", flexShrink: 0, width: "1.8em" }}>
+                    {step.number}
+                  </span>
+                  <div style={{ paddingTop: 4 }}>
+                    <h3 style={{ fontFamily: DISPLAY, fontWeight: 400, fontSize: "clamp(1.4rem, 2.4vw, 1.9rem)", lineHeight: 1.12, letterSpacing: "-0.02em", color: ed.ink, margin: "0 0 10px" }}>
+                      {step.title}
+                    </h3>
+                    <p style={{ fontFamily: GRO, fontSize: 16, lineHeight: 1.6, color: ed.inkSoft, margin: 0, maxWidth: "44ch" }}>
+                      {step.description}
+                    </p>
+                  </div>
+                </RevealItem>
+              ))}
+            </RevealGroup>
           </div>
-          <p className="text-lg text-[var(--healthscan-text-muted)] max-w-2xl mx-auto">
-            Ready to take control of your nutrition? Get early access to the most comprehensive food analysis app ever created.
-          </p>
+
+          {/* Phone — the routine, tracked */}
+          <div style={{ flex: "1 1 300px", minWidth: 280, display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <ProtocolMockup />
+            <p style={{ fontFamily: GRO, fontSize: 11, fontStyle: "italic", color: ed.inkSoft, marginTop: 18, letterSpacing: "0.02em", textAlign: "center" }}>
+              Fig. 02 — Your day, checked off
+            </p>
+          </div>
         </div>
       </div>
     </section>

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 
 interface AnimatedHeadlineProps {
   baseText?: string;
+  /** Text shown between the base text and the animated word. */
+  connector?: string;
   words?: string[];
   className?: string;
   interval?: number;
@@ -9,6 +11,7 @@ interface AnimatedHeadlineProps {
 
 export function AnimatedHeadline({
   baseText = "Your health detective",
+  connector = "in your pocket for your",
   words = ["products"],
   className = "",
   interval = 3000
@@ -45,7 +48,7 @@ export function AnimatedHeadline({
           {baseText}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 px-4">
-          <span>in your pocket for your</span>
+          {connector && <span>{connector}</span>}
           <span className="relative inline-block">
             <span 
               className={`

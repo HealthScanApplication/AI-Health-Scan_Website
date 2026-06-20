@@ -64,7 +64,7 @@
       outDir: 'build',
     },
     server: {
-      port: 3000,
+      port: process.env.PORT ? Number(process.env.PORT) : 3000,
       open: true,
     },
   });

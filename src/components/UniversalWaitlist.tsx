@@ -21,6 +21,10 @@ interface UniversalWaitlistProps {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  /** 'hero' = frosted-glass on-dark; 'editorial' = underline input + outlined line button. */
+  variant?: 'default' | 'hero' | 'editorial';
+  /** Label for the submit button (e.g. "Get early access"). */
+  submitLabel?: string;
 }
 
 
@@ -31,12 +35,74 @@ interface QueuePositionInfo {
   lastUpdated: string;
 }
 
-export function UniversalWaitlist({ 
-  onSignupSuccess, 
+export function UniversalWaitlist({
+  onSignupSuccess,
   placeholder = "Add your email",
   className = "",
-  autoFocus = false
+  autoFocus = false,
+  variant = 'default',
+  submitLabel = 'Join Waitlist'
 }: UniversalWaitlistProps) {
+  const isHero = variant === 'hero';
+  const isEditorial = variant === 'editorial';
+  const editorialInputStyle: any = {
+    flex: 1,
+    minWidth: 180,
+    maxWidth: 320,
+    fontFamily: '"Archivo", "Inter", sans-serif',
+    fontSize: 16,
+    color: '#16140F',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '1px solid #16140F',
+    borderRadius: 0,
+    padding: '8px 0',
+    outline: 'none',
+  };
+  // Editorial submit = the unified outlined CTA (matches .ed-cta).
+  const editorialButtonStyle: any = {
+    fontFamily: '"Archivo", "Inter", sans-serif',
+    fontSize: 12,
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    color: '#16140F',
+    background: 'transparent',
+    border: '1px solid #16140F',
+    borderRadius: 2,
+    padding: '12px 22px',
+    lineHeight: 1,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    boxShadow: 'none',
+    transition: 'background-color 200ms ease, color 200ms ease',
+  };
+  const heroInputStyle = {
+    flex: 1,
+    height: 52,
+    padding: '0 20px',
+    borderRadius: 999,
+    fontSize: 16,
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(247,241,232,0.20)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    color: '#f7f1e8',
+  };
+  const heroButtonStyle = {
+    height: 52,
+    padding: '0 28px',
+    borderRadius: 999,
+    background: '#224228',
+    color: '#f7f1e8',
+    fontSize: 15,
+    fontWeight: 500,
+    letterSpacing: 0,
+    boxShadow: 'none',
+    whiteSpace: 'nowrap',
+    border: 'none',
+    transition: 'background-color 300ms cubic-bezier(0.4,0,0.2,1)',
+  };
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -367,8 +433,11 @@ export function UniversalWaitlist({
   return (
     <div className={`relative ${className}`}>
       {/* Main waitlist form */}
-      <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto">
-        <div className="flex gap-3 w-full">
+      <form onSubmit={handleSubmit} className="w-full mx-auto" style={isEditorial ? { maxWidth: 460 } : isHero ? { maxWidth: 460 } : { maxWidth: 448 }}>
+        <div
+          className={`flex w-full ${isHero ? 'hero-waitlist-row' : ''}`}
+          style={{ gap: isEditorial ? 16 : isHero ? 8 : 12, alignItems: isEditorial ? 'center' : 'stretch' }}
+        >
           <Input
             ref={emailInputRef}
             type="email"
@@ -377,20 +446,32 @@ export function UniversalWaitlist({
             onChange={(e) => setEmail(e.target.value)}
             onFocus={() => { setIsFocused(true); trackSignupStart(); }}
             onBlur={() => setIsFocused(false)}
-            className={`flex-1 h-12 px-4 bg-[var(--input-background)] border-2 rounded-xl text-gray-900 placeholder:text-gray-500 focus:border-[var(--healthscan-green)] focus:outline-none focus:ring-0 transition-colors ${
-              hasReferral && isActive ? 'border-[var(--healthscan-green)] ring-2 ring-[var(--healthscan-green)]/30' : 'border-gray-200'
-            } ${isShaking ? 'animate-button-shake' : ''}`}
+            style={isEditorial ? editorialInputStyle : isHero ? heroInputStyle : undefined}
+            className={isEditorial
+              ? `editorial-email-input flex-1 ${isShaking ? 'animate-button-shake' : ''}`
+              : isHero
+              ? `hero-email-input flex-1 ${isShaking ? 'animate-button-shake' : ''}`
+              : `flex-1 h-12 px-4 bg-[var(--input-background)] border-2 rounded-xl text-gray-900 placeholder:text-gray-500 focus:border-[var(--healthscan-green)] focus:outline-none focus:ring-0 transition-colors ${
+                  hasReferral && isActive ? 'border-[var(--healthscan-green)] ring-2 ring-[var(--healthscan-green)]/30' : 'border-gray-200'
+                } ${isShaking ? 'animate-button-shake' : ''}`}
             disabled={isLoading}
             required
           />
           <Button
             type="submit"
-            disabled={isLoading || !email}
-            className={`h-12 px-6 bg-[var(--healthscan-green)] hover:bg-[var(--healthscan-light-green)] text-white font-medium rounded-xl transition-all duration-200 whitespace-nowrap ${
-              isShaking ? 'animate-button-shake' : ''
-            }`}
+            disabled={isLoading}
+            onMouseEnter={isEditorial ? (e) => { e.currentTarget.style.background = '#16140F'; e.currentTarget.style.color = '#F4F1EA'; } : undefined}
+            onMouseLeave={isEditorial ? (e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#16140F'; } : undefined}
+            style={isEditorial ? editorialButtonStyle : isHero ? heroButtonStyle : undefined}
+            className={isEditorial
+              ? ""
+              : isHero
+              ? `hero-cta ${isShaking ? 'animate-button-shake' : ''}`
+              : `h-12 px-6 bg-[var(--healthscan-green)] hover:bg-[var(--healthscan-light-green)] text-white font-semibold rounded-xl shadow-sm transition-all duration-200 whitespace-nowrap ${
+                  isShaking ? 'animate-button-shake' : ''
+                }`}
           >
-            {isLoading ? 'Joining...' : 'Join Waitlist'}
+            {isLoading ? 'Joining…' : submitLabel}
           </Button>
         </div>
       </form>

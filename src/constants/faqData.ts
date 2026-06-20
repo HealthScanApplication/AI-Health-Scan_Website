@@ -12,132 +12,142 @@ export interface FAQItem {
 }
 
 export const faqData: FAQItem[] = [
-  // General Questions
+  // General
   {
     question: "What is HealthScan?",
     answer:
-      "HealthScan is an AI-powered mobile app that instantly analyzes food products, meals, and ingredients to provide comprehensive nutritional information, detect harmful substances, and offer personalized health recommendations. Simply take a photo or scan a barcode to discover what's really in your food.",
+      "HealthScan is a goal-based health app. Tell it what you want to achieve — lose weight, clearer skin, build muscle, more energy, better sleep, or feed your kids better — and it builds you a personalized routine: daily to-dos, meals, habits, and activity, with an AI food scanner built in to check what you eat along the way.",
     category: "general",
   },
   {
-    question: "How does HealthScan work?",
+    question: "What exactly is a “routine”?",
     answer:
-      "HealthScan uses advanced AI and computer vision to analyze photos of meals, product labels, and barcodes. Our technology identifies ingredients, calculates nutritional content, detects potential toxins or allergens, and provides personalized insights based on your health profile and dietary goals.",
+      "A routine is your day-by-day plan for a goal. It's a simple checklist grouped into supplements, things to consume, things to do, and sleep — each scheduled through the day. You tick items off as you go, build streaks, and watch your progress. HealthScan adapts the routine over time as you stick with it.",
     category: "general",
   },
   {
-    question: "When will HealthScan be available?",
+    question: "How much does HealthScan cost?",
     answer:
-      "HealthScan is launching soon! Join our waitlist to get early access and receive free weeks when the app launches. We're currently accepting beta testers and will be rolling out access gradually to ensure the best user experience.",
-    category: "launch",
-  },
-  {
-    question: "How much will HealthScan cost?",
-    answer:
-      "We'll offer both free and premium tiers. The free version includes basic scanning and nutritional information. Premium features like detailed toxin analysis, personalized recommendations, and advanced tracking will be available through subscription. Waitlist members get their first weeks free!",
+      "There's a free tier and a premium subscription. Free covers the core routine, daily checklist, and food scanning. Premium unlocks deeper analysis, activity integrations, family profiles, and the ability to shop your routine in one tap. You can try the app and start a routine before deciding to upgrade.",
     category: "general",
   },
 
   // Features
   {
-    question: "What kind of foods can HealthScan analyze?",
+    question: "How do I build a routine?",
     answer:
-      "HealthScan can analyze virtually any food item - from packaged products with barcodes to fresh meals, fruits, vegetables, restaurant dishes, and homemade recipes. Our AI recognizes ingredients in photos and provides comprehensive analysis for both processed and whole foods.",
+      "Pick a goal and HealthScan generates a routine for it in seconds — the daily to-dos, meals, habits, and the exact foods, supplements, and products you'll need. From there you just follow the plan each day, check items off, and let it adjust as you progress.",
     category: "features",
   },
   {
-    question:
-      "Can HealthScan detect allergens and harmful substances?",
+    question: "What goals can I create a routine for?",
     answer:
-      "Yes! HealthScan identifies common allergens (nuts, dairy, gluten, etc.) and detects harmful substances like pesticides, heavy metals, endocrine disruptors, and food additives. We provide safety warnings and help you make informed choices about what you consume.",
+      "Health goals like losing weight, more energy, gut health, lowering sugar, and better sleep; beauty goals like clearer skin, glowing complexion, and stronger hair and nails; and fitness goals like building muscle, getting lean, and boosting endurance. There are also routines for women's health and for feeding kids well.",
     category: "features",
   },
   {
-    question:
-      "Does HealthScan provide personalized recommendations?",
+    question: "How does the food scanner work?",
     answer:
-      "Absolutely! HealthScan learns your dietary preferences, health goals, allergies, and nutritional needs to provide personalized recommendations. The app suggests healthier alternatives, tracks your nutrient intake over time, and helps optimize your diet for your specific health objectives.",
+      "Point your camera at any meal or packaged product. HealthScan reads it in seconds and gives you a health score, the nutrients that matter, and the ingredients worth watching — then tells you whether it fits your current goal and logs it to your routine. The scanner is built into every routine, so what you eat feeds directly into your plan.",
     category: "features",
   },
   {
-    question: "Can I track my nutrition over time?",
+    question: "Does it track my activity, and sync with Strava and Ōura Ring?",
     answer:
-      "Yes! HealthScan includes comprehensive tracking features that monitor your nutritional intake, identify patterns, and track progress toward your health goals. You'll see detailed analytics on nutrient consumption, potential deficiencies, and improvements over time.",
+      "Yes. You can log workouts, water, sleep, and habits, and watch your streaks build. HealthScan also syncs with Strava and the Ōura Ring, so your workouts and your sleep and recovery flow in automatically and your routine adapts to how your body is actually doing.",
     category: "features",
   },
   {
-    question: "Does HealthScan work offline?",
+    question: "Can I buy everything my routine needs?",
     answer:
-      "Basic scanning functionality works offline, but detailed analysis, database lookups, and personalized recommendations require an internet connection. We cache frequently scanned items to improve performance when connectivity is limited.",
-    category: "technical",
+      "Yes. Every routine comes with a kit — the specific foods, supplements, and products it calls for — and you can shop the lot in a single tap rather than hunting them down yourself.",
+    category: "features",
+  },
+  {
+    question: "Can I use HealthScan for my family?",
+    answer:
+      "Yes. Premium accounts support multiple profiles with their own goals, preferences, and dietary needs. Parents can manage a child's routine, plan family meals everyone will actually eat, and keep an eye on the household's nutrition together.",
+    category: "features",
   },
 
   // Privacy & Data
   {
     question: "How is my data protected?",
     answer:
-      "Your privacy is our top priority. All personal health data is encrypted and stored securely. We never sell your data to third parties. Food photos are processed and then deleted from our servers. You have full control over your data and can delete your account at any time.",
+      "Your privacy comes first. Personal health data is encrypted and stored securely, food photos are processed and then deleted from our servers, and you have full control — you can delete your account and data at any time.",
     category: "privacy",
   },
   {
-    question: "Do you share my food data with companies?",
+    question: "Do you sell or share my data?",
     answer:
-      "Never. We do not share individual user data with food companies, advertisers, or any third parties. We may use anonymized, aggregated data to improve our algorithms and contribute to food safety research, but your personal information remains completely private.",
+      "Never. We don't sell or share your personal data with food companies, advertisers, or any third party. We may use anonymized, aggregated data to improve our analysis, but your personal information stays private — full stop.",
     category: "privacy",
   },
   {
-    question: "Can I export my health data?",
+    question: "What happens to my Strava and Ōura data?",
     answer:
-      "Yes! You can export all your health and nutrition data at any time in standard formats (CSV, JSON). This ensures you always have access to your information and can share it with healthcare providers if needed.",
+      "Connected services like Strava and the Ōura Ring are used only to personalize your routine — bringing in your workouts, sleep, and recovery. We never sell that data, and you can disconnect either service at any time from settings.",
+    category: "privacy",
+  },
+  {
+    question: "Can I export my data?",
+    answer:
+      "Yes. You can export your health and nutrition data at any time in standard formats (CSV, JSON), so you always have it and can share it with a healthcare provider if you choose.",
     category: "privacy",
   },
 
   // Technical
   {
-    question: "Which devices support HealthScan?",
+    question: "Which devices is HealthScan on?",
     answer:
-      "HealthScan will be available for both iOS and Android devices. We recommend devices with cameras from the last 5 years for optimal scanning performance. The app works on smartphones and tablets.",
+      "HealthScan is live on iOS — download it from the App Store on iPhone today. An Android version is coming soon. For the best scanning results we recommend a device with a camera from roughly the last five years.",
     category: "technical",
   },
   {
-    question: "How accurate is the nutritional analysis?",
+    question: "How accurate is the scanner's analysis?",
     answer:
-      "HealthScan uses advanced AI technology to analyze nutritional content from food images and product data. While our AI provides comprehensive analysis based on extensive databases like USDA, FDA, and OpenFood Facts, we're continuously working to improve accuracy. We're developing future features that will include expert validation systems and crowd-sourcing assistance to help verify and enhance our data quality over time.",
+      "The scanner uses AI and computer vision alongside established databases like USDA, FDA, and Open Food Facts to estimate nutrition and flag ingredients to watch. It's informational and always improving — it isn't a medical device and doesn't diagnose, treat, or cure anything, so check with a qualified professional for medical advice.",
     category: "technical",
   },
   {
-    question: "What if HealthScan can't recognize a food item?",
+    question: "Does it work offline?",
     answer:
-      "If our AI can't identify something, you can manually add ingredients or search our extensive database. You can also submit photos to help us improve - our team reviews submissions to enhance recognition capabilities for future users.",
+      "Your daily checklist and routine work offline, so you can tick items off anywhere. Scanning, detailed analysis, and syncing with services like Strava and Ōura need an internet connection. Frequently scanned items are cached to keep things fast.",
+    category: "technical",
+  },
+  {
+    question: "What if the scanner can't recognize a food?",
+    answer:
+      "If the AI can't identify something, you can add it manually or search the catalog. You can also submit a photo to help us improve — our team reviews submissions so recognition keeps getting better for everyone.",
     category: "technical",
   },
 
-  // Launch & Access
+  // Availability & Access
   {
-    question: "How do I get early access?",
+    question: "Is HealthScan available yet?",
     answer:
-      "Join our waitlist by entering your email address! Early access members will receive invitations as soon as we begin our beta rollout, plus free weeks of premium features. We're also running a referral program - share your link to move up the list faster.",
+      "Yes — HealthScan is out now on the App Store for iPhone. There's no waitlist and no invite needed: download it, pick a goal, and start your first routine today. Android is on the way.",
     category: "launch",
   },
   {
-    question: "Will there be a waiting period after launch?",
+    question: "Do I need an invite or to join a waitlist?",
     answer:
-      "We're launching gradually to ensure the best user experience. Waitlist members get priority access, and we'll send invitations in waves. The more people you refer, the earlier you'll get access!",
+      "No. The app is live, so you can get started straight away on iOS. If you'd like occasional updates — new routines, scanner findings, and tips — you can subscribe to the dispatch, but it's not required to use the app.",
     category: "launch",
   },
   {
-    question: "Can I use HealthScan for my family?",
+    question: "How do I get started?",
     answer:
-      "Yes! Premium accounts support multiple family member profiles with individual health goals, dietary restrictions, and personalized recommendations. Parents can manage children's profiles and monitor family nutrition trends.",
-    category: "features",
+      "Download HealthScan from the App Store, choose the goal that matters to you, and you'll get a personalized routine right away. Follow the daily to-dos, scan your food as you go, and connect Strava or your Ōura Ring to make it even more tailored.",
+    category: "launch",
   },
 ];
 
 export const categories = [
   { id: "all", label: "All Questions", icon: HelpCircle },
   { id: "general", label: "General", icon: Sparkles },
-  { id: "features", label: "Features", icon: Sparkles },
+  { id: "features", label: "Routines & Features", icon: Sparkles },
   { id: "privacy", label: "Privacy", icon: Sparkles },
   { id: "technical", label: "Technical", icon: Sparkles },
-  { id: "launch", label: "Launch", icon: Sparkles },
+  { id: "launch", label: "Availability", icon: Sparkles },
 ];

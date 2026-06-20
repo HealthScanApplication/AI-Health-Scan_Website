@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getLaunchTime, hasLaunched as hasLaunchedNow, LAUNCH_LABEL } from "../config/launchConfig";
+import { APP_STORE_URL, GOOGLE_PLAY_URL, APP_IS_LIVE } from "../config/appLinks";
 
 interface TimeLeft {
   days: number;
@@ -18,7 +20,7 @@ export function CountdownTimer() {
   });
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const launchDate = new Date("2026-03-21T20:00:00Z").getTime(); // 9pm CEST = 8pm UTC
+  const launchDate = getLaunchTime();
 
   useEffect(() => {
     // Calculate initial time immediately
@@ -95,12 +97,13 @@ export function CountdownTimer() {
 
   // Check if launch date has passed
   const now = new Date().getTime();
-  const hasLaunched = now >= launchDate;
+  const countdownDone = now >= launchDate;
 
-  if (hasLaunched) {
+  // Only celebrate "Live" when the app is actually downloadable (real store links set).
+  if (countdownDone && hasLaunchedNow(now)) {
     return (
       <div className="text-center">
-        <div 
+        <div
           className="inline-block px-6 py-3 rounded-lg shadow-lg relative overflow-hidden"
           style={{
             background: 'linear-gradient(135deg, #10b981, #14b8a6, #06b6d4)',
@@ -112,14 +115,40 @@ export function CountdownTimer() {
             🚀 HealthScan is Live!
           </span>
         </div>
-        <p 
-          className="text-sm mt-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent font-medium"
+        <div className="flex flex-wrap justify-center gap-3 mt-3">
+          {APP_STORE_URL && (
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-emerald-700 underline underline-offset-2">
+              Download on the App Store
+            </a>
+          )}
+          {GOOGLE_PLAY_URL && (
+            <a href={GOOGLE_PLAY_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-emerald-700 underline underline-offset-2">
+              Get it on Google Play
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Countdown reached zero but the app isn't downloadable yet — never claim it's live.
+  if (countdownDone && !APP_IS_LIVE) {
+    return (
+      <div className="text-center">
+        <div
+          className="inline-block px-6 py-3 rounded-lg shadow-lg relative overflow-hidden"
           style={{
+            background: 'linear-gradient(135deg, #10b981, #14b8a6, #06b6d4)',
             backgroundSize: '200% 200%',
-            animation: 'gradient-x 4s ease infinite 1s'
+            animation: 'gradient-x 3s ease infinite'
           }}
         >
-          The beta launched on March 21, 2026 — download now!
+          <span className="text-white font-bold text-lg relative z-10">
+            🌱 Launching soon
+          </span>
+        </div>
+        <p className="text-sm mt-2 text-[var(--healthscan-text-muted)] font-medium">
+          We're putting the finishing touches on the app — join the waitlist to be first in.
         </p>
       </div>
     );
@@ -161,7 +190,7 @@ export function CountdownTimer() {
           animation: 'gradient-x 5s ease infinite 1.5s'
         }}
       >
-        Until HealthScan Beta Launch • Mar 21, 2026
+        Until HealthScan Beta Launch • {LAUNCH_LABEL}
       </p>
     </div>
   );

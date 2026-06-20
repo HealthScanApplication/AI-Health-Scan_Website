@@ -1,24 +1,57 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
 import { UniversalWaitlist } from "./UniversalWaitlist";
-import { CountdownTimer } from "./CountdownTimer";
-import { CelebrationElements } from "./CelebrationElements";
-import { AnimatedHeadline } from "./AnimatedHeadline";
-
 import { ReferralInvitationBanner } from "./ReferralInvitationBanner";
-import { User } from "lucide-react";
-
-import { useAuth } from "../contexts/AuthContext";
+import { projectId, publicAnonKey } from "../utils/supabase/info";
+import { APP_STORE_URL } from "../config/appLinks";
+import heroPoster from "../assets/5f38caf68dd6b8af22362056b70854ea4cf4b933.png";
 import {
-  projectId,
-  publicAnonKey,
-} from "../utils/supabase/info";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
-import healthScanLogo from "../assets/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png";
-import heroBackground from "../assets/5f38caf68dd6b8af22362056b70854ea4cf4b933.png";
+  ed,
+  GRO,
+  coverStyle,
+  deckStyle,
+  folioStyle,
+} from "../config/editorialTheme";
+
+// Stylish Apple glyph for the "Try" CTA
+function AppleMark({ size = 15 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" style={{ marginBottom: -2 }}>
+      <path d="M17.05 12.54c-.02-2.06 1.68-3.05 1.76-3.1-.96-1.4-2.46-1.6-3-1.62-1.27-.13-2.49.75-3.14.75-.65 0-1.65-.73-2.71-.71-1.39.02-2.68.81-3.4 2.06-1.45 2.52-.37 6.25 1.04 8.3.69 1 1.51 2.13 2.58 2.09 1.04-.04 1.43-.67 2.69-.67 1.25 0 1.61.67 2.71.65 1.12-.02 1.83-1.02 2.51-2.03.79-1.16 1.12-2.29 1.13-2.35-.02-.01-2.17-.83-2.19-3.3zM15 5.88c.57-.69.96-1.65.85-2.61-.83.03-1.83.55-2.42 1.24-.53.61-.99 1.59-.87 2.53.93.07 1.87-.47 2.44-1.16z" />
+    </svg>
+  );
+}
+
+// Strava brandmark (orange chevron) for the integrations strip.
+function StravaMark({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#FC4C02" aria-hidden="true">
+      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.172" />
+    </svg>
+  );
+}
+
+// Ōura ring glyph (a band) for the integrations strip.
+function OuraRing({ size = 15 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <circle cx="12" cy="12" r="8" fill="none" stroke="#16140F" strokeWidth="3.4" />
+    </svg>
+  );
+}
+
+// Apple Health heart for the integrations strip.
+function AppleHealthMark({ size = 15 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#FB2C53" aria-hidden="true">
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    </svg>
+  );
+}
+
+const syncName: React.CSSProperties = { fontFamily: GRO, fontSize: 13, fontWeight: 600, letterSpacing: "0.02em", color: ed.ink };
+const syncDivider: React.CSSProperties = { width: 1, height: 13, background: ed.hair };
 
 interface HeroSectionProps {
   hasReferral?: boolean;
@@ -26,179 +59,110 @@ interface HeroSectionProps {
   referralCode?: string | null;
 }
 
+const GOAL_WORDS = ["weight loss", "clearer skin", "lean muscle", "more energy", "better sleep", "healthy kids", "gut health"];
+
+const overline: React.CSSProperties = {
+  fontFamily: GRO,
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.2em",
+  color: ed.inkSoft,
+  margin: 0,
+};
+
 export function HeroSection({ hasReferral, isActive, referralCode }: HeroSectionProps = {}) {
-  const { user } = useAuth();
-  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
-  const [userPosition, setUserPosition] = useState<number | null>(null);
-  const [isLoadingCount, setIsLoadingCount] = useState(true);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
+  const [allowVideo, setAllowVideo] = useState(false);
   const [backgroundVideos, setBackgroundVideos] = useState<string[]>([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [fadingOut, setFadingOut] = useState(false);
+  const [wordIndex, setWordIndex] = useState(0);
+  const [wordVisible, setWordVisible] = useState(true);
 
-  const [showCelebration, setShowCelebration] = useState(Math.random() > 0.7);
-
-  // Fetch videos from meals, ingredients, and elements for background slideshow (randomized)
   useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setReduceMotion(reduce);
+    const narrowMq = window.matchMedia("(max-width: 768px)");
+    const applyNarrow = () => setIsNarrow(narrowMq.matches);
+    applyNarrow();
+    narrowMq.addEventListener?.("change", applyNarrow);
+    const conn = (navigator as any).connection;
+    const eff = conn?.effectiveType || "";
+    const slow = conn?.saveData === true || /(^|-)2g$/.test(eff) || (typeof conn?.downlink === "number" && conn.downlink < 1.5);
+    let videoTimer: ReturnType<typeof setTimeout> | undefined;
+    if (!reduce && !conn?.saveData && !(window.matchMedia("(max-width: 600px)").matches && slow) && !/(^|-)2g$/.test(eff)) {
+      // Let the poster image paint + the page settle before we fetch/stream video.
+      videoTimer = setTimeout(() => setAllowVideo(true), 900);
+    }
+    return () => {
+      narrowMq.removeEventListener?.("change", applyNarrow);
+      if (videoTimer) clearTimeout(videoTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!allowVideo) return;
     const fetchVideos = async () => {
       try {
         const base = `https://${projectId}.supabase.co/rest/v1`;
-        const headers = { 'apikey': publicAnonKey, 'Authorization': `Bearer ${publicAnonKey}` };
-        const [ingRes, recRes, eleRes] = await Promise.all([
+        const headers = { apikey: publicAnonKey, Authorization: `Bearer ${publicAnonKey}` };
+        const [a, b, c] = await Promise.all([
           fetch(`${base}/catalog_ingredients?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
           fetch(`${base}/catalog_recipes?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
           fetch(`${base}/catalog_elements?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
         ]);
-        const ingData = ingRes.ok ? await ingRes.json() : [];
-        const recData = recRes.ok ? await recRes.json() : [];
-        const eleData = eleRes.ok ? await eleRes.json() : [];
-        const ing = (ingData as any[]).map((r: any) => r.video_url).filter(Boolean);
-        const rec = (recData as any[]).map((r: any) => r.video_url).filter(Boolean);
-        const ele = (eleData as any[]).map((r: any) => r.video_url).filter(Boolean);
-        // Combine all videos and randomize order
-        const all = [...ing, ...rec, ...ele].sort(() => Math.random() - 0.5).slice(0, 12);
+        const ja = a.ok ? await a.json() : [];
+        const jb = b.ok ? await b.json() : [];
+        const jc = c.ok ? await c.json() : [];
+        const all = [...ja, ...jb, ...jc].map((r: any) => r.video_url).filter(Boolean).sort(() => Math.random() - 0.5).slice(0, 10);
         if (all.length > 0) setBackgroundVideos(all);
       } catch {
-        // silently ignore — background is optional
+        /* poster remains */
       }
     };
     fetchVideos();
-  }, [projectId, publicAnonKey]);
+  }, [allowVideo]);
 
-  // Auto-advance video every 6s with a 0.8s fade-out before switching
   useEffect(() => {
     if (backgroundVideos.length < 2) return;
-    const interval = setInterval(() => {
+    const t = setInterval(() => {
       setFadingOut(true);
       setTimeout(() => {
-        setCurrentVideoIndex(prev => (prev + 1) % backgroundVideos.length);
+        setCurrentVideoIndex((p) => (p + 1) % backgroundVideos.length);
         setFadingOut(false);
       }, 800);
-    }, 6000);
-    return () => clearInterval(interval);
+    }, 7000);
+    return () => clearInterval(t);
   }, [backgroundVideos]);
 
-  // Curated words that work well with the HealthScan theme
-  const animatedWords = [
-    "kids",
-    "treats",
-    "meals",
-    "snacks",
-    "drinks",
-    "supplements",
-    "products",
-  ];
-
-  // Generate consistent referral code based on email
-  const generateConsistentReferralCode = (email: string): string => {
-    let hash = 0;
-    for (let i = 0; i < email.length; i++) {
-      const char = email.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    const positiveHash = Math.abs(hash);
-    const code = positiveHash.toString(36).substring(0, 6).padEnd(6, '0');
-    return `hs_${code}`;
-  };
-
   useEffect(() => {
-    // Randomize celebration elements every 10 seconds
-    const interval = setInterval(() => {
-      setShowCelebration(Math.random() > 0.6);
-    }, 10000);
-
-    return () => clearInterval(interval);
+    const t = setInterval(() => {
+      setWordVisible(false);
+      setTimeout(() => {
+        setWordIndex((i) => (i + 1) % GOAL_WORDS.length);
+        setWordVisible(true);
+      }, 320);
+    }, 3200);
+    return () => clearInterval(t);
   }, []);
-
-  // Load real waitlist count and user position
-  useEffect(() => {
-    const loadWaitlistData = async () => {
-      try {
-        setIsLoadingCount(true);
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/waitlist-count`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          },
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setWaitlistCount(data.count || 0);
-        } else {
-          setWaitlistCount(null);
-        }
-
-        // Get user position from localStorage if available (only for logged in users)
-        if (user?.email) {
-          const userEmail = localStorage.getItem('healthscan_user_email');
-          const storedPosition = localStorage.getItem('healthscan_user_position');
-          
-          // Don't display user position - remove position indicator
-          setUserPosition(null);
-        } else {
-          // Clear user position if not logged in
-          setUserPosition(null);
-        }
-      } catch (error) {
-        // Silently handle fetch errors - these are expected during development/offline mode
-        setWaitlistCount(null);
-        setUserPosition(null);
-      } finally {
-        setIsLoadingCount(false);
-      }
-    };
-
-    loadWaitlistData();
-
-    // Listen for user signup events to update count only (not position)
-    const handleUserSignup = (event: CustomEvent) => {
-      // Don't display individual user position
-      setUserPosition(null);
-      loadWaitlistData();
-    };
-
-    window.addEventListener("userSignedUp", handleUserSignup as EventListener);
-
-    return () => {
-      window.removeEventListener(
-        "userSignedUp",
-        handleUserSignup as EventListener,
-      );
-    };
-  }, [user?.email]); // Add user?.email dependency to re-run when login status changes
-
-  // Helper function to get the appropriate social proof text
-  const getSocialProofText = () => {
-    if (user?.email) {
-      // Logged in user - show generic message instead of position
-      return "You're on the waitlist! 🌱";
-    } else if (!user?.email && waitlistCount !== null && waitlistCount > 0) {
-      // Not logged in, show total queue size
-      return `${waitlistCount} people in the queue`;
-    } else {
-      // Fallback text
-      return "Join our growing community";
-    }
-  };
 
   return (
     <section
       id="hero-section"
-      className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      style={{ position: "relative", minHeight: "100svh", background: ed.paper, overflow: "hidden" }}
     >
-      {/* Hero Background — static image + faded video mosaic */}
-      <div className="absolute inset-0 w-full h-full">
+      {/* Cover stock — faded photo under a heavy paper tint so it reads as printed paper */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }} aria-hidden="true">
         <img
-          src={heroBackground}
-          alt="HealthScan Hero Background"
-          className="absolute top-0 left-0 w-full h-full object-cover"
+          src={heroPoster}
+          alt=""
+          {...({ fetchpriority: "high" } as any)}
+          decoding="async"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "saturate(0.9) contrast(1.02)" }}
         />
-
-        {/* Single fullscreen background video — fades to next clip every 6s */}
-        {backgroundVideos.length > 0 && (
+        {allowVideo && backgroundVideos.length > 0 && (
           <video
             key={backgroundVideos[currentVideoIndex]}
             src={backgroundVideos[currentVideoIndex]}
@@ -206,189 +170,109 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
             muted
             loop
             playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{
-              opacity: fadingOut ? 0 : 0.28,
-              transition: 'opacity 0.8s ease-in-out',
-            }}
+            aria-hidden="true"
+            tabIndex={-1}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "saturate(0.9)", opacity: fadingOut ? 0 : 1, transition: "opacity 0.8s ease-in-out" }}
           />
         )}
-
-        {/* White transparent overlay */}
-        <div className="absolute inset-0 bg-white/15"></div>
-        
-        {/* Animated luminosity gradient overlay */}
-        <div 
-          className="absolute inset-0 opacity-30 animate-pulse"
-          style={{
-            background: `
-              linear-gradient(45deg, 
-                rgba(255, 255, 255, 0.2) 0%, 
-                rgba(255, 255, 255, 0.05) 25%, 
-                rgba(255, 255, 255, 0.3) 50%, 
-                rgba(255, 255, 255, 0.1) 75%, 
-                rgba(255, 255, 255, 0.2) 100%
-              )
-            `,
-            backgroundSize: "400% 400%",
-            animation: "gradientLuminosity 8s ease-in-out infinite"
-          }}
-        />
-
-        {/* Subtle overlay for better text readability */}
-        <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px]"></div>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(244,241,234,0.78) 0%, rgba(244,241,234,0.7) 55%, rgba(244,241,234,0.86) 100%)" }} />
       </div>
 
-      {/* Subtle enhancement overlay */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Light enhancement to complement the background image */}
-        {/* Vintage Noise Texture Overlay */}
-        <div
-          className="absolute inset-0 opacity-20 mix-blend-overlay"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.8'/%3E%3C/svg%3E")`,
-          }}
-        />
-
-        {/* Animated Gradient Overlay */}
-        <div
-          className="absolute inset-0 opacity-15 animate-gradient-flow"
-          style={{
-            background: `
-              linear-gradient(45deg, 
-                rgba(22, 163, 74, 0.1) 0%, 
-                rgba(34, 197, 94, 0.15) 25%, 
-                rgba(16, 185, 129, 0.1) 50%, 
-                rgba(6, 182, 212, 0.12) 75%, 
-                rgba(22, 163, 74, 0.08) 100%
-              ),
-              radial-gradient(ellipse at 30% 40%, rgba(255, 255, 255, 0.1) 0%, transparent 60%),
-              radial-gradient(ellipse at 70% 60%, rgba(22, 163, 74, 0.05) 0%, transparent 50%)
-            `,
-            backgroundSize: "400% 400%, 100% 100%, 100% 100%",
-          }}
-        />
-      </div>
-
-      {/* Celebration Elements */}
-      {showCelebration && <CelebrationElements isActive={showCelebration} />}
-
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full flex flex-col justify-center min-h-screen sm:min-h-0">
-        {/* Logo - Hidden on mobile */}
-        <div className="hidden sm:flex justify-center mb-8">
-          <img
-            src={healthScanLogo}
-            alt="HealthScan"
-            className="h-16 w-auto sm:h-20"
-          />
-        </div>
-        {/* Launch Badge */}
-        <div className="flex justify-center items-center mb-6 mt-4 sm:mt-0">
-          <Badge variant="secondary" className="bg-gray-100 text-gray-500 text-xs font-normal border-gray-200 opacity-80">
-            Beta Launch • Mar 21, 2026
-          </Badge>
+      {/* Cover content on the grid */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          minHeight: "100svh",
+          display: "flex",
+          flexDirection: "column",
+          maxWidth: 1440,
+          margin: "0 auto",
+          paddingLeft: "clamp(20px, 5vw, 72px)",
+          paddingRight: "clamp(20px, 5vw, 72px)",
+          paddingTop: "clamp(104px, 14vh, 150px)",
+          paddingBottom: "clamp(32px, 5vh, 56px)",
+        }}
+      >
+        {/* Top: issue line + folio */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: `1px solid ${ed.hair}`, paddingTop: 14 }}>
+          <p style={overline}>Issue 01 — Out now — Summer 2026</p>
+          <p style={folioStyle}>01 / 08</p>
         </div>
 
-        {/* Animated Main Headline */}
-        <AnimatedHeadline
-          words={animatedWords}
-          interval={2800}
-          className="text-center mb-3"
-        />
+        <div style={{ flex: 1, minHeight: "clamp(40px, 8vh, 120px)" }} />
 
-        {/* Subheadline */}
-        <p className="text-base sm:text-lg text-[rgba(0,0,0,0.47)] mb-8 max-w-2xl mx-auto leading-relaxed">
-          Know exactly what you're eating before you eat it — protect your health with real-time ingredient analysis and personalized safety alerts.
-        </p>
+        {/* Cover line + deck, lower-left */}
+        <div style={{ width: "100%" }}>
+          <h1 style={coverStyle}>
+            <span style={{ display: "block" }}>Build a routine</span>
+            <span style={{ display: "block" }}>
+              for{" "}
+              <span
+                style={{
+                  fontStyle: "italic",
+                  color: ed.accent,
+                  transition: reduceMotion ? undefined : "opacity 320ms ease",
+                  opacity: wordVisible ? 1 : 0,
+                }}
+              >
+                {GOAL_WORDS[wordIndex]}
+              </span>
+              .
+            </span>
+          </h1>
+          <p style={{ ...deckStyle, marginTop: "clamp(20px, 3vw, 36px)", maxWidth: "34ch" }}>
+            Daily to-dos, activity tracking, and a food scanner — set for whatever you want to achieve.
+          </p>
 
-        {/* Countdown Timer */}
-        <div className="mb-8">
-          <CountdownTimer />
-        </div>
-
-        {/* Email Capture / Referral Section */}
-        <div className="mb-8">
-          <UniversalWaitlist 
-            placeholder="Add your email" 
-            autoFocus={true}
-          />
-        </div>
-
-
-
-        {/* Position-Based Social Proof */}
-        {!isLoadingCount && (
-          <div className="flex justify-center items-center gap-4 text-sm text-[var(--healthscan-text-muted)]">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-blue-100 shadow-sm">
-                  <ImageWithFallback
-                    src="https://ui-avatars.com/api/?name=Sarah+Chen&size=32&background=3b82f6&color=ffffff&rounded=true&bold=true&format=png"
-                    alt="HealthScan user - Sarah"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-green-100 shadow-sm">
-                  <ImageWithFallback
-                    src="https://ui-avatars.com/api/?name=Michael+Rodriguez&size=32&background=16a34a&color=ffffff&rounded=true&bold=true&format=png"
-                    alt="HealthScan user - Michael"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-purple-100 shadow-sm">
-                  <ImageWithFallback
-                    src="https://ui-avatars.com/api/?name=Emma+Thompson&size=32&background=8b5cf6&color=ffffff&rounded=true&bold=true&format=png"
-                    alt="HealthScan user - Emma"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-orange-100 shadow-sm">
-                  <ImageWithFallback
-                    src="https://ui-avatars.com/api/?name=James+Wilson&size=32&background=f59e0b&color=ffffff&rounded=true&bold=true&format=png"
-                    alt="HealthScan user - James"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-              <span>{getSocialProofText()}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Loading state for social proof */}
-        {isLoadingCount && (
-          <div className="flex justify-center items-center gap-4 text-sm text-[var(--healthscan-text-muted)]">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white animate-pulse overflow-hidden flex items-center justify-center">
-                  <User className="w-4 h-4 text-gray-400" />
-                </div>
-                <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white animate-pulse overflow-hidden flex items-center justify-center">
-                  <User className="w-4 h-4 text-gray-400" />
-                </div>
-                <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white animate-pulse overflow-hidden flex items-center justify-center">
-                  <User className="w-4 h-4 text-gray-400" />
-                </div>
-                <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white animate-pulse overflow-hidden flex items-center justify-center">
-                  <User className="w-4 h-4 text-gray-400" />
-                </div>
-              </div>
-              <span>Loading your position...</span>
-            </div>
-            <div className="hidden sm:block w-1 h-1 bg-gray-300 rounded-full"></div>
-            <span className="hidden sm:inline">
-              No spam, ever 📧
+          {/* Integrations — syncs with Apple Health, Ōura Ring & Strava */}
+          <div style={{ marginTop: "clamp(22px, 3vw, 34px)", display: "flex", alignItems: "center", gap: "10px 16px", flexWrap: "wrap" }}>
+            <span style={{ ...overline, color: ed.inkFaint }}>Syncs with</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <AppleHealthMark size={15} />
+              <span style={syncName}>Apple Health</span>
+            </span>
+            <span aria-hidden="true" style={syncDivider} />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <OuraRing size={14} />
+              <span style={syncName}>Ōura Ring</span>
+            </span>
+            <span aria-hidden="true" style={syncDivider} />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <StravaMark size={15} />
+              <span style={syncName}>Strava</span>
             </span>
           </div>
-        )}
+        </div>
+
+        {/* Bottom: waitlist (left) + cover credit (right) */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 28, marginTop: "clamp(44px, 7vh, 88px)" }}>
+          <div>
+            <p style={{ ...overline, color: ed.accent, marginBottom: 14 }}>Out now on iOS — Android coming soon</p>
+            <a
+              href={APP_STORE_URL || undefined}
+              target={APP_STORE_URL ? "_blank" : undefined}
+              rel="noopener noreferrer"
+              className="ed-cta"
+            >
+              <AppleMark />Try HealthScan&nbsp;→
+            </a>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginTop: 22 }}>
+              <span style={{ ...overline, color: ed.inkSoft }}>The dispatch</span>
+              <UniversalWaitlist variant="editorial" submitLabel="Subscribe →" placeholder="you@email.com" />
+            </div>
+          </div>
+          {!isNarrow && (
+            <p style={{ fontFamily: GRO, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.16em", color: ed.inkSoft, textAlign: "right", lineHeight: 1.8, margin: 0 }}>
+              Photography — Studio HealthScan
+              <br />
+              Words — The Editors
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Floating Referral Invitation Banner */}
-      <ReferralInvitationBanner 
-        hasReferral={hasReferral || false}
-        isActive={isActive || false}
-        referralCode={referralCode || null}
-      />
+      <ReferralInvitationBanner hasReferral={hasReferral || false} isActive={isActive || false} referralCode={referralCode || null} />
     </section>
   );
 }
