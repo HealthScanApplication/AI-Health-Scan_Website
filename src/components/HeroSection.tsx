@@ -109,15 +109,13 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
       try {
         const base = `https://${projectId}.supabase.co/rest/v1`;
         const headers = { apikey: publicAnonKey, Authorization: `Bearer ${publicAnonKey}` };
-        const [a, b, c] = await Promise.all([
-          fetch(`${base}/catalog_ingredients?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
-          fetch(`${base}/catalog_recipes?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
-          fetch(`${base}/catalog_elements?select=video_url&video_url=not.is.null&video_url=neq.&limit=8`, { headers }),
-        ]);
-        const ja = a.ok ? await a.json() : [];
-        const jb = b.ok ? await b.json() : [];
-        const jc = c.ok ? await c.json() : [];
-        const all = [...ja, ...jb, ...jc].map((r: any) => r.video_url).filter(Boolean).sort(() => Math.random() - 0.5).slice(0, 10);
+        // Only fruit & vegetable footage in the hero — fresh produce, not nuts/grains/animal.
+        const res = await fetch(
+          `${base}/catalog_ingredients?select=video_url&video_url=not.is.null&video_url=neq.&or=(category.ilike.*fruit*,category.ilike.*veget*)&limit=80`,
+          { headers },
+        );
+        const rows = res.ok ? await res.json() : [];
+        const all = rows.map((r: any) => r.video_url).filter(Boolean).sort(() => Math.random() - 0.5).slice(0, 10);
         if (all.length > 0) setBackgroundVideos(all);
       } catch {
         /* poster remains */
