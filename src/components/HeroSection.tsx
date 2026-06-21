@@ -24,10 +24,10 @@ function AppleMark({ size = 15 }: { size?: number }) {
   );
 }
 
-// Strava brandmark (orange chevron) for the integrations strip.
+// Strava brandmark (in the HealthScan ochre accent) for the integrations strip.
 function StravaMark({ size = 16 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="#FC4C02" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#9A6A2F" aria-hidden="true">
       <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.172" />
     </svg>
   );
@@ -37,15 +37,15 @@ function StravaMark({ size = 16 }: { size?: number }) {
 function OuraRing({ size = 15 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <circle cx="12" cy="12" r="8" fill="none" stroke="#16140F" strokeWidth="3.4" />
+      <circle cx="12" cy="12" r="8" fill="none" stroke="#9A6A2F" strokeWidth="3.4" />
     </svg>
   );
 }
 
-// Apple Health heart for the integrations strip.
+// Apple Health heart (in the HealthScan ochre accent) for the integrations strip.
 function AppleHealthMark({ size = 15 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="#FB2C53" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#9A6A2F" aria-hidden="true">
       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
     </svg>
   );
