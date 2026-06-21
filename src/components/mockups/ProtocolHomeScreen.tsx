@@ -161,11 +161,14 @@ export function ProtocolHomeScreen({
   items,
   date = new Date(),
   done = 0,
+  scale = 0.85,
 }: {
   protocolName: string;
   items: HomeItem[];
   date?: Date;
   done?: number;
+  /** Shrink the whole app UI to fit the device frame more naturally (1 = real-phone size). */
+  scale?: number;
 }) {
   // book-end the day with grey Sleep anchors (End Sleep / Start Sleep), like the app
   const allItems = withSleepAnchors(items);
@@ -197,7 +200,8 @@ export function ProtocolHomeScreen({
   const total = allItems.length;
 
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", fontFamily: POPPINS, background: "#FFFFFF", color: "#111827", overflow: "hidden" }}>
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#FFFFFF" }}>
+    <div style={{ position: "absolute", top: 0, left: 0, width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "top left", display: "flex", flexDirection: "column", fontFamily: POPPINS, color: "#111827", overflow: "hidden" }}>
       {/* status bar */}
       <div style={{ padding: "13px 22px 2px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: "#111827", fontVariantNumeric: "tabular-nums", letterSpacing: 0.2 }}>9:41</span>
@@ -347,6 +351,7 @@ export function ProtocolHomeScreen({
           <Plus size={24} strokeWidth={1.6} color="#FFFFFF" />
         </span>
       </div>
+    </div>
     </div>
   );
 }
