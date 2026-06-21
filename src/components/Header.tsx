@@ -510,16 +510,11 @@ export function Header({
                   </DropdownMenuContent>
                   </DropdownMenu>
                   
-                  {/* Refer Friends Button - Moved to right */}
+                  {/* Refer Friends — unified outlined CTA */}
                   <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button
-                      onClick={handleReferralModal}
-                      style={{ fontFamily: '"Archivo","Inter",sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#16140F', background: 'none', border: 'none', padding: '8px 4px', textDecoration: 'underline', textUnderlineOffset: 4, textDecorationColor: '#9A6A2F', cursor: 'pointer', height: 'auto', boxShadow: 'none' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = oura.forestHover; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = oura.forest; }}
-                    >
+                    <button onClick={handleReferralModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 16px' }}>
                       <Share2 className="w-4 h-4" />
-                      <span>Refer Friends</span>
+                      Refer Friends
                     </button>
                   </div>
                 </div>
@@ -642,16 +637,11 @@ export function Header({
                       <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: oura.muted, fontWeight: 600 }}>
                         Actions
                       </h3>
-                      {/* Mobile Refer Friends Button */}
+                      {/* Mobile Refer Friends — unified outlined CTA */}
                       <div className={`w-full ${isShaking ? 'animate-button-shake' : ''}`}>
-                        <button
-                          onClick={handleReferralModal}
-                          style={{ fontFamily: '"Archivo","Inter",sans-serif', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#16140F', background: 'none', border: 'none', padding: '10px 0', textDecoration: 'underline', textUnderlineOffset: 4, textDecorationColor: '#9A6A2F', cursor: 'pointer', width: '100%', height: 'auto', boxShadow: 'none', textAlign: 'left' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = oura.forestHover; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = oura.forest; }}
-                        >
+                        <button onClick={handleReferralModal} className="ed-cta" style={{ width: '100%' }}>
                           <Share2 className="w-4 h-4" />
-                          <span>Refer Friends</span>
+                          Refer Friends
                         </button>
                       </div>
                     </div>

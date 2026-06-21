@@ -18,6 +18,7 @@ import {
   Lightbulb,
   Zap,
   Activity,
+  Sparkles,
 } from "lucide-react";
 
 export type CatKey = "supplements" | "consume" | "do" | "sleep";
@@ -57,6 +58,7 @@ export function itemIcon(item: ProtocolItem): { Icon: any; color: string } {
     if (/coffee|tea|latte|matcha|drink|shake|smoothie|collagen|ag1|electrolyte|water/.test(n)) return { Icon: Coffee, color: "#795548" };
     return { Icon: Utensils, color: "#388E3C" };
   }
+  if (/cleanse|serum|moisturi|cream|\bmask\b|toner|essence|exfoliant|spf|sunscreen|gua sha|setting mist|mucin|skincare|\bskin\b|eye cream/.test(n)) return { Icon: Sparkles, color: "#D8638E" };
   if (/sauna|steam|heat/.test(n)) return { Icon: Flame, color: "#E64A19" };
   if (/cold|shower|plunge|ice|cryo|contrast|splash/.test(n)) return { Icon: Droplets, color: "#039BE5" };
   if (/sleep|bed|wind.?down|lights.?out/.test(n)) return { Icon: Moon, color: "#5C6BC0" };

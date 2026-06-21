@@ -194,6 +194,9 @@
       .ed-cta-dark { color: #F4F1EA; border-color: rgba(244,241,234,0.5); }
       .ed-cta-dark:hover { background: #F4F1EA; color: #16140F; border-color: #F4F1EA; }
       .ed-cta:disabled, .ed-cta-dark:disabled { opacity: .5; cursor: default; }
+      /* hide the scrollbar inside the phone-framed protocol timeline */
+      .phone-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+      .phone-scroll::-webkit-scrollbar { display: none; }
       /* editorial submit button (shadcn <button>) — un-force the size + keep text centered */
       .ed-cta-sub { font-size: 11px !important; line-height: 1 !important; }
     </style>

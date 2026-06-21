@@ -9,6 +9,7 @@ import heroPoster from "../assets/5f38caf68dd6b8af22362056b70854ea4cf4b933.png";
 import {
   ed,
   GRO,
+  DISPLAY,
   coverStyle,
   deckStyle,
   folioStyle,
@@ -59,7 +60,7 @@ interface HeroSectionProps {
   referralCode?: string | null;
 }
 
-const GOAL_WORDS = ["weight loss", "clearer skin", "lean muscle", "more energy", "better sleep", "healthy kids", "gut health"];
+const GOAL_WORDS = ["weight loss", "clearer skin", "lean muscle", "more energy", "better sleep", "gut health", "healthy kids", "longevity"];
 
 const overline: React.CSSProperties = {
   fontFamily: GRO,
@@ -190,14 +191,14 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
           margin: "0 auto",
           paddingLeft: "clamp(20px, 5vw, 72px)",
           paddingRight: "clamp(20px, 5vw, 72px)",
-          paddingTop: "clamp(104px, 14vh, 150px)",
+          paddingTop: "clamp(88px, 9vh, 104px)",
           paddingBottom: "clamp(32px, 5vh, 56px)",
         }}
       >
         {/* Top: issue line + folio */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: `1px solid ${ed.hair}`, paddingTop: 14 }}>
-          <p style={overline}>Issue 01 — Out now — Summer 2026</p>
-          <p style={folioStyle}>01 / 08</p>
+          <p style={overline}>HealthScan — Health · Beauty · Fitness</p>
+          <p style={folioStyle}>Out now on iOS</p>
         </div>
 
         <div style={{ flex: 1, minHeight: "clamp(40px, 8vh, 120px)" }} />
@@ -227,7 +228,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
 
           {/* Integrations — syncs with Apple Health, Ōura Ring & Strava */}
           <div style={{ marginTop: "clamp(22px, 3vw, 34px)", display: "flex", alignItems: "center", gap: "10px 16px", flexWrap: "wrap" }}>
-            <span style={{ ...overline, color: ed.inkFaint }}>Syncs with</span>
+            <span style={{ ...overline, color: ed.inkFaint }}>Syncs</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
               <AppleHealthMark size={15} />
               <span style={syncName}>Apple Health</span>
@@ -256,8 +257,9 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
                 rel="noopener noreferrer"
                 className="ed-cta"
               >
-                <AppleMark />Try HealthScan&nbsp;→
+                <AppleMark />Try&nbsp;→
               </a>
+              <span style={{ fontFamily: DISPLAY, fontStyle: "italic", fontSize: 17, color: ed.inkSoft }}>or</span>
               <UniversalWaitlist variant="editorial" submitLabel="Subscribe →" placeholder="you@email.com" />
             </div>
           </div>
