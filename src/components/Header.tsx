@@ -378,7 +378,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('routines')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
@@ -387,7 +387,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('features')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
@@ -396,7 +396,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('how-it-works')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
@@ -405,7 +405,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('faq')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
