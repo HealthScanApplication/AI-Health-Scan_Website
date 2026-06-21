@@ -1,6 +1,16 @@
 import { ed, GRO, DISPLAY, kickerStyle, folioStyle, h2Style, deckStyle } from "../config/editorialTheme";
 import { Reveal, RevealGroup, RevealItem } from "./motion/Reveal";
-import { ProtocolMockup } from "./mockups/ProtocolMockup";
+import { PhoneFrame } from "./mockups/PhoneFrame";
+import { ProtocolHomeScreen, type HomeItem } from "./mockups/ProtocolHomeScreen";
+
+/* A weight-loss day, partly checked off — same app UI as the "routine" section above. */
+const CHECKED_DAY: HomeItem[] = [
+  { display_name: "Vitamin D3", item_type: "supplement", time: "06:30", group_name: "Supplements", done: true },
+  { display_name: "Green Tea", item_type: "consume", time: "07:00", group_name: "Breakfast", done: true },
+  { display_name: "Morning Sunlight", item_type: "activity", time: "07:30", group_name: "Do", duration_minutes: 10, done: true },
+  { display_name: "High-Protein Lunch", item_type: "consume", time: "12:30", group_name: "Lunch" },
+  { display_name: "Strength Session", item_type: "activity", time: "18:00", group_name: "Do", duration_minutes: 30 },
+];
 
 const STEPS = [
   {
@@ -87,9 +97,11 @@ export function HowItWorksSection() {
             </RevealGroup>
           </div>
 
-          {/* Phone — the routine, tracked */}
+          {/* Phone — the routine, tracked (same app UI as the section above, checked off) */}
           <div style={{ flex: "1 1 300px", minWidth: 280, display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <ProtocolMockup />
+            <PhoneFrame width={300} screenBg="#FFFFFF">
+              <ProtocolHomeScreen protocolName="Weight-loss routine" items={CHECKED_DAY} anchors={false} />
+            </PhoneFrame>
             <p style={{ fontFamily: GRO, fontSize: 11, fontStyle: "italic", color: ed.inkSoft, marginTop: 18, letterSpacing: "0.02em", textAlign: "center" }}>
               Fig. 02 — Your day, checked off
             </p>

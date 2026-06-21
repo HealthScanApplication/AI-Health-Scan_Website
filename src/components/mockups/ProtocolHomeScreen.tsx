@@ -14,7 +14,7 @@
  */
 import {
   User, BarChart, TrendingUp, ShoppingBasket,
-  ListChecks, BookOpen, Plus, Repeat,
+  ListChecks, BookOpen, Plus, Repeat, Check,
 } from "lucide-react";
 import {
   CATEGORY_TINTS, itemIcon, type CatKey, type ProtocolItem as CatItem,
@@ -33,6 +33,7 @@ export interface HomeItem {
   image_url?: string | null;
   repeat?: boolean;
   description?: string | null;
+  done?: boolean;                // checked off for the day
 }
 
 /* ───────── time + category helpers (mirror mobile precedence) ───────── */
@@ -162,6 +163,7 @@ export function ProtocolHomeScreen({
   date = new Date(),
   done = 0,
   scale = 0.85,
+  anchors = true,
 }: {
   protocolName: string;
   items: HomeItem[];
@@ -169,9 +171,11 @@ export function ProtocolHomeScreen({
   done?: number;
   /** Shrink the whole app UI to fit the device frame more naturally (1 = real-phone size). */
   scale?: number;
+  /** Book-end the day with the grey Sleep anchors (off for a clean checked-off demo). */
+  anchors?: boolean;
 }) {
   // book-end the day with grey Sleep anchors (End Sleep / Start Sleep), like the app
-  const allItems = withSleepAnchors(items);
+  const allItems = anchors ? withSleepAnchors(items) : items;
 
   // wake hour = End Sleep / Wake item's hour, clamped 0..11, else 5
   let wakeHour = 5;
@@ -198,6 +202,7 @@ export function ProtocolHomeScreen({
   const weekLine = `WEEK ${isoWeek(date)}  ·  ${WD[date.getDay()]} ${MON[date.getMonth()]} ${date.getDate()}`;
   const sectionDate = `${WD[date.getDay()]}, ${MON[date.getMonth()]} ${date.getDate()}`;
   const total = allItems.length;
+  const doneCount = allItems.filter((i) => i.done).length || done;
 
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#FFFFFF" }}>
@@ -275,24 +280,28 @@ export function ProtocolHomeScreen({
                       {band.items.map((it, ii) => {
                         const ic = iconFor(it);
                         const ItemIcon = ic.Icon;
+                        const isDone = !!it.done;
                         const sub = [fmtTime(it.time), it.group_name, it.duration_minutes ? `${it.duration_minutes} min` : null].filter(Boolean).join(" · ");
                         return (
                           <div key={ii} style={{ display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF", borderRadius: 12, padding: "8px 10px", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
                             {it.image_url ? (
-                              <img src={it.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", background: "#F3F4F6", flexShrink: 0 }} />
+                              <img src={it.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", background: "#F3F4F6", flexShrink: 0, opacity: isDone ? 0.5 : 1 }} />
                             ) : (
-                              <span style={{ width: 36, height: 36, borderRadius: 8, background: tint.bg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              <span style={{ width: 36, height: 36, borderRadius: 8, background: tint.bg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: isDone ? 0.5 : 1 }}>
                                 <ItemIcon size={18} strokeWidth={1.8} color={ic.color} />
                               </span>
                             )}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                                <span style={{ fontSize: 14, fontWeight: 500, color: tint.fg, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
+                                <span style={{ fontSize: 14, fontWeight: 500, color: isDone ? "#9CA3AF" : tint.fg, textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
                                 {it.repeat && <Repeat size={11} color={tint.fg} strokeWidth={2} style={{ flexShrink: 0 }} />}
                               </div>
-                              {sub && <div style={{ fontSize: 11, fontWeight: 400, color: "#9CA3AF", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
+                              {sub && <div style={{ fontSize: 11, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
                               {it.description && <div style={{ fontSize: 11, lineHeight: 1.4, color: tint.fg, marginTop: 4, opacity: 0.92 }}>{it.description}</div>}
                             </div>
+                            <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", background: isDone ? "#22C55E" : "#FFFFFF", border: isDone ? "1px solid #22C55E" : "1.5px solid #D1D5DB" }}>
+                              {isDone && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+                            </span>
                           </div>
                         );
                       })}
@@ -307,14 +316,14 @@ export function ProtocolHomeScreen({
         {/* FOOTER goals card */}
         <div style={{ margin: "10px 16px 0", background: "#FFFFFF", borderRadius: 12, padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
           <div style={{ height: 4, borderRadius: 2, background: "#E5E7EB", marginBottom: 10 }}>
-            <div style={{ height: "100%", borderRadius: 2, background: "#059669", width: `${total ? Math.min(100, Math.max(0, (done / total) * 100)) : 0}%` }} />
+            <div style={{ height: "100%", borderRadius: 2, background: "#059669", width: `${total ? Math.min(100, Math.max(0, (doneCount / total) * 100)) : 0}%` }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", color: "#6B7280" }}>DAILY GOALS ▾</span>
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontSize: 42, fontWeight: 600, letterSpacing: -1.5, lineHeight: "46px" }}>
-              <span style={{ color: "#000000" }}>{done}</span>
+              <span style={{ color: "#000000" }}>{doneCount}</span>
               <span style={{ color: "#C7CBD1" }}>/{total}</span>
             </span>
           </div>
