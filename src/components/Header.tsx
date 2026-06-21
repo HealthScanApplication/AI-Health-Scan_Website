@@ -13,7 +13,7 @@ import {
   LogOut, 
   ChevronDown,
   Shield,
-  Menu,
+  MoreHorizontal,
   X,
   Share2
 } from 'lucide-react';
@@ -378,7 +378,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('routines')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 14, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
@@ -387,7 +387,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('features')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 14, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
@@ -396,7 +396,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('how-it-works')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 14, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
@@ -405,7 +405,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('faq')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 14, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
               >
@@ -423,20 +423,7 @@ export function Header({
                   className="p-1"
                   style={{ color: oura.body }}
                 >
-                  {mobileMenuOpen ? (
-                    <X className="w-5 h-5" />
-                  ) : (
-                    <Avatar className="w-8 h-8 avatar-with-hover-effects">
-                      <AvatarImage
-                        src={user.user_metadata?.avatar_url}
-                        alt="Profile picture"
-                        className="object-cover"
-                      />
-                      <AvatarFallback className="text-white text-sm avatar-fallback" style={{ background: oura.forest }}>
-                        {getUserInitials(user.user_metadata?.name || user.email || 'U')}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
+                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <MoreHorizontal className="w-5 h-5" />}
                 </Button>
               ) : (
                 <Button
@@ -445,7 +432,7 @@ export function Header({
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   style={{ color: oura.body }}
                 >
-                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <MoreHorizontal className="w-5 h-5" />}
                 </Button>
               )}
             </div>
@@ -463,7 +450,7 @@ export function Header({
                     >
                       <div className="hidden lg:flex flex-col items-end">
                         <span className="text-sm font-medium text-gray-900 text-right">
-                          {user.email}
+                          {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
                         </span>
                       </div>
                       <Avatar className="w-8 h-8 avatar-with-hover-effects">
@@ -514,7 +501,7 @@ export function Header({
                   <div className={isShaking ? 'animate-button-shake' : ''}>
                     <button onClick={handleReferralModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 16px' }}>
                       <Share2 className="w-4 h-4" />
-                      Refer Friends
+                      Refer
                     </button>
                   </div>
                 </div>
