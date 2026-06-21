@@ -12,10 +12,8 @@
  *
  * No-JIT: every style is inline (the site ships prebuilt static CSS).
  */
-import type { ReactNode } from "react";
 import {
-  User, Info, LocateFixed, Pencil, FlaskConical, Ellipsis,
-  MoreVertical, BarChart, TrendingUp, ShoppingBasket,
+  User, BarChart, TrendingUp, ShoppingBasket,
   ListChecks, BookOpen, Plus, Repeat,
 } from "lucide-react";
 import {
@@ -157,15 +155,6 @@ function isoWeek(d: Date): number {
 }
 function sameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
-/* ───────── small chrome pieces ───────── */
-function IconBtn({ children }: { children: ReactNode }) {
-  return (
-    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#F3F4F6", border: "1px solid #E5E7EB", flexShrink: 0 }}>
-      {children}
-    </span>
-  );
-}
-
 /* ───────── the screen ───────── */
 export function ProtocolHomeScreen({
   protocolName,
@@ -230,15 +219,8 @@ export function ProtocolHomeScreen({
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-start", minWidth: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: "#374151", whiteSpace: "nowrap" }}>{weekLine}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.2, color: "#9CA3AF", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }}>{(protocolName || "Your routine").toUpperCase()}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.2, color: "#9CA3AF", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(protocolName || "Your routine").toUpperCase()}</span>
             </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-            <IconBtn><Info size={15} strokeWidth={2} color="#16A34A" /></IconBtn>
-            <IconBtn><LocateFixed size={14} strokeWidth={2} color="#4B5563" /></IconBtn>
-            <IconBtn><Pencil size={13} strokeWidth={2} color="#6B7280" /></IconBtn>
-            <IconBtn><FlaskConical size={14} strokeWidth={2} color="#6B7280" /></IconBtn>
-            <IconBtn><Ellipsis size={16} color="#9CA3AF" /></IconBtn>
           </div>
         </div>
 
@@ -307,9 +289,6 @@ export function ProtocolHomeScreen({
                               {sub && <div style={{ fontSize: 11, fontWeight: 400, color: "#9CA3AF", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
                               {it.description && <div style={{ fontSize: 11, lineHeight: 1.4, color: tint.fg, marginTop: 4, opacity: 0.92 }}>{it.description}</div>}
                             </div>
-                            <span style={{ width: 20, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                              <MoreVertical size={15} color="#C4C4C0" strokeWidth={2} />
-                            </span>
                           </div>
                         );
                       })}
