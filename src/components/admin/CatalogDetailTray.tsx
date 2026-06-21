@@ -21,6 +21,7 @@ import { IngredientRelationsPanel } from './IngredientRelationsPanel';
 import { PackageItemsPanel } from './PackageItemsPanel';
 import { MidjourneyPromptGenerator } from './MidjourneyPromptGenerator';
 import { JunctionRecordsPanel } from './JunctionRecordsPanel';
+import { RecordPreview } from './preview/RecordPreview';
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -186,6 +187,11 @@ export function CatalogDetailTray({
 
       {/* Content with padding */}
       <div className="px-6 py-5 space-y-4">
+        {/* App-faithful mobile preview of this record */}
+        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 4 }}>
+          <RecordPreview activeTab={activeTab} record={record} />
+        </div>
+
         {/* Badges */}
         <BadgeRow record={record} activeTab={activeTab} />
 

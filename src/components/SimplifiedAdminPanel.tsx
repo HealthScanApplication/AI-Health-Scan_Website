@@ -71,6 +71,7 @@ import { CatalogDetailTray } from './admin/CatalogDetailTray';
 import { AdminModal } from './ui/AdminModal';
 import { AdminDebugPanel } from './admin/AdminDebugPanel';
 import { HealthScanProductsOverview } from './admin/HealthScanProductsOverview';
+import { ProtocolEditor } from './admin/ProtocolEditor';
 import { CookingToolsField, PROCESSING_METHODS, type EquipmentRecord } from './admin/fields/CookingToolsField';
 import { CookingMethodLinksSection } from './admin/fields/CookingMethodLinksSection';
 import { stripProcessing, cleanIngredientName } from '../utils/recipeProcessing';
@@ -1748,7 +1749,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
         { id: 'equipment', label: 'Equipment', icon: <Wrench className="w-4 h-4" />, table: 'catalog_equipment' },
         { id: 'activities', label: 'Activities', icon: <Dumbbell className="w-4 h-4" />, table: 'catalog_activities' },
         { id: 'symptoms', label: 'Symptoms', icon: <HeartPulse className="w-4 h-4" />, table: 'catalog_symptoms' },
-        { id: 'protocols', label: 'Protocols', icon: <ClipboardList className="w-4 h-4" />, table: 'catalog_protocols' },
+        { id: 'protocols', label: 'Protocols', icon: <ClipboardList className="w-4 h-4" />, table: 'protocols' },
       ]
     },
     {
@@ -1784,7 +1785,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     activeTab,
     table: currentTab?.table || '',
     accessToken,
-    enabled: !!currentTab && activeTab !== 'sync',
+    // 'protocols' is handled by the dedicated ProtocolEditor against the real
+    // `protocols`/`protocol_items` tables — skip the legacy catalog fetch.
+    enabled: !!currentTab && activeTab !== 'sync' && activeTab !== 'protocols',
   });
   const [editingRecord, setEditingRecord] = useState<AdminRecord | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -4359,6 +4362,9 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
 
             {tabs.filter(tab => tab.id !== 'sync' && tab.id !== 'notifications').map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
+                {tab.id === 'protocols' ? (
+                  <ProtocolEditor accessToken={accessToken} />
+                ) : (<>
                 {/* Waitlist Funnel Dashboard */}
                 {tab.id === 'waitlist' && validRecords.length > 0 && !showSearch && (
                   <WaitlistFunnelDashboard records={validRecords} accessToken={accessToken} ipGeoData={ipGeoData} />
@@ -5136,6 +5142,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                     </div>
                   </div>
                 )}
+                </>)}
               </TabsContent>
             ))}
           </Tabs>
