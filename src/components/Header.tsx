@@ -374,7 +374,7 @@ export function Header({
             </div>
 
             {/* Desktop Navigation - Centered and Optimized */}
-            <nav aria-label="Main navigation" className="hidden md:flex items-center justify-center flex-1 space-x-1">
+            <nav aria-label="Main navigation" className="hs-hdr-wide items-center justify-center flex-1 space-x-1">
               <button
                 onClick={() => handleSectionScroll('routines')}
                 className="px-4 py-2"
@@ -414,7 +414,7 @@ export function Header({
             </nav>
 
             {/* Mobile menu button */}
-            <div className="md:hidden absolute right-4">
+            <div className="hs-hdr-narrow absolute right-4">
               {user ? (
                 <Button
                   variant="ghost"
@@ -438,7 +438,7 @@ export function Header({
             </div>
 
             {/* User Authentication - Desktop */}
-            <div className="hidden md:flex items-center space-x-4 flex-shrink-0">
+            <div className="hs-hdr-wide items-center space-x-4 flex-shrink-0">
               {user ? (
                 <div className="flex items-center space-x-3">
                   {/* User Information - Moved to left */}
@@ -530,7 +530,7 @@ export function Header({
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div
-              className="md:hidden"
+              className="hs-hdr-narrow"
               style={{ borderTop: `1px solid ${oura.hairline}`, background: oura.cream }}
             >
               <div className="py-4">
