@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff,
+  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -21,7 +21,8 @@ import { MediaUploadField } from './MediaUploadField';
 import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
-  type AdminProtocol, type AdminProtocolItem,
+  searchCatalog, getCatalogByIds, linkedKind, linkPatch, CATALOG_CFG,
+  type AdminProtocol, type AdminProtocolItem, type CatalogKind, type CatalogHit,
 } from '../../utils/protocolAdmin';
 
 /* ── palette (neutral admin) ── */
@@ -98,7 +99,7 @@ function toTimeInput(t: string | null): string {
 // admin protocol_items → the shared home-screen item shape.
 // Only timeline actions (not rules) appear on the app home screen; each item's
 // child descriptions ride along as a faded checklist (like the real app).
-function toHomeItems(items: AdminProtocolItem[]): HomeItem[] {
+function toHomeItems(items: AdminProtocolItem[], linkImages?: Map<string, string>): HomeItem[] {
   const childrenByParent = new Map<string, string[]>();
   for (const it of items) {
     if (it.parent_protocol_item_id) {
@@ -117,15 +118,16 @@ function toHomeItems(items: AdminProtocolItem[]): HomeItem[] {
       time: it.scheduled_time,
       duration_minutes: it.duration_minutes,
       group_name: it.group_name,
+      image_url: linkImages?.get(it.id) || null,
       children: childrenByParent.get(it.id),
     }));
 }
 
 /* ── live preview — the exact app home screen, fed the saved steps ── */
-function PhonePreview({ name, items, imageUrl }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null }) {
+function PhonePreview({ name, items, imageUrl, linkImages }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null; linkImages?: Map<string, string> }) {
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">
-      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items)} imageUrl={imageUrl} />
+      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} imageUrl={imageUrl} />
     </PhoneFrame>
   );
 }
@@ -154,6 +156,13 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [kindTab, setKindTab] = useState<Kind>('action');
+  // catalog linking
+  const [linkInfo, setLinkInfo] = useState<Map<string, CatalogHit & { kind: CatalogKind }>>(new Map());
+  const [linkerItemId, setLinkerItemId] = useState<string | null>(null);
+  const [linkKind, setLinkKind] = useState<CatalogKind>('recipe');
+  const [linkQuery, setLinkQuery] = useState('');
+  const [linkResults, setLinkResults] = useState<CatalogHit[]>([]);
+  const [linkBusy, setLinkBusy] = useState(false);
 
   // last-saved snapshot of items, to decide whether an inline edit needs a write
   const baseline = useRef<Map<string, AdminProtocolItem>>(new Map());
@@ -176,12 +185,33 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   }
   useEffect(() => { loadList(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  // resolve linked catalog records (name + image) for display + preview thumbnails
+  async function resolveLinks(rows: AdminProtocolItem[]) {
+    const groups: Record<CatalogKind, { itemId: string; cid: string }[]> = { recipe: [], product: [], activity: [], supplement: [] };
+    for (const it of rows) {
+      const k = linkedKind(it);
+      if (k) groups[k].push({ itemId: it.id, cid: (it as any)[CATALOG_CFG[k].fk] });
+    }
+    const map = new Map<string, CatalogHit & { kind: CatalogKind }>();
+    await Promise.all((Object.keys(groups) as CatalogKind[]).map(async (k) => {
+      const ids = [...new Set(groups[k].map((g) => g.cid).filter(Boolean))];
+      if (!ids.length) return;
+      try {
+        const hits = await getCatalogByIds(accessToken, k, ids);
+        const byCid = new Map(hits.map((h) => [h.id, h]));
+        for (const g of groups[k]) { const h = byCid.get(g.cid); if (h) map.set(g.itemId, { ...h, kind: k }); }
+      } catch { /* ignore */ }
+    }));
+    setLinkInfo(map);
+  }
+
   async function loadItems(id: string) {
     setLoadingItems(true);
     try {
       const rows = await listProtocolItems(accessToken, id);
       setItems(rows);
       baseline.current = new Map(rows.map((r) => [r.id, { ...r }]));
+      resolveLinks(rows);
     } catch (e: any) {
       toast.error(`Failed to load steps: ${e?.message || e}`);
       setItems([]);
@@ -332,6 +362,103 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     }
   }
 
+  /* ── catalog linking ── */
+  function defaultKind(it: AdminProtocolItem): CatalogKind {
+    if (it.category === 'supplement') return 'supplement';
+    if (it.category === 'consume') return 'recipe';
+    if (it.category === 'do') return it.subtype === 'exercise' ? 'activity' : 'product';
+    return 'product';
+  }
+  async function runSearch(kind: CatalogKind, q: string) {
+    setLinkBusy(true);
+    try { setLinkResults(await searchCatalog(accessToken, kind, q, 10)); }
+    catch { setLinkResults([]); }
+    finally { setLinkBusy(false); }
+  }
+  function openLinker(it: AdminProtocolItem) {
+    const k = linkedKind(it) || defaultKind(it);
+    setLinkerItemId(it.id); setLinkKind(k); setLinkQuery(it.display_name || '');
+    runSearch(k, it.display_name || '');
+  }
+  async function linkItemTo(it: AdminProtocolItem, kind: CatalogKind, hit: CatalogHit) {
+    const patch = linkPatch(kind, hit.id);
+    editItemLocal(it.id, patch);
+    setBusyItem(it.id);
+    try {
+      await updateProtocolItem(accessToken, it.id, patch);
+      baseline.current.set(it.id, { ...(items.find((x) => x.id === it.id) || it), ...patch });
+      setLinkInfo((m) => new Map(m).set(it.id, { ...hit, kind }));
+      setLinkerItemId(null);
+      toast.success(`Linked ${kind}`);
+    } catch (e: any) {
+      const base = baseline.current.get(it.id); if (base) editItemLocal(it.id, base);
+      toast.error(`Link failed: ${e?.message || e}`);
+    } finally { setBusyItem(null); }
+  }
+  async function unlinkItem(it: AdminProtocolItem) {
+    const patch = linkPatch(null, null);
+    editItemLocal(it.id, patch);
+    setBusyItem(it.id);
+    try {
+      await updateProtocolItem(accessToken, it.id, patch);
+      baseline.current.set(it.id, { ...(items.find((x) => x.id === it.id) || it), ...patch });
+      setLinkInfo((m) => { const n = new Map(m); n.delete(it.id); return n; });
+      toast.success('Unlinked');
+    } catch (e: any) { toast.error(`Unlink failed: ${e?.message || e}`); }
+    finally { setBusyItem(null); }
+  }
+  const linkBtnStyle: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 4px' };
+  const thumb = (img: string | null) => (
+    <span style={{ width: 28, height: 28, borderRadius: 6, overflow: 'hidden', background: C.panel, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Link2 size={13} color={C.faint} />}
+    </span>
+  );
+  function CatalogLinker({ it }: { it: AdminProtocolItem }) {
+    const link = linkInfo.get(it.id);
+    const open = linkerItemId === it.id;
+    return (
+      <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px dashed ' + C.hair }}>
+        {link ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {thumb(link.image)}
+            <span style={{ fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>{link.name}</span>
+            <span style={{ fontSize: 9.5, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{link.kind}</span>
+            <button onClick={() => openLinker(it)} style={linkBtnStyle}>change</button>
+            <button onClick={() => unlinkItem(it)} title="Unlink" style={{ ...linkBtnStyle, color: C.danger }}><X size={13} /></button>
+          </div>
+        ) : (
+          <button onClick={() => openLinker(it)} style={{ ...linkBtnStyle, color: C.accent }}><Link2 size={12} /> Link {defaultKind(it)}…</button>
+        )}
+        {open && (
+          <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: '#fff' }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              <select value={linkKind} onChange={(e) => { const k = e.target.value as CatalogKind; setLinkKind(k); runSearch(k, linkQuery); }} style={{ ...inputStyle, width: 112 }}>
+                {(['recipe', 'product', 'activity', 'supplement'] as CatalogKind[]).map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+              <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value); }} placeholder="Search catalog…" style={{ ...inputStyle, flex: 1 }} />
+              <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
+            </div>
+            {linkBusy ? (
+              <div style={{ padding: 12, textAlign: 'center', color: C.faint }}><Loader2 size={16} className="animate-spin" style={{ display: 'inline' }} /></div>
+            ) : linkResults.length === 0 ? (
+              <div style={{ fontSize: 12, color: C.faint, padding: 8, textAlign: 'center' }}>No matches</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+                {linkResults.map((h) => (
+                  <button key={h.id} onClick={() => linkItemTo(it, linkKind, h)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                    {thumb(h.image)}
+                    <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   /* ── inline row renderers (closures over items/handlers) ── */
   function ChildRow({ k }: { k: AdminProtocolItem }) {
     return (
@@ -408,6 +535,7 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
             {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
           </button>
         </div>
+        {it.kind === 'action' && <CatalogLinker it={it} />}
         {kids.length > 0 && (
           <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {kids.map((k) => <ChildRow key={k.id} k={k} />)}
@@ -628,7 +756,12 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
 
             {/* live mobile preview */}
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, position: 'sticky', top: 12 }}>
-              <PhonePreview name={form.name || selected.name} items={items} imageUrl={form.image_url || selected.image_url} />
+              <PhonePreview
+                name={form.name || selected.name}
+                items={items}
+                imageUrl={form.image_url || selected.image_url}
+                linkImages={new Map([...linkInfo].filter(([, v]) => v.image).map(([id, v]) => [id, v.image as string]))}
+              />
               <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 280 }}>
                 Live preview — the home screen as it appears in the mobile app.
               </p>
