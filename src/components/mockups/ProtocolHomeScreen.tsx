@@ -165,11 +165,14 @@ export function ProtocolHomeScreen({
   done = 0,
   scale = 0.85,
   anchors = true,
+  imageUrl = null,
 }: {
   protocolName: string;
   items: HomeItem[];
   date?: Date;
   done?: number;
+  /** Protocol cover image, shown as the header avatar. */
+  imageUrl?: string | null;
   /** Shrink the whole app UI to fit the device frame more naturally (1 = real-phone size). */
   scale?: number;
   /** Book-end the day with the grey Sleep anchors (off for a clean checked-off demo). */
@@ -224,8 +227,10 @@ export function ProtocolHomeScreen({
         {/* HEADER */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 40, padding: "0 16px", marginBottom: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 1, minWidth: 0 }}>
-            <span style={{ width: 24, height: 24, borderRadius: 12, background: "#E5E7EB", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <User size={13} color="#4B5563" strokeWidth={1.5} />
+            <span style={{ width: 24, height: 24, borderRadius: 12, background: "#E5E7EB", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+              {imageUrl
+                ? <img src={imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <User size={13} color="#4B5563" strokeWidth={1.5} />}
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-start", minWidth: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: "#374151", whiteSpace: "nowrap" }}>{weekLine}</span>

@@ -122,10 +122,10 @@ function toHomeItems(items: AdminProtocolItem[]): HomeItem[] {
 }
 
 /* ── live preview — the exact app home screen, fed the saved steps ── */
-function PhonePreview({ name, items }: { name: string; items: AdminProtocolItem[] }) {
+function PhonePreview({ name, items, imageUrl }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null }) {
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">
-      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items)} />
+      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items)} imageUrl={imageUrl} />
     </PhoneFrame>
   );
 }
@@ -464,13 +464,21 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
                   border: 'none', borderBottom: '1px solid ' + C.hair,
                   background: on ? '#EEF4FF' : 'transparent',
                   borderLeft: `3px solid ${on ? C.accent : 'transparent'}`,
+                  display: 'flex', alignItems: 'center', gap: 10,
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name || 'Untitled'}</div>
-                <div style={{ fontSize: 11, color: C.faint, marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {p.is_suggested && <span style={{ color: C.accent, fontWeight: 600 }}>Suggested</span>}
-                  {p.category && <span>{p.category}</span>}
-                </div>
+                <span style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, overflow: 'hidden', background: C.panel, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {p.image_url
+                    ? <img src={p.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ fontSize: 14, fontWeight: 700, color: C.faint }}>{(p.name || '?').charAt(0)}</span>}
+                </span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name || 'Untitled'}</div>
+                  <div style={{ fontSize: 11, color: C.faint, marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {p.is_suggested && <span style={{ color: C.accent, fontWeight: 600 }}>Suggested</span>}
+                    {p.category && <span>{p.category}</span>}
+                  </div>
+                </span>
               </button>
             );
           })}
@@ -620,7 +628,7 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
 
             {/* live mobile preview */}
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, position: 'sticky', top: 12 }}>
-              <PhonePreview name={form.name || selected.name} items={items} />
+              <PhonePreview name={form.name || selected.name} items={items} imageUrl={form.image_url || selected.image_url} />
               <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 280 }}>
                 Live preview — the home screen as it appears in the mobile app.
               </p>
