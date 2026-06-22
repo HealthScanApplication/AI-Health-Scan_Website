@@ -70,19 +70,29 @@ function toTimeInput(t: string | null): string {
   return m ? `${m[1].padStart(2, '0')}:${m[2]}` : '';
 }
 // admin protocol_items → the shared home-screen item shape.
-// Only timeline actions (not rules/children) appear on the app home screen.
+// Only timeline actions (not rules) appear on the app home screen; each item's
+// child descriptions ride along as a faded checklist (like the real app).
 function toHomeItems(items: AdminProtocolItem[]): HomeItem[] {
+  const childrenByParent = new Map<string, string[]>();
+  for (const it of items) {
+    if (it.parent_protocol_item_id) {
+      const arr = childrenByParent.get(it.parent_protocol_item_id) || [];
+      arr.push(it.display_name || 'Detail');
+      childrenByParent.set(it.parent_protocol_item_id, arr);
+    }
+  }
   return items
     .filter((it) => (it.kind === null || it.kind === 'action') && !it.parent_protocol_item_id)
     .map((it) => ({
-    display_name: it.display_name || 'Untitled step',
-    item_type: it.item_type || undefined,
-    kind: it.kind,
-    scope: it.scope,
-    time: it.scheduled_time,
-    duration_minutes: it.duration_minutes,
-    group_name: it.group_name,
-  }));
+      display_name: it.display_name || 'Untitled step',
+      item_type: it.item_type || undefined,
+      kind: it.kind,
+      scope: it.scope,
+      time: it.scheduled_time,
+      duration_minutes: it.duration_minutes,
+      group_name: it.group_name,
+      children: childrenByParent.get(it.id),
+    }));
 }
 
 /* ── live preview — the exact app home screen, fed the saved steps ── */

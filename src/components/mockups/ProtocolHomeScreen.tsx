@@ -34,6 +34,7 @@ export interface HomeItem {
   repeat?: boolean;
   description?: string | null;
   done?: boolean;                // checked off for the day
+  children?: string[];           // sub-item descriptions, shown as a faded checklist (like the app)
 }
 
 /* ───────── time + category helpers (mirror mobile precedence) ───────── */
@@ -298,6 +299,16 @@ export function ProtocolHomeScreen({
                               </div>
                               {sub && <div style={{ fontSize: 11, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
                               {it.description && <div style={{ fontSize: 11, lineHeight: 1.4, color: tint.fg, marginTop: 4, opacity: 0.92 }}>{it.description}</div>}
+                              {it.children && it.children.length > 0 && (
+                                <div style={{ marginTop: 5, display: "flex", flexDirection: "column", gap: 3 }}>
+                                  {it.children.map((c, ci) => (
+                                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                      <span style={{ width: 4, height: 4, borderRadius: 2, background: "#C4C4C0", flexShrink: 0 }} />
+                                      <span style={{ fontSize: 10.5, color: "#9CA3AF", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", background: isDone ? "#22C55E" : "#FFFFFF", border: isDone ? "1px solid #22C55E" : "1.5px solid #D1D5DB" }}>
                               {isDone && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
