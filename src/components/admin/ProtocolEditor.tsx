@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight,
+  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -45,6 +45,32 @@ const KIND_TABS: { k: Kind; label: string }[] = [
   { k: 'rule_do', label: "Do's" },
   { k: 'rule_dont', label: "Don'ts" },
 ];
+
+// Two-level type taxonomy (category → subtype → backing item_type).
+const CATEGORIES = ['consume', 'do', 'sleep', 'supplement'];
+const SUBTYPES_BY_CAT: Record<string, string[]> = {
+  consume: ['meal', 'drink', 'snack', 'beverage'],
+  do: ['hygiene', 'wellness', 'exercise'],
+  sleep: ['sleep'],
+  supplement: ['supplement'],
+};
+// sensible default backing when category changes
+const DEFAULT_TYPE_BY_CAT: Record<string, string> = {
+  consume: 'consume', do: 'activity', sleep: 'activity', supplement: 'supplement',
+};
+
+// part-of-day from 'HH:MM:SS' (Morning < 12, Afternoon 12–16, Evening ≥ 17, else Anytime)
+function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | 'Anytime' {
+  const m = /^(\d{1,2}):/.exec(time || '');
+  if (!m) return 'Anytime';
+  const h = parseInt(m[1], 10);
+  if (h < 12) return 'Morning';
+  if (h < 17) return 'Afternoon';
+  return 'Evening';
+}
+const POD_ORDER = ['Morning', 'Afternoon', 'Evening', 'Anytime'] as const;
+const minutesOf = (t: string | null) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 1e9; };
+const isSleepName = (n: string) => /^(end[\s-]?sleep|wake)/i.test((n || '').trim());
 
 /* ── helpers ── */
 // DB item_type (5 values) → the simplified union categorize/itemIcon expect.
@@ -249,6 +275,9 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
         day_number: 1,
         sort_order: maxSort + 1,
         parent_protocol_item_id: parentId || null,
+        category: kind === 'action' ? 'do' : null,
+        subtype: kind === 'action' ? 'wellness' : null,
+        hidden: false,
       });
       setItems((its) => [...its, created]);
       baseline.current.set(created.id, { ...created });
@@ -282,6 +311,27 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     }
   }
 
+  // change category → reset subtype + backing item_type sensibly, commit all three
+  function changeCategory(id: string, cat: string) {
+    const sub = (SUBTYPES_BY_CAT[cat] || [])[0] || null;
+    editItemLocal(id, { category: cat, subtype: sub, item_type: DEFAULT_TYPE_BY_CAT[cat] || 'activity' });
+  }
+  async function toggleHidden(it: AdminProtocolItem) {
+    editItemLocal(it.id, { hidden: !it.hidden });
+    // commit on the next tick (editItemLocal is async state) — re-read from a patch
+    setBusyItem(it.id);
+    try {
+      const updated = await updateProtocolItem(accessToken, it.id, { hidden: !it.hidden });
+      baseline.current.set(it.id, { ...(items.find((x) => x.id === it.id) || it), ...updated });
+      toast.success(updated.hidden ? 'Hidden from day view' : 'Visible');
+    } catch (e: any) {
+      editItemLocal(it.id, { hidden: it.hidden });
+      toast.error(`Update failed: ${e?.message || e}`);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
   /* ── inline row renderers (closures over items/handlers) ── */
   function ChildRow({ k }: { k: AdminProtocolItem }) {
     return (
@@ -305,27 +355,36 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     const isRule = it.kind !== 'action';
     const kids = items.filter((x) => x.parent_protocol_item_id === it.id);
     const tint = CATEGORY_TINTS[categorize(catItem(it))];
+    const cat = it.category || 'do';
+    const subOpts = SUBTYPES_BY_CAT[cat] || [];
     return (
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
+      <div style={{ opacity: it.hidden ? 0.55 : 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper, flexWrap: 'wrap' }}>
           <span style={{ width: 8, height: 8, borderRadius: 4, background: it.kind === 'rule_dont' ? C.danger : tint.fg, flexShrink: 0 }} />
           <input
             value={it.display_name || ''}
             onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
             onBlur={() => commitItem(it.id, ['display_name'])}
-            style={{ ...inputStyle, flex: 1, minWidth: 100 }}
+            style={{ ...inputStyle, flex: 1, minWidth: 120, textDecoration: it.hidden ? 'line-through' : 'none' }}
           />
           {!isRule ? (
             <>
               <input type="time" value={toTimeInput(it.scheduled_time)}
                 onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
                 onBlur={() => commitItem(it.id, ['scheduled_time'])}
-                style={{ ...inputStyle, width: 100, flexShrink: 0 }} />
-              <select value={it.item_type || 'activity'}
-                onChange={(e) => editItemLocal(it.id, { item_type: e.target.value })}
-                onBlur={() => commitItem(it.id, ['item_type'])}
-                style={{ ...inputStyle, width: 108, flexShrink: 0 }}>
-                {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                style={{ ...inputStyle, width: 92, flexShrink: 0 }} />
+              {/* two-level type: category → subtype */}
+              <select value={cat}
+                onChange={(e) => changeCategory(it.id, e.target.value)}
+                onBlur={() => commitItem(it.id, ['category', 'subtype', 'item_type'])}
+                style={{ ...inputStyle, width: 96, flexShrink: 0 }}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={it.subtype || subOpts[0] || ''}
+                onChange={(e) => editItemLocal(it.id, { subtype: e.target.value })}
+                onBlur={() => commitItem(it.id, ['subtype'])}
+                style={{ ...inputStyle, width: 96, flexShrink: 0 }}>
+                {subOpts.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </>
           ) : (
@@ -336,6 +395,10 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
               {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
+          <button onClick={() => toggleHidden(it)} disabled={busyItem === it.id} title={it.hidden ? 'Show in day view' : 'Hide from day view'}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', color: it.hidden ? C.faint : C.sub, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+            {it.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
           <button onClick={() => addItem((it.kind as Kind) || 'action', it.id)} title="Add detail / sub-item"
             style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.sub, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
             <CornerDownRight size={15} />
@@ -506,7 +569,51 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
                 ) : (() => {
                   const tops = items.filter((i) => i.kind === kindTab && !i.parent_protocol_item_id);
                   if (!tops.length) return <div style={{ padding: 24, textAlign: 'center', color: C.faint, fontSize: 13 }}>Nothing here yet — add the first one.</div>;
-                  return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{tops.map((it) => <ItemRow key={it.id} it={it} />)}</div>;
+
+                  // group helper
+                  const group = (list: AdminProtocolItem[], keyOf: (i: AdminProtocolItem) => string) => {
+                    const m = new Map<string, AdminProtocolItem[]>();
+                    for (const it of list) { const k = keyOf(it); if (!m.has(k)) m.set(k, []); m.get(k)!.push(it); }
+                    return m;
+                  };
+                  const podHeader = (t: string) => (
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.sub, margin: '2px 0 6px' }}>{t}</div>
+                  );
+                  const groupCard = (label: string, list: AdminProtocolItem[]) => (
+                    <div key={label} style={{ border: '1px solid ' + C.hair, borderRadius: 10, padding: 8, background: C.panel }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 6, paddingLeft: 2 }}>{label}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{list.map((it) => <ItemRow key={it.id} it={it} />)}</div>
+                    </div>
+                  );
+
+                  if (kindTab !== 'action') {
+                    // rules grouped by scope
+                    const byScope = group(tops, (i) => i.scope || 'general');
+                    return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{[...byScope.entries()].map(([s, list]) => groupCard(s, list))}</div>;
+                  }
+
+                  // timeline: sleep-end first, then by time → part-of-day → group_name
+                  const sorted = [...tops].sort((a, b) => {
+                    const as = isSleepName(a.display_name || '') ? -1 : 0, bs = isSleepName(b.display_name || '') ? -1 : 0;
+                    if (as !== bs) return as - bs;
+                    return minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time);
+                  });
+                  const byPod = group(sorted, (i) => partOfDay(i.scheduled_time));
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {POD_ORDER.filter((p) => byPod.has(p)).map((pod) => {
+                        const byGroup = group(byPod.get(pod)!, (i) => i.group_name || 'Ungrouped');
+                        return (
+                          <div key={pod}>
+                            {podHeader(pod)}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              {[...byGroup.entries()].map(([g, list]) => groupCard(g, list))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
                 })()}
               </div>
             </div>

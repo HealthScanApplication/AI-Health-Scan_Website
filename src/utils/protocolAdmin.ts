@@ -48,12 +48,15 @@ export interface AdminProtocolItem {
   sort_order: number | null;
   parent_protocol_item_id: string | null; // child description items point at their parent
   has_children: boolean | null;
+  category: string | null;   // consume | do | sleep | supplement
+  subtype: string | null;    // consume: meal|drink|snack|beverage · do: hygiene|wellness|exercise
+  hidden: boolean | null;    // kept in the protocol but hidden from the day view
 }
 
 const PROTOCOL_COLS =
   'id,name,description,category,type,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
 const ITEM_COLS =
-  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children';
+  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden';
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return {
