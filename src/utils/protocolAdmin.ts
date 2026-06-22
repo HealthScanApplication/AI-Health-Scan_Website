@@ -159,17 +159,17 @@ export async function deleteProtocolItem(accessToken: string, id: string): Promi
 
 /* ───────── catalog linking (recipes / products / activities / supplements) ───────── */
 export type CatalogKind = 'recipe' | 'product' | 'activity' | 'supplement';
-export interface CatalogHit { id: string; name: string; image: string | null }
-interface CatCfg { table: string; fk: keyof AdminProtocolItem; nameCols: string[]; imgCols: string[]; }
+export interface CatalogHit { id: string; name: string; image: string | null; price?: number | null; buyUrl?: string | null }
+interface CatCfg { table: string; fk: keyof AdminProtocolItem; nameCols: string[]; imgCols: string[]; buyCols?: string[] }
 // Only columns that actually exist on each table (a bad column 400s the whole select).
 export const CATALOG_CFG: Record<CatalogKind, CatCfg> = {
   recipe: { table: 'catalog_recipes', fk: 'catalog_recipe_id', nameCols: ['name_common'], imgCols: ['image_url', 'image_primary_url', 'images'] },
-  product: { table: 'catalog_products', fk: 'catalog_product_id', nameCols: ['name_common', 'name_brand', 'market_name', 'name'], imgCols: ['image_url', 'image_primary_url', 'image', 'images'] },
+  product: { table: 'catalog_products', fk: 'catalog_product_id', nameCols: ['name_common', 'name_brand', 'market_name', 'name'], imgCols: ['image_url', 'image_primary_url', 'image', 'images'], buyCols: ['price_usd', 'affiliate_link_amazon', 'affiliate_link_shopify', 'purchase_url', 'affiliate_url'] },
   activity: { table: 'catalog_activities', fk: 'catalog_activity_id', nameCols: ['name'], imgCols: ['image_url', 'image_primary_url', 'primary_image_url'] },
   supplement: { table: 'hs_supplements', fk: 'supplement_id', nameCols: ['name'], imgCols: ['image_url'] },
 };
 const ALL_FKS: (keyof AdminProtocolItem)[] = ['catalog_recipe_id', 'catalog_product_id', 'catalog_activity_id', 'supplement_id'];
-const catalogCols = (cfg: CatCfg) => ['id', ...cfg.nameCols, ...cfg.imgCols].join(',');
+const catalogCols = (cfg: CatCfg) => ['id', ...cfg.nameCols, ...cfg.imgCols, ...(cfg.buyCols || [])].join(',');
 
 function mapHit(cfg: CatCfg, row: any): CatalogHit {
   const name = cfg.nameCols.map((c) => row[c]).find(Boolean) || 'Untitled';
@@ -180,7 +180,12 @@ function mapHit(cfg: CatCfg, row: any): CatalogHit {
     image = c === 'images' ? (Array.isArray(v) ? v[0] : typeof v === 'string' ? v : null) : v;
     if (image) break;
   }
-  return { id: row.id, name, image };
+  const hit: CatalogHit = { id: row.id, name, image };
+  if (cfg.buyCols) {
+    hit.price = row.price_usd ?? null;
+    hit.buyUrl = row.affiliate_link_amazon || row.affiliate_link_shopify || row.purchase_url || row.affiliate_url || null;
+  }
+  return hit;
 }
 
 /** Search a catalog by name (empty query → top suggestions). */

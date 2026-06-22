@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X,
+  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -407,6 +407,27 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     } catch (e: any) { toast.error(`Unlink failed: ${e?.message || e}`); }
     finally { setBusyItem(null); }
   }
+  // add a "suggested product to buy" as a product-linked child, then open its product search
+  async function addProductChild(parentId: string) {
+    if (!selected) return;
+    setAdding(true);
+    const maxSort = items.reduce((m, it) => Math.max(m, it.sort_order || 0), 0);
+    try {
+      const created = await createProtocolItem(accessToken, {
+        protocol_id: selected.id,
+        display_name: 'Suggested product',
+        item_type: 'product',
+        kind: 'action',
+        parent_protocol_item_id: parentId,
+        sort_order: maxSort + 1,
+      });
+      setItems((its) => [...its, created]);
+      baseline.current.set(created.id, { ...created });
+      setLinkerItemId(created.id); setLinkKind('product'); setLinkQuery(''); runSearch('product', '');
+      toast.success('Pick a product to suggest');
+    } catch (e: any) { toast.error(`Add failed: ${e?.message || e}`); }
+    finally { setAdding(false); }
+  }
   const linkBtnStyle: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 4px' };
   const thumb = (img: string | null) => (
     <span style={{ width: 28, height: 28, borderRadius: 6, overflow: 'hidden', background: C.panel, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -421,8 +442,13 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
         {link ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {thumb(link.image)}
-            <span style={{ fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>{link.name}</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{link.name}</span>
             <span style={{ fontSize: 9.5, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{link.kind}</span>
+            {link.kind === 'product' && (link.price != null || link.buyUrl) && (
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: C.good, whiteSpace: 'nowrap' }}>
+                {link.price != null ? `$${link.price}` : ''}{link.buyUrl ? (link.price != null ? ' · Buy ↗' : 'Buy ↗') : ''}
+              </span>
+            )}
             <button onClick={() => openLinker(it)} style={linkBtnStyle}>change</button>
             <button onClick={() => unlinkItem(it)} title="Unlink" style={{ ...linkBtnStyle, color: C.danger }}><X size={13} /></button>
           </div>
@@ -461,19 +487,25 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
 
   /* ── inline row renderers (closures over items/handlers) ── */
   function ChildRow({ k }: { k: AdminProtocolItem }) {
+    const isProduct = k.item_type === 'product' || !!linkedKind(k);
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <CornerDownRight size={13} color={C.faint} style={{ flexShrink: 0 }} />
-        <input
-          value={k.display_name || ''}
-          onChange={(e) => editItemLocal(k.id, { display_name: e.target.value })}
-          onBlur={() => commitItem(k.id, ['display_name'])}
-          style={{ ...inputStyle, flex: 1, fontSize: 12 }}
-        />
-        <button onClick={() => removeItem(k)} disabled={busyItem === k.id} title="Delete detail"
-          style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, padding: 5, flexShrink: 0, display: 'inline-flex' }}>
-          {busyItem === k.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-        </button>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isProduct
+            ? <ShoppingBag size={13} color={C.accent} style={{ flexShrink: 0 }} />
+            : <CornerDownRight size={13} color={C.faint} style={{ flexShrink: 0 }} />}
+          <input
+            value={k.display_name || ''}
+            onChange={(e) => editItemLocal(k.id, { display_name: e.target.value })}
+            onBlur={() => commitItem(k.id, ['display_name'])}
+            style={{ ...inputStyle, flex: 1, fontSize: 12 }}
+          />
+          <button onClick={() => removeItem(k)} disabled={busyItem === k.id} title="Delete"
+            style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, padding: 5, flexShrink: 0, display: 'inline-flex' }}>
+            {busyItem === k.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+          </button>
+        </div>
+        {isProduct && <CatalogLinker it={k} />}
       </div>
     );
   }
@@ -530,6 +562,12 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
             style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.sub, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
             <CornerDownRight size={15} />
           </button>
+          {it.kind === 'action' && (
+            <button onClick={() => addProductChild(it.id)} title="Suggest a product to buy"
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.accent, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+              <ShoppingBag size={15} />
+            </button>
+          )}
           <button onClick={() => removeItem(it)} disabled={busyItem === it.id} title="Delete"
             style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
             {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
