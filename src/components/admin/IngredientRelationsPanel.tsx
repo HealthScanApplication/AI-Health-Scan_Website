@@ -290,7 +290,7 @@ export function IngredientRelationsPanel({ record, accessToken }: IngredientRela
   async function loadRecipes() {
     try {
       const rows: any[] = await supaFetch(
-        `recipe_ingredients?select=id,qty_g,unit,catalog_recipes(id,name_common,category,image_url)&ingredient_id=eq.${ingredientId}&order=qty_g.desc.nullslast`,
+        `catalog_recipe_ingredients?select=id,qty_g:amount_g,unit,catalog_recipes(id,name_common,category,image_url)&ingredient_id=eq.${ingredientId}&order=amount_g.desc.nullslast`,
         accessToken,
       );
       setRecipes(

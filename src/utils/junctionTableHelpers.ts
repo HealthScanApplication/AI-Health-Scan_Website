@@ -152,11 +152,11 @@ export async function getIngredientsForElement(elementId: string, minAmount?: nu
  */
 export async function getRecipeIngredients(recipeId: string) {
   const { data, error } = await stagingSupabase
-    .from('recipe_ingredients')
+    .from('catalog_recipe_ingredients')
     .select(`
       id,
       ingredient_id,
-      qty_g,
+      qty_g:amount_g,
       unit,
       sort_order,
       notes,
@@ -183,11 +183,11 @@ export async function getRecipeIngredients(recipeId: string) {
  */
 export async function getRecipesForIngredient(ingredientId: string) {
   const { data, error } = await stagingSupabase
-    .from('recipe_ingredients')
+    .from('catalog_recipe_ingredients')
     .select(`
       id,
       recipe_id,
-      qty_g,
+      qty_g:amount_g,
       unit,
       catalog_recipes (
         id,
@@ -197,7 +197,7 @@ export async function getRecipesForIngredient(ingredientId: string) {
       )
     `)
     .eq('ingredient_id', ingredientId)
-    .order('qty_g', { ascending: false, nullsFirst: false });
+    .order('amount_g', { ascending: false, nullsFirst: false });
 
   if (error) throw error;
   return data || [];

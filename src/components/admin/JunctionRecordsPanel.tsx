@@ -49,7 +49,7 @@ const JUNCTION_CONFIG: Record<string, JunctionConfig[]> = {
     },
     {
       label: 'Used in Recipes',
-      junctionTable: 'recipe_ingredients',
+      junctionTable: 'catalog_recipe_ingredients',
       targetTable: 'catalog_recipes',
       junctionKey: 'ingredient_id',
       targetKey: 'recipe_id',
@@ -58,7 +58,7 @@ const JUNCTION_CONFIG: Record<string, JunctionConfig[]> = {
   recipes: [
     {
       label: 'Ingredients',
-      junctionTable: 'recipe_ingredients',
+      junctionTable: 'catalog_recipe_ingredients',
       targetTable: 'catalog_ingredients',
       junctionKey: 'recipe_id',
       targetKey: 'ingredient_id',
