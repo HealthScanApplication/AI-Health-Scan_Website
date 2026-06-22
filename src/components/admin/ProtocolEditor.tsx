@@ -530,83 +530,70 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     );
   }
 
-  function ItemRow({ it }: { it: AdminProtocolItem }) {
+  function ItemRow({ it, num }: { it: AdminProtocolItem; num?: number }) {
     const isRule = it.kind !== 'action';
     const kids = items.filter((x) => x.parent_protocol_item_id === it.id);
-    const tint = CATEGORY_TINTS[categorize(catItem(it))];
     const cat = it.category || 'do';
     const subOpts = SUBTYPES_BY_CAT[cat] || [];
+    const curVerb = DO_VERBS.find((v) => new RegExp('^' + v + '\\b', 'i').test((it.display_name || '').trim())) || '';
+    const selW: React.CSSProperties = { ...inputStyle, width: 104, flexShrink: 0 };
+    const iconBtn: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', padding: 6, flexShrink: 0, display: 'inline-flex' };
     return (
-      <div style={{ opacity: it.hidden ? 0.55 : 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper, flexWrap: 'wrap' }}>
-          <span style={{ width: 8, height: 8, borderRadius: 4, background: it.kind === 'rule_dont' ? C.danger : tint.fg, flexShrink: 0 }} />
+      <div style={{ opacity: it.hidden ? 0.55 : 1, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
+        {/* row 1 — number · name · time */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? '#FEE2E2' : '#EEF4FF', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
           <input
             value={it.display_name || ''}
             onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
             onBlur={() => commitItem(it.id, ['display_name'])}
-            style={{ ...inputStyle, flex: 1, minWidth: 120, textDecoration: it.hidden ? 'line-through' : 'none' }}
+            style={{ ...inputStyle, flex: 1, minWidth: 80, textDecoration: it.hidden ? 'line-through' : 'none' }}
           />
+          {!isRule && (
+            <input type="time" value={toTimeInput(it.scheduled_time)}
+              onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
+              onBlur={() => commitItem(it.id, ['scheduled_time'])}
+              style={{ ...inputStyle, width: 100, flexShrink: 0 }} />
+          )}
+        </div>
+        {/* row 2 — type selects (consistent width) · actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
           {!isRule ? (
             <>
-              <input type="time" value={toTimeInput(it.scheduled_time)}
-                onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
-                onBlur={() => commitItem(it.id, ['scheduled_time'])}
-                style={{ ...inputStyle, width: 92, flexShrink: 0 }} />
-              {/* two-level type: category → subtype */}
-              <select value={cat}
-                onChange={(e) => changeCategory(it.id, e.target.value)}
-                onBlur={() => commitItem(it.id, ['category', 'subtype', 'item_type'])}
-                style={{ ...inputStyle, width: 96, flexShrink: 0 }}>
+              <select value={cat} onChange={(e) => changeCategory(it.id, e.target.value)} onBlur={() => commitItem(it.id, ['category', 'subtype', 'item_type'])} style={selW}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <select value={it.subtype || subOpts[0] || ''}
-                onChange={(e) => editItemLocal(it.id, { subtype: e.target.value })}
-                onBlur={() => commitItem(it.id, ['subtype'])}
-                style={{ ...inputStyle, width: 96, flexShrink: 0 }}>
+              <select value={it.subtype || subOpts[0] || ''} onChange={(e) => editItemLocal(it.id, { subtype: e.target.value })} onBlur={() => commitItem(it.id, ['subtype'])} style={selW}>
                 {subOpts.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+              {cat === 'do' && (
+                <select value={curVerb} onChange={(e) => setVerb(it, e.target.value)} style={selW} title="Lead the name with a verb">
+                  <option value="">+ verb</option>
+                  {DO_VERBS.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+              )}
             </>
           ) : (
-            <select value={it.scope || 'none'}
-              onChange={(e) => editItemLocal(it.id, { scope: e.target.value === 'none' ? null : e.target.value })}
-              onBlur={() => commitItem(it.id, ['scope'])}
-              style={{ ...inputStyle, width: 116, flexShrink: 0 }}>
+            <select value={it.scope || 'none'} onChange={(e) => editItemLocal(it.id, { scope: e.target.value === 'none' ? null : e.target.value })} onBlur={() => commitItem(it.id, ['scope'])} style={selW}>
               {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
-          <button onClick={() => toggleHidden(it)} disabled={busyItem === it.id} title={it.hidden ? 'Show in day view' : 'Hide from day view'}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: it.hidden ? C.faint : C.sub, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+          <span style={{ flex: 1 }} />
+          <button onClick={() => toggleHidden(it)} disabled={busyItem === it.id} title={it.hidden ? 'Show in day view' : 'Hide from day view'} style={{ ...iconBtn, color: it.hidden ? C.faint : C.sub }}>
             {it.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
-          <button onClick={() => addItem((it.kind as Kind) || 'action', it.id)} title="Add detail / sub-item"
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.sub, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+          <button onClick={() => addItem((it.kind as Kind) || 'action', it.id)} title="Add detail / sub-item" style={{ ...iconBtn, color: C.sub }}>
             <CornerDownRight size={15} />
           </button>
           {it.kind === 'action' && (
-            <button onClick={() => addProductChild(it.id)} title="Suggest a product to buy"
-              style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.accent, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+            <button onClick={() => addProductChild(it.id)} title="Suggest a product to buy" style={{ ...iconBtn, color: C.accent }}>
               <ShoppingBag size={15} />
             </button>
           )}
-          <button onClick={() => removeItem(it)} disabled={busyItem === it.id} title="Delete"
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+          <button onClick={() => removeItem(it)} disabled={busyItem === it.id} title="Delete" style={{ ...iconBtn, color: C.danger }}>
             {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
           </button>
         </div>
-        {it.kind === 'action' && it.category === 'do' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, marginLeft: 14, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, color: C.faint, marginRight: 2 }}>verb</span>
-            {DO_VERBS.map((v) => {
-              const on = new RegExp('^' + v + '\\b', 'i').test((it.display_name || '').trim());
-              return (
-                <button key={v} onClick={() => setVerb(it, v)}
-                  style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? '#EEF4FF' : '#fff', color: on ? C.accent : C.sub }}>
-                  {v}
-                </button>
-              );
-            })}
-          </div>
-        )}
         {it.kind === 'action' && <CatalogLinker it={it} />}
         {kids.length > 0 && (
           <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -784,13 +771,21 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
                     for (const it of list) { const k = keyOf(it); if (!m.has(k)) m.set(k, []); m.get(k)!.push(it); }
                     return m;
                   };
+                  // timeline order = sleep-end first, then by time; numbers every item 1..N
+                  const sorted = [...tops].sort((a, b) => {
+                    const as = isSleepName(a.display_name || '') ? -1 : 0, bs = isSleepName(b.display_name || '') ? -1 : 0;
+                    if (as !== bs) return as - bs;
+                    return minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time);
+                  });
+                  const ordered = kindTab === 'action' ? sorted : tops;
+                  const stepNo = new Map<string, number>(ordered.map((it, i) => [it.id, i + 1]));
                   const podHeader = (t: string) => (
                     <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.sub, margin: '2px 0 6px' }}>{t}</div>
                   );
                   const groupCard = (label: string, list: AdminProtocolItem[]) => (
                     <div key={label} style={{ border: '1px solid ' + C.hair, borderRadius: 10, padding: 8, background: C.panel }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 6, paddingLeft: 2 }}>{label}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{list.map((it) => <ItemRow key={it.id} it={it} />)}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{list.map((it) => <ItemRow key={it.id} it={it} num={stepNo.get(it.id)} />)}</div>
                     </div>
                   );
 
@@ -800,12 +795,6 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
                     return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{[...byScope.entries()].map(([s, list]) => groupCard(s, list))}</div>;
                   }
 
-                  // timeline: sleep-end first, then by time → part-of-day → group_name
-                  const sorted = [...tops].sort((a, b) => {
-                    const as = isSleepName(a.display_name || '') ? -1 : 0, bs = isSleepName(b.display_name || '') ? -1 : 0;
-                    if (as !== bs) return as - bs;
-                    return minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time);
-                  });
                   const byPod = group(sorted, (i) => partOfDay(i.scheduled_time));
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
