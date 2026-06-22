@@ -46,12 +46,14 @@ export interface AdminProtocolItem {
   group_name: string | null;
   day_number: number | null;
   sort_order: number | null;
+  parent_protocol_item_id: string | null; // child description items point at their parent
+  has_children: boolean | null;
 }
 
 const PROTOCOL_COLS =
   'id,name,description,category,type,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
 const ITEM_COLS =
-  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order';
+  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children';
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return {
@@ -146,4 +148,16 @@ export async function deleteProtocolItem(accessToken: string, id: string): Promi
     headers: headers(accessToken),
   });
   await handle(res, 'Delete step');
+}
+
+/** Upload an image to storage via the admin edge function; returns the public URL. */
+export async function uploadProtocolImage(accessToken: string, file: File, bucket = 'catalog-media'): Promise<string> {
+  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/storage/upload`;
+  const form = new FormData();
+  form.append('file', file);
+  form.append('bucket', bucket);
+  const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) throw new Error(data.error || `Upload failed (${res.status})`);
+  return data.publicUrl;
 }

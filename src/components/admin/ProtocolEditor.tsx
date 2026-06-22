@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle,
+  Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -17,9 +17,10 @@ import {
 } from '../../config/protocolCategories';
 import { PhoneFrame } from '../mockups/PhoneFrame';
 import { ProtocolHomeScreen, type HomeItem } from '../mockups/ProtocolHomeScreen';
+import { MediaUploadField } from './MediaUploadField';
 import {
   listProtocols, listProtocolItems, updateProtocol,
-  createProtocolItem, updateProtocolItem, deleteProtocolItem,
+  createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
   type AdminProtocol, type AdminProtocolItem,
 } from '../../utils/protocolAdmin';
 
@@ -37,6 +38,13 @@ const PROTO_FIELDS: (keyof AdminProtocol)[] = [
 ];
 
 const ITEM_TYPES = ['supplement', 'consume', 'recipe', 'activity', 'product'];
+const SCOPES = ['none', 'inside', 'outside', 'consume', 'supplement'];
+type Kind = 'action' | 'rule_do' | 'rule_dont';
+const KIND_TABS: { k: Kind; label: string }[] = [
+  { k: 'action', label: 'Timeline' },
+  { k: 'rule_do', label: "Do's" },
+  { k: 'rule_dont', label: "Don'ts" },
+];
 
 /* ── helpers ── */
 // DB item_type (5 values) → the simplified union categorize/itemIcon expect.
@@ -61,9 +69,12 @@ function toTimeInput(t: string | null): string {
   const m = /^(\d{1,2}):(\d{2})/.exec(t);
   return m ? `${m[1].padStart(2, '0')}:${m[2]}` : '';
 }
-// admin protocol_items → the shared home-screen item shape
+// admin protocol_items → the shared home-screen item shape.
+// Only timeline actions (not rules/children) appear on the app home screen.
 function toHomeItems(items: AdminProtocolItem[]): HomeItem[] {
-  return items.map((it) => ({
+  return items
+    .filter((it) => (it.kind === null || it.kind === 'action') && !it.parent_protocol_item_id)
+    .map((it) => ({
     display_name: it.display_name || 'Untitled step',
     item_type: it.item_type || undefined,
     kind: it.kind,
@@ -106,6 +117,7 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   const [savingProtocol, setSavingProtocol] = useState(false);
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [kindTab, setKindTab] = useState<Kind>('action');
 
   // last-saved snapshot of items, to decide whether an inline edit needs a write
   const baseline = useRef<Map<string, AdminProtocolItem>>(new Map());
@@ -211,23 +223,26 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     }
   }
 
-  async function addStep() {
+  async function addItem(kind: Kind, parentId?: string) {
     if (!selected) return;
     setAdding(true);
+    const isRule = kind !== 'action';
     const maxSort = items.reduce((m, it) => Math.max(m, it.sort_order || 0), 0);
     try {
       const created = await createProtocolItem(accessToken, {
         protocol_id: selected.id,
-        display_name: 'New step',
+        display_name: parentId ? 'New detail' : kind === 'rule_dont' ? 'New avoidance' : isRule ? 'New do' : 'New step',
         item_type: 'activity',
-        kind: 'action',
-        scheduled_time: '08:00:00',
+        kind,
+        scope: isRule ? 'outside' : null,
+        scheduled_time: isRule || parentId ? null : '08:00:00',
         day_number: 1,
         sort_order: maxSort + 1,
+        parent_protocol_item_id: parentId || null,
       });
       setItems((its) => [...its, created]);
       baseline.current.set(created.id, { ...created });
-      toast.success('Step added');
+      toast.success('Added');
     } catch (e: any) {
       toast.error(`Add failed: ${e?.message || e}`);
     } finally {
@@ -235,19 +250,98 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     }
   }
 
-  async function removeStep(it: AdminProtocolItem) {
-    if (!window.confirm(`Delete step "${it.display_name || 'Untitled'}"? This cannot be undone.`)) return;
+  async function removeItem(it: AdminProtocolItem) {
+    const kids = items.filter((x) => x.parent_protocol_item_id === it.id);
+    const msg = kids.length
+      ? `Delete "${it.display_name || 'Untitled'}" and its ${kids.length} sub-item(s)? This cannot be undone.`
+      : `Delete "${it.display_name || 'Untitled'}"? This cannot be undone.`;
+    if (!window.confirm(msg)) return;
     setBusyItem(it.id);
     try {
+      // delete children first (referential integrity), then the parent
+      for (const k of kids) await deleteProtocolItem(accessToken, k.id);
       await deleteProtocolItem(accessToken, it.id);
-      setItems((its) => its.filter((x) => x.id !== it.id));
-      baseline.current.delete(it.id);
-      toast.success('Step deleted');
+      const removed = new Set([it.id, ...kids.map((k) => k.id)]);
+      setItems((its) => its.filter((x) => !removed.has(x.id)));
+      removed.forEach((id) => baseline.current.delete(id));
+      toast.success('Deleted');
     } catch (e: any) {
       toast.error(`Delete failed: ${e?.message || e}`);
     } finally {
       setBusyItem(null);
     }
+  }
+
+  /* ── inline row renderers (closures over items/handlers) ── */
+  function ChildRow({ k }: { k: AdminProtocolItem }) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <CornerDownRight size={13} color={C.faint} style={{ flexShrink: 0 }} />
+        <input
+          value={k.display_name || ''}
+          onChange={(e) => editItemLocal(k.id, { display_name: e.target.value })}
+          onBlur={() => commitItem(k.id, ['display_name'])}
+          style={{ ...inputStyle, flex: 1, fontSize: 12 }}
+        />
+        <button onClick={() => removeItem(k)} disabled={busyItem === k.id} title="Delete detail"
+          style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, padding: 5, flexShrink: 0, display: 'inline-flex' }}>
+          {busyItem === k.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+        </button>
+      </div>
+    );
+  }
+
+  function ItemRow({ it }: { it: AdminProtocolItem }) {
+    const isRule = it.kind !== 'action';
+    const kids = items.filter((x) => x.parent_protocol_item_id === it.id);
+    const tint = CATEGORY_TINTS[categorize(catItem(it))];
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: it.kind === 'rule_dont' ? C.danger : tint.fg, flexShrink: 0 }} />
+          <input
+            value={it.display_name || ''}
+            onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
+            onBlur={() => commitItem(it.id, ['display_name'])}
+            style={{ ...inputStyle, flex: 1, minWidth: 100 }}
+          />
+          {!isRule ? (
+            <>
+              <input type="time" value={toTimeInput(it.scheduled_time)}
+                onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
+                onBlur={() => commitItem(it.id, ['scheduled_time'])}
+                style={{ ...inputStyle, width: 100, flexShrink: 0 }} />
+              <select value={it.item_type || 'activity'}
+                onChange={(e) => editItemLocal(it.id, { item_type: e.target.value })}
+                onBlur={() => commitItem(it.id, ['item_type'])}
+                style={{ ...inputStyle, width: 108, flexShrink: 0 }}>
+                {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </>
+          ) : (
+            <select value={it.scope || 'none'}
+              onChange={(e) => editItemLocal(it.id, { scope: e.target.value === 'none' ? null : e.target.value })}
+              onBlur={() => commitItem(it.id, ['scope'])}
+              style={{ ...inputStyle, width: 116, flexShrink: 0 }}>
+              {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          <button onClick={() => addItem((it.kind as Kind) || 'action', it.id)} title="Add detail / sub-item"
+            style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.sub, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+            <CornerDownRight size={15} />
+          </button>
+          <button onClick={() => removeItem(it)} disabled={busyItem === it.id} title="Delete"
+            style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, padding: 6, flexShrink: 0, display: 'inline-flex' }}>
+            {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+          </button>
+        </div>
+        {kids.length > 0 && (
+          <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {kids.map((k) => <ChildRow key={k.id} k={k} />)}
+          </div>
+        )}
+      </div>
+    );
   }
 
   /* ── render ── */
@@ -355,7 +449,13 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
                   <Field label="Health score"><input type="number" style={inputStyle} value={form.health_score ?? ''} onChange={(e) => setField('health_score', e.target.value === '' ? null : Number(e.target.value))} /></Field>
                   <Field label="Total days"><input type="number" style={inputStyle} value={form.total_days ?? ''} onChange={(e) => setField('total_days', e.target.value === '' ? null : Number(e.target.value))} /></Field>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <Field label="Image URL"><input style={inputStyle} value={form.image_url || ''} onChange={(e) => setField('image_url', e.target.value)} /></Field>
+                    <MediaUploadField
+                      label="Protocol image"
+                      mediaType="image"
+                      value={form.image_url || ''}
+                      onChange={(url) => setField('image_url', url)}
+                      onUpload={(file) => uploadProtocolImage(accessToken, file)}
+                    />
                   </div>
                   <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 2 }}>
                     {([['is_suggested', 'Suggested'], ['is_active', 'Active'], ['is_public', 'Public']] as const).map(([key, lbl]) => (
@@ -368,65 +468,36 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
                 </div>
               </div>
 
-              {/* steps editor */}
+              {/* items editor — Timeline / Do's / Don'ts, each with child details */}
               <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.ink }}>
-                    Steps {loadingItems ? '' : `(${items.length})`}
-                  </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {KIND_TABS.map(({ k, label }) => {
+                      const on = kindTab === k;
+                      const count = items.filter((i) => i.kind === k && !i.parent_protocol_item_id).length;
+                      return (
+                        <button key={k} onClick={() => setKindTab(k)}
+                          style={{ fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? '#EEF4FF' : '#fff', color: on ? C.accent : C.sub }}>
+                          {label} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
                   <button
-                    onClick={addStep}
+                    onClick={() => addItem(kindTab)}
                     disabled={adding}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.accent, background: '#fff', color: C.accent }}
                   >
-                    {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add step
+                    {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add {kindTab === 'action' ? 'step' : kindTab === 'rule_do' ? 'do' : "don't"}
                   </button>
                 </div>
                 {loadingItems ? (
                   <div style={{ padding: 24, textAlign: 'center', color: C.faint }}><Loader2 size={18} className="animate-spin" style={{ display: 'inline' }} /></div>
-                ) : items.length === 0 ? (
-                  <div style={{ padding: 24, textAlign: 'center', color: C.faint, fontSize: 13 }}>No steps yet — add the first one.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {items.map((it) => {
-                      const tint = CATEGORY_TINTS[categorize(catItem(it))];
-                      return (
-                        <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 4, background: tint.fg, flexShrink: 0 }} />
-                          <input
-                            value={it.display_name || ''}
-                            onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
-                            onBlur={() => commitItem(it.id, ['display_name'])}
-                            style={{ ...inputStyle, flex: 1, minWidth: 120 }}
-                          />
-                          <input
-                            type="time"
-                            value={toTimeInput(it.scheduled_time)}
-                            onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
-                            onBlur={() => commitItem(it.id, ['scheduled_time'])}
-                            style={{ ...inputStyle, width: 110, flexShrink: 0 }}
-                          />
-                          <select
-                            value={it.item_type || 'activity'}
-                            onChange={(e) => { editItemLocal(it.id, { item_type: e.target.value }); }}
-                            onBlur={() => commitItem(it.id, ['item_type'])}
-                            style={{ ...inputStyle, width: 120, flexShrink: 0 }}
-                          >
-                            {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                          <button
-                            onClick={() => removeStep(it)}
-                            disabled={busyItem === it.id}
-                            title="Delete step"
-                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, padding: 6, flexShrink: 0, display: 'inline-flex' }}
-                          >
-                            {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                ) : (() => {
+                  const tops = items.filter((i) => i.kind === kindTab && !i.parent_protocol_item_id);
+                  if (!tops.length) return <div style={{ padding: 24, textAlign: 'center', color: C.faint, fontSize: 13 }}>Nothing here yet — add the first one.</div>;
+                  return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{tops.map((it) => <ItemRow key={it.id} it={it} />)}</div>;
+                })()}
               </div>
             </div>
 
