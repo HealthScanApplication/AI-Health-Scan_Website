@@ -60,6 +60,10 @@ const DEFAULT_TYPE_BY_CAT: Record<string, string> = {
   consume: 'consume', do: 'activity', sleep: 'activity', supplement: 'supplement',
 };
 
+// verb-led naming for "do" steps (Apply Moisturizer, Use …) — non-destructive, swaps the leading verb.
+const DO_VERBS = ['Apply', 'Use', 'Take', 'Do', 'Practice', 'Massage', 'Cleanse'];
+const VERB_RE = /^(apply|use|take|do|practice|massage|cleanse|perform|complete)\s+/i;
+
 // part-of-day from 'HH:MM:SS' (Morning < 12, Afternoon 12–16, Evening ≥ 17, else Anytime)
 function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | 'Anytime' {
   const m = /^(\d{1,2}):/.exec(time || '');
@@ -362,6 +366,22 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     }
   }
 
+  // swap/prepend the leading verb on a "do" step name
+  async function setVerb(it: AdminProtocolItem, verb: string) {
+    const base = (it.display_name || '').replace(VERB_RE, '').trim();
+    const name = `${verb} ${base}`.trim();
+    if (name === it.display_name) return;
+    editItemLocal(it.id, { display_name: name });
+    setBusyItem(it.id);
+    try {
+      await updateProtocolItem(accessToken, it.id, { display_name: name });
+      baseline.current.set(it.id, { ...(items.find((x) => x.id === it.id) || it), display_name: name });
+    } catch (e: any) {
+      editItemLocal(it.id, { display_name: it.display_name });
+      toast.error(`Update failed: ${e?.message || e}`);
+    } finally { setBusyItem(null); }
+  }
+
   /* ── catalog linking ── */
   function defaultKind(it: AdminProtocolItem): CatalogKind {
     if (it.category === 'supplement') return 'supplement';
@@ -573,6 +593,20 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
             {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
           </button>
         </div>
+        {it.kind === 'action' && it.category === 'do' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, marginLeft: 14, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, color: C.faint, marginRight: 2 }}>verb</span>
+            {DO_VERBS.map((v) => {
+              const on = new RegExp('^' + v + '\\b', 'i').test((it.display_name || '').trim());
+              return (
+                <button key={v} onClick={() => setVerb(it, v)}
+                  style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? '#EEF4FF' : '#fff', color: on ? C.accent : C.sub }}>
+                  {v}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {it.kind === 'action' && <CatalogLinker it={it} />}
         {kids.length > 0 && (
           <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>
