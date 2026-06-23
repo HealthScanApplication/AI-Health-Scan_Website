@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
-  Pencil, GitMerge,
+  Pencil, GitMerge, Download, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -258,6 +258,8 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
 
   const [form, setForm] = useState<Partial<AdminProtocol>>({});
   const [savingProtocol, setSavingProtocol] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [kindTab, setKindTab] = useState<Kind>('action');
@@ -398,6 +400,87 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
       toast.error(`Save failed: ${e?.message || e}`);
     } finally {
       setSavingProtocol(false);
+    }
+  }
+
+  /* ── export / import (round-trip a protocol as JSON) ── */
+  // item columns that round-trip; id/protocol_id/parent are remapped on import, not carried verbatim
+  const IMPORT_ITEM_FIELDS: (keyof AdminProtocolItem)[] = [
+    'display_name', 'item_type', 'kind', 'scope', 'scheduled_time', 'duration_minutes',
+    'group_name', 'day_number', 'sort_order', 'category', 'subtype', 'hidden',
+    'catalog_recipe_id', 'catalog_product_id', 'catalog_activity_id', 'catalog_ingredient_id', 'supplement_id',
+  ];
+
+  function exportProtocol() {
+    if (!selected) return;
+    const payload = {
+      _format: 'healthscan.protocol',
+      _version: 1,
+      exported_at: new Date().toISOString(),
+      protocol: { ...selected, ...form }, // include any unsaved edits in the form
+      items,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `protocol-${(selected.name || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled'}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${items.length} step(s)`);
+  }
+
+  function sanitizeImportItem(fi: any, protocolId: string, parentId: string | null): Partial<AdminProtocolItem> {
+    const out: any = { protocol_id: protocolId, parent_protocol_item_id: parentId };
+    for (const f of IMPORT_ITEM_FIELDS) if (fi[f] !== undefined) out[f] = fi[f];
+    return out;
+  }
+
+  async function importProtocol(file: File) {
+    setImporting(true);
+    try {
+      const data = JSON.parse(await file.text());
+      const p = data?.protocol;
+      const fileItems: any[] = Array.isArray(data?.items) ? data.items : [];
+      if (!p || !p.id) throw new Error('Not a valid protocol export (missing protocol.id).');
+      const target = protocols.find((x) => x.id === p.id);
+      if (!target) throw new Error(`No protocol with id "${p.id}" in this environment. Export from this environment first — creating brand-new protocols on import isn't supported.`);
+
+      const current = await listProtocolItems(accessToken, target.id);
+      if (!window.confirm(
+        `Import will OVERWRITE “${target.name}”.\n\nIts details and all ${current.length} current step(s) will be replaced with the file’s ${fileItems.length} step(s).\n\nThis cannot be undone. Continue?`,
+      )) { setImporting(false); return; }
+
+      // 1) protocol fields (only the editable allowlist — never touch id/user_id/timestamps)
+      const patch: any = {};
+      for (const f of PROTO_FIELDS) if (p[f] !== undefined) patch[f] = p[f];
+      if (Object.keys(patch).length) await updateProtocol(accessToken, target.id, patch);
+
+      // 2) clear existing items (children first for referential integrity)
+      for (const it of current.filter((c) => c.parent_protocol_item_id)) await deleteProtocolItem(accessToken, it.id);
+      for (const it of current.filter((c) => !c.parent_protocol_item_id)) await deleteProtocolItem(accessToken, it.id);
+
+      // 3) insert file items, remapping ids so parent links survive (any nesting depth)
+      const idMap = new Map<string, string>();
+      const remaining = [...fileItems];
+      let guard = 0;
+      while (remaining.length && guard < 5000) {
+        guard++;
+        const idx = remaining.findIndex((i) => !i.parent_protocol_item_id || idMap.has(i.parent_protocol_item_id));
+        const fi = idx >= 0 ? remaining.splice(idx, 1)[0] : remaining.shift(); // orphan → insert flat
+        const parentId = fi.parent_protocol_item_id ? idMap.get(fi.parent_protocol_item_id) || null : null;
+        const created = await createProtocolItem(accessToken, sanitizeImportItem(fi, target.id, parentId));
+        if (fi.id) idMap.set(fi.id, created.id);
+      }
+
+      toast.success(`Imported ${fileItems.length} step(s) into “${target.name}”`);
+      await loadList(true);
+      setSelectedId(target.id);
+      await loadItems(target.id);
+    } catch (e: any) {
+      toast.error(`Import failed: ${e?.message || e}`);
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -1018,22 +1101,35 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
             <div style={{ flex: '1 1 420px', minWidth: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* protocol fields */}
               <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
                   <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.ink }}>Protocol details</h3>
-                  <button
-                    onClick={saveProtocol}
-                    disabled={!dirty || savingProtocol}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600,
-                      padding: '7px 14px', borderRadius: 8, cursor: dirty && !savingProtocol ? 'pointer' : 'default',
-                      border: '1px solid ' + (dirty ? C.accent : C.hair),
-                      background: dirty ? C.accent : C.panel, color: dirty ? '#fff' : C.faint,
-                      opacity: savingProtocol ? 0.7 : 1,
-                    }}
-                  >
-                    {savingProtocol ? <Loader2 size={14} className="animate-spin" /> : dirty ? <Save size={14} /> : <Check size={14} />}
-                    {savingProtocol ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {/* export / import round-trip */}
+                    <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) importProtocol(f); }} />
+                    <button onClick={exportProtocol} title="Download this protocol + steps as JSON"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>
+                      <Download size={14} /> Export
+                    </button>
+                    <button onClick={() => importInputRef.current?.click()} disabled={importing} title="Replace this protocol from an edited JSON export"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: importing ? 'default' : 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub, opacity: importing ? 0.7 : 1 }}>
+                      {importing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Import
+                    </button>
+                    <button
+                      onClick={saveProtocol}
+                      disabled={!dirty || savingProtocol}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600,
+                        padding: '7px 14px', borderRadius: 8, cursor: dirty && !savingProtocol ? 'pointer' : 'default',
+                        border: '1px solid ' + (dirty ? C.accent : C.hair),
+                        background: dirty ? C.accent : C.panel, color: dirty ? '#fff' : C.faint,
+                        opacity: savingProtocol ? 0.7 : 1,
+                      }}
+                    >
+                      {savingProtocol ? <Loader2 size={14} className="animate-spin" /> : dirty ? <Save size={14} /> : <Check size={14} />}
+                      {savingProtocol ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
+                    </button>
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div style={{ gridColumn: '1 / -1' }}>
