@@ -2252,6 +2252,36 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
     }, 100);
   };
 
+  // Open a catalog record (by kind + id) in its real editor — used by the Protocol
+  // Editor so a linked recipe/ingredient/product/etc. opens its actual record.
+  const openCatalogRecord = async (kind: string, id: string) => {
+    const MAP: Record<string, { tab: string; table: string; modalTab: string }> = {
+      ingredient: { tab: 'ingredients', table: 'catalog_ingredients', modalTab: 'culinary' },
+      recipe: { tab: 'recipes', table: 'catalog_recipes', modalTab: 'culinary' },
+      product: { tab: 'products', table: 'catalog_products', modalTab: 'culinary' },
+      activity: { tab: 'activities', table: 'catalog_activities', modalTab: 'culinary' },
+      supplement: { tab: 'hs_supplements', table: 'hs_supplements', modalTab: 'culinary' },
+    };
+    const m = MAP[kind];
+    if (!m) { toast.error(`Can't open ${kind} records here`); return; }
+    try {
+      const url = `https://${projectId}.supabase.co/rest/v1/${m.table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, apikey: publicAnonKey } });
+      const rows = await res.json().catch(() => []);
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (!row) { toast.error('Record not found in this environment'); return; }
+      setShowEditModal(false);
+      setTimeout(() => {
+        setActiveTab(m.tab);
+        setEditingRecord({ ...row });
+        setEditModalTab(m.modalTab);
+        setAutoLinkResults(null);
+        setAiIngredientSuggestResults(null);
+        setShowEditModal(true);
+      }, 100);
+    } catch (e: any) { toast.error(`Open failed: ${e?.message || e}`); }
+  };
+
   const handleAiLinkIngredients = async () => {
     if (!editingRecord || activeTab !== 'elements') return;
     setAiLinkingIngredients(true);
@@ -4363,7 +4393,7 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             {tabs.filter(tab => tab.id !== 'sync' && tab.id !== 'notifications').map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                 {tab.id === 'protocols' ? (
-                  <ProtocolEditor accessToken={accessToken} />
+                  <ProtocolEditor accessToken={accessToken} onOpenCatalogRecord={openCatalogRecord} />
                 ) : (<>
                 {/* Waitlist Funnel Dashboard */}
                 {tab.id === 'waitlist' && validRecords.length > 0 && !showSearch && (

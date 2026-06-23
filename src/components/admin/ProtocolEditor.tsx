@@ -243,7 +243,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ── main editor ── */
-export function ProtocolEditor({ accessToken }: { accessToken: string }) {
+export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessToken: string; onOpenCatalogRecord?: (kind: CatalogKind, id: string) => void }) {
   const [protocols, setProtocols] = useState<AdminProtocol[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -701,6 +701,13 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     } finally { setLinkBusy(false); }
   }
 
+  // open a linked catalog record in its REAL editor (Ingredients / Recipes / … tab).
+  // Falls back to the in-panel manager modal when the editor isn't wired (standalone use).
+  function openRecord(lk: CatalogHit & { kind: CatalogKind }, itemId: string) {
+    if (onOpenCatalogRecord) { onOpenCatalogRecord(lk.kind, lk.id); return; }
+    setViewRec({ ...lk, itemId });
+  }
+
   /* ── linked-record manager (edit / merge / delete), driven by the lightbox ── */
   // sync the editor when a different record is opened
   useEffect(() => {
@@ -777,16 +784,18 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
       <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px dashed ' + C.hair }}>
         {link ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button" onClick={() => link && setViewRec({ ...link, itemId: it.id })} title="View / add image" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex' }}>
+            <button type="button" onClick={() => link && openRecord(link, it.id)} title={`Open ${link.kind} record`} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex' }}>
               {thumb(link.image)}
             </button>
-            <span style={{ fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{link.name}</span>
+            <button type="button" onClick={() => link && openRecord(link, it.id)} title={`Open ${link.kind} record`}
+              style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150, textAlign: 'left' }}>{link.name}</button>
             <span style={{ fontSize: 9.5, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{link.kind}</span>
             {link.kind === 'product' && (link.price != null || link.buyUrl) && (
               <span style={{ fontSize: 10.5, fontWeight: 600, color: C.good, whiteSpace: 'nowrap' }}>
                 {link.price != null ? `$${link.price}` : ''}{link.buyUrl ? (link.price != null ? ' · Buy ↗' : 'Buy ↗') : ''}
               </span>
             )}
+            <button onClick={() => link && setViewRec({ ...link, itemId: it.id })} title="Merge / delete record" style={linkBtnStyle}><GitMerge size={13} /></button>
             <button onClick={() => openLinker(it)} style={linkBtnStyle}>change</button>
             <button onClick={() => unlinkItem(it)} title="Unlink" style={{ ...linkBtnStyle, color: C.danger }}><X size={13} /></button>
           </div>
@@ -862,7 +871,7 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
           {(() => {
             const lk = linkInfo.get(it.id);
             return lk?.image ? (
-              <button type="button" onClick={() => setViewRec({ ...lk, itemId: it.id })} title={`View / edit ${lk.kind}: ${lk.name}`}
+              <button type="button" onClick={() => openRecord(lk, it.id)} title={`Open ${lk.kind}: ${lk.name}`}
                 style={{ width: 30, height: 30, borderRadius: 7, overflow: 'hidden', border: '1px solid ' + C.hair, padding: 0, cursor: 'pointer', flexShrink: 0, background: C.panel }}>
                 <img src={lk.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </button>
