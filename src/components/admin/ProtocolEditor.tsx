@@ -22,7 +22,7 @@ import { MediaUploadField } from './MediaUploadField';
 import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
-  searchCatalog, getCatalogByIds, linkedKind, linkPatch, CATALOG_CFG,
+  searchCatalog, getCatalogByIds, linkedKind, linkPatch, updateCatalogImage, CATALOG_CFG,
   type AdminProtocol, type AdminProtocolItem, type CatalogKind, type CatalogHit,
 } from '../../utils/protocolAdmin';
 
@@ -549,6 +549,20 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     } catch (e: any) { toast.error(`Add failed: ${e?.message || e}`); }
     finally { setAdding(false); }
   }
+  // upload an image straight onto the linked catalog record (fills the data gap inline)
+  async function uploadLinkedImage(file: File) {
+    if (!viewRec) return;
+    setLinkBusy(true);
+    try {
+      const url = await uploadProtocolImage(accessToken, file);
+      await updateCatalogImage(accessToken, viewRec.kind, viewRec.id, url);
+      setLinkInfo((m) => { const n = new Map(m); const e = n.get(viewRec.itemId); if (e) n.set(viewRec.itemId, { ...e, image: url }); return n; });
+      setViewRec((v) => (v ? { ...v, image: url } : v));
+      toast.success('Image saved to the record');
+    } catch (e: any) {
+      toast.error(`Upload failed: ${e?.message || e}`);
+    } finally { setLinkBusy(false); }
+  }
   const linkBtnStyle: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 4px' };
   const thumb = (img: string | null) => (
     <span style={{ width: 28, height: 28, borderRadius: 6, overflow: 'hidden', background: C.panel, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -562,7 +576,9 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
       <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px dashed ' + C.hair }}>
         {link ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {thumb(link.image)}
+            <button type="button" onClick={() => link && setViewRec({ ...link, itemId: it.id })} title="View / add image" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex' }}>
+              {thumb(link.image)}
+            </button>
             <span style={{ fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{link.name}</span>
             <span style={{ fontSize: 9.5, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{link.kind}</span>
             {link.kind === 'product' && (link.price != null || link.buyUrl) && (
@@ -713,15 +729,21 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
       {viewRec && (
         <div onClick={() => setViewRec(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', maxWidth: 420, width: '100%', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)' }}>
-            {viewRec.image && <img src={viewRec.image} alt="" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block', background: C.panel }} />}
+            {viewRec.image
+              ? <img src={viewRec.image} alt="" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block', background: C.panel }} />
+              : <div style={{ height: 160, background: C.panel, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.faint, fontSize: 13 }}>{linkBusy ? <Loader2 size={20} className="animate-spin" /> : 'No image on this record yet'}</div>}
             <div style={{ padding: 16 }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{viewRec.kind}{viewRec.price != null ? ` · $${viewRec.price}` : ''}</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: C.ink, marginTop: 2 }}>{viewRec.name}</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                <label style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: linkBusy ? 'default' : 'pointer', border: '1px solid ' + C.accent, background: C.accent, color: '#fff' }}>
+                  {linkBusy ? 'Uploading…' : viewRec.image ? 'Replace image' : 'Upload image'}
+                  <input type="file" accept="image/*" disabled={linkBusy} style={{ display: 'none' }}
+                    onChange={(e) => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) uploadLinkedImage(f); }} />
+                </label>
                 <button onClick={() => { const it = items.find((x) => x.id === viewRec.itemId); setViewRec(null); if (it) openLinker(it); }}
-                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.accent, background: C.accent, color: '#fff' }}>Change link</button>
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>Change link</button>
                 {viewRec.buyUrl && <a href={viewRec.buyUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid ' + C.hair, color: C.good, textDecoration: 'none' }}>Buy ↗</a>}
-                {viewRec.image && <a href={viewRec.image} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid ' + C.hair, color: C.sub, textDecoration: 'none' }}>Open image ↗</a>}
                 <button onClick={() => setViewRec(null)} style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>Close</button>
               </div>
             </div>

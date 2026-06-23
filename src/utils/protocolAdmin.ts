@@ -232,6 +232,19 @@ export function linkPatch(kind: CatalogKind | null, id: string | null): Partial<
   return patch;
 }
 
+/** Set image_url on a linked catalog record via the admin edge function (service role). */
+export async function updateCatalogImage(accessToken: string, kind: CatalogKind, id: string, imageUrl: string): Promise<string> {
+  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table: CATALOG_CFG[kind].table, id, updates: { image_url: imageUrl } }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) throw new Error(data.error || `Update failed (${res.status})`);
+  return imageUrl;
+}
+
 /** Upload an image to storage via the admin edge function; returns the public URL. */
 export async function uploadProtocolImage(accessToken: string, file: File, bucket = 'catalog-media'): Promise<string> {
   const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/storage/upload`;
