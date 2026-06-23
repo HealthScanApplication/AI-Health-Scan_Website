@@ -233,17 +233,67 @@ export function linkPatch(kind: CatalogKind | null, id: string | null): Partial<
   return patch;
 }
 
-/** Set image_url on a linked catalog record via the admin edge function (service role). */
-export async function updateCatalogImage(accessToken: string, kind: CatalogKind, id: string, imageUrl: string): Promise<string> {
+/** The primary editable name column for a catalog kind. */
+export function catalogNameCol(kind: CatalogKind): string {
+  return CATALOG_CFG[kind].nameCols[0];
+}
+
+/** Patch arbitrary fields on a linked catalog record via the admin edge function (service role). */
+export async function updateCatalogFields(accessToken: string, kind: CatalogKind, id: string, updates: Record<string, any>): Promise<void> {
   const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/update`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ table: CATALOG_CFG[kind].table, id, updates: { image_url: imageUrl } }),
+    body: JSON.stringify({ table: CATALOG_CFG[kind].table, id, updates }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.success === false) throw new Error(data.error || `Update failed (${res.status})`);
+}
+
+/** Set image_url on a linked catalog record (thin wrapper over updateCatalogFields). */
+export async function updateCatalogImage(accessToken: string, kind: CatalogKind, id: string, imageUrl: string): Promise<string> {
+  await updateCatalogFields(accessToken, kind, id, { image_url: imageUrl });
   return imageUrl;
+}
+
+/** Delete a catalog record via the admin edge function (service role). */
+export async function deleteCatalogRecord(accessToken: string, kind: CatalogKind, id: string): Promise<void> {
+  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/delete`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table: CATALOG_CFG[kind].table, id }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) throw new Error(data.error || `Delete failed (${res.status})`);
+}
+
+/** Merge a duplicate catalog record into a survivor — re-points protocol links + recipe↔ingredient
+ *  junctions onto the survivor, then deletes the duplicate. Returns per-table re-point counts. */
+export async function mergeCatalogRecords(accessToken: string, kind: CatalogKind, survivorId: string, duplicateId: string): Promise<Record<string, number>> {
+  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/merge`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, survivorId, duplicateId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) throw new Error(data.error || `Merge failed (${res.status})`);
+  return data.repointed || {};
+}
+
+/** How many protocol_items across ALL protocols reference this catalog record (for delete warnings). */
+export async function countProtocolRefs(accessToken: string, kind: CatalogKind, id: string): Promise<number> {
+  const fk = CATALOG_CFG[kind].fk;
+  const res = await fetch(`${rest()}/protocol_items?${fk}=eq.${id}&select=id`, {
+    method: 'GET',
+    headers: headers(accessToken, { Prefer: 'count=exact' }),
+  });
+  // PostgREST returns the count in Content-Range: 0-24/123
+  const cr = res.headers.get('content-range');
+  if (cr && cr.includes('/')) { const n = parseInt(cr.split('/')[1], 10); if (!Number.isNaN(n)) return n; }
+  const rows = (await handle(res, 'Count refs')) || [];
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 /** Upload an image to storage via the admin edge function; returns the public URL. */

@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
+  Pencil, GitMerge,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,7 @@ import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
   searchCatalog, getCatalogByIds, linkedKind, linkPatch, updateCatalogImage, CATALOG_CFG,
+  updateCatalogFields, deleteCatalogRecord, mergeCatalogRecords, countProtocolRefs, catalogNameCol,
   type AdminProtocol, type AdminProtocolItem, type CatalogKind, type CatalogHit,
 } from '../../utils/protocolAdmin';
 
@@ -267,6 +269,14 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   const [linkResults, setLinkResults] = useState<CatalogHit[]>([]);
   const [linkBusy, setLinkBusy] = useState(false);
   const [viewRec, setViewRec] = useState<(CatalogHit & { kind: CatalogKind; itemId: string }) | null>(null);
+  // record manager (edit / merge / delete) inside the lightbox
+  const [recName, setRecName] = useState('');
+  const [recBusy, setRecBusy] = useState(false);
+  const [recRefs, setRecRefs] = useState<number | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeQuery, setMergeQuery] = useState('');
+  const [mergeResults, setMergeResults] = useState<CatalogHit[]>([]);
+  const [mergeBusy, setMergeBusy] = useState(false);
 
   // last-saved snapshot of items, to decide whether an inline edit needs a write
   const baseline = useRef<Map<string, AdminProtocolItem>>(new Map());
@@ -607,6 +617,70 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
       toast.error(`Upload failed: ${e?.message || e}`);
     } finally { setLinkBusy(false); }
   }
+
+  /* ── linked-record manager (edit / merge / delete), driven by the lightbox ── */
+  // sync the editor when a different record is opened
+  useEffect(() => {
+    if (!viewRec) return;
+    setRecName(viewRec.name || '');
+    setMergeOpen(false); setMergeQuery(''); setMergeResults([]); setRecRefs(null);
+    countProtocolRefs(accessToken, viewRec.kind, viewRec.id).then(setRecRefs).catch(() => setRecRefs(null));
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [viewRec?.id]);
+
+  async function saveRecName() {
+    if (!viewRec) return;
+    const name = recName.trim();
+    if (!name || name === viewRec.name) return;
+    setRecBusy(true);
+    try {
+      await updateCatalogFields(accessToken, viewRec.kind, viewRec.id, { [catalogNameCol(viewRec.kind)]: name });
+      setLinkInfo((m) => { const n = new Map(m); const e = n.get(viewRec.itemId); if (e) n.set(viewRec.itemId, { ...e, name }); return n; });
+      setViewRec((v) => (v ? { ...v, name } : v));
+      toast.success('Record renamed');
+    } catch (e: any) { toast.error(`Rename failed: ${e?.message || e}`); }
+    finally { setRecBusy(false); }
+  }
+  async function runMergeSearch(q: string) {
+    if (!viewRec) return;
+    setMergeBusy(true);
+    try { const hits = await searchCatalog(accessToken, viewRec.kind, q, 10); setMergeResults(hits.filter((h) => h.id !== viewRec.id)); }
+    catch { setMergeResults([]); }
+    finally { setMergeBusy(false); }
+  }
+  async function doMerge(dup: CatalogHit) {
+    if (!viewRec) return;
+    const survivor = viewRec;
+    if (!window.confirm(`Merge "${dup.name}" INTO "${survivor.name}"?\n\nEvery protocol link and recipe↔ingredient junction pointing at "${dup.name}" will be re-pointed to "${survivor.name}", then "${dup.name}" will be permanently deleted.\n\nThis cannot be undone.`)) return;
+    setMergeBusy(true);
+    try {
+      const counts = await mergeCatalogRecords(accessToken, survivor.kind, survivor.id, dup.id);
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
+      toast.success(`Merged — re-pointed ${total} reference${total === 1 ? '' : 's'}`);
+      setMergeOpen(false); setMergeQuery(''); setMergeResults([]);
+      if (selectedId) await loadItems(selectedId);
+      countProtocolRefs(accessToken, survivor.kind, survivor.id).then(setRecRefs).catch(() => {});
+    } catch (e: any) { toast.error(`Merge failed: ${e?.message || e}`); }
+    finally { setMergeBusy(false); }
+  }
+  async function deleteRecord() {
+    if (!viewRec) return;
+    const rec = viewRec;
+    const others = Math.max(0, (recRefs ?? 1) - 1);
+    const warn = others > 0 ? `\n\n⚠ ${others} other protocol item(s) reference this record — they will be left unlinked.` : '';
+    if (!window.confirm(`Delete "${rec.name}" (${rec.kind})?\n\nThe link on this item is cleared and the catalog record is permanently deleted.${warn}\n\nThis cannot be undone.`)) return;
+    setRecBusy(true);
+    try {
+      const it = items.find((x) => x.id === rec.itemId);
+      if (it) await updateProtocolItem(accessToken, it.id, linkPatch(null, null));
+      await deleteCatalogRecord(accessToken, rec.kind, rec.id);
+      toast.success('Record deleted');
+      setViewRec(null);
+      if (selectedId) await loadItems(selectedId);
+    } catch (e: any) { toast.error(`Delete failed: ${e?.message || e}`); }
+    finally { setRecBusy(false); }
+  }
+
   const linkBtnStyle: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 4px' };
   const thumb = (img: string | null) => (
     <span style={{ width: 28, height: 28, borderRadius: 6, overflow: 'hidden', background: C.panel, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -774,20 +848,72 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
             {viewRec.image
               ? <img src={viewRec.image} alt="" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block', background: C.panel }} />
               : <div style={{ height: 160, background: C.panel, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.faint, fontSize: 13 }}>{linkBusy ? <Loader2 size={20} className="animate-spin" /> : 'No image on this record yet'}</div>}
-            <div style={{ padding: 16 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{viewRec.kind}{viewRec.price != null ? ` · $${viewRec.price}` : ''}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: C.ink, marginTop: 2 }}>{viewRec.name}</div>
+            <div style={{ padding: 16, maxHeight: 'calc(90vh - 200px)', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {viewRec.kind}{viewRec.price != null ? ` · $${viewRec.price}` : ''}
+                  {recRefs != null && <span style={{ marginLeft: 8, color: C.faint, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>· used by {recRefs} item{recRefs === 1 ? '' : 's'}</span>}
+                </div>
+                <button onClick={() => setViewRec(null)} title="Close" style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, display: 'inline-flex', padding: 2 }}><X size={18} /></button>
+              </div>
+
+              {/* edit name */}
+              <div style={{ marginTop: 10 }}>
+                <label style={labelStyle}><Pencil size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />Record name</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={recName} onChange={(e) => setRecName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRecName(); }} style={{ ...inputStyle, flex: 1 }} />
+                  <button onClick={saveRecName} disabled={recBusy || !recName.trim() || recName.trim() === viewRec.name}
+                    style={{ fontSize: 13, fontWeight: 600, padding: '0 14px', borderRadius: 8, cursor: recBusy ? 'default' : 'pointer', border: '1px solid ' + (recName.trim() && recName.trim() !== viewRec.name ? C.accent : C.hair), background: recName.trim() && recName.trim() !== viewRec.name ? C.accent : C.panel, color: recName.trim() && recName.trim() !== viewRec.name ? '#fff' : C.faint, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {recBusy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+                  </button>
+                </div>
+              </div>
+
+              {/* primary actions */}
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                <label style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: linkBusy ? 'default' : 'pointer', border: '1px solid ' + C.accent, background: C.accent, color: '#fff' }}>
+                <label style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: linkBusy ? 'default' : 'pointer', border: '1px solid ' + C.accent, background: C.accent, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {linkBusy ? 'Uploading…' : viewRec.image ? 'Replace image' : 'Upload image'}
                   <input type="file" accept="image/*" disabled={linkBusy} style={{ display: 'none' }}
                     onChange={(e) => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) uploadLinkedImage(f); }} />
                 </label>
+                <button onClick={() => setMergeOpen((o) => { const n = !o; if (n && !mergeResults.length) runMergeSearch(''); return n; })}
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + (mergeOpen ? C.accent : C.hair), background: mergeOpen ? '#EEF4FF' : '#fff', color: mergeOpen ? C.accent : C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}><GitMerge size={14} /> Merge duplicate</button>
                 <button onClick={() => { const it = items.find((x) => x.id === viewRec.itemId); setViewRec(null); if (it) openLinker(it); }}
-                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>Change link</button>
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Link2 size={14} /> Change link</button>
                 {viewRec.buyUrl && <a href={viewRec.buyUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid ' + C.hair, color: C.good, textDecoration: 'none' }}>Buy ↗</a>}
-                <button onClick={() => setViewRec(null)} style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>Close</button>
+                <button onClick={deleteRecord} disabled={recBusy}
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: recBusy ? 'default' : 'pointer', border: '1px solid ' + C.danger, background: '#fff', color: C.danger, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Trash2 size={14} /> Delete</button>
               </div>
+
+              {/* merge panel — fold another record of the same kind into this one */}
+              {mergeOpen && (
+                <div style={{ marginTop: 14, padding: 12, border: '1px solid ' + C.hair, borderRadius: 10, background: C.panel }}>
+                  <div style={{ fontSize: 12, color: C.sub, marginBottom: 8, display: 'flex', gap: 6 }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1, color: C.accent }} />
+                    <span>Pick a duplicate to fold <strong>into “{viewRec.name}”</strong>. Its links + recipe↔ingredient junctions move here, then it’s deleted.</span>
+                  </div>
+                  <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <Search size={14} color={C.faint} style={{ position: 'absolute', left: 9, top: 9 }} />
+                    <input value={mergeQuery} onChange={(e) => { setMergeQuery(e.target.value); runMergeSearch(e.target.value); }} placeholder={`Search ${viewRec.kind}s…`} style={{ ...inputStyle, paddingLeft: 28 }} />
+                  </div>
+                  {mergeBusy ? (
+                    <div style={{ padding: 12, textAlign: 'center', color: C.faint }}><Loader2 size={16} className="animate-spin" style={{ display: 'inline' }} /></div>
+                  ) : mergeResults.length === 0 ? (
+                    <div style={{ fontSize: 12, color: C.faint, padding: 8, textAlign: 'center' }}>No other {viewRec.kind}s found</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
+                      {mergeResults.map((h) => (
+                        <button key={h.id} onClick={() => doMerge(h)} disabled={mergeBusy}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                          {thumb(h.image)}
+                          <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: C.accent, display: 'inline-flex', alignItems: 'center', gap: 3 }}><GitMerge size={12} /> merge in</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

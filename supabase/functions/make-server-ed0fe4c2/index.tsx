@@ -1365,6 +1365,57 @@ app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c: any) => {
   } catch (error: any) { return c.json({ success: false, error: 'Internal server error' }, 500) }
 })
 
+// Admin: merge two catalog records — fold `duplicateId` into `survivorId`, re-pointing
+// every reference (protocol_items links + recipe↔ingredient junction rows) onto the
+// survivor, then delete the duplicate. "Preserving the junction records" = the junction
+// rows are re-parented, not dropped (colliding duplicates are de-duped to respect the
+// (recipe_id, ingredient_id) uniqueness).
+app.post('/make-server-ed0fe4c2/admin/catalog/merge', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { kind, survivorId, duplicateId } = await c.req.json()
+    if (!survivorId || !duplicateId) return c.json({ success: false, error: 'survivorId and duplicateId are required' }, 400)
+    if (survivorId === duplicateId) return c.json({ success: false, error: 'Cannot merge a record into itself' }, 400)
+
+    // referencing columns per catalog kind (table the id lives in + everything that points at it)
+    const KIND_CFG: Record<string, { table: string; refs: { t: string; col: string }[] }> = {
+      recipe:     { table: 'catalog_recipes',     refs: [{ t: 'protocol_items', col: 'catalog_recipe_id' },     { t: 'catalog_recipe_ingredients', col: 'recipe_id' }] },
+      ingredient: { table: 'catalog_ingredients', refs: [{ t: 'protocol_items', col: 'catalog_ingredient_id' }, { t: 'catalog_recipe_ingredients', col: 'ingredient_id' }] },
+      product:    { table: 'catalog_products',    refs: [{ t: 'protocol_items', col: 'catalog_product_id' }] },
+      activity:   { table: 'catalog_activities',  refs: [{ t: 'protocol_items', col: 'catalog_activity_id' }] },
+      supplement: { table: 'hs_supplements',      refs: [{ t: 'protocol_items', col: 'supplement_id' }] },
+    }
+    const cfg = KIND_CFG[kind]
+    if (!cfg) return c.json({ success: false, error: `Invalid kind: ${kind}` }, 400)
+
+    const repointed: Record<string, number> = {}
+    for (const ref of cfg.refs) {
+      // junction tables carry a (recipe_id, ingredient_id) pair — drop duplicate-side rows
+      // that would collide with an existing survivor-side row before re-pointing the rest.
+      if (ref.t === 'catalog_recipe_ingredients') {
+        const otherCol = ref.col === 'recipe_id' ? 'ingredient_id' : 'recipe_id'
+        const { data: survRows } = await supabase.from(ref.t).select(otherCol).eq(ref.col, survivorId)
+        const survSet = new Set((survRows || []).map((r: any) => r[otherCol]))
+        const { data: dupRows } = await supabase.from(ref.t).select(`id,${otherCol}`).eq(ref.col, duplicateId)
+        const collide = (dupRows || []).filter((r: any) => survSet.has(r[otherCol])).map((r: any) => r.id)
+        if (collide.length) await supabase.from(ref.t).delete().in('id', collide)
+      }
+      const { data, error } = await supabase.from(ref.t).update({ [ref.col]: survivorId }).eq(ref.col, duplicateId).select('id')
+      if (error) return c.json({ success: false, error: `Re-point ${ref.t}.${ref.col} failed: ${error.message}` }, 500)
+      repointed[`${ref.t}.${ref.col}`] = (data || []).length
+    }
+
+    // delete the now-orphaned duplicate (catalog_products may also live in the KV store)
+    if (kind === 'product') { try { await kv.del(duplicateId) } catch (_e) { /* not a KV product */ } }
+    const { error: delErr } = await supabase.from(cfg.table).delete().eq('id', duplicateId)
+    if (delErr) return c.json({ success: false, error: `Delete duplicate failed: ${delErr.message}` }, 500)
+
+    return c.json({ success: true, repointed })
+  } catch (error: any) { return c.json({ success: false, error: 'Internal server error' }, 500) }
+})
+
 // Admin: AI Fill Fields — uses OpenAI to populate empty fields based on record name and existing data
 app.post('/make-server-ed0fe4c2/admin/ai-fill-fields', async (c: any) => {
   try {
