@@ -245,6 +245,7 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   const [linkQuery, setLinkQuery] = useState('');
   const [linkResults, setLinkResults] = useState<CatalogHit[]>([]);
   const [linkBusy, setLinkBusy] = useState(false);
+  const [viewRec, setViewRec] = useState<(CatalogHit & { kind: CatalogKind; itemId: string }) | null>(null);
 
   // last-saved snapshot of items, to decide whether an inline edit needs a write
   const baseline = useRef<Map<string, AdminProtocolItem>>(new Map());
@@ -642,6 +643,15 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
         {/* row 1 — number · name · time */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? '#FEE2E2' : '#EEF4FF', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
+          {(() => {
+            const lk = linkInfo.get(it.id);
+            return lk?.image ? (
+              <button type="button" onClick={() => setViewRec({ ...lk, itemId: it.id })} title={`View / edit ${lk.kind}: ${lk.name}`}
+                style={{ width: 30, height: 30, borderRadius: 7, overflow: 'hidden', border: '1px solid ' + C.hair, padding: 0, cursor: 'pointer', flexShrink: 0, background: C.panel }}>
+                <img src={lk.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </button>
+            ) : null;
+          })()}
           <input
             value={it.display_name || ''}
             onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
@@ -699,6 +709,25 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   /* ── render ── */
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minHeight: 560 }}>
+      {/* linked-record lightbox (view / re-link) */}
+      {viewRec && (
+        <div onClick={() => setViewRec(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', maxWidth: 420, width: '100%', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)' }}>
+            {viewRec.image && <img src={viewRec.image} alt="" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block', background: C.panel }} />}
+            <div style={{ padding: 16 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{viewRec.kind}{viewRec.price != null ? ` · $${viewRec.price}` : ''}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.ink, marginTop: 2 }}>{viewRec.name}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                <button onClick={() => { const it = items.find((x) => x.id === viewRec.itemId); setViewRec(null); if (it) openLinker(it); }}
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.accent, background: C.accent, color: '#fff' }}>Change link</button>
+                {viewRec.buyUrl && <a href={viewRec.buyUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid ' + C.hair, color: C.good, textDecoration: 'none' }}>Buy ↗</a>}
+                {viewRec.image && <a href={viewRec.image} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid ' + C.hair, color: C.sub, textDecoration: 'none' }}>Open image ↗</a>}
+                <button onClick={() => setViewRec(null)} style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── protocol list ── */}
       <div style={{ width: 260, flexShrink: 0, border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 720 }}>
         <div style={{ padding: 10, borderBottom: '1px solid ' + C.hair }}>
