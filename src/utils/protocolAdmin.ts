@@ -21,6 +21,7 @@ export interface AdminProtocol {
   description: string | null;
   category: string | null;
   type: string | null;
+  target_gender: string | null;
   creator: string | null;
   source: string | null;
   image_url: string | null;
@@ -59,7 +60,7 @@ export interface AdminProtocolItem {
 }
 
 const PROTOCOL_COLS =
-  'id,name,description,category,type,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
+  'id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
 const ITEM_COLS =
   'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id';
 

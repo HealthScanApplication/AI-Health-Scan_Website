@@ -62,8 +62,17 @@ const DEFAULT_TYPE_BY_CAT: Record<string, string> = {
 };
 
 // verb-led naming for "do" steps (Apply Moisturizer, Use …) — non-destructive, swaps the leading verb.
-const DO_VERBS = ['Apply', 'Use', 'Take', 'Do', 'Practice', 'Massage', 'Cleanse'];
-const VERB_RE = /^(apply|use|take|do|practice|massage|cleanse|perform|complete)\s+/i;
+const DO_VERBS = [
+  'Apply', 'Use', 'Take', 'Do', 'Practice', 'Massage', 'Cleanse', 'Wash', 'Rinse',
+  'Exfoliate', 'Moisturize', 'Hydrate', 'Tone', 'Mask', 'Steam', 'Soak', 'Brush',
+  'Floss', 'Stretch', 'Roll', 'Foam-roll', 'Meditate', 'Breathe', 'Walk', 'Run',
+  'Lift', 'Train', 'Warm-up', 'Cool-down', 'Rest', 'Drink', 'Eat', 'Avoid', 'Limit',
+];
+// recognise any leading verb (built from DO_VERBS so swapping stays in sync) + a couple of synonyms
+const VERB_RE = new RegExp(
+  '^(' + DO_VERBS.map((v) => v.toLowerCase().replace('-', '[\\s-]?')).join('|') + '|perform|complete)\\s+',
+  'i',
+);
 
 // part-of-day from 'HH:MM:SS' (Morning < 12, Afternoon 12–16, Evening ≥ 17, else Anytime)
 function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | 'Anytime' {
@@ -140,6 +149,7 @@ function PhonePreview({ name, items, imageUrl, linkImages }: { name: string; ite
 /* ── small field primitives ── */
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: C.sub, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4, display: 'block' };
 const inputStyle: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 13, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, outline: 'none', boxSizing: 'border-box' };
+const filterSel: React.CSSProperties = { flex: '1 1 72px', minWidth: 0, padding: '5px 6px', fontSize: 11, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 7, background: C.paper, outline: 'none', cursor: 'pointer' };
 
 /* ── clean icon+label dropdown (native <select> can't show icons) ── */
 interface Opt { value: string; label: string; Icon?: any; color?: string }
@@ -188,6 +198,14 @@ function primaryTypeOf(it: AdminProtocolItem): string {
 
 const VERB_OPTS: Opt[] = [{ value: '', label: '+ verb' }, ...DO_VERBS.map((v) => ({ value: v, label: v }))];
 const SCOPE_OPTS: Opt[] = SCOPES.map((s) => ({ value: s, label: s }));
+// catalog link targets — the SAME icon picker as Type (recipe / ingredient / product / activity / supplement)
+const LINK_OPTS: Opt[] = [
+  { value: 'recipe', label: 'Recipe', Icon: Utensils, color: '#388E3C' },
+  { value: 'ingredient', label: 'Ingredient', Icon: Leaf, color: '#43A047' },
+  { value: 'product', label: 'Product', Icon: Package, color: '#6B7280' },
+  { value: 'activity', label: 'Activity', Icon: Dumbbell, color: '#D45B0A' },
+  { value: 'supplement', label: 'Supplement', Icon: Pill, color: '#0097A7' },
+];
 
 function IconSelect({ value, options, onChange, width = 132, placeholder }: { value: string; options: Opt[]; onChange: (v: string) => void; width?: number; placeholder?: string }) {
   const [open, setOpen] = useState(false);
@@ -228,6 +246,9 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [fGender, setFGender] = useState('');
+  const [fCategory, setFCategory] = useState('');
+  const [fType, setFType] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [items, setItems] = useState<AdminProtocolItem[]>([]);
@@ -315,14 +336,37 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     return PROTO_FIELDS.some((f) => (form as any)[f] !== (selected as any)[f]);
   }, [form, selected]);
 
+  // distinct, case-folded filter options drawn from the loaded protocols
+  const distinctOf = (key: keyof AdminProtocol) => {
+    const seen = new Map<string, string>();
+    for (const p of protocols) {
+      const v = (p as any)[key];
+      if (v == null || v === '') continue;
+      const lo = String(v).toLowerCase();
+      if (!seen.has(lo)) seen.set(lo, String(v));
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  };
+  const categoryOpts = useMemo(() => distinctOf('category'), [protocols]);
+  const typeOpts = useMemo(() => distinctOf('type'), [protocols]);
+  const filtersActive = !!(fGender || fCategory || fType || query.trim());
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return protocols;
-    return protocols.filter((p) =>
-      (p.name || '').toLowerCase().includes(q) ||
-      (p.category || '').toLowerCase().includes(q) ||
-      (p.creator || '').toLowerCase().includes(q));
-  }, [protocols, query]);
+    return protocols.filter((p) => {
+      if (q && !(
+        (p.name || '').toLowerCase().includes(q) ||
+        (p.category || '').toLowerCase().includes(q) ||
+        (p.creator || '').toLowerCase().includes(q))) return false;
+      if (fGender) {
+        const g = (p.target_gender || '').toLowerCase();
+        if (fGender === 'unspecified' ? g !== '' : g !== fGender) return false;
+      }
+      if (fCategory && (p.category || '').toLowerCase() !== fCategory.toLowerCase()) return false;
+      if (fType && (p.type || '').toLowerCase() !== fType.toLowerCase()) return false;
+      return true;
+    });
+  }, [protocols, query, fGender, fCategory, fType]);
 
   function setField<K extends keyof AdminProtocol>(key: K, value: AdminProtocol[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -595,9 +639,8 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
         {open && (
           <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: '#fff' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-              <select value={linkKind} onChange={(e) => { const k = e.target.value as CatalogKind; setLinkKind(k); runSearch(k, linkQuery); }} style={{ ...inputStyle, width: 112 }}>
-                {(['recipe', 'ingredient', 'product', 'activity', 'supplement'] as CatalogKind[]).map((k) => <option key={k} value={k}>{k}</option>)}
-              </select>
+              <IconSelect value={linkKind} options={LINK_OPTS} width={132}
+                onChange={(k) => { setLinkKind(k as CatalogKind); runSearch(k as CatalogKind, linkQuery); }} />
               <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value); }} placeholder="Search catalog…" style={{ ...inputStyle, flex: 1 }} />
               <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
             </div>
@@ -656,8 +699,8 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     const iconBtn: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', padding: 4, flexShrink: 0, display: 'inline-flex' };
     return (
       <div style={{ opacity: it.hidden ? 0.55 : 1, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
-        {/* one horizontal row — # · img · name · time · type · sub · verb · actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* horizontal controls — wraps within the column so nothing overhangs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? '#FEE2E2' : '#EEF4FF', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
           {(() => {
             const lk = linkInfo.get(it.id);
@@ -672,41 +715,44 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
             value={it.display_name || ''}
             onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
             onBlur={() => commitItem(it.id, ['display_name'])}
-            style={{ ...inputStyle, flex: 1, minWidth: 90, textDecoration: it.hidden ? 'line-through' : 'none' }}
+            style={{ ...inputStyle, flex: '1 1 150px', minWidth: 120, width: 'auto', textDecoration: it.hidden ? 'line-through' : 'none' }}
           />
           {!isRule && (
             <input type="time" value={toTimeInput(it.scheduled_time)}
               onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
               onBlur={() => commitItem(it.id, ['scheduled_time'])}
-              style={{ ...inputStyle, width: 86, flexShrink: 0, padding: '7px 6px' }} />
+              style={{ ...inputStyle, width: 78, flexShrink: 0, padding: '7px 6px' }} />
           )}
           {!isRule ? (
             <>
-              <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={124} />
+              <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={116} />
               {subOpts2.length > 1 && (
-                <IconSelect value={it.subtype || subOpts2[0].value} options={subOpts2} onChange={(s) => commitField(it, { subtype: s })} width={112} />
+                <IconSelect value={it.subtype || subOpts2[0].value} options={subOpts2} onChange={(s) => commitField(it, { subtype: s })} width={104} />
               )}
               {cat === 'do' && (
                 <IconSelect value={curVerb} options={VERB_OPTS} onChange={(v) => setVerb(it, v)} width={92} placeholder="+ verb" />
               )}
             </>
           ) : (
-            <IconSelect value={it.scope || 'none'} options={SCOPE_OPTS} onChange={(s) => commitField(it, { scope: s === 'none' ? null : s })} width={120} />
+            <IconSelect value={it.scope || 'none'} options={SCOPE_OPTS} onChange={(s) => commitField(it, { scope: s === 'none' ? null : s })} width={116} />
           )}
-          <button onClick={() => toggleHidden(it)} disabled={busyItem === it.id} title={it.hidden ? 'Show in day view' : 'Hide from day view'} style={{ ...iconBtn, color: it.hidden ? C.faint : C.sub }}>
-            {it.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
-          <button onClick={() => addItem((it.kind as Kind) || 'action', it.id)} title="Add detail / sub-item" style={{ ...iconBtn, color: C.sub }}>
-            <CornerDownRight size={15} />
-          </button>
-          {it.kind === 'action' && (
-            <button onClick={() => addProductChild(it.id)} title="Suggest a product to buy" style={{ ...iconBtn, color: C.accent }}>
-              <ShoppingBag size={15} />
+          {/* action icons stay grouped (never split across a wrap) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, marginLeft: 'auto' }}>
+            <button onClick={() => toggleHidden(it)} disabled={busyItem === it.id} title={it.hidden ? 'Show in day view' : 'Hide from day view'} style={{ ...iconBtn, color: it.hidden ? C.faint : C.sub }}>
+              {it.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
-          )}
-          <button onClick={() => removeItem(it)} disabled={busyItem === it.id} title="Delete" style={{ ...iconBtn, color: C.danger }}>
-            {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-          </button>
+            <button onClick={() => addItem((it.kind as Kind) || 'action', it.id)} title="Add detail / sub-item" style={{ ...iconBtn, color: C.sub }}>
+              <CornerDownRight size={15} />
+            </button>
+            {it.kind === 'action' && (
+              <button onClick={() => addProductChild(it.id)} title="Suggest a product to buy" style={{ ...iconBtn, color: C.accent }}>
+                <ShoppingBag size={15} />
+              </button>
+            )}
+            <button onClick={() => removeItem(it)} disabled={busyItem === it.id} title="Delete" style={{ ...iconBtn, color: C.danger }}>
+              {busyItem === it.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+            </button>
+          </div>
         </div>
         {it.kind === 'action' && <CatalogLinker it={it} />}
         {kids.length > 0 && (
@@ -758,8 +804,31 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
               style={{ ...inputStyle, paddingLeft: 28 }}
             />
           </div>
+          {/* gender · category · type filters */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <select value={fGender} onChange={(e) => setFGender(e.target.value)} style={filterSel} title="Filter by target gender">
+              <option value="">All genders</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="unspecified">Unspecified</option>
+            </select>
+            <select value={fCategory} onChange={(e) => setFCategory(e.target.value)} style={filterSel} title="Filter by category">
+              <option value="">All categories</option>
+              {categoryOpts.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select value={fType} onChange={(e) => setFType(e.target.value)} style={filterSel} title="Filter by type">
+              <option value="">All types</option>
+              {typeOpts.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-            <span style={{ fontSize: 11, color: C.faint }}>{filtered.length} of {protocols.length}</span>
+            <span style={{ fontSize: 11, color: C.faint }}>
+              {filtered.length} of {protocols.length}
+              {filtersActive && (
+                <button onClick={() => { setQuery(''); setFGender(''); setFCategory(''); setFType(''); }}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.accent, fontSize: 11, marginLeft: 8, padding: 0 }}>Clear</button>
+              )}
+            </span>
             <button onClick={() => loadList(true)} title="Refresh" style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
               <RefreshCw size={12} /> Refresh
             </button>
