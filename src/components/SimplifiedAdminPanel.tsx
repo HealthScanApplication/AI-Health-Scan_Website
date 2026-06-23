@@ -58,6 +58,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { MarkdownField } from './admin/MarkdownField';
 import { getCurrentEnvironment, setCurrentEnvironment, getCurrentEnvironmentConfig, ENVIRONMENTS, type Environment } from '../utils/supabase/environments';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
 import { adminFieldConfig, getFieldsForView, getCategoryHierarchy, kingdomColorMap, type FieldConfig } from '../config/adminFieldConfig';
@@ -7549,10 +7550,14 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
             }
 
             if (field.type === 'textarea') {
+              // description fields get the Markdown rich-text editor (bold / headings / lists)
+              const isDescription = /description/i.test(field.key) || /description/i.test(field.label || '');
               return (
                 <div key={field.key} className="space-y-1.5">
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
-                  <textarea value={typeof val === 'string' ? val : ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className={textareaCls} />
+                  {isDescription
+                    ? <MarkdownField value={typeof val === 'string' ? val : ''} onChange={(v) => updateField(v)} placeholder={field.placeholder} minHeight={120} />
+                    : <textarea value={typeof val === 'string' ? val : ''} onChange={(e) => updateField(e.target.value)} placeholder={field.placeholder} className={textareaCls} />}
                 </div>
               );
             }

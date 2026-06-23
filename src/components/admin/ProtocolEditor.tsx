@@ -20,6 +20,7 @@ import {
 import { PhoneFrame } from '../mockups/PhoneFrame';
 import { ProtocolHomeScreen, type HomeItem } from '../mockups/ProtocolHomeScreen';
 import { MediaUploadField } from './MediaUploadField';
+import { MarkdownField } from './MarkdownField';
 import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
@@ -1146,7 +1147,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <Field label="Description">
-                      <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical', fontFamily: 'inherit' }} value={form.description || ''} onChange={(e) => setField('description', e.target.value)} />
+                      <MarkdownField value={form.description || ''} onChange={(v) => setField('description', v)} minHeight={120} />
                     </Field>
                   </div>
                   <Field label="Category"><input style={inputStyle} value={form.category || ''} onChange={(e) => setField('category', e.target.value)} /></Field>
