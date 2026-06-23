@@ -653,11 +653,11 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     const cat = it.category || 'do';
     const subOpts2 = SUB_OPTS[cat] || [];
     const curVerb = DO_VERBS.find((v) => new RegExp('^' + v + '\\b', 'i').test((it.display_name || '').trim())) || '';
-    const iconBtn: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', padding: 6, flexShrink: 0, display: 'inline-flex' };
+    const iconBtn: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', padding: 4, flexShrink: 0, display: 'inline-flex' };
     return (
       <div style={{ opacity: it.hidden ? 0.55 : 1, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
-        {/* row 1 — number · name · time */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* one horizontal row — # · img · name · time · type · sub · verb · actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? '#FEE2E2' : '#EEF4FF', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
           {(() => {
             const lk = linkInfo.get(it.id);
@@ -672,31 +672,27 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
             value={it.display_name || ''}
             onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
             onBlur={() => commitItem(it.id, ['display_name'])}
-            style={{ ...inputStyle, flex: 1, minWidth: 80, textDecoration: it.hidden ? 'line-through' : 'none' }}
+            style={{ ...inputStyle, flex: 1, minWidth: 90, textDecoration: it.hidden ? 'line-through' : 'none' }}
           />
           {!isRule && (
             <input type="time" value={toTimeInput(it.scheduled_time)}
               onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
               onBlur={() => commitItem(it.id, ['scheduled_time'])}
-              style={{ ...inputStyle, width: 100, flexShrink: 0 }} />
+              style={{ ...inputStyle, width: 86, flexShrink: 0, padding: '7px 6px' }} />
           )}
-        </div>
-        {/* row 2 — type selects (consistent width) · actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
           {!isRule ? (
             <>
-              <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={132} />
+              <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={124} />
               {subOpts2.length > 1 && (
-                <IconSelect value={it.subtype || subOpts2[0].value} options={subOpts2} onChange={(s) => commitField(it, { subtype: s })} width={120} />
+                <IconSelect value={it.subtype || subOpts2[0].value} options={subOpts2} onChange={(s) => commitField(it, { subtype: s })} width={112} />
               )}
               {cat === 'do' && (
-                <IconSelect value={curVerb} options={VERB_OPTS} onChange={(v) => setVerb(it, v)} width={110} placeholder="+ verb" />
+                <IconSelect value={curVerb} options={VERB_OPTS} onChange={(v) => setVerb(it, v)} width={92} placeholder="+ verb" />
               )}
             </>
           ) : (
-            <IconSelect value={it.scope || 'none'} options={SCOPE_OPTS} onChange={(s) => commitField(it, { scope: s === 'none' ? null : s })} width={130} />
+            <IconSelect value={it.scope || 'none'} options={SCOPE_OPTS} onChange={(s) => commitField(it, { scope: s === 'none' ? null : s })} width={120} />
           )}
-          <span style={{ flex: 1 }} />
           <button onClick={() => toggleHidden(it)} disabled={busyItem === it.id} title={it.hidden ? 'Show in day view' : 'Hide from day view'} style={{ ...iconBtn, color: it.hidden ? C.faint : C.sub }}>
             {it.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
