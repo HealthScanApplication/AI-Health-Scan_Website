@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
+  ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -139,6 +140,83 @@ function PhonePreview({ name, items, imageUrl, linkImages }: { name: string; ite
 /* ── small field primitives ── */
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: C.sub, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4, display: 'block' };
 const inputStyle: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 13, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, outline: 'none', boxSizing: 'border-box' };
+
+/* ── clean icon+label dropdown (native <select> can't show icons) ── */
+interface Opt { value: string; label: string; Icon?: any; color?: string }
+// "What is it?" — the primary type of an item.
+const TYPE_OPTS: Opt[] = [
+  { value: 'recipe', label: 'Recipe', Icon: Utensils, color: '#388E3C' },
+  { value: 'ingredient', label: 'Ingredient', Icon: Leaf, color: '#43A047' },
+  { value: 'product', label: 'Product', Icon: Package, color: '#6B7280' },
+  { value: 'activity', label: 'Activity', Icon: Dumbbell, color: '#D45B0A' },
+  { value: 'supplement', label: 'Supplement', Icon: Pill, color: '#0097A7' },
+  { value: 'sleep', label: 'Sleep', Icon: Moon, color: '#5C6B7A' },
+];
+// secondary sub-type, keyed by the stored `category` the primary maps to.
+const SUB_OPTS: Record<string, Opt[]> = {
+  consume: [
+    { value: 'meal', label: 'Meal', Icon: Utensils, color: '#388E3C' },
+    { value: 'drink', label: 'Drink', Icon: Coffee, color: '#795548' },
+    { value: 'snack', label: 'Snack', Icon: Apple, color: '#E64A19' },
+    { value: 'beverage', label: 'Beverage', Icon: GlassWater, color: '#039BE5' },
+  ],
+  do: [
+    { value: 'hygiene', label: 'Hygiene', Icon: Sparkles, color: '#D8638E' },
+    { value: 'wellness', label: 'Wellness', Icon: Wind, color: '#26A69A' },
+    { value: 'exercise', label: 'Exercise', Icon: Activity, color: '#43A047' },
+  ],
+  sleep: [{ value: 'sleep', label: 'Sleep', Icon: Moon, color: '#5C6B7A' }],
+  supplement: [{ value: 'supplement', label: 'Supplement', Icon: Pill, color: '#0097A7' }],
+};
+// primary type → stored fields (category drives the app; do = "Activity" in the UI)
+const TYPE_TO_DATA: Record<string, { category: string; item_type: string }> = {
+  recipe: { category: 'consume', item_type: 'recipe' },
+  ingredient: { category: 'consume', item_type: 'consume' },
+  product: { category: 'consume', item_type: 'product' },
+  activity: { category: 'do', item_type: 'activity' },
+  supplement: { category: 'supplement', item_type: 'supplement' },
+  sleep: { category: 'sleep', item_type: 'activity' },
+};
+function primaryTypeOf(it: AdminProtocolItem): string {
+  if (it.category === 'do') return 'activity';
+  if (it.category === 'sleep') return 'sleep';
+  if (it.category === 'supplement') return 'supplement';
+  if (it.item_type === 'recipe') return 'recipe';
+  if (it.item_type === 'product') return 'product';
+  return 'ingredient'; // consume default
+}
+
+const VERB_OPTS: Opt[] = [{ value: '', label: '+ verb' }, ...DO_VERBS.map((v) => ({ value: v, label: v }))];
+const SCOPE_OPTS: Opt[] = SCOPES.map((s) => ({ value: s, label: s }));
+
+function IconSelect({ value, options, onChange, width = 132, placeholder }: { value: string; options: Opt[]; onChange: (v: string) => void; width?: number; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const cur = options.find((o) => o.value === value);
+  return (
+    <div style={{ position: 'relative', width, flexShrink: 0 }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 8px', fontSize: 12.5, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, cursor: 'pointer', boxSizing: 'border-box' }}>
+        {cur?.Icon && <cur.Icon size={14} color={cur.color || C.sub} style={{ flexShrink: 0 }} />}
+        <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cur?.label || placeholder || '—'}</span>
+        <ChevronDown size={13} color={C.faint} style={{ flexShrink: 0 }} />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: '100%', zIndex: 41, background: '#fff', border: '1px solid ' + C.hair, borderRadius: 8, boxShadow: '0 10px 28px -10px rgba(0,0,0,0.3)', padding: 4, maxHeight: 260, overflowY: 'auto' }}>
+            {options.map((o) => (
+              <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', background: o.value === value ? '#EEF4FF' : 'transparent', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, color: C.ink, textAlign: 'left' }}>
+                {o.Icon && <o.Icon size={15} color={o.color || C.sub} style={{ flexShrink: 0 }} />}
+                <span>{o.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label style={labelStyle}>{label}</label>{children}</div>;
@@ -350,6 +428,25 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     const sub = (SUBTYPES_BY_CAT[cat] || [])[0] || null;
     editItemLocal(id, { category: cat, subtype: sub, item_type: DEFAULT_TYPE_BY_CAT[cat] || 'activity' });
   }
+  // optimistic field write that survives React's async state (used by the icon dropdowns)
+  async function commitField(it: AdminProtocolItem, patch: Partial<AdminProtocolItem>) {
+    const prev = items.find((x) => x.id === it.id) || it;
+    editItemLocal(it.id, patch);
+    setBusyItem(it.id);
+    try {
+      await updateProtocolItem(accessToken, it.id, patch);
+      baseline.current.set(it.id, { ...prev, ...patch });
+    } catch (e: any) {
+      editItemLocal(it.id, prev);
+      toast.error(`Update failed: ${e?.message || e}`);
+    } finally { setBusyItem(null); }
+  }
+  // primary "what is it?" → category + item_type + a valid subtype
+  function setPrimaryType(it: AdminProtocolItem, t: string) {
+    const d = TYPE_TO_DATA[t]; if (!d) return;
+    const subs = SUB_OPTS[d.category] || [];
+    commitField(it, { category: d.category, item_type: d.item_type, subtype: subs[0]?.value || null });
+  }
   async function toggleHidden(it: AdminProtocolItem) {
     editItemLocal(it.id, { hidden: !it.hidden });
     // commit on the next tick (editItemLocal is async state) — re-read from a patch
@@ -384,11 +481,13 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
 
   /* ── catalog linking ── */
   function defaultKind(it: AdminProtocolItem): CatalogKind {
-    if (it.category === 'supplement') return 'supplement';
-    // whole foods / seeds / herbs are ingredients; a full dish is a recipe
-    if (it.category === 'consume') return it.subtype === 'meal' ? 'recipe' : 'ingredient';
-    if (it.category === 'do') return it.subtype === 'exercise' ? 'activity' : 'product';
-    return 'product';
+    // mirror the item's primary "what is it?" type
+    const t = primaryTypeOf(it);
+    if (t === 'recipe') return 'recipe';
+    if (t === 'product') return 'product';
+    if (t === 'supplement') return 'supplement';
+    if (t === 'activity') return it.subtype === 'exercise' ? 'activity' : 'product';
+    return 'ingredient'; // ingredient (and sleep) default to the ingredient catalog
   }
   async function runSearch(kind: CatalogKind, q: string) {
     setLinkBusy(true);
@@ -535,9 +634,8 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
     const isRule = it.kind !== 'action';
     const kids = items.filter((x) => x.parent_protocol_item_id === it.id);
     const cat = it.category || 'do';
-    const subOpts = SUBTYPES_BY_CAT[cat] || [];
+    const subOpts2 = SUB_OPTS[cat] || [];
     const curVerb = DO_VERBS.find((v) => new RegExp('^' + v + '\\b', 'i').test((it.display_name || '').trim())) || '';
-    const selW: React.CSSProperties = { ...inputStyle, width: 104, flexShrink: 0 };
     const iconBtn: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', padding: 6, flexShrink: 0, display: 'inline-flex' };
     return (
       <div style={{ opacity: it.hidden ? 0.55 : 1, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
@@ -561,23 +659,16 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
           {!isRule ? (
             <>
-              <select value={cat} onChange={(e) => changeCategory(it.id, e.target.value)} onBlur={() => commitItem(it.id, ['category', 'subtype', 'item_type'])} style={selW}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <select value={it.subtype || subOpts[0] || ''} onChange={(e) => editItemLocal(it.id, { subtype: e.target.value })} onBlur={() => commitItem(it.id, ['subtype'])} style={selW}>
-                {subOpts.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={132} />
+              {subOpts2.length > 1 && (
+                <IconSelect value={it.subtype || subOpts2[0].value} options={subOpts2} onChange={(s) => commitField(it, { subtype: s })} width={120} />
+              )}
               {cat === 'do' && (
-                <select value={curVerb} onChange={(e) => setVerb(it, e.target.value)} style={selW} title="Lead the name with a verb">
-                  <option value="">+ verb</option>
-                  {DO_VERBS.map((v) => <option key={v} value={v}>{v}</option>)}
-                </select>
+                <IconSelect value={curVerb} options={VERB_OPTS} onChange={(v) => setVerb(it, v)} width={110} placeholder="+ verb" />
               )}
             </>
           ) : (
-            <select value={it.scope || 'none'} onChange={(e) => editItemLocal(it.id, { scope: e.target.value === 'none' ? null : e.target.value })} onBlur={() => commitItem(it.id, ['scope'])} style={selW}>
-              {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <IconSelect value={it.scope || 'none'} options={SCOPE_OPTS} onChange={(s) => commitField(it, { scope: s === 'none' ? null : s })} width={130} />
           )}
           <span style={{ flex: 1 }} />
           <button onClick={() => toggleHidden(it)} disabled={busyItem === it.id} title={it.hidden ? 'Show in day view' : 'Hide from day view'} style={{ ...iconBtn, color: it.hidden ? C.faint : C.sub }}>
