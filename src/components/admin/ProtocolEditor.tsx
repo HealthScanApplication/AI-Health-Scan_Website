@@ -191,7 +191,7 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
 
   // resolve linked catalog records (name + image) for display + preview thumbnails
   async function resolveLinks(rows: AdminProtocolItem[]) {
-    const groups: Record<CatalogKind, { itemId: string; cid: string }[]> = { recipe: [], product: [], activity: [], supplement: [] };
+    const groups: Record<CatalogKind, { itemId: string; cid: string }[]> = { recipe: [], ingredient: [], product: [], activity: [], supplement: [] };
     for (const it of rows) {
       const k = linkedKind(it);
       if (k) groups[k].push({ itemId: it.id, cid: (it as any)[CATALOG_CFG[k].fk] });
@@ -385,7 +385,8 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
   /* ── catalog linking ── */
   function defaultKind(it: AdminProtocolItem): CatalogKind {
     if (it.category === 'supplement') return 'supplement';
-    if (it.category === 'consume') return 'recipe';
+    // whole foods / seeds / herbs are ingredients; a full dish is a recipe
+    if (it.category === 'consume') return it.subtype === 'meal' ? 'recipe' : 'ingredient';
     if (it.category === 'do') return it.subtype === 'exercise' ? 'activity' : 'product';
     return 'product';
   }
@@ -479,7 +480,7 @@ export function ProtocolEditor({ accessToken }: { accessToken: string }) {
           <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: '#fff' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
               <select value={linkKind} onChange={(e) => { const k = e.target.value as CatalogKind; setLinkKind(k); runSearch(k, linkQuery); }} style={{ ...inputStyle, width: 112 }}>
-                {(['recipe', 'product', 'activity', 'supplement'] as CatalogKind[]).map((k) => <option key={k} value={k}>{k}</option>)}
+                {(['recipe', 'ingredient', 'product', 'activity', 'supplement'] as CatalogKind[]).map((k) => <option key={k} value={k}>{k}</option>)}
               </select>
               <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value); }} placeholder="Search catalog…" style={{ ...inputStyle, flex: 1 }} />
               <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
