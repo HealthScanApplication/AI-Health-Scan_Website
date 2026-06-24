@@ -548,6 +548,10 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
   const sleepWin = computeSleepWindow(dayItems);
   const wakeItem = sleepWin.wakeItem;
   const bedItem = sleepWin.bedItem;
+  // any sleep anchors beyond the one wake + one bedtime are duplicates (e.g. a stray
+  // "End Sleep" left next to "Wake at 4am") — offer to clean them up.
+  const extraAnchors = dayItems.filter((it) =>
+    (isWakeName(it.display_name || '') || isBedName(it.display_name || '')) && it !== wakeItem && it !== bedItem);
   // create or re-time a sleep anchor ("End Sleep" wake / "Start Sleep" bedtime).
   async function setAnchor(which: 'wake' | 'bed', time: string) {
     if (!selected) return;
@@ -576,6 +580,20 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     } catch (e: any) {
       toast.error(`Update failed: ${e?.message || e}`);
     } finally { setBusyItem(null); }
+  }
+  // delete duplicate sleep anchors, keeping the resolved wake + bedtime
+  async function cleanupAnchors() {
+    if (!extraAnchors.length) return;
+    if (!window.confirm(`Remove ${extraAnchors.length} duplicate sleep anchor(s)?\n\n${extraAnchors.map((a) => `• ${a.display_name} (${toTimeInput(a.scheduled_time) || '—'})`).join('\n')}\n\nKeeps the wake + bedtime shown above.`)) return;
+    setBusyItem('anchor-cleanup');
+    try {
+      for (const it of extraAnchors) await deleteProtocolItem(accessToken, it.id);
+      const removed = new Set(extraAnchors.map((it) => it.id));
+      setItems((its) => its.filter((x) => !removed.has(x.id)));
+      removed.forEach((id) => baseline.current.delete(id));
+      toast.success('Cleaned up sleep anchors');
+    } catch (e: any) { toast.error(`Cleanup failed: ${e?.message || e}`); }
+    finally { setBusyItem(null); }
   }
 
   async function removeItem(it: AdminProtocolItem) {
@@ -1261,9 +1279,16 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                       </span>
                     )}
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 10.5, color: C.faint, maxWidth: 220 }}>
-                      {wakeItem || bedItem ? 'Pins the day’s start/end.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}
-                    </span>
+                    {extraAnchors.length > 0 ? (
+                      <button onClick={cleanupAnchors} disabled={busyItem === 'anchor-cleanup'}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.danger, padding: '5px 9px', borderRadius: 8, border: '1px solid #FCA5A5', background: '#FEF2F2', cursor: 'pointer' }}>
+                        {busyItem === 'anchor-cleanup' ? <Loader2 size={12} className="animate-spin" /> : <AlertCircle size={12} />} Remove {extraAnchors.length} duplicate anchor{extraAnchors.length === 1 ? '' : 's'}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 10.5, color: C.faint, maxWidth: 220 }}>
+                        {wakeItem || bedItem ? 'Pins the day’s start/end.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}
+                      </span>
+                    )}
                   </div>
                 )}
                 {loadingItems ? (
@@ -1278,12 +1303,16 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                     for (const it of list) { const k = keyOf(it); if (!m.has(k)) m.set(k, []); m.get(k)!.push(it); }
                     return m;
                   };
-                  // timeline order = sleep-end first, then by time; numbers every item 1..N
-                  const sorted = [...tops].sort((a, b) => {
-                    const as = isSleepName(a.display_name || '') ? -1 : 0, bs = isSleepName(b.display_name || '') ? -1 : 0;
-                    if (as !== bs) return as - bs;
-                    return minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time);
-                  });
+                  // timeline order: WAKE anchors first, BEDTIME anchors last, everything
+                  // else by clock time (so an 08:00 "End Sleep" can't jump ahead of 04:xx).
+                  const anchorKey = (it: AdminProtocolItem) => {
+                    const n = it.display_name || '';
+                    const t = minutesOf(it.scheduled_time);
+                    if (isWakeName(n)) return -1e7 + t;
+                    if (isBedName(n)) return 1e7 + t;
+                    return t;
+                  };
+                  const sorted = [...tops].sort((a, b) => anchorKey(a) - anchorKey(b));
                   const ordered = kindTab === 'action' ? sorted : tops;
                   const stepNo = new Map<string, number>(ordered.map((it, i) => [it.id, i + 1]));
                   const podHeader = (t: string) => (
