@@ -21,6 +21,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { isSleepItemByName } from "../protocolDomain/category";
+
 export type CatKey = "supplements" | "consume" | "do" | "sleep";
 
 export const CATEGORY_TINTS: Record<CatKey, { fg: string; bg: string; label: string; Icon: any }> = {
@@ -41,11 +43,9 @@ export interface ProtocolItem {
   group_name?: string;  // meal-slot grouping (Breakfast, Lunch, Snack, …)
 }
 
-const SLEEP_NAME = /\b(sleep|wind[\s-]?down|lights?[\s-]?out|nightly reflection|dream journal)\b/i;
-
 /** Canonical category for an item — mirrors mobile categorizeProtocolItem precedence. */
 export function categorize(item: ProtocolItem): CatKey {
-  if (SLEEP_NAME.test(item.name)) return "sleep";
+  if (isSleepItemByName(item.name)) return "sleep";
   if (item.item_type === "supplement") return "supplements";
   if (item.item_type === "consume") return "consume";
   return "do";

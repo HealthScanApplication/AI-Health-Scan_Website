@@ -22,6 +22,7 @@ import {
 import { computeSleepWindow } from "../../utils/sleepWindow";
 import { getItemTod, parseHM, type SimpleTod } from "../../protocolDomain/timeOfDay";
 import { mealSlotName } from "../../protocolDomain/mealSlot";
+import { isSleepItemByName } from "../../protocolDomain/category";
 
 const POPPINS = 'Poppins, "Archivo", system-ui, -apple-system, sans-serif';
 
@@ -48,11 +49,8 @@ function fmtTime(t?: string | null): string {
   const ampm = hm.h < 12 ? "am" : "pm";
   return `${h12}:${String(hm.m).padStart(2, "0")}${ampm}`;
 }
-const SLEEP_NAME = /^sleep$|^start[\s-]?sleep|^end[\s-]?sleep|^wake(\s?up)?$|dream[\s-]?journal|nightly[\s-]?reflection|wind[\s-]?down|lights?[\s-]?out/i;
-
 function categorizeFull(it: HomeItem): CatKey {
-  const n = (it.display_name || "").trim().toLowerCase();
-  if (SLEEP_NAME.test(n)) return "sleep";
+  if (isSleepItemByName(it.display_name)) return "sleep";
   if (it.item_type === "supplement") return "supplements";
   if (it.item_type === "consume" || it.item_type === "recipe") return "consume";
   if (it.scope === "consume") return "consume";
