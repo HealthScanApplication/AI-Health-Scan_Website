@@ -56,8 +56,10 @@ import {
   Users,
   Filter,
   ClipboardList,
+  GitMerge,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { mergeCatalogRecords, updateCatalogFields, CATALOG_CFG, type CatalogKind } from '../utils/protocolAdmin';
 import { MarkdownField } from './admin/MarkdownField';
 import { getCurrentEnvironment, setCurrentEnvironment, getCurrentEnvironmentConfig, ENVIRONMENTS, type Environment } from '../utils/supabase/environments';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -1810,6 +1812,65 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkAction, setBulkAction] = useState<'update' | 'delete' | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<string | null>(null);
+  // merge two records (data fill + junction re-point + delete duplicate)
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeKeepId, setMergeKeepId] = useState<string | null>(null);
+  const [mergeBusy, setMergeBusy] = useState(false);
+
+  // which catalog kind (if any) the current tab can merge — gated to tables the
+  // admin/catalog/merge endpoint knows how to re-point.
+  const tabToMergeKind = (tab: string): CatalogKind | null => {
+    const map: Record<string, CatalogKind> = {
+      recipes: 'recipe', ingredients: 'ingredient', products: 'product', activities: 'activity', hs_supplements: 'supplement',
+    };
+    return map[tab] || null;
+  };
+
+  const openMerge = () => {
+    const ids = [...selectedRecords];
+    if (ids.length !== 2) return;
+    // default survivor = the one with an image, else the first selected
+    const recs = records.filter((r: any) => selectedRecords.has(r.id));
+    const withImg = recs.find((r: any) => r.image_url || r.image_primary_url || r.image);
+    setMergeKeepId(withImg?.id || ids[0]);
+    setMergeOpen(true);
+  };
+
+  const doMergeRecords = async () => {
+    const kind = tabToMergeKind(activeTab);
+    const ids = [...selectedRecords];
+    if (!kind || ids.length !== 2 || !mergeKeepId) return;
+    const survivorId = mergeKeepId;
+    const duplicateId = ids.find((x) => x !== survivorId)!;
+    setMergeBusy(true);
+    try {
+      const table = CATALOG_CFG[kind].table;
+      const url = `https://${projectId}.supabase.co/rest/v1/${table}?id=in.(${survivorId},${duplicateId})&select=*`;
+      const rows = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, apikey: publicAnonKey } }).then((r) => r.json());
+      const surv = (Array.isArray(rows) ? rows : []).find((r: any) => r.id === survivorId) || {};
+      const dup = (Array.isArray(rows) ? rows : []).find((r: any) => r.id === duplicateId) || {};
+      // data merge: fill the survivor's EMPTY fields from the duplicate (never overwrite)
+      const SKIP = new Set(['id', 'created_at', 'updated_at', 'imported_at', 'api_source', 'external_id']);
+      const isEmpty = (v: any) => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+      const patch: Record<string, any> = {};
+      for (const [k, v] of Object.entries(dup)) {
+        if (SKIP.has(k)) continue;
+        if (isEmpty(surv[k]) && !isEmpty(v)) patch[k] = v;
+      }
+      if (Object.keys(patch).length) await updateCatalogFields(accessToken, kind, survivorId, patch);
+      const counts = await mergeCatalogRecords(accessToken, kind, survivorId, duplicateId);
+      const total = Object.values(counts).reduce((a: number, b: number) => a + b, 0);
+      toast.success(`Merged — filled ${Object.keys(patch).length} field(s), re-pointed ${total} reference(s), deleted the duplicate`);
+      setMergeOpen(false);
+      setSelectedRecords(new Set());
+      setBulkMode(false);
+      await fetchRecords();
+    } catch (e: any) {
+      toast.error(`Merge failed: ${e?.message || e}`);
+    } finally {
+      setMergeBusy(false);
+    }
+  };
 
   // Sync state
   const [syncDiff, setSyncDiff] = useState<Record<string, any> | null>(null);
@@ -4994,6 +5055,51 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                   )}
 
                   {/* Bulk Actions Bar */}
+                  {mergeOpen && selectedRecords.size === 2 && (() => {
+                    const recs = records.filter((r: any) => selectedRecords.has(r.id));
+                    const nameOf = (r: any) => r?.name_common || r?.name || r?.name_brand || r?.market_name || r?.display_name || 'Untitled';
+                    const imgOf = (r: any) => r?.image_url || r?.image_primary_url || r?.image || null;
+                    return (
+                      <div onClick={() => !mergeBusy && setMergeOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 460, boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)', padding: 20 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <GitMerge className="w-4 h-4 text-purple-600" />
+                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111827' }}>Merge 2 records</h3>
+                          </div>
+                          <p style={{ fontSize: 12.5, color: '#6B7280', margin: '0 0 14px', lineHeight: 1.5 }}>
+                            Pick the record to <strong>keep</strong>. The other's values fill its empty fields, every recipe↔ingredient junction + protocol link that pointed at the other is re-pointed here, then the other is permanently deleted. This cannot be undone.
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {recs.map((r: any) => {
+                              const keep = mergeKeepId === r.id;
+                              return (
+                                <button key={r.id} onClick={() => setMergeKeepId(r.id)} disabled={mergeBusy}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, cursor: 'pointer', textAlign: 'left', border: '2px solid ' + (keep ? '#7C3AED' : '#E5E7EB'), background: keep ? '#F5F3FF' : '#fff' }}>
+                                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, border: '2px solid ' + (keep ? '#7C3AED' : '#9CA3AF'), background: keep ? '#7C3AED' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {keep && <span style={{ width: 7, height: 7, borderRadius: 999, background: '#fff' }} />}
+                                  </span>
+                                  {imgOf(r)
+                                    ? <img src={imgOf(r)} alt="" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: '#F3F4F6' }} />
+                                    : <span style={{ width: 38, height: 38, borderRadius: 8, background: '#F3F4F6', flexShrink: 0 }} />}
+                                  <span style={{ minWidth: 0, flex: 1 }}>
+                                    <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nameOf(r)}</span>
+                                    <span style={{ fontSize: 11, fontWeight: 600, color: keep ? '#7C3AED' : '#9CA3AF' }}>{keep ? 'KEEP — survivor' : 'merge in → delete'}</span>
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+                            <Button size="sm" variant="outline" onClick={() => setMergeOpen(false)} disabled={mergeBusy}>Cancel</Button>
+                            <Button size="sm" onClick={doMergeRecords} disabled={mergeBusy || !mergeKeepId}
+                              className="gap-1 bg-purple-600 hover:bg-purple-700 text-white">
+                              <GitMerge className="w-3 h-3" />{mergeBusy ? 'Merging…' : 'Merge'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {bulkMode && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
                       <div className="flex items-center justify-between">
@@ -5010,6 +5116,17 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
                         </div>
                         {selectedRecords.size > 0 && (
                           <div className="flex gap-2">
+                            {selectedRecords.size === 2 && tabToMergeKind(activeTab) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={openMerge}
+                                className="gap-1 text-purple-700 border-purple-300 hover:bg-purple-100"
+                              >
+                                <GitMerge className="w-3 h-3" />
+                                Merge 2
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
