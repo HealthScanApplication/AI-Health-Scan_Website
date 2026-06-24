@@ -21,6 +21,7 @@ import { PhoneFrame } from '../mockups/PhoneFrame';
 import { ProtocolHomeScreen, type HomeItem } from '../mockups/ProtocolHomeScreen';
 import { MediaUploadField } from './MediaUploadField';
 import { MarkdownField } from './MarkdownField';
+import { computeSleepWindow, isWakeName, isBedName } from '../../utils/sleepWindow';
 import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
@@ -88,18 +89,9 @@ function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | '
 }
 const POD_ORDER = ['Morning', 'Afternoon', 'Evening', 'Anytime'] as const;
 const minutesOf = (t: string | null) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 1e9; };
-const isSleepName = (n: string) => /^(end[\s-]?sleep|wake)/i.test((n || '').trim());
-// Day-anchor detection — mirrors the mobile app (ProtocolWidget) + the mockup.
-// Wake (morning / End Sleep): matches "Wake", "Wake at 4am", "Wake Up", "End Sleep", "Rise"…
-const WAKE_RE = /^(wake|end[\s-]?sleep|rise|get[\s-]?up|morning[\s-]?wake)\b/i;
-const isWakeName = (n: string) => WAKE_RE.test((n || '').trim());
-// Bedtime (evening / Start Sleep): a sleep/bed action that is NOT the morning wake and NOT a prep step.
-function isBedName(n: string) {
-  const t = (n || '').trim();
-  if (isWakeName(t)) return false;                                  // never the morning wake (e.g. "End Sleep")
-  if (/(prep|prepare|wind[\s-]?down|reflection)/i.test(t)) return false; // prep steps don't count
-  return /\b(start[\s-]?sleep|bed(time)?|lights[\s-]?out|sleep)\b/i.test(t);
-}
+// Sleep-anchor detection lives in ../../utils/sleepWindow (shared with the mockup
+// + mirrored in the mobile widget). `isSleepName` keeps the legacy sort-first rule.
+const isSleepName = (n: string) => isWakeName(n);
 
 /* ── helpers ── */
 // DB item_type (5 values) → the simplified union categorize/itemIcon expect.
@@ -551,11 +543,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     }
   }
 
-  // the day's wake (End Sleep) and bedtime (Start Sleep) anchor items, if present.
-  // Wake = earliest wake-named item; Bedtime = latest bed-named item — kept distinct.
+  // the day's sleep window (wake / bedtime anchors + computed hours) — shared logic.
   const dayItems = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id);
-  const wakeItem = dayItems.filter((it) => isWakeName(it.display_name || '')).sort((a, b) => minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time))[0];
-  const bedItem = dayItems.filter((it) => isBedName(it.display_name || '')).sort((a, b) => minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time)).slice(-1)[0];
+  const sleepWin = computeSleepWindow(dayItems);
+  const wakeItem = sleepWin.wakeItem;
+  const bedItem = sleepWin.bedItem;
   // create or re-time a sleep anchor ("End Sleep" wake / "Start Sleep" bedtime).
   async function setAnchor(which: 'wake' | 'bed', time: string) {
     if (!selected) return;
@@ -1263,6 +1255,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                         style={{ ...inputStyle, width: 110, padding: '6px 8px' }} />
                       <span style={{ fontSize: 10.5, color: C.faint }}>Start&nbsp;Sleep</span>
                     </label>
+                    {sleepWin.durationLabel && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#5C6B7A', padding: '4px 9px', borderRadius: 999, background: '#EEF1F5' }}>
+                        <Moon size={12} color="#5C6B7A" /> {sleepWin.durationLabel} sleep
+                      </span>
+                    )}
                     <span style={{ flex: 1 }} />
                     <span style={{ fontSize: 10.5, color: C.faint, maxWidth: 220 }}>
                       {wakeItem || bedItem ? 'Pins the day’s start/end.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}

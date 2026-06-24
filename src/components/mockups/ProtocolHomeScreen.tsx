@@ -19,6 +19,7 @@ import {
 import {
   CATEGORY_TINTS, itemIcon, type CatKey, type ProtocolItem as CatItem,
 } from "../../config/protocolCategories";
+import { computeSleepWindow } from "../../utils/sleepWindow";
 
 const POPPINS = 'Poppins, "Archivo", system-ui, -apple-system, sans-serif';
 
@@ -180,6 +181,8 @@ export function ProtocolHomeScreen({
 }) {
   // book-end the day with grey Sleep anchors (End Sleep / Start Sleep), like the app
   const allItems = anchors ? withSleepAnchors(items) : items;
+  // sleep window (hours slept = bedtime → wake) — shown on the anchor cards
+  const sleepWin = computeSleepWindow(allItems.map((i) => ({ display_name: i.display_name, scheduled_time: i.time ?? null, category: null })));
 
   // wake hour = End Sleep / Wake item's hour, clamped 0..11, else 5
   let wakeHour = 5;
@@ -287,7 +290,9 @@ export function ProtocolHomeScreen({
                         const ic = iconFor(it);
                         const ItemIcon = ic.Icon;
                         const isDone = !!it.done;
-                        const sub = [fmtTime(it.time), it.group_name, it.duration_minutes ? `${it.duration_minutes} min` : null].filter(Boolean).join(" · ");
+                        const sleepExtra = sleepWin.durationLabel && isWake(it) ? `${sleepWin.durationLabel} sleep`
+                          : sleepWin.durationLabel && isBed(it) ? `${sleepWin.durationLabel} until wake` : null;
+                        const sub = [fmtTime(it.time), it.group_name, sleepExtra, it.duration_minutes ? `${it.duration_minutes} min` : null].filter(Boolean).join(" · ");
                         return (
                           <div key={ii} style={{ display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF", borderRadius: 12, padding: "8px 10px", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
                             {it.image_url ? (
