@@ -21,6 +21,7 @@ import {
 } from "../../config/protocolCategories";
 import { computeSleepWindow } from "../../utils/sleepWindow";
 import { getItemTod, parseHM, type SimpleTod } from "../../protocolDomain/timeOfDay";
+import { mealSlotName } from "../../protocolDomain/mealSlot";
 
 const POPPINS = 'Poppins, "Archivo", system-ui, -apple-system, sans-serif';
 
@@ -69,10 +70,7 @@ function iconFor(it: HomeItem) {
   return itemIcon({ name: it.display_name || "", item_type: t });
 }
 
-function mealSlot(group?: string | null): string | null {
-  const m = /^(?:consume\s)?(breakfast|lunch|dinner|supper|snack)$/i.exec((group || "").trim());
-  return m ? m[1] : null;
-}
+const mealSlot = (group?: string | null): string | null => mealSlotName(group);
 // Day-anchor detection, mirroring the app (ProtocolWidget):
 // "End Sleep"/Wake book-ends the morning; the terminal sleep/bed action ends the day.
 const WAKE_RE = /^(end[\s-]?sleep|wake([\s-]?up)?|morning[\s-]?wake)$/i;
