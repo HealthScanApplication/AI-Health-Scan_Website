@@ -14,11 +14,31 @@ function ProtocolPhone({ protocol }: { protocol: RealProtocol }) {
     display_name: it.name,
     item_type: it.item_type,
     time: it.meta || null,
+    image_url: it.image_url || null,
+    group_name: it.group_name || null,
   }));
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">
       <ProtocolHomeScreen protocolName={protocol.name} items={items} />
     </PhoneFrame>
+  );
+}
+
+/* ---- Do / Avoid guidance shown under the protocol card (mirrors the app) ---- */
+function GuidanceList({ title, glyph, color, items }: { title: string; glyph: string; color: string; items?: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+      <div style={{ fontFamily: GRO, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em", color, marginBottom: 10 }}>{title}</div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map((it, i) => (
+          <li key={i} style={{ display: "flex", gap: 9, fontFamily: GRO, fontSize: 14, lineHeight: 1.45, color: ed.inkSoft }}>
+            <span aria-hidden style={{ color, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{glyph}</span>
+            <span>{it}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -117,6 +137,13 @@ export function GoalToggle() {
           <p style={{ fontFamily: GRO, fontSize: 17, lineHeight: 1.6, color: ed.inkSoft, margin: "18px 0 0", maxWidth: "42ch" }}>
             {leadParagraph(protocol.description)}
           </p>
+
+          {(protocol.dos?.length || protocol.donts?.length) ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "24px 40px", marginTop: 30, maxWidth: "44ch" }}>
+              <GuidanceList title="Do" glyph="✓" color="#5E7B5A" items={protocol.dos} />
+              <GuidanceList title="Avoid" glyph="✕" color="#B0573F" items={protocol.donts} />
+            </div>
+          ) : null}
         </div>
 
         {/* The home screen — presented like the other sections */}

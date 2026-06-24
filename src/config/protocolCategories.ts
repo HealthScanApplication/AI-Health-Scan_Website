@@ -37,6 +37,8 @@ export interface ProtocolItem {
   name: string;
   item_type: "supplement" | "consume" | "activity";
   meta?: string;
+  image_url?: string;   // linked recipe / catalog image (shown on meal cards)
+  group_name?: string;  // meal-slot grouping (Breakfast, Lunch, Snack, …)
 }
 
 const SLEEP_NAME = /\b(sleep|wind[\s-]?down|lights?[\s-]?out|nightly reflection|dream journal)\b/i;
