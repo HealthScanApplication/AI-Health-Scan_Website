@@ -89,6 +89,15 @@ function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | '
 const POD_ORDER = ['Morning', 'Afternoon', 'Evening', 'Anytime'] as const;
 const minutesOf = (t: string | null) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 1e9; };
 const isSleepName = (n: string) => /^(end[\s-]?sleep|wake)/i.test((n || '').trim());
+// Day-anchor detection — mirrors the mobile app (ProtocolWidget) + the mockup.
+const WAKE_RE = /^(end[\s-]?sleep|wake([\s-]?up)?|morning[\s-]?wake)$/i;
+const isWakeName = (n: string) => WAKE_RE.test((n || '').trim());
+function isBedName(n: string) {
+  const t = (n || '').trim();
+  if (/^(start[\s-]?sleep|bed(time)?|lights[\s-]?out)$/i.test(t)) return true;
+  if (/(prep|prepare|wind[\s-]?down|reflection)/i.test(t)) return false; // prep steps don't count
+  return /\b(sleep|bed)\b/i.test(t);
+}
 
 /* ── helpers ── */
 // DB item_type (5 values) → the simplified union categorize/itemIcon expect.
@@ -538,6 +547,39 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     } finally {
       setAdding(false);
     }
+  }
+
+  // the day's wake (End Sleep) and bedtime (Start Sleep) anchor items, if present
+  const wakeItem = items.find((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id && isWakeName(it.display_name || ''));
+  const bedItem = items.find((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id && isBedName(it.display_name || ''));
+  // create or re-time a sleep anchor ("End Sleep" wake / "Start Sleep" bedtime).
+  async function setAnchor(which: 'wake' | 'bed', time: string) {
+    if (!selected) return;
+    const hhmmss = time ? `${time}:00` : null;
+    const existing = which === 'wake' ? wakeItem : bedItem;
+    setBusyItem(existing?.id || `anchor-${which}`);
+    try {
+      if (existing) {
+        editItemLocal(existing.id, { scheduled_time: hhmmss });
+        const updated = await updateProtocolItem(accessToken, existing.id, { scheduled_time: hhmmss });
+        baseline.current.set(existing.id, { ...(items.find((x) => x.id === existing.id) || existing), ...updated });
+        toast.success(which === 'wake' ? 'Wake time set' : 'Bedtime set');
+      } else if (hhmmss) {
+        const maxSort = items.reduce((m, it) => Math.max(m, it.sort_order || 0), 0);
+        const created = await createProtocolItem(accessToken, {
+          protocol_id: selected.id,
+          display_name: which === 'wake' ? 'End Sleep' : 'Start Sleep',
+          item_type: 'activity', kind: 'action', scheduled_time: hhmmss,
+          group_name: 'Sleep', category: 'sleep', subtype: 'sleep',
+          day_number: 1, sort_order: maxSort + 1, hidden: false,
+        });
+        setItems((its) => [...its, created]);
+        baseline.current.set(created.id, { ...created });
+        toast.success(which === 'wake' ? 'Wake anchor added' : 'Bedtime anchor added');
+      }
+    } catch (e: any) {
+      toast.error(`Update failed: ${e?.message || e}`);
+    } finally { setBusyItem(null); }
   }
 
   async function removeItem(it: AdminProtocolItem) {
@@ -1199,6 +1241,30 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                     {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add {kindTab === 'action' ? 'step' : kindTab === 'rule_do' ? 'do' : "don't"}
                   </button>
                 </div>
+                {/* Sleep & wake window — book-ends the day for every protocol (like the app) */}
+                {kindTab === 'action' && (
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 16px', padding: '10px 12px', marginBottom: 12, borderRadius: 10, border: '1px solid ' + C.hair, background: C.panel }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: C.sub }}>
+                      <Moon size={14} color="#5C6B7A" /> Sleep & wake
+                    </span>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.sub }}>
+                      Wake
+                      <input type="time" value={toTimeInput(wakeItem?.scheduled_time || null)} onChange={(e) => setAnchor('wake', e.target.value)}
+                        style={{ ...inputStyle, width: 110, padding: '6px 8px' }} />
+                      <span style={{ fontSize: 10.5, color: C.faint }}>End&nbsp;Sleep</span>
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.sub }}>
+                      Bedtime
+                      <input type="time" value={toTimeInput(bedItem?.scheduled_time || null)} onChange={(e) => setAnchor('bed', e.target.value)}
+                        style={{ ...inputStyle, width: 110, padding: '6px 8px' }} />
+                      <span style={{ fontSize: 10.5, color: C.faint }}>Start&nbsp;Sleep</span>
+                    </label>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ fontSize: 10.5, color: C.faint, maxWidth: 220 }}>
+                      {wakeItem || bedItem ? 'Pins the day’s start/end.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}
+                    </span>
+                  </div>
+                )}
                 {loadingItems ? (
                   <div style={{ padding: 24, textAlign: 'center', color: C.faint }}><Loader2 size={18} className="animate-spin" style={{ display: 'inline' }} /></div>
                 ) : (() => {
