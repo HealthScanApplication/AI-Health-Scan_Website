@@ -20,6 +20,7 @@ import {
   CATEGORY_TINTS, itemIcon, type CatKey, type ProtocolItem as CatItem,
 } from "../../config/protocolCategories";
 import { computeSleepWindow } from "../../utils/sleepWindow";
+import { getItemTod, parseHM, type SimpleTod } from "../../protocolDomain/timeOfDay";
 
 const POPPINS = 'Poppins, "Archivo", system-ui, -apple-system, sans-serif';
 
@@ -39,13 +40,6 @@ export interface HomeItem {
 }
 
 /* ───────── time + category helpers (mirror mobile precedence) ───────── */
-function parseHM(t?: string | null): { h: number; m: number; mins: number } | null {
-  if (!t) return null;
-  const x = /^(\d{1,2}):(\d{2})/.exec(t);
-  if (!x) return null;
-  const h = parseInt(x[1], 10), m = parseInt(x[2], 10);
-  return { h, m, mins: h * 60 + m };
-}
 function fmtTime(t?: string | null): string {
   const hm = parseHM(t);
   if (!hm) return "";
@@ -108,19 +102,9 @@ function withSleepAnchors(items: HomeItem[]): HomeItem[] {
   ];
 }
 
-type Tod = "Morning" | "Afternoon" | "Evening";
-function getItemTod(it: HomeItem, wakeHour: number): Tod {
-  const g = (it.group_name || "").toLowerCase();
-  if (/morning|wake|(^|\s)am(\s|$)/.test(g)) return "Morning";
-  if (/afternoon/.test(g)) return "Afternoon";
-  if (/evening|night|bed|sleep|(^|\s)pm(\s|$)/.test(g)) return "Evening";
-  const hm = parseHM(it.time);
-  if (!hm) return "Morning";
-  const h = hm.h;
-  if (h >= wakeHour && h <= 11) return "Morning";
-  if (h >= 12 && h <= 16) return "Afternoon";
-  return "Evening";
-}
+type Tod = SimpleTod;
+const todForItem = (it: HomeItem, wakeHour: number): Tod =>
+  getItemTod({ group_name: it.group_name, scheduled_time: it.time }, wakeHour);
 
 interface Band { cat: CatKey; slot: string | null; firstMin: number | null; order: number; time?: string | null; label: string; items: HomeItem[] }
 function buildBands(list: HomeItem[]): Band[] {
@@ -195,7 +179,7 @@ export function ProtocolHomeScreen({
 
   const todOrder: Tod[] = ["Morning", "Afternoon", "Evening"];
   const byTod: Record<Tod, HomeItem[]> = { Morning: [], Afternoon: [], Evening: [] };
-  for (const it of allItems) byTod[getItemTod(it, wakeHour)].push(it);
+  for (const it of allItems) byTod[todForItem(it, wakeHour)].push(it);
   const sections = todOrder
     .map((tod) => ({ tod, bands: buildBands(byTod[tod]) }))
     .filter((s) => s.bands.length);
