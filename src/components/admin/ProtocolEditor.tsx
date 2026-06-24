@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
-  Pencil, GitMerge, Download, Upload,
+  Pencil, GitMerge, Download, Upload, Repeat, CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -204,6 +204,15 @@ function primaryTypeOf(it: AdminProtocolItem): string {
 
 const VERB_OPTS: Opt[] = [{ value: '', label: '+ verb' }, ...DO_VERBS.map((v) => ({ value: v, label: v }))];
 const SCOPE_OPTS: Opt[] = SCOPES.map((s) => ({ value: s, label: s }));
+// cadence — maps to protocol_items.recurrence_type (the mobile app's itemShowsOnDate honours these)
+const REPEAT_OPTS: Opt[] = [
+  { value: 'daily', label: 'Every day', Icon: Repeat, color: '#6B7280' },
+  { value: 'weekly', label: 'Days of week', Icon: CalendarDays, color: '#2563EB' },
+  { value: 'custom', label: 'Every N days', Icon: RefreshCw, color: '#D45B0A' },
+  { value: 'monthly', label: 'Monthly', Icon: CalendarDays, color: '#0097A7' },
+  { value: 'one_off', label: 'Once (date)', Icon: CalendarDays, color: '#DC2626' },
+];
+const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']; // index = day-of-week (0=Sun), matches mobile recurrence_days_of_week
 // catalog link targets — the SAME icon picker as Type (recipe / ingredient / product / activity / supplement)
 const LINK_OPTS: Opt[] = [
   { value: 'recipe', label: 'Recipe', Icon: Utensils, color: '#388E3C' },
@@ -413,6 +422,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     'display_name', 'item_type', 'kind', 'scope', 'scheduled_time', 'duration_minutes',
     'group_name', 'day_number', 'sort_order', 'category', 'subtype', 'hidden',
     'catalog_recipe_id', 'catalog_product_id', 'catalog_activity_id', 'catalog_ingredient_id', 'supplement_id',
+    'recurrence_type', 'recurrence_days_of_week', 'recurrence_interval_days', 'recurrence_start_date', 'recurrence_end_date', 'scheduled_date',
   ];
 
   function exportProtocol() {
@@ -642,6 +652,20 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     const subs = SUB_OPTS[d.category] || [];
     commitField(it, { category: d.category, item_type: d.item_type, subtype: subs[0]?.value || null });
   }
+  // cadence: set recurrence_type + sensible defaults, clearing the now-irrelevant fields
+  function setRecurType(it: AdminProtocolItem, type: string) {
+    const patch: Partial<AdminProtocolItem> = {
+      recurrence_type: type, recurrence_days_of_week: null, recurrence_interval_days: null, scheduled_date: null,
+    };
+    if (type === 'weekly') patch.recurrence_days_of_week = it.recurrence_days_of_week?.length ? it.recurrence_days_of_week : [1, 3, 5];
+    if (type === 'custom') patch.recurrence_interval_days = it.recurrence_interval_days || 2;
+    commitField(it, patch);
+  }
+  function toggleDow(it: AdminProtocolItem, d: number) {
+    const cur = it.recurrence_days_of_week || [];
+    const next = cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort((a, b) => a - b);
+    commitField(it, { recurrence_days_of_week: next });
+  }
   async function toggleHidden(it: AdminProtocolItem) {
     editItemLocal(it.id, { hidden: !it.hidden });
     // commit on the next tick (editItemLocal is async state) — re-read from a patch
@@ -834,6 +858,43 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
       {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Link2 size={13} color={C.faint} />}
     </span>
   );
+  // cadence editor — daily / weekly (days) / every N days / monthly / once (date)
+  function RepeatRow({ it }: { it: AdminProtocolItem }) {
+    const rt = it.recurrence_type || 'daily';
+    const mini: React.CSSProperties = { width: 56, padding: '5px 6px', fontSize: 12, border: '1px solid ' + C.hair, borderRadius: 7, color: C.ink, background: C.paper, outline: 'none' };
+    return (
+      <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px dashed ' + C.hair, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}><Repeat size={12} /> Repeat</span>
+        <IconSelect value={rt} options={REPEAT_OPTS} onChange={(t) => setRecurType(it, t)} width={148} />
+        {rt === 'weekly' && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            {DOW.map((lbl, d) => {
+              const on = (it.recurrence_days_of_week || []).includes(d);
+              return (
+                <button key={d} onClick={() => toggleDow(it, d)} title={lbl}
+                  style={{ width: 26, height: 26, borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? '#EEF4FF' : '#fff', color: on ? C.accent : C.sub }}>{lbl[0]}</button>
+              );
+            })}
+          </div>
+        )}
+        {rt === 'custom' && (
+          <span style={{ fontSize: 12, color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            every
+            <input type="number" min={1} value={it.recurrence_interval_days ?? 2}
+              onChange={(e) => editItemLocal(it.id, { recurrence_interval_days: e.target.value === '' ? null : Math.max(1, parseInt(e.target.value) || 1) })}
+              onBlur={() => commitItem(it.id, ['recurrence_interval_days'])} style={mini} />
+            days
+          </span>
+        )}
+        {rt === 'one_off' && (
+          <input type="date" value={it.scheduled_date || ''}
+            onChange={(e) => editItemLocal(it.id, { scheduled_date: e.target.value || null })}
+            onBlur={() => commitItem(it.id, ['scheduled_date'])} style={{ ...mini, width: 148 }} />
+        )}
+        {rt === 'monthly' && <span style={{ fontSize: 11, color: C.faint }}>same day each month</span>}
+      </div>
+    );
+  }
   function CatalogLinker({ it }: { it: AdminProtocolItem }) {
     const link = linkInfo.get(it.id);
     const open = linkerItemId === it.id;
@@ -977,6 +1038,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
             </button>
           </div>
         </div>
+        {it.kind === 'action' && it.category !== 'sleep' && <RepeatRow it={it} />}
         {it.kind === 'action' && it.category !== 'sleep' && <CatalogLinker it={it} />}
         {kids.length > 0 && (
           <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>

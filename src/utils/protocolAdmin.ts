@@ -57,12 +57,19 @@ export interface AdminProtocolItem {
   catalog_activity_id: string | null;
   catalog_ingredient_id: string | null;
   supplement_id: string | null;
+  // cadence / recurrence (read by the mobile app's itemShowsOnDate + day_number cycle)
+  recurrence_type: string | null;            // daily | weekly | biweekly | monthly | custom | one_off
+  recurrence_days_of_week: number[] | null;  // 0..6 = Sun..Sat (weekly/biweekly)
+  recurrence_interval_days: number | null;   // every N days (custom)
+  recurrence_start_date: string | null;      // ISO date anchor
+  recurrence_end_date: string | null;        // ISO date bound
+  scheduled_date: string | null;             // ISO date — one_off items
 }
 
 const PROTOCOL_COLS =
   'id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
 const ITEM_COLS =
-  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id';
+  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id,recurrence_type,recurrence_days_of_week,recurrence_interval_days,recurrence_start_date,recurrence_end_date,scheduled_date';
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return {
