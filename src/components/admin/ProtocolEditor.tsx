@@ -90,13 +90,15 @@ const POD_ORDER = ['Morning', 'Afternoon', 'Evening', 'Anytime'] as const;
 const minutesOf = (t: string | null) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 1e9; };
 const isSleepName = (n: string) => /^(end[\s-]?sleep|wake)/i.test((n || '').trim());
 // Day-anchor detection — mirrors the mobile app (ProtocolWidget) + the mockup.
-const WAKE_RE = /^(end[\s-]?sleep|wake([\s-]?up)?|morning[\s-]?wake)$/i;
+// Wake (morning / End Sleep): matches "Wake", "Wake at 4am", "Wake Up", "End Sleep", "Rise"…
+const WAKE_RE = /^(wake|end[\s-]?sleep|rise|get[\s-]?up|morning[\s-]?wake)\b/i;
 const isWakeName = (n: string) => WAKE_RE.test((n || '').trim());
+// Bedtime (evening / Start Sleep): a sleep/bed action that is NOT the morning wake and NOT a prep step.
 function isBedName(n: string) {
   const t = (n || '').trim();
-  if (/^(start[\s-]?sleep|bed(time)?|lights[\s-]?out)$/i.test(t)) return true;
+  if (isWakeName(t)) return false;                                  // never the morning wake (e.g. "End Sleep")
   if (/(prep|prepare|wind[\s-]?down|reflection)/i.test(t)) return false; // prep steps don't count
-  return /\b(sleep|bed)\b/i.test(t);
+  return /\b(start[\s-]?sleep|bed(time)?|lights[\s-]?out|sleep)\b/i.test(t);
 }
 
 /* ── helpers ── */
@@ -549,9 +551,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     }
   }
 
-  // the day's wake (End Sleep) and bedtime (Start Sleep) anchor items, if present
-  const wakeItem = items.find((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id && isWakeName(it.display_name || ''));
-  const bedItem = items.find((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id && isBedName(it.display_name || ''));
+  // the day's wake (End Sleep) and bedtime (Start Sleep) anchor items, if present.
+  // Wake = earliest wake-named item; Bedtime = latest bed-named item — kept distinct.
+  const dayItems = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id);
+  const wakeItem = dayItems.filter((it) => isWakeName(it.display_name || '')).sort((a, b) => minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time))[0];
+  const bedItem = dayItems.filter((it) => isBedName(it.display_name || '')).sort((a, b) => minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time)).slice(-1)[0];
   // create or re-time a sleep anchor ("End Sleep" wake / "Start Sleep" bedtime).
   async function setAnchor(which: 'wake' | 'bed', time: string) {
     if (!selected) return;
@@ -930,7 +934,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
             <input type="time" value={toTimeInput(it.scheduled_time)}
               onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
               onBlur={() => commitItem(it.id, ['scheduled_time'])}
-              style={{ ...inputStyle, width: 78, flexShrink: 0, padding: '7px 6px' }} />
+              style={{ ...inputStyle, width: 96, flexShrink: 0, padding: '7px 6px' }} />
           )}
           {!isRule ? (
             <>
@@ -963,7 +967,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
             </button>
           </div>
         </div>
-        {it.kind === 'action' && <CatalogLinker it={it} />}
+        {it.kind === 'action' && it.category !== 'sleep' && <CatalogLinker it={it} />}
         {kids.length > 0 && (
           <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {kids.map((k) => <ChildRow key={k.id} k={k} />)}
