@@ -1831,7 +1831,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
 
   const openMerge = () => {
     const ids = [...selectedRecords];
-    if (ids.length !== 2) return;
+    if (ids.length < 2) return;
     // default survivor = the one with an image, else the first selected
     const recs = records.filter((r: any) => selectedRecords.has(r.id));
     const withImg = recs.find((r: any) => r.image_url || r.image_primary_url || r.image);
@@ -1839,31 +1839,45 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     setMergeOpen(true);
   };
 
+  // Fold N-1 duplicates into the survivor: fill its empty fields from each, then
+  // re-point references + delete each duplicate (one RPC per duplicate, in order).
   const doMergeRecords = async () => {
     const kind = tabToMergeKind(activeTab);
     const ids = [...selectedRecords];
-    if (!kind || ids.length !== 2 || !mergeKeepId) return;
+    if (!kind || ids.length < 2 || !mergeKeepId) return;
     const survivorId = mergeKeepId;
-    const duplicateId = ids.find((x) => x !== survivorId)!;
+    const duplicateIds = ids.filter((x) => x !== survivorId);
     setMergeBusy(true);
     try {
       const table = CATALOG_CFG[kind].table;
-      const url = `https://${projectId}.supabase.co/rest/v1/${table}?id=in.(${survivorId},${duplicateId})&select=*`;
-      const rows = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, apikey: publicAnonKey } }).then((r) => r.json());
-      const surv = (Array.isArray(rows) ? rows : []).find((r: any) => r.id === survivorId) || {};
-      const dup = (Array.isArray(rows) ? rows : []).find((r: any) => r.id === duplicateId) || {};
-      // data merge: fill the survivor's EMPTY fields from the duplicate (never overwrite)
+      const rows = await fetch(
+        `https://${projectId}.supabase.co/rest/v1/${table}?id=in.(${ids.join(',')})&select=*`,
+        { headers: { Authorization: `Bearer ${accessToken}`, apikey: publicAnonKey } },
+      ).then((r) => r.json());
+      const byId = new Map<string, any>((Array.isArray(rows) ? rows : []).map((r: any) => [r.id, r]));
+      const surv = byId.get(survivorId) || {};
+
+      // data merge: fill the survivor's EMPTY fields from the duplicates, in order
+      // (each duplicate only fills what's still empty — never overwrites).
       const SKIP = new Set(['id', 'created_at', 'updated_at', 'imported_at', 'api_source', 'external_id']);
       const isEmpty = (v: any) => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
       const patch: Record<string, any> = {};
-      for (const [k, v] of Object.entries(dup)) {
-        if (SKIP.has(k)) continue;
-        if (isEmpty(surv[k]) && !isEmpty(v)) patch[k] = v;
+      for (const dupId of duplicateIds) {
+        const dup = byId.get(dupId) || {};
+        for (const [k, v] of Object.entries(dup)) {
+          if (SKIP.has(k)) continue;
+          if (isEmpty(surv[k]) && isEmpty(patch[k]) && !isEmpty(v)) patch[k] = v;
+        }
       }
       if (Object.keys(patch).length) await updateCatalogFields(accessToken, kind, survivorId, patch);
-      const counts = await mergeCatalogRecords(accessToken, kind, survivorId, duplicateId);
-      const total = Object.values(counts).reduce((a: number, b: number) => a + b, 0);
-      toast.success(`Merged — filled ${Object.keys(patch).length} field(s), re-pointed ${total} reference(s), deleted the duplicate`);
+
+      // re-point + delete each duplicate (sequential so collisions resolve against the survivor)
+      let total = 0;
+      for (const dupId of duplicateIds) {
+        const counts = await mergeCatalogRecords(accessToken, kind, survivorId, dupId);
+        total += Object.values(counts).reduce((a: number, b: number) => a + b, 0);
+      }
+      toast.success(`Merged ${duplicateIds.length + 1} records — filled ${Object.keys(patch).length} field(s), re-pointed ${total} reference(s)`);
       setMergeOpen(false);
       setSelectedRecords(new Set());
       setBulkMode(false);
@@ -5068,19 +5082,19 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                   )}
 
                   {/* Bulk Actions Bar */}
-                  {mergeOpen && selectedRecords.size === 2 && (() => {
+                  {mergeOpen && selectedRecords.size >= 2 && (() => {
                     const recs = records.filter((r: any) => selectedRecords.has(r.id));
                     const nameOf = (r: any) => r?.name_common || r?.name || r?.name_brand || r?.market_name || r?.display_name || 'Untitled';
                     const imgOf = (r: any) => r?.image_url || r?.image_primary_url || r?.image || null;
                     return (
                       <div onClick={() => !mergeBusy && setMergeOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 460, boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)', padding: 20 }}>
+                        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 460, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)', padding: 20 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                             <GitMerge className="w-4 h-4 text-purple-600" />
-                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111827' }}>Merge 2 records</h3>
+                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111827' }}>Merge {recs.length} records</h3>
                           </div>
                           <p style={{ fontSize: 12.5, color: '#6B7280', margin: '0 0 14px', lineHeight: 1.5 }}>
-                            Pick the record to <strong>keep</strong>. The other's values fill its empty fields, every recipe↔ingredient junction + protocol link that pointed at the other is re-pointed here, then the other is permanently deleted. This cannot be undone.
+                            Pick the record to <strong>keep</strong>. The other {recs.length - 1}{recs.length - 1 === 1 ? '’s values fill' : ' records’ values fill'} its empty fields, every recipe↔ingredient junction + protocol link that pointed at them is re-pointed here, then they are permanently deleted. This cannot be undone.
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {recs.map((r: any) => {
@@ -5129,7 +5143,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                         </div>
                         {selectedRecords.size > 0 && (
                           <div className="flex gap-2">
-                            {selectedRecords.size === 2 && tabToMergeKind(activeTab) && (
+                            {selectedRecords.size >= 2 && tabToMergeKind(activeTab) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -5137,7 +5151,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                                 className="gap-1 text-purple-700 border-purple-300 hover:bg-purple-100"
                               >
                                 <GitMerge className="w-3 h-3" />
-                                Merge 2
+                                Merge {selectedRecords.size}
                               </Button>
                             )}
                             <Button
