@@ -303,6 +303,23 @@ export async function mergeCatalogRecords(accessToken: string, kind: CatalogKind
   return (await res.json().catch(() => ({}))) || {};
 }
 
+/** Mirror a merge that already ran on staging onto PRODUCTION (via the edge
+ *  function, which holds the prod service key). Folds each duplicate into the
+ *  survivor on prod and upserts the merged survivor row. Call only from staging. */
+export async function mergeCatalogRecordsOnProd(
+  accessToken: string, kind: CatalogKind, survivorId: string, duplicateIds: string[], survivorRow: any,
+): Promise<Record<string, number>> {
+  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/merge-prod`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table: CATALOG_CFG[kind].table, survivorId, duplicateIds, survivorRow }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) throw new Error(data.error || `Prod sync failed (${res.status})`);
+  return data.repointed || {};
+}
+
 /** How many protocol_items across ALL protocols reference this catalog record (for delete warnings). */
 export async function countProtocolRefs(accessToken: string, kind: CatalogKind, id: string): Promise<number> {
   const fk = CATALOG_CFG[kind].fk;

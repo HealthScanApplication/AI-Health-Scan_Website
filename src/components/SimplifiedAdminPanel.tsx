@@ -59,7 +59,7 @@ import {
   GitMerge,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
-import { mergeCatalogRecords, updateCatalogFields, CATALOG_CFG, type CatalogKind } from '../utils/protocolAdmin';
+import { mergeCatalogRecords, mergeCatalogRecordsOnProd, updateCatalogFields, CATALOG_CFG, type CatalogKind } from '../utils/protocolAdmin';
 import { MarkdownField } from './admin/MarkdownField';
 import { getCurrentEnvironment, setCurrentEnvironment, getCurrentEnvironmentConfig, ENVIRONMENTS, type Environment } from '../utils/supabase/environments';
 import { FloatingDebugMenu } from './FloatingDebugMenu';
@@ -1877,7 +1877,21 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
         const counts = await mergeCatalogRecords(accessToken, kind, survivorId, dupId);
         total += Object.values(counts).reduce((a: number, b: number) => a + b, 0);
       }
-      toast.success(`Merged ${duplicateIds.length + 1} records — filled ${Object.keys(patch).length} field(s), re-pointed ${total} reference(s)`);
+
+      // keep PRODUCTION in sync: apply the same merge on prod (staging env only).
+      // Best-effort — a prod-sync failure never undoes the completed staging merge.
+      let prodNote = '';
+      if (projectId === 'mofhvoudjxinvpplsytd') {
+        try {
+          const survivorRow = { ...surv, ...patch };
+          await mergeCatalogRecordsOnProd(accessToken, kind, survivorId, duplicateIds, survivorRow);
+          prodNote = ' · synced to prod';
+        } catch (e: any) {
+          prodNote = ' · prod NOT synced';
+          toast.error(`Prod sync failed (staging merge is done): ${e?.message || e}`);
+        }
+      }
+      toast.success(`Merged ${duplicateIds.length + 1} records — filled ${Object.keys(patch).length} field(s), re-pointed ${total} reference(s)${prodNote}`);
       setMergeOpen(false);
       setSelectedRecords(new Set());
       setBulkMode(false);

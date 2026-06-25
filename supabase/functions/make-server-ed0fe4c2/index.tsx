@@ -3469,6 +3469,60 @@ app.post('/make-server-ed0fe4c2/admin/sync/pull-from-prod', async (c: any) => {
     return c.json({ success: false, error: error?.message || 'Pull failed' }, 500)
   }
 })
+
+// POST /admin/catalog/merge-prod — apply a merge that already ran on staging to
+// production too, so the two stay in sync. Runs merge_catalog_records() on prod
+// (re-points every FK + deletes the duplicate) for each duplicate id, then
+// mirrors the survivor row (so prod's surviving record matches staging's merged
+// one). Needs PROD_SUPABASE_SERVICE_ROLE_KEY + the RPC migration applied on prod.
+app.post('/make-server-ed0fe4c2/admin/catalog/merge-prod', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    if (!PROD_SERVICE_KEY) return c.json({ success: false, error: 'PROD_SUPABASE_SERVICE_ROLE_KEY not configured' }, 500)
+
+    const { table, survivorId, duplicateIds, survivorRow } = await c.req.json() as {
+      table?: string; survivorId?: string; duplicateIds?: string[]; survivorRow?: any
+    }
+    if (!table || !survivorId || !Array.isArray(duplicateIds) || !duplicateIds.length) {
+      return c.json({ success: false, error: 'table, survivorId and duplicateIds[] are required' }, 400)
+    }
+
+    const repointed: Record<string, number> = {}
+    for (const dupId of duplicateIds) {
+      if (!dupId || dupId === survivorId) continue
+      const res = await fetch(`${PROD_URL}/rest/v1/rpc/merge_catalog_records`, {
+        method: 'POST',
+        headers: { apikey: PROD_SERVICE_KEY, Authorization: `Bearer ${PROD_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_table: table, p_survivor: survivorId, p_duplicate: dupId }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // dup may simply not exist on prod yet — treat 'row not found'-ish as a skip, surface real errors
+        const msg = typeof body === 'object' ? JSON.stringify(body) : String(body)
+        if (/merge_catalog_records.*does not exist|not found|PGRST202/i.test(msg)) {
+          return c.json({ success: false, error: `Prod is missing merge_catalog_records — apply migration 20260625_merge_catalog_records_rpc.sql on production. (${res.status})` }, 500)
+        }
+        console.warn(`[Sync] merge-prod ${table} ${dupId} → ${res.status}: ${msg}`)
+        continue
+      }
+      if (body && typeof body === 'object') for (const [k, v] of Object.entries(body)) repointed[k] = (repointed[k] || 0) + (Number(v) || 0)
+    }
+
+    // mirror the merged survivor row so prod matches staging
+    if (survivorRow && typeof survivorRow === 'object') {
+      try { const clean = { ...survivorRow }; delete clean._displayIndex; await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, [clean]) }
+      catch (e: any) { console.warn(`[Sync] merge-prod survivor upsert failed: ${e?.message || e}`) }
+    }
+
+    console.log(`[Sync] merge-prod ${table}: folded ${duplicateIds.length} into ${survivorId} by ${adminValidation.user?.email}`)
+    return c.json({ success: true, repointed })
+  } catch (error: any) {
+    console.error('[Sync] merge-prod error:', error)
+    return c.json({ success: false, error: error?.message || 'merge-prod failed' }, 500)
+  }
+})
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════════════════════
