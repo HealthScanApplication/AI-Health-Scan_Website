@@ -14,11 +14,11 @@ import { isAdminUser } from '../utils/adminUtils'
 import { useAdminAuth, getAccessTokenDirect } from '../contexts/AuthContext'
 import { EnvironmentToggle } from './admin/EnvironmentToggle'
 import { EnvironmentBanner } from './admin/EnvironmentBanner'
+import { AdminWorkspace } from './admin/AdminWorkspace'
 
 // Lazy-loaded pages (not needed on initial landing page load)
 const ProfilePage = React.lazy(() => import('./ProfilePage').then(m => ({ default: m.ProfilePage })))
 const SettingsPage = React.lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })))
-const SimplifiedAdminPanel = React.lazy(() => import('./SimplifiedAdminPanel').then(m => ({ default: m.SimplifiedAdminPanel })))
 const NetworkDiagnostic = React.lazy(() => import('./NetworkDiagnostic').then(m => ({ default: m.NetworkDiagnostic })))
 const LoginDiagnostic = React.lazy(() => import('./LoginDiagnostic').then(m => ({ default: m.LoginDiagnostic })))
 const Blog = React.lazy(() => import('./Blog').then(m => ({ default: m.Blog })))
@@ -261,7 +261,7 @@ export function PageRenderer({
             </div>
             {/* Mobile-optimized container with better padding */}
             <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 lg:py-8">
-              <SimplifiedAdminPanel
+              <AdminWorkspace
                 user={user}
                 accessToken={finalAccessToken}
               />
