@@ -275,18 +275,58 @@ export async function deleteCatalogRecord(accessToken: string, kind: CatalogKind
   if (!res.ok || data.success === false) throw new Error(data.error || `Delete failed (${res.status})`);
 }
 
-/** Merge a duplicate catalog record into a survivor — re-points protocol links + recipe↔ingredient
- *  junctions onto the survivor, then deletes the duplicate. Returns per-table re-point counts. */
+/** Merge a duplicate catalog record into a survivor — re-points protocol links +
+ *  recipe↔ingredient junctions onto the survivor, then deletes the duplicate.
+ *  Returns per-table re-point counts.
+ *
+ *  Done CLIENT-SIDE via PostgREST (no edge-function dependency, so it can't 404 on
+ *  a stale deploy). protocol_items + catalog_recipe_ingredients writes require the
+ *  is_healthscan_admin() RLS policies — see migration
+ *  20260625_catalog_recipe_ingredients_admin_write_rls.sql. The duplicate delete
+ *  goes through the service-role /delete endpoint (also handles KV products). */
 export async function mergeCatalogRecords(accessToken: string, kind: CatalogKind, survivorId: string, duplicateId: string): Promise<Record<string, number>> {
-  const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/catalog/merge`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind, survivorId, duplicateId }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.success === false) throw new Error(data.error || `Merge failed (${res.status})`);
-  return data.repointed || {};
+  if (!survivorId || !duplicateId || survivorId === duplicateId) throw new Error('Pick two different records');
+  const cfg = CATALOG_CFG[kind];
+  const enc = encodeURIComponent;
+  const repointed: Record<string, number> = {};
+
+  // referencing columns: the recipe↔ingredient junction FIRST (re-pointed before
+  // anything is deleted, so an RLS failure aborts cleanly), then protocol links.
+  const refs: { table: string; col: string }[] = [];
+  if (kind === 'recipe') refs.push({ table: 'catalog_recipe_ingredients', col: 'recipe_id' });
+  if (kind === 'ingredient') refs.push({ table: 'catalog_recipe_ingredients', col: 'ingredient_id' });
+  refs.push({ table: 'protocol_items', col: cfg.fk as string });
+
+  for (const ref of refs) {
+    // junction tables carry a (recipe_id, ingredient_id) pair — drop duplicate-side
+    // rows that would collide with an existing survivor-side row before re-pointing.
+    if (ref.table === 'catalog_recipe_ingredients') {
+      const otherCol = ref.col === 'recipe_id' ? 'ingredient_id' : 'recipe_id';
+      const sRows = (await handle(await fetch(`${rest()}/${ref.table}?${ref.col}=eq.${enc(survivorId)}&select=${otherCol}`, { headers: headers(accessToken) }), 'Read junction')) || [];
+      const survSet = new Set((sRows as any[]).map((r) => r[otherCol]));
+      const dRows = (await handle(await fetch(`${rest()}/${ref.table}?${ref.col}=eq.${enc(duplicateId)}&select=id,${otherCol}`, { headers: headers(accessToken) }), 'Read junction')) || [];
+      const collide = (dRows as any[]).filter((r) => survSet.has(r[otherCol])).map((r) => r.id);
+      if (collide.length) await handle(await fetch(`${rest()}/${ref.table}?id=in.(${collide.join(',')})`, { method: 'DELETE', headers: headers(accessToken) }), 'De-dup junction');
+    }
+    const res = await fetch(`${rest()}/${ref.table}?${ref.col}=eq.${enc(duplicateId)}`, {
+      method: 'PATCH',
+      headers: headers(accessToken, { Prefer: 'return=representation' }),
+      body: JSON.stringify({ [ref.col]: survivorId }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      if (/42501|permission denied/i.test(detail)) {
+        throw new Error(`Re-pointing ${ref.table} is blocked by RLS. Apply migration supabase/migrations/20260625_catalog_recipe_ingredients_admin_write_rls.sql, then retry.`);
+      }
+      throw new Error(`Re-point ${ref.table} failed (${res.status}): ${detail || res.statusText}`);
+    }
+    const rows = (await res.json().catch(() => [])) as any[];
+    repointed[`${ref.table}.${ref.col}`] = Array.isArray(rows) ? rows.length : 0;
+  }
+
+  // delete the now-orphaned duplicate (service-role endpoint — handles KV products too)
+  await deleteCatalogRecord(accessToken, kind, duplicateId);
+  return repointed;
 }
 
 /** How many protocol_items across ALL protocols reference this catalog record (for delete warnings). */
