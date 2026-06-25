@@ -33,6 +33,8 @@ export type QaOffender = { id: string; name: string; detail: string };
 export type QaCheck = {
   key: string;
   label: string;
+  /** Plain-language "why this is flagged + what to fix", for a non-engineer. */
+  fix: string;
   /** Higher = more launch-critical. */
   severity: 'high' | 'medium' | 'low';
   count: number;
@@ -83,7 +85,14 @@ export function duplicateRecipeNames(recipes: QaRecipe[]): QaCheck {
       });
     }
   }
-  return { key: 'duplicate_names', label: 'Duplicate recipe names', severity: 'high', count: offenders.length, offenders };
+  return {
+    key: 'duplicate_names',
+    label: 'Duplicate recipe names',
+    fix: 'Two or more recipes share the same visible name. Merge true duplicates, or rename the variants to specific dish names (e.g. "Wild Salmon Anti-Inflammatory Dinner").',
+    severity: 'high',
+    count: offenders.length,
+    offenders,
+  };
 }
 
 /** 2. Recipe completeness — ingredients/steps/servings/nutrition/score (DEV-314). */
@@ -101,7 +110,14 @@ export function recipeCompleteness(recipes: QaRecipe[], ingredientCount: Map<str
   }
   // Worst (most gaps) first.
   offenders.sort((a, b) => b.detail.split('·').length - a.detail.split('·').length);
-  return { key: 'incomplete', label: 'Incomplete recipes', severity: 'high', count: offenders.length, offenders };
+  return {
+    key: 'incomplete',
+    label: 'Incomplete recipes',
+    fix: 'The recipe is missing data users expect. Open it and add the missing ingredients, steps, serving size, nutrition, or health score.',
+    severity: 'high',
+    count: offenders.length,
+    offenders,
+  };
 }
 
 /** 3. Meal-slot correctness — "lunch suggests lunch" + slot-only names (DEV-313/326). */
@@ -119,7 +135,14 @@ export function mealSlotMismatch(recipes: QaRecipe[]): QaCheck {
       offenders.push({ id: r.id, name: nm(r), detail: `slotted "${slot}" but looks like a dessert/drink/snack` });
     }
   }
-  return { key: 'slot_mismatch', label: 'Meal-slot mismatch (lunch-not-lunch)', severity: 'medium', count: offenders.length, offenders };
+  return {
+    key: 'slot_mismatch',
+    label: 'Wrong meal type (e.g. lunch that isn’t lunch)',
+    fix: 'This item is shown for a meal it doesn’t fit, or its name is just a category. Rename it to a real dish, or move it to the correct meal type (breakfast/lunch/dinner/snack/dessert/beverage).',
+    severity: 'medium',
+    count: offenders.length,
+    offenders,
+  };
 }
 
 /** 4. Image coverage for any catalog table (recipes/activities/ingredients/products) (DEV-315). */
@@ -150,7 +173,14 @@ export function genericDescriptions(recipes: QaRecipe[]): QaCheck {
       offenders.push({ id: r.id, name: nm(r), detail: `generic/templated: "${d.slice(0, 60)}…"` });
     }
   }
-  return { key: 'generic_desc', label: 'Missing / generic descriptions', severity: 'medium', count: offenders.length, offenders };
+  return {
+    key: 'generic_desc',
+    label: 'Missing or generic descriptions',
+    fix: 'The description is empty, too short, or generic filler. Rewrite it with a specific, factual description of this dish.',
+    severity: 'medium',
+    count: offenders.length,
+    offenders,
+  };
 }
 
 /** 6. Risk/benefit badge sanity — junction drift + near-duplicate divergence (DEV-317). */
@@ -185,7 +215,14 @@ export function riskBadgeSanity(recipes: QaRecipe[], elementCount: Map<string, n
       });
     }
   }
-  return { key: 'risk_sanity', label: 'Risk/benefit badge sanity', severity: 'medium', count: offenders.length, offenders };
+  return {
+    key: 'risk_sanity',
+    label: 'Risk/benefit badges look off',
+    fix: 'The risk/benefit badges don’t match the item’s ingredients, or two near-identical recipes show very different risk counts. Re-derive the badges from the ingredients so they’re consistent.',
+    severity: 'medium',
+    count: offenders.length,
+    offenders,
+  };
 }
 
 /** 7. Placeholder / malformed image URLs (DEV-315). */
@@ -198,5 +235,12 @@ export function placeholderImages(recipes: QaRecipe[]): QaCheck {
       offenders.push({ id: r.id, name: nm(r), detail: `placeholder/malformed: ${url.slice(0, 60)}` });
     }
   }
-  return { key: 'bad_images', label: 'Placeholder / malformed images', severity: 'medium', count: offenders.length, offenders };
+  return {
+    key: 'bad_images',
+    label: 'Placeholder or broken images',
+    fix: 'The image is a placeholder or a broken/non-standard link. Replace it with a real photo of this exact item.',
+    severity: 'medium',
+    count: offenders.length,
+    offenders,
+  };
 }

@@ -115,6 +115,9 @@ interface AdminRecord {
 interface SimplifiedAdminPanelProps {
   accessToken: string;
   user: any;
+  /** DEV-318: when set, the Data-QA dashboard is jumping to a record — pre-fill
+   *  the cross-tab search so the admin lands on that item. */
+  initialSearch?: string;
 }
 
 // Minimal MD5 implementation for Gravatar hashing
@@ -1722,7 +1725,7 @@ function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId,
   );
 }
 
-export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanelProps) {
+export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: SimplifiedAdminPanelProps) {
   const [activeTab, setActiveTab] = useState('waitlist');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState('users');
@@ -1887,6 +1890,16 @@ export function SimplifiedAdminPanel({ accessToken, user }: SimplifiedAdminPanel
   const [showSearch, setShowSearch] = useState(false);
   const recordsCache = useRef<Record<string, AdminRecord[]>>({});
   const [crossTabResults, setCrossTabResults] = useState<{ tabId: string; tabLabel: string; record: AdminRecord }[]>([]);
+
+  // DEV-318: jump-to-record from the Data-QA dashboard. When an offender row is
+  // opened, pre-fill the cross-tab search so the admin lands on that item (for a
+  // duplicate name, both rows show up where the existing merge UI lives).
+  useEffect(() => {
+    if (initialSearch && initialSearch.trim()) {
+      setSearchQuery(initialSearch);
+      setShowSearch(true);
+    }
+  }, [initialSearch]);
   const [elementsCache, setElementsCache] = useState<AdminRecord[]>([]);
   const [elementSearchQuery, setElementSearchQuery] = useState('');
   const [elementSourcesCache, setElementSourcesCache] = useState<{ elementId: string; ingredients: AdminRecord[]; recipes: AdminRecord[]; products: AdminRecord[] } | null>(null);
