@@ -56,7 +56,12 @@ const SEVERITY_STYLE: Record<QaCheck['severity'], string> = {
   low: 'border-gray-200 bg-gray-50',
 };
 
-export function CatalogQADashboard(): React.ReactElement {
+export function CatalogQADashboard({
+  onOpenInAdmin,
+}: {
+  /** Jump to a catalog item in the admin editor (pre-fills its search). */
+  onOpenInAdmin?: (searchTerm: string) => void;
+} = {}): React.ReactElement {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ranAt, setRanAt] = useState<string | null>(null);
@@ -115,7 +120,9 @@ export function CatalogQADashboard(): React.ReactElement {
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Catalog Data-Quality</h2>
           <p className="text-sm text-gray-500">
-            {ranAt ? `Last run: ${ranAt} · ${totalIssues} issues across ${checks.length} checks` : 'Read-only checks (DEV-318 / DEV-323).'}
+            {ranAt
+              ? `Last run: ${ranAt} · ${totalIssues} issue${totalIssues === 1 ? '' : 's'} across ${checks.length} checks`
+              : 'Catalog health checks. Read-only — open an item in the editor to fix it.'}
           </p>
         </div>
         <button
@@ -157,7 +164,10 @@ export function CatalogQADashboard(): React.ReactElement {
                 <span className="text-sm font-medium text-gray-800">{c.label}</span>
                 <span className="rounded-full bg-white/70 px-2 py-0.5 text-sm font-semibold text-gray-900">{c.count}</span>
               </div>
-              <div className="mt-1 text-xs text-gray-500">{c.severity} severity · tap to view</div>
+              <div className="mt-1 text-xs text-gray-600">{c.fix}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-wide text-gray-400">
+                {c.severity} priority · tap to view {c.count} {c.count === 1 ? 'item' : 'items'}
+              </div>
             </button>
           ))}
         </div>
@@ -169,8 +179,9 @@ export function CatalogQADashboard(): React.ReactElement {
         if (!c) return null;
         return (
           <div className="rounded-lg border border-gray-200 bg-white">
-            <div className="border-b border-gray-100 px-4 py-2 text-sm font-medium text-gray-800">
-              {c.label} — {c.count} {c.count === 1 ? 'row' : 'rows'}
+            <div className="border-b border-gray-100 px-4 py-2">
+              <div className="text-sm font-medium text-gray-800">{c.label} — {c.count} {c.count === 1 ? 'item' : 'items'}</div>
+              <div className="mt-0.5 text-xs text-gray-500">What to fix: {c.fix}</div>
             </div>
             <div className="max-h-96 overflow-auto">
               {c.offenders.length === 0 ? (
@@ -182,10 +193,19 @@ export function CatalogQADashboard(): React.ReactElement {
                       <tr key={o.id} className="border-b border-gray-50">
                         <td className="px-4 py-2 font-medium text-gray-900">{o.name}</td>
                         <td className="px-4 py-2 text-gray-600">{o.detail}</td>
-                        <td className="px-4 py-2 text-right">
+                        <td className="px-4 py-2 text-right whitespace-nowrap">
+                          {onOpenInAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenInAdmin(o.name && o.name !== '(unnamed)' ? o.name : o.id)}
+                              className="mr-2 rounded bg-gray-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-gray-800"
+                            >
+                              Open in Admin →
+                            </button>
+                          )}
                           <code
                             className="cursor-pointer rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500"
-                            title="Copy id"
+                            title="Copy ID"
                             onClick={() => { try { void navigator.clipboard?.writeText(o.id); } catch { /* noop */ } }}
                           >
                             {o.id}

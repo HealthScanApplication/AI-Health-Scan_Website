@@ -30,6 +30,15 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 export function AdminWorkspace({ user, accessToken }: { user: any; accessToken: string }): React.ReactElement {
   const [tab, setTab] = useState<AdminTab>('panel');
+  const [jumpSearch, setJumpSearch] = useState<string | undefined>(undefined);
+
+  // DEV-318: from a Data-QA offender row → switch to the Admin Panel with its
+  // search pre-filled so the admin lands on that item to fix it.
+  const openInAdmin = (term: string) => {
+    setJumpSearch(term);
+    setTab('panel');
+  };
+
   return (
     <div>
       <div className="mb-4 flex gap-2 border-b border-gray-200">
@@ -39,10 +48,10 @@ export function AdminWorkspace({ user, accessToken }: { user: any; accessToken: 
 
       {tab === 'panel' ? (
         <Suspense fallback={<div className="p-6 text-sm text-gray-400">Loading admin…</div>}>
-          <SimplifiedAdminPanel user={user} accessToken={accessToken} />
+          <SimplifiedAdminPanel user={user} accessToken={accessToken} initialSearch={jumpSearch} />
         </Suspense>
       ) : (
-        <CatalogQADashboard />
+        <CatalogQADashboard onOpenInAdmin={openInAdmin} />
       )}
     </div>
   );
