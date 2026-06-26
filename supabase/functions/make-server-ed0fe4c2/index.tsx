@@ -3315,6 +3315,23 @@ async function fetchAllFromSupabase(baseUrl: string, serviceKey: string, table: 
   return all
 }
 
+async function fetchAllIds(baseUrl: string, serviceKey: string, table: string): Promise<string[]> {
+  const all: string[] = []
+  let offset = 0
+  const limit = 1000
+  while (true) {
+    const res = await fetch(`${baseUrl}/rest/v1/${table}?select=id&limit=${limit}&offset=${offset}`, {
+      headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+    })
+    if (!res.ok) throw new Error(`Failed to fetch ids for ${table} from ${baseUrl}: ${res.status}`)
+    const batch = await res.json()
+    all.push(...batch.map((r: any) => String(r.id)))
+    if (batch.length < limit) break
+    offset += limit
+  }
+  return all
+}
+
 async function upsertToSupabase(baseUrl: string, serviceKey: string, table: string, records: any[]): Promise<void> {
   const batchSize = 100
   for (let i = 0; i < records.length; i += batchSize) {
@@ -3521,6 +3538,75 @@ app.post('/make-server-ed0fe4c2/admin/catalog/merge-prod', async (c: any) => {
   } catch (error: any) {
     console.error('[Sync] merge-prod error:', error)
     return c.json({ success: false, error: error?.message || 'merge-prod failed' }, 500)
+  }
+})
+
+// POST /admin/sync/mirror-to-prod — make production MIRROR staging for the chosen
+// tables: upsert all staging rows, then DELETE prod rows whose id isn't in staging
+// (via mirror_delete_absent — set-based, FK-safe). { dryRun: true } only reports
+// what WOULD change (insert/update + delete counts), writing nothing.
+app.post('/make-server-ed0fe4c2/admin/sync/mirror-to-prod', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    if (!PROD_SERVICE_KEY) return c.json({ success: false, error: 'PROD_SUPABASE_SERVICE_ROLE_KEY not configured' }, 500)
+
+    const { tables, dryRun } = await c.req.json() as { tables?: string[]; dryRun?: boolean }
+    const targetTables = (tables || [...SYNC_TABLES]).filter(t => SYNC_TABLES.includes(t as SyncTable))
+    if (!targetTables.length) return c.json({ success: false, error: 'No valid tables specified' }, 400)
+
+    const stagingKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const stagingUrl = Deno.env.get('SUPABASE_URL')!
+    const results: Record<string, any> = {}
+
+    // ── dry run: report counts only, no writes ──
+    if (dryRun) {
+      for (const table of targetTables) {
+        try {
+          const [stagingIds, prodIds] = await Promise.all([
+            fetchAllIds(stagingUrl, stagingKey, table),
+            fetchAllIds(PROD_URL, PROD_SERVICE_KEY, table),
+          ])
+          const keep = new Set(stagingIds)
+          const willDelete = prodIds.filter(id => !keep.has(id)).length
+          results[table] = { staging: stagingIds.length, prod: prodIds.length, willUpsert: stagingIds.length, willDelete, status: 'ok' }
+        } catch (err: any) { results[table] = { status: 'error', error: err.message } }
+      }
+      return c.json({ success: true, dryRun: true, results })
+    }
+
+    // ── real mirror: upsert pass (parent-first), then delete pass (child-first) ──
+    const stagingIdsByTable: Record<string, string[]> = {}
+    for (const table of targetTables) {
+      try {
+        const records = await fetchAllFromSupabase(stagingUrl, stagingKey, table)
+        stagingIdsByTable[table] = records.map((r: any) => String(r.id))
+        const clean = records.map((r: any) => { const c2 = { ...r }; delete c2._displayIndex; return c2 })
+        await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, clean)
+        results[table] = { upserted: clean.length, status: 'ok' }
+      } catch (err: any) { results[table] = { status: 'error', error: err.message } }
+    }
+    for (const table of [...targetTables].reverse()) {
+      if (results[table]?.status === 'error') continue
+      const keep = stagingIdsByTable[table] || []
+      if (!keep.length) { results[table].deleted = 0; results[table].note = 'staging empty — skipped delete'; continue }
+      try {
+        const res = await fetch(`${PROD_URL}/rest/v1/rpc/mirror_delete_absent`, {
+          method: 'POST',
+          headers: { apikey: PROD_SERVICE_KEY, Authorization: `Bearer ${PROD_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_table: table, p_keep_ids: keep }),
+        })
+        const body = await res.json().catch(() => null)
+        if (!res.ok) { results[table].deleteError = typeof body === 'object' ? JSON.stringify(body) : String(body); continue }
+        results[table].deleted = Number(body) || 0
+      } catch (err: any) { results[table].deleteError = err.message }
+    }
+    console.log(`[Sync] mirror-to-prod (${targetTables.join(',')}) by ${adminValidation.user?.email}`)
+    return c.json({ success: true, results })
+  } catch (error: any) {
+    console.error('[Sync] mirror-to-prod error:', error)
+    return c.json({ success: false, error: error?.message || 'Mirror failed' }, 500)
   }
 })
 // ─────────────────────────────────────────────────────────────────────────────

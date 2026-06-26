@@ -1911,6 +1911,38 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
   const [syncResults, setSyncResults] = useState<Record<string, any> | null>(null);
   const [syncSelectedTables, setSyncSelectedTables] = useState<string[]>(['catalog_elements', 'catalog_ingredients', 'catalog_recipes']);
   const [syncConfirm, setSyncConfirm] = useState<'push' | 'pull' | null>(null);
+  // mirror (push + delete prod rows not in staging)
+  const [syncMirroring, setSyncMirroring] = useState(false);
+  const [mirrorPreview, setMirrorPreview] = useState<Record<string, any> | null>(null);
+
+  const syncEdge = async (path: string, body: any) => {
+    const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/sync/${path}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    return res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
+  };
+  const runMirrorDryRun = async () => {
+    if (syncSelectedTables.length === 0) return;
+    setSyncMirroring(true);
+    try {
+      const data = await syncEdge('mirror-to-prod', { tables: syncSelectedTables, dryRun: true });
+      if (data.success) setMirrorPreview(data.results);
+      else toast.error(data.error || 'Mirror preview failed');
+    } catch (e: any) { toast.error(`Mirror preview failed: ${e?.message || e}`); }
+    finally { setSyncMirroring(false); }
+  };
+  const runMirror = async () => {
+    setSyncMirroring(true);
+    try {
+      const data = await syncEdge('mirror-to-prod', { tables: syncSelectedTables, dryRun: false });
+      if (data.success) {
+        setSyncResults(data.results); setMirrorPreview(null);
+        const del = Object.values(data.results as Record<string, any>).reduce((a: number, r: any) => a + (r.deleted || 0), 0);
+        toast.success(`Mirrored to production — deleted ${del} stale record(s)`);
+      } else toast.error(data.error || 'Mirror failed');
+    } catch (e: any) { toast.error(`Mirror failed: ${e?.message || e}`); }
+    finally { setSyncMirroring(false); }
+  };
   const [savingRecord, setSavingRecord] = useState(false);
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -4477,7 +4509,49 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     {syncPushing ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>🚀</span>}
                     {syncPushing ? 'Pushing...' : 'Push to Production'}
                   </button>
+                  <button type="button"
+                    onClick={runMirrorDryRun}
+                    disabled={syncMirroring || syncSelectedTables.length === 0}
+                    title="Make prod identical to staging — also DELETES prod records not in staging"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                  >
+                    {syncMirroring ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>🪞</span>}
+                    {syncMirroring ? 'Working...' : 'Mirror to Production'}
+                  </button>
                 </div>
+
+                {/* Mirror dry-run confirmation — shows exactly what will be deleted */}
+                {mirrorPreview && (
+                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-3">
+                    <p className="text-sm font-bold text-purple-900">🪞 Mirror preview — production will be made identical to staging</p>
+                    <div className="space-y-1">
+                      {Object.entries(mirrorPreview).map(([table, info]: [string, any]) => (
+                        <div key={table} className="flex items-center justify-between text-xs bg-white rounded-lg px-3 py-2 border border-purple-100">
+                          <span className="font-medium text-gray-800">{table.replace('catalog_', '')}</span>
+                          {info.status === 'error' ? (
+                            <span className="text-red-600">error: {info.error}</span>
+                          ) : (
+                            <span className="text-gray-600">
+                              upsert {info.willUpsert} · <span className={info.willDelete > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>delete {info.willDelete}</span>
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-red-700 font-semibold">
+                      This permanently DELETES {Object.values(mirrorPreview).reduce((a: number, r: any) => a + (r.willDelete || 0), 0)} production record(s) not present in staging. This cannot be undone.
+                    </p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setMirrorPreview(null)} disabled={syncMirroring}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-white text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
+                      <button type="button" onClick={runMirror} disabled={syncMirroring}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50">
+                        {syncMirroring ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>🪞</span>}
+                        {syncMirroring ? 'Mirroring...' : 'Mirror now (with deletes)'}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-xs text-amber-700 space-y-1">
                   <p className="font-semibold">⚠️ Important</p>
