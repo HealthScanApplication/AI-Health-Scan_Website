@@ -12,9 +12,10 @@
  *
  * No-JIT: every style is inline (the site ships prebuilt static CSS).
  */
+import { useState } from "react";
 import {
   User, BarChart, TrendingUp, ShoppingBasket,
-  ListChecks, BookOpen, Plus, Repeat, Check,
+  ListChecks, BookOpen, Plus, Repeat, Check, Eye, EyeOff,
 } from "lucide-react";
 import {
   CATEGORY_TINTS, itemIcon, type CatKey, type ProtocolItem as CatItem,
@@ -153,6 +154,7 @@ export function ProtocolHomeScreen({
   scale = 0.85,
   anchors = true,
   imageUrl = null,
+  showDetails: showDetailsProp = true,
 }: {
   protocolName: string;
   items: HomeItem[];
@@ -164,7 +166,11 @@ export function ProtocolHomeScreen({
   scale?: number;
   /** Book-end the day with the grey Sleep anchors (off for a clean checked-off demo). */
   anchors?: boolean;
+  /** Initial state of the in-frame "Details" toggle (each step's description + child checklist). */
+  showDetails?: boolean;
 }) {
+  // In-frame toggle for per-step descriptions + child do/don't lines (mirrors the app's showDetails).
+  const [showDetails, setShowDetails] = useState(showDetailsProp);
   // book-end the day with grey Sleep anchors (End Sleep / Start Sleep), like the app
   const allItems = anchors ? withSleepAnchors(items) : items;
   // sleep window (hours slept = bedtime → wake) — shown on the anchor cards
@@ -226,6 +232,11 @@ export function ProtocolHomeScreen({
               <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.2, color: "#9CA3AF", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(protocolName || "Your routine").toUpperCase()}</span>
             </div>
           </div>
+          <button type="button" onClick={() => setShowDetails((v) => !v)} title={showDetails ? "Hide step details" : "Show step details"}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0, padding: "4px 9px", borderRadius: 999, border: "1px solid #E5E7EB", background: "#FFFFFF", cursor: "pointer", fontSize: 10, fontWeight: 600, letterSpacing: 0.3, color: "#6B7280", lineHeight: 1 }}>
+            {showDetails ? <EyeOff size={11} strokeWidth={2} /> : <Eye size={11} strokeWidth={2} />}
+            {showDetails ? "Hide" : "Details"}
+          </button>
         </div>
 
         {/* WEEK STRIP */}
@@ -294,13 +305,13 @@ export function ProtocolHomeScreen({
                                 {it.repeat && <Repeat size={11} color={tint.fg} strokeWidth={2} style={{ flexShrink: 0 }} />}
                               </div>
                               {sub && <div style={{ fontSize: 11, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
-                              {it.description && <div style={{ fontSize: 11, lineHeight: 1.4, color: tint.fg, marginTop: 4, opacity: 0.92 }}>{it.description}</div>}
-                              {it.children && it.children.length > 0 && (
-                                <div style={{ marginTop: 5, display: "flex", flexDirection: "column", gap: 3 }}>
+                              {showDetails && it.description && <div style={{ fontSize: 11, lineHeight: 1.4, color: tint.fg, marginTop: 4, opacity: 0.92 }}>{it.description}</div>}
+                              {showDetails && it.children && it.children.length > 0 && (
+                                <div style={{ marginTop: 5, display: "flex", flexDirection: "column", gap: 4 }}>
                                   {it.children.map((c, ci) => (
-                                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                      <span style={{ width: 4, height: 4, borderRadius: 2, background: "#C4C4C0", flexShrink: 0 }} />
-                                      <span style={{ fontSize: 10.5, color: "#9CA3AF", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c}</span>
+                                    <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
+                                      <span style={{ width: 4, height: 4, borderRadius: 2, background: "#C4C4C0", flexShrink: 0, marginTop: 5 }} />
+                                      <span style={{ fontSize: 10.5, color: "#9CA3AF", lineHeight: 1.35 }}>{c}</span>
                                     </div>
                                   ))}
                                 </div>

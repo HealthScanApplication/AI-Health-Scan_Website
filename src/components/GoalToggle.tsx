@@ -16,6 +16,8 @@ function ProtocolPhone({ protocol }: { protocol: RealProtocol }) {
     time: it.meta || null,
     image_url: it.image_url || null,
     group_name: it.group_name || null,
+    description: it.description || null,
+    children: it.children,
   }));
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">

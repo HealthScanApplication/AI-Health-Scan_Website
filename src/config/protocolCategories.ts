@@ -41,6 +41,8 @@ export interface ProtocolItem {
   meta?: string;
   image_url?: string;   // linked recipe / catalog image (shown on meal cards)
   group_name?: string;  // meal-slot grouping (Breakfast, Lunch, Snack, …)
+  description?: string;  // the item's own note, shown under the title (like the app)
+  children?: string[];   // child detail lines (the "do / don't" how-to steps)
 }
 
 /** Canonical category for an item — mirrors mobile categorizeProtocolItem precedence. */
