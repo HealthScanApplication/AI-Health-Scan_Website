@@ -1804,15 +1804,30 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [aiImageField, setAiImageField] = useState<string | null>(null); // field key currently AI-generating
+  const [aiPrompts, setAiPrompts] = useState<Record<string, string>>({}); // per-field edited image prompts
+  // clear edited prompts when switching records
+  useEffect(() => { setAiPrompts({}); }, [editingRecord?.id]);
 
-  // Generate an image for one field of the record being edited, via OpenAI, and
-  // set it. `variant` (raw/cut/cooked/plated…) tunes the prompt for image_url_* fields.
-  const generateFieldImage = async (fieldKey: string, variant: string | null) => {
+  // map an image field key → prompt variant (image_url_raw → 'raw', etc.)
+  const variantForField = (key: string): string | null => {
+    const m = /^image_url_(.+)$/.exec(key);
+    return m ? m[1] : null;
+  };
+  // the (possibly user-edited) prompt for an image field, defaulting to the auto-built one
+  const promptForField = (fieldKey: string): string => {
+    if (aiPrompts[fieldKey] !== undefined) return aiPrompts[fieldKey];
+    if (!editingRecord) return '';
+    return buildImagePrompt(adminFieldConfig[activeTab]?.label || activeTab, editingRecord, variantForField(fieldKey));
+  };
+
+  // Generate an image for one field of the record being edited (via the visible
+  // prompt — editable) and set it.
+  const generateFieldImage = async (fieldKey: string) => {
     if (!editingRecord) return;
+    const prompt = promptForField(fieldKey).trim();
+    if (!prompt) { toast.error('Prompt is empty'); return; }
     setAiImageField(fieldKey);
     try {
-      const tabType = adminFieldConfig[activeTab]?.label || activeTab;
-      const prompt = buildImagePrompt(tabType, editingRecord, variant);
       toast.info('Generating image… (~20–40s)');
       const url = await aiGenerateImage(accessToken, prompt);
       setEditingRecord((prev: any) => (prev ? { ...prev, [fieldKey]: url } : prev));
@@ -1823,10 +1838,30 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
       setAiImageField(null);
     }
   };
-  // map an image field key → prompt variant (image_url_raw → 'raw', etc.)
-  const variantForField = (key: string): string | null => {
-    const m = /^image_url_(.+)$/.exec(key);
-    return m ? m[1] : null;
+
+  // The visible, editable prompt + generate button shown under each image field.
+  const aiImageControls = (field: any, val: any) => {
+    if ((field.mediaType ?? 'image') !== 'image') return null;
+    const busy = aiImageField === field.key;
+    const prompt = promptForField(field.key);
+    const isEdited = aiPrompts[field.key] !== undefined;
+    return (
+      <div className="mt-1.5 rounded-lg border border-purple-200 bg-purple-50/50 p-1.5 space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-purple-600 flex items-center gap-1"><Sparkles className="w-3 h-3" /> AI image prompt</span>
+          {isEdited && <button type="button" className="text-[10px] text-gray-400 hover:text-gray-600" onClick={() => setAiPrompts((p) => { const n = { ...p }; delete n[field.key]; return n; })}>reset</button>}
+        </div>
+        <textarea value={prompt} disabled={busy} rows={2}
+          onChange={(e) => setAiPrompts((p) => ({ ...p, [field.key]: e.target.value }))}
+          placeholder="Describe the image to generate…"
+          className="w-full text-[11px] leading-snug border border-purple-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-purple-300 resize-y" />
+        <button type="button" disabled={busy || !prompt.trim()} onClick={() => generateFieldImage(field.key)}
+          className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60">
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          {busy ? 'Generating…' : (val ? 'Regenerate with AI' : 'Generate with AI')}
+        </button>
+      </div>
+    );
   };
   const [listUploadingId, setListUploadingId] = useState<string | null>(null);
   const [subFilter, setSubFilter] = useState<string>('all');
@@ -5740,14 +5775,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     placeholder={field.placeholder}
                     onUpload={handleUpload}
                   />
-                  {(field.mediaType || 'image') === 'image' && (
-                    <button type="button" disabled={aiImageField === field.key}
-                      onClick={() => generateFieldImage(field.key, variantForField(field.key))}
-                      className="mt-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-60">
-                      {aiImageField === field.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                      {aiImageField === field.key ? 'Generating…' : (val ? 'Regenerate with AI' : 'Generate with AI')}
-                    </button>
-                  )}
+                  {aiImageControls(field, val)}
                 </div>
               );
             }
@@ -5797,14 +5825,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     }
                   }} />
                   <input value={val || ''} onChange={(e) => updateField(e.target.value)} placeholder="Image URL" className={`${inputCls} text-xs`} />
-                  {(field.mediaType ?? 'image') === 'image' && (
-                    <button type="button" disabled={aiImageField === field.key}
-                      onClick={() => generateFieldImage(field.key, variantForField(field.key))}
-                      className="mt-1 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-60">
-                      {aiImageField === field.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                      {aiImageField === field.key ? 'Generating…' : (val ? 'Regenerate with AI' : 'Generate with AI')}
-                    </button>
-                  )}
+                  {aiImageControls(field, val)}
                 </div>
               );
             }
