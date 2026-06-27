@@ -88,11 +88,17 @@ function orderKey(it: HomeItem): number {
   return parseHM(it.time)?.mins ?? 5e8;
 }
 // Book-end any day with grey Sleep anchors when the protocol doesn't supply them.
+// The WAKE default links to the protocol's own first timed step (so a 7am routine
+// wakes at 7am, not a fixed 6am). Bedtime stays a real 10pm default — the last
+// step is usually an evening activity, not actual bedtime.
 function withSleepAnchors(items: HomeItem[]): HomeItem[] {
   const hasEnd = items.some(isWake);
   const hasStart = items.some(isBed);
+  const mins = items.map((i) => parseHM(i.time)?.mins).filter((m): m is number => m != null).sort((a, b) => a - b);
+  const toHM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  const wakeTime = mins.length ? toHM(mins[0]) : "06:00";
   return [
-    ...(hasEnd ? [] : [{ display_name: "End Sleep", item_type: "activity", time: "06:00" } as HomeItem]),
+    ...(hasEnd ? [] : [{ display_name: "End Sleep", item_type: "activity", time: wakeTime } as HomeItem]),
     ...items,
     ...(hasStart ? [] : [{ display_name: "Start Sleep", item_type: "activity", time: "22:00" } as HomeItem]),
   ];

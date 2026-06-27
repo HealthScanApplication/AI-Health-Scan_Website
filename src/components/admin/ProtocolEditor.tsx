@@ -562,6 +562,17 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
   // "End Sleep" left next to "Wake at 4am") — offer to clean them up.
   const extraAnchors = dayItems.filter((it) =>
     (isWakeName(it.display_name || '') || isBedName(it.display_name || '')) && it !== wakeItem && it !== bedItem);
+  // derive the wake default from the protocol's own FIRST timed step, so the day
+  // starts when the routine starts instead of a fixed 6am. (Bedtime stays a real
+  // default — the last step is usually an evening activity, not actual bedtime.)
+  const timedSteps = dayItems
+    .filter((it) => it !== wakeItem && it !== bedItem && it.scheduled_time && minutesOf(it.scheduled_time) < 1e9)
+    .sort((a, b) => minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time));
+  const derivedWake = timedSteps.length ? toTimeInput(timedSteps[0].scheduled_time) : '';
+  // pin wake = first step (links the day's start to the schedule)
+  async function linkAnchorsToSchedule() {
+    if (derivedWake && !wakeItem) await setAnchor('wake', derivedWake);
+  }
   // create or re-time a sleep anchor ("End Sleep" wake / "Start Sleep" bedtime).
   async function setAnchor(which: 'wake' | 'bed', time: string) {
     if (!selected) return;
@@ -1346,8 +1357,14 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.danger, padding: '5px 9px', borderRadius: 8, border: '1px solid #FCA5A5', background: '#FEF2F2', cursor: 'pointer' }}>
                         {busyItem === 'anchor-cleanup' ? <Loader2 size={12} className="animate-spin" /> : <AlertCircle size={12} />} Remove {extraAnchors.length} duplicate anchor{extraAnchors.length === 1 ? '' : 's'}
                       </button>
+                    ) : (!wakeItem && derivedWake) ? (
+                      <button onClick={linkAnchorsToSchedule} disabled={!!busyItem}
+                        title={`Pin wake (End Sleep) to your first step at ${derivedWake}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.accent, padding: '5px 9px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF', cursor: 'pointer' }}>
+                        <Link2 size={12} /> Link wake to first step ({derivedWake})
+                      </button>
                     ) : (
-                      <span style={{ fontSize: 10.5, color: C.faint, maxWidth: 220 }}>
+                      <span style={{ fontSize: 10.5, color: C.faint, maxWidth: 240 }}>
                         {wakeItem || bedItem ? 'Pins the day’s start/end.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}
                       </span>
                     )}
