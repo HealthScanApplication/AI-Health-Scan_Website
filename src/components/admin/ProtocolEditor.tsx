@@ -22,6 +22,7 @@ import { ProtocolHomeScreen, type HomeItem } from '../mockups/ProtocolHomeScreen
 import { MediaUploadField } from './MediaUploadField';
 import { MarkdownField } from './MarkdownField';
 import { computeSleepWindow, isWakeName, isBedName } from '../../utils/sleepWindow';
+import { descriptiveMealSlot } from '../../protocolDomain/mealSlot';
 import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
@@ -719,16 +720,27 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     if (t === 'activity') return it.subtype === 'exercise' ? 'activity' : 'product';
     return 'ingredient'; // ingredient (and sleep) default to the ingredient catalog
   }
-  async function runSearch(kind: CatalogKind, q: string) {
+  // Meal slot a consume item belongs to (broad/descriptive, e.g. "Nutritious
+  // Lunch" → Lunch). Drives slot-aware recipe suggestions instead of blind search.
+  function itemMealSlot(it?: AdminProtocolItem | null): string | null {
+    return it && it.category === 'consume' ? descriptiveMealSlot(it.group_name) : null;
+  }
+  async function runSearch(kind: CatalogKind, q: string, it?: AdminProtocolItem) {
+    const item = it || items.find((x) => x.id === linkerItemId);
+    const slot = kind === 'recipe' ? itemMealSlot(item) : null;
     setLinkBusy(true);
-    try { setLinkResults(await searchCatalog(accessToken, kind, q, 10)); }
+    try { setLinkResults(await searchCatalog(accessToken, kind, q, slot && !q.trim() ? 6 : 10, slot ?? undefined)); }
     catch { setLinkResults([]); }
     finally { setLinkBusy(false); }
   }
   function openLinker(it: AdminProtocolItem) {
-    const k = linkedKind(it) || defaultKind(it);
-    setLinkerItemId(it.id); setLinkKind(k); setLinkQuery(it.display_name || '');
-    runSearch(k, it.display_name || '');
+    const slot = itemMealSlot(it);
+    // A meal-slot item with nothing linked yet opens straight into recipe
+    // suggestions (empty query so the ranker, not name-match, drives results).
+    const k = linkedKind(it) || (slot ? 'recipe' : defaultKind(it));
+    const q = k === 'recipe' && slot ? '' : (it.display_name || '');
+    setLinkerItemId(it.id); setLinkKind(k); setLinkQuery(q);
+    runSearch(k, q, it);
   }
   async function linkItemTo(it: AdminProtocolItem, kind: CatalogKind, hit: CatalogHit) {
     const patch = linkPatch(kind, hit.id);
@@ -909,6 +921,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
   function CatalogLinker({ it }: { it: AdminProtocolItem }) {
     const link = linkInfo.get(it.id);
     const open = linkerItemId === it.id;
+    const slot = itemMealSlot(it);
+    const suggesting = open && slot && linkKind === 'recipe' && !linkQuery.trim();
     return (
       <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px dashed ' + C.hair }}>
         {link ? (
@@ -935,10 +949,16 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
           <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: '#fff' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
               <IconSelect value={linkKind} options={LINK_OPTS} width={132}
-                onChange={(k) => { setLinkKind(k as CatalogKind); runSearch(k as CatalogKind, linkQuery); }} />
-              <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value); }} placeholder="Search catalog…" style={{ ...inputStyle, flex: 1 }} />
+                onChange={(k) => { setLinkKind(k as CatalogKind); runSearch(k as CatalogKind, linkQuery, it); }} />
+              <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value, it); }}
+                placeholder={slot && linkKind === 'recipe' ? `Suggest ${slot} recipes — or type to search…` : 'Search catalog…'} style={{ ...inputStyle, flex: 1 }} />
               <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
             </div>
+            {suggesting && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: C.good, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5 }}>
+                <Sparkles size={12} /> Suggested for {slot}
+              </div>
+            )}
             {linkBusy ? (
               <div style={{ padding: 12, textAlign: 'center', color: C.faint }}><Loader2 size={16} className="animate-spin" style={{ display: 'inline' }} /></div>
             ) : linkResults.length === 0 ? (
@@ -950,6 +970,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: '#fff', cursor: 'pointer', textAlign: 'left' }}>
                     {thumb(h.image)}
                     <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
+                    {h.healthScore != null && (
+                      <span title="Health score" style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: C.good, background: C.goodBg, border: '1px solid ' + C.goodBorder, borderRadius: 999, padding: '1px 6px' }}>{h.healthScore}</span>
+                    )}
                   </button>
                 ))}
               </div>

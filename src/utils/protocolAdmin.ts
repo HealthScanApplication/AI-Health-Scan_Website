@@ -12,6 +12,10 @@
  * environment (staging | production) via ../utils/supabase/info.
  */
 import { projectId, publicAnonKey } from './supabase/info';
+import {
+  recipeMatchesSlot, recipeMealBucket, slotNameToBucket,
+  descriptiveMealSlot, slotDescriptors, parsePrepMinutes, type SlotDescriptors,
+} from '../protocolDomain/mealSlot';
 
 const rest = () => `https://${projectId}.supabase.co/rest/v1`;
 
@@ -168,18 +172,18 @@ export async function deleteProtocolItem(accessToken: string, id: string): Promi
 
 /* ───────── catalog linking (recipes / products / activities / supplements) ───────── */
 export type CatalogKind = 'recipe' | 'ingredient' | 'product' | 'activity' | 'supplement';
-export interface CatalogHit { id: string; name: string; image: string | null; price?: number | null; buyUrl?: string | null }
-interface CatCfg { table: string; fk: keyof AdminProtocolItem; nameCols: string[]; imgCols: string[]; buyCols?: string[] }
+export interface CatalogHit { id: string; name: string; image: string | null; price?: number | null; buyUrl?: string | null; healthScore?: number | null }
+interface CatCfg { table: string; fk: keyof AdminProtocolItem; nameCols: string[]; imgCols: string[]; buyCols?: string[]; extraCols?: string[] }
 // Only columns that actually exist on each table (a bad column 400s the whole select).
 export const CATALOG_CFG: Record<CatalogKind, CatCfg> = {
-  recipe: { table: 'catalog_recipes', fk: 'catalog_recipe_id', nameCols: ['name_common'], imgCols: ['image_url', 'image_primary_url', 'images'] },
+  recipe: { table: 'catalog_recipes', fk: 'catalog_recipe_id', nameCols: ['name_common'], imgCols: ['image_url', 'image_primary_url', 'images'], extraCols: ['meal_slot', 'health_score', 'tags', 'dietary_info', 'prep_time', 'is_group', 'type'] },
   ingredient: { table: 'catalog_ingredients', fk: 'catalog_ingredient_id', nameCols: ['name_common', 'name'], imgCols: ['image_url', 'image_primary_url', 'images'] },
   product: { table: 'catalog_products', fk: 'catalog_product_id', nameCols: ['name_common', 'name_brand', 'market_name', 'name'], imgCols: ['image_url', 'image_primary_url', 'image', 'images'], buyCols: ['price_usd', 'affiliate_link_amazon', 'affiliate_link_shopify', 'purchase_url', 'affiliate_url'] },
   activity: { table: 'catalog_activities', fk: 'catalog_activity_id', nameCols: ['name'], imgCols: ['image_url', 'image_primary_url', 'primary_image_url'] },
   supplement: { table: 'hs_supplements', fk: 'supplement_id', nameCols: ['name'], imgCols: ['image_url'] },
 };
 const ALL_FKS: (keyof AdminProtocolItem)[] = ['catalog_recipe_id', 'catalog_ingredient_id', 'catalog_product_id', 'catalog_activity_id', 'supplement_id'];
-const catalogCols = (cfg: CatCfg) => ['id', ...cfg.nameCols, ...cfg.imgCols, ...(cfg.buyCols || [])].join(',');
+const catalogCols = (cfg: CatCfg) => ['id', ...cfg.nameCols, ...cfg.imgCols, ...(cfg.buyCols || []), ...(cfg.extraCols || [])].join(',');
 
 function mapHit(cfg: CatCfg, row: any): CatalogHit {
   const name = cfg.nameCols.map((c) => row[c]).find(Boolean) || 'Untitled';
@@ -195,14 +199,78 @@ function mapHit(cfg: CatCfg, row: any): CatalogHit {
     hit.price = row.price_usd ?? null;
     hit.buyUrl = row.affiliate_link_amazon || row.affiliate_link_shopify || row.purchase_url || row.affiliate_url || null;
   }
+  if ('health_score' in row) hit.healthScore = typeof row.health_score === 'number' ? row.health_score : null;
   return hit;
 }
 
-/** Search a catalog by name (empty query → top suggestions). */
-export async function searchCatalog(accessToken: string, kind: CatalogKind, query: string, limit = 8): Promise<CatalogHit[]> {
+/* ── slot-aware recipe suggestion (broad/descriptive meal slots) ──
+ * Ranks recipes for a slot like "Lunch", "Nutritious Lunch" or "High-Protein
+ * Dinner": base = health_score, plus boosts for descriptors parsed from the slot
+ * name against the recipe's tags / dietary_info / prep_time. Only reads columns
+ * that exist on catalog_recipes. Mirrors the mobile fetchSlotRecipeSuggestions
+ * pipeline (fetch top 80 → match bucket → main-meal fallback) + descriptor rank. */
+function scoreRecipe(r: any, d: SlotDescriptors): number {
+  const base = typeof r.health_score === 'number' ? r.health_score : 50;
+  let s = base;
+  const tags = new Set((Array.isArray(r.tags) ? r.tags : []).map((t: any) => String(t).toLowerCase()));
+  const di = (r.dietary_info && typeof r.dietary_info === 'object') ? r.dietary_info : {};
+  if (d.nutritious) s += base * 0.3;
+  if (d.protein) s += (tags.has('protein') || tags.has('high_protein') || tags.has('high-protein')) ? 25 : (di.contains_meat ? 12 : 0);
+  if (d.quick) { const p = parsePrepMinutes(r.prep_time); s += (p != null && p <= 15) ? 20 : 0; }
+  if (d.vegan) s += (di.vegan || tags.has('vegan') || tags.has('plant_based') || tags.has('plant-based')) ? 40 : 0;
+  if (d.keto) s += (di.keto || di.low_carb || tags.has('keto') || tags.has('low_carb') || tags.has('low-carb')) ? 30 : 0;
+  if (d.light) s += (tags.has('light') || tags.has('low_cal') || tags.has('low-cal')) ? 15 : 0;
+  return s;
+}
+
+async function suggestRecipesForSlot(accessToken: string, cfg: CatCfg, slotName: string, limit: number): Promise<CatalogHit[]> {
+  const base = descriptiveMealSlot(slotName) ?? slotName;
+  const d = slotDescriptors(slotName);
+  const url = `${rest()}/${cfg.table}?select=${catalogCols(cfg)}`
+    + `&image_url=not.is.null`
+    + `&or=(is_group.is.null,is_group.eq.false)`
+    + `&order=health_score.desc.nullslast`
+    + `&limit=80`;
+  const res = await fetch(url, { headers: headers(accessToken) });
+  const rows: any[] = (await handle(res, `Suggest ${cfg.table}`)) || [];
+  const usable = rows.filter((r) => r.type !== 'group' && r.is_group !== true);
+  const score = (r: any) => scoreRecipe(r, d);
+  const slotBucket = slotNameToBucket(base);
+  // Exact bucket match beats an 'anytime' wildcard match, so a real Lunch recipe
+  // outranks a high-scoring anytime puree that merely fits every slot.
+  const exact = (r: any) => (recipeMealBucket(r.meal_slot) === slotBucket ? 1 : 0);
+  const matched = usable.filter((r) => recipeMatchesSlot(r.meal_slot, base))
+    .sort((a, b) => (exact(b) - exact(a)) || (score(b) - score(a)));
+  // Fallback stays slot-appropriate: never surface a Beverage/Snack recipe for a main meal.
+  const isMainMeal = slotBucket === 'Morning' || slotBucket === 'Afternoon' || slotBucket === 'Evening';
+  const fallbackPool = (isMainMeal
+    ? usable.filter((r) => { const b = recipeMealBucket(r.meal_slot); return b !== 'Beverages' && b !== 'Snacks'; })
+    : usable).filter((r) => !matched.includes(r)).sort((a, b) => score(b) - score(a));
+  const ranked = [...matched, ...fallbackPool]; // matched first (both already score-sorted), disjoint
+  // Variety: cap recipes sharing the same first tag to 2 so a slot isn't all smoothies.
+  const out: any[] = [];
+  const tagCount = new Map<string, number>();
+  for (const r of ranked) {
+    if (out.length >= limit) break;
+    const t0 = (Array.isArray(r.tags) && r.tags.length) ? String(r.tags[0]).toLowerCase() : '';
+    if (t0 && (tagCount.get(t0) || 0) >= 2) continue;
+    if (t0) tagCount.set(t0, (tagCount.get(t0) || 0) + 1);
+    out.push(r);
+  }
+  if (out.length < limit) for (const r of ranked) { if (out.length >= limit) break; if (!out.includes(r)) out.push(r); }
+  return out.slice(0, limit).map((r) => mapHit(cfg, r));
+}
+
+/** Search a catalog by name (empty query → top suggestions). When `slotName` is
+ *  given for recipes and there is no typed query, returns slot-aware ranked
+ *  suggestions (e.g. for a "Nutritious Lunch" meal slot) instead of alpha order. */
+export async function searchCatalog(accessToken: string, kind: CatalogKind, query: string, limit = 8, slotName?: string): Promise<CatalogHit[]> {
   const cfg = CATALOG_CFG[kind];
-  let url = `${rest()}/${cfg.table}?select=${catalogCols(cfg)}&limit=${limit}`;
   const q = query.trim();
+  if (kind === 'recipe' && slotName && !q) {
+    return suggestRecipesForSlot(accessToken, cfg, slotName, limit);
+  }
+  let url = `${rest()}/${cfg.table}?select=${catalogCols(cfg)}&limit=${limit}`;
   if (q) {
     const or = cfg.nameCols.map((c) => `${c}.ilike.*${encodeURIComponent(q)}*`).join(',');
     url += `&or=(${or})`;

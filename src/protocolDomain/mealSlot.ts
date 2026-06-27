@@ -61,3 +61,59 @@ export function recipeMatchesSlot(rawMealSlot: unknown, slotName: string | null 
   if (recipeBucket === 'Anytime' || slotBucket === 'Anytime') return true;
   return recipeBucket === slotBucket;
 }
+
+/**
+ * Base meal slot for a possibly-descriptive group name. Unlike mealSlotName (a
+ * strict gate used to decide empty-slot cards), this extracts the underlying
+ * slot from adjective-prefixed names like "Nutritious Lunch", "High-Protein
+ * Dinner" or "Quick Breakfast" so the recipe suggester still fires. Matches on
+ * whole word tokens (never substrings) and returns null when no meal word is
+ * present. Does NOT change what mealSlotName returns.
+ */
+export function descriptiveMealSlot(groupName?: string | null): MealSlot | null {
+  const exact = mealSlotName(groupName);
+  if (exact) return exact;
+  const tokens = (groupName || '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  for (const t of tokens) {
+    if (t === 'breakfast') return 'Breakfast';
+    if (t === 'lunch') return 'Lunch';
+    if (t === 'dinner') return 'Dinner';
+    if (t === 'supper') return 'Supper';
+    if (t === 'snack' || t === 'snacks') return 'Snack';
+  }
+  return null;
+}
+
+/**
+ * Descriptor flags parsed from a slot/group name's adjectives. Drives recipe
+ * ranking — e.g. "Nutritious Lunch" → {nutritious}, "High-Protein Dinner" →
+ * {protein}, "Quick Vegan Snack" → {quick, vegan}. All optional; absent = no
+ * boost applied for that signal.
+ */
+export interface SlotDescriptors {
+  nutritious?: boolean;
+  protein?: boolean;
+  quick?: boolean;
+  light?: boolean;
+  vegan?: boolean;
+  keto?: boolean;
+}
+
+export function slotDescriptors(name?: string | null): SlotDescriptors {
+  const s = (name || '').toLowerCase();
+  const d: SlotDescriptors = {};
+  if (/nutritious|healthy|wholesome|balanced|nourish/.test(s)) d.nutritious = true;
+  if (/high.?protein|protein|muscle/.test(s)) d.protein = true;
+  if (/quick|fast|easy|express|grab/.test(s)) d.quick = true;
+  if (/light|low.?cal|lean/.test(s)) d.light = true;
+  if (/vegan|plant.?based|\bplant\b/.test(s)) d.vegan = true;
+  if (/keto|low.?carb/.test(s)) d.keto = true;
+  return d;
+}
+
+/** Parse a recipe prep_time (free text like "15", "10-15 min") → minutes, or null. */
+export function parsePrepMinutes(raw: unknown): number | null {
+  if (raw == null) return null;
+  const m = String(raw).match(/\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
