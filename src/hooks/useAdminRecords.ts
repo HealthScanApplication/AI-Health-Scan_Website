@@ -34,10 +34,13 @@ export function useAdminRecords({ activeTab, table, accessToken, enabled = true 
 
       let url: string;
 
-      // Use custom endpoint for KV-stored data (waitlist, products)
-      if (activeTab === 'waitlist' || activeTab === 'products') {
-        const kvEndpoint = activeTab === 'waitlist' ? 'admin/waitlist' : 'admin/products';
-        url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/${kvEndpoint}`;
+      // Use custom KV-store endpoint for waitlist only. NOTE: products used to be
+      // KV-backed too, but they now live in the `catalog_products` table — routing
+      // 'products' here returned the (empty) legacy KV store, so the Products tab
+      // showed "No records found" despite 1.7k+ rows. Products now fall through to
+      // the REST path below like every other catalog table.
+      if (activeTab === 'waitlist') {
+        url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/waitlist`;
         console.log(`[Admin] Fetching ${activeTab} from KV store: ${url}`);
 
         const response = await fetch(url, {
