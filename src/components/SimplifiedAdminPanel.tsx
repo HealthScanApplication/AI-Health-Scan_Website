@@ -81,6 +81,8 @@ import { stripProcessing, cleanIngredientName } from '../utils/recipeProcessing'
 import { CatalogItemTag } from './admin/shared/CatalogItemTag';
 import { IconPickerField, LucideIconPreview } from './admin/IconPickerField';
 import { MediaUploadField } from './admin/MediaUploadField';
+import { aiGenerateImage } from '../utils/aiImage';
+import { buildImagePrompt } from '../utils/imagePromptBuilder';
 import DrvTableEditor from './admin/DrvTableEditor';
 import InterventionsEditor from './admin/InterventionsEditor';
 import StructuredJsonEditor from './admin/StructuredJsonEditor';
@@ -1801,6 +1803,31 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
   const [bulkEditField, setBulkEditField] = useState('');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [aiImageField, setAiImageField] = useState<string | null>(null); // field key currently AI-generating
+
+  // Generate an image for one field of the record being edited, via OpenAI, and
+  // set it. `variant` (raw/cut/cooked/plated…) tunes the prompt for image_url_* fields.
+  const generateFieldImage = async (fieldKey: string, variant: string | null) => {
+    if (!editingRecord) return;
+    setAiImageField(fieldKey);
+    try {
+      const tabType = adminFieldConfig[activeTab]?.label || activeTab;
+      const prompt = buildImagePrompt(tabType, editingRecord, variant);
+      toast.info('Generating image… (~20–40s)');
+      const url = await aiGenerateImage(accessToken, prompt);
+      setEditingRecord((prev: any) => (prev ? { ...prev, [fieldKey]: url } : prev));
+      toast.success('Image generated');
+    } catch (e: any) {
+      toast.error(`Generate failed: ${(e?.message || '').slice(0, 100)}`);
+    } finally {
+      setAiImageField(null);
+    }
+  };
+  // map an image field key → prompt variant (image_url_raw → 'raw', etc.)
+  const variantForField = (key: string): string | null => {
+    const m = /^image_url_(.+)$/.exec(key);
+    return m ? m[1] : null;
+  };
   const [listUploadingId, setListUploadingId] = useState<string | null>(null);
   const [subFilter, setSubFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -3348,6 +3375,52 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     } else {
       toast.success(`Batch ${mode === 'improve' ? 'improvement' : 'enrichment'} complete — ${filled} fields updated, ${skipped} skipped, ${errors} errors`);
     }
+  };
+
+  // primary image field for the current tab (defaults to image_url)
+  const primaryImageField = (): string => {
+    const fields = getFieldsForView(activeTab, 'edit') as any[];
+    const img = fields.find((f) => (f.type === 'image' || f.type === 'media_upload') && (f.mediaType ?? 'image') === 'image');
+    return img?.key || 'image_url';
+  };
+
+  // Batch: generate AI images for every record on this tab MISSING one (fill-blanks only).
+  const handleBatchGenerateImages = async () => {
+    if (!currentTab?.table || activeTab === 'waitlist' || activeTab === 'scans') return;
+    const imgField = primaryImageField();
+    const tabType = adminFieldConfig[activeTab]?.label || activeTab;
+    const candidates = sortedRecords.filter((r) => (r.name || r.name_common) && !r[imgField]);
+    if (!candidates.length) { toast.info('No records on this tab are missing an image'); return; }
+    const lo = (candidates.length * 0.04).toFixed(2), hi = (candidates.length * 0.19).toFixed(2);
+    if (!confirm(`Generate AI images for ${candidates.length} record(s) missing "${imgField}"?\n\nFills blanks only — never overwrites. Est. OpenAI cost ~$${lo}–$${hi}. This runs one at a time and can be cancelled.`)) return;
+
+    setBatchEnriching(true);
+    batchCancelRef.current = false;
+    const recordResults: Array<{ id: string; name: string; status: 'done' | 'skipped' | 'error'; fieldsAdded: number; filledFields: number; totalFields: number }> = [];
+    let filled = 0, errors = 0, completedRecords = 0;
+    setBatchProgress({ current: 0, total: candidates.length, name: '', filled, skipped: 0, errors, completedRecords, initialIncomplete: candidates.length, recordResults });
+    for (let i = 0; i < candidates.length; i++) {
+      if (batchCancelRef.current) break;
+      const rec = candidates[i];
+      const name = rec.name_common || rec.name || `Record ${i + 1}`;
+      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped: 0, errors, completedRecords, initialIncomplete: candidates.length, recordResults: [...recordResults] });
+      try {
+        const url = await aiGenerateImage(accessToken, buildImagePrompt(tabType, rec, variantForField(imgField)));
+        const save = await saveRecordToDB(currentTab.table, rec.id, { [imgField]: url });
+        if (save.expired) { setBatchEnriching(false); setBatchProgress(null); toast.error('Session expired — log in again'); return; }
+        if (save.ok) { filled++; completedRecords++; recordResults.push({ id: rec.id, name, status: 'done', fieldsAdded: 1, filledFields: 1, totalFields: 1 }); }
+        else { errors++; recordResults.push({ id: rec.id, name, status: 'error', fieldsAdded: 0, filledFields: 0, totalFields: 1 }); }
+      } catch {
+        errors++; recordResults.push({ id: rec.id, name, status: 'error', fieldsAdded: 0, filledFields: 0, totalFields: 1 });
+      }
+      setBatchProgress({ current: i + 1, total: candidates.length, name, filled, skipped: 0, errors, completedRecords, initialIncomplete: candidates.length, recordResults: [...recordResults] });
+      if (i > 0 && i % 10 === 0) fetchRecords();
+    }
+    setBatchEnriching(false);
+    const cancelled = batchCancelRef.current;
+    fetchRecords();
+    toast.success(`${cancelled ? 'Stopped — ' : ''}Generated ${filled} image(s)${errors ? `, ${errors} failed` : ''}`);
+    setTimeout(() => setBatchProgress(null), 4000);
   };
 
   // ─── Import Element Data (EU, USA, HealthScan, All) ──────────────
@@ -5003,6 +5076,17 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                                     <div className="text-[10px] text-gray-400">Rewrite existing data — more scientific &amp; culinary depth</div>
                                   </div>
                                 </button>
+                                <div className="my-1 border-t border-gray-100" />
+                                <button
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center gap-2 text-gray-700"
+                                  onClick={() => { setShowBatchMenu(false); handleBatchGenerateImages(); }}
+                                >
+                                  <ImageIcon className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                                  <div>
+                                    <div className="font-medium">Generate missing images</div>
+                                    <div className="text-[10px] text-gray-400">AI image for every record with no image (fills blanks only)</div>
+                                  </div>
+                                </button>
                               </div>
                             )}
                           </div>
@@ -5656,6 +5740,14 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     placeholder={field.placeholder}
                     onUpload={handleUpload}
                   />
+                  {(field.mediaType || 'image') === 'image' && (
+                    <button type="button" disabled={aiImageField === field.key}
+                      onClick={() => generateFieldImage(field.key, variantForField(field.key))}
+                      className="mt-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-60">
+                      {aiImageField === field.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {aiImageField === field.key ? 'Generating…' : (val ? 'Regenerate with AI' : 'Generate with AI')}
+                    </button>
+                  )}
                 </div>
               );
             }
@@ -5705,6 +5797,14 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     }
                   }} />
                   <input value={val || ''} onChange={(e) => updateField(e.target.value)} placeholder="Image URL" className={`${inputCls} text-xs`} />
+                  {(field.mediaType ?? 'image') === 'image' && (
+                    <button type="button" disabled={aiImageField === field.key}
+                      onClick={() => generateFieldImage(field.key, variantForField(field.key))}
+                      className="mt-1 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-60">
+                      {aiImageField === field.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {aiImageField === field.key ? 'Generating…' : (val ? 'Regenerate with AI' : 'Generate with AI')}
+                    </button>
+                  )}
                 </div>
               );
             }

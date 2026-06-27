@@ -1348,6 +1348,64 @@ app.post('/make-server-ed0fe4c2/admin/storage/upload', async (c: any) => {
   }
 })
 
+// ── AI image generation ──────────────────────────────────────────────────────
+// Provider-extensible: OpenAI (gpt-image-1) is wired now. To add Midjourney /
+// Replicate-Flux later, add a branch that returns raw PNG bytes — the upload +
+// endpoint stay the same. Midjourney has no official API (needs an async relay +
+// job queue), so it's a future provider, not a drop-in.
+async function generateImageBytes(provider: string, prompt: string, opts: { size?: string } = {}): Promise<Uint8Array> {
+  const p = (provider || 'openai').toLowerCase()
+  if (p === 'openai') {
+    const key = Deno.env.get('OPENAI_API_KEY')
+    if (!key) throw new Error('OPENAI_API_KEY not configured')
+    const call = (model: string, extra: Record<string, any> = {}) => fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, size: opts.size || '1024x1024', n: 1, ...extra }),
+    })
+    // Try gpt-image-1; fall back to dall-e-3 if this org doesn't have access to it.
+    let res = await call('gpt-image-1')
+    let j = await res.json().catch(() => ({}))
+    if (!res.ok && /gpt-image|model|verif|does not have access|must be verified/i.test(JSON.stringify(j?.error || ''))) {
+      res = await call('dall-e-3', { response_format: 'b64_json' })
+      j = await res.json().catch(() => ({}))
+    }
+    if (!res.ok) throw new Error(j?.error?.message || `OpenAI image error (${res.status})`)
+    const d = j?.data?.[0]
+    if (d?.b64_json) return Uint8Array.from(atob(d.b64_json), (ch: string) => ch.charCodeAt(0))
+    if (d?.url) { const ir = await fetch(d.url); return new Uint8Array(await ir.arrayBuffer()) }
+    throw new Error('OpenAI returned no image data')
+  }
+  // if (p === 'replicate') { … real-API Flux/SDXL … }
+  // if (p === 'midjourney') { … async relay submit → handled by a job endpoint … }
+  throw new Error(`Image provider "${provider}" is not configured yet`)
+}
+
+app.post('/make-server-ed0fe4c2/admin/ai-generate-image', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+
+    const { prompt, provider = 'openai', size = '1024x1024', bucket = 'catalog-media' } = await c.req.json()
+    if (!prompt || typeof prompt !== 'string') return c.json({ success: false, error: 'prompt is required' }, 400)
+
+    const bytes = await generateImageBytes(provider, prompt, { size })
+
+    const { data: existing } = await supabase.storage.getBucket(bucket)
+    if (!existing) await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: 52428800 })
+    const path = `ai-generated/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
+    const { error: uploadErr } = await supabase.storage.from(bucket).upload(path, bytes, { contentType: 'image/png', upsert: true })
+    if (uploadErr) return c.json({ success: false, error: uploadErr.message }, 500)
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+    console.log(`[Admin] AI image (${provider}) → ${path} by ${adminValidation.user?.email}`)
+    return c.json({ success: true, publicUrl: urlData.publicUrl, prompt, provider })
+  } catch (error: any) {
+    console.error('[Admin] ai-generate-image error:', error)
+    return c.json({ success: false, error: error?.message || 'Image generation failed' }, 500)
+  }
+})
+
 // Admin: Delete catalog record
 app.post('/make-server-ed0fe4c2/admin/catalog/delete', async (c: any) => {
   try {
