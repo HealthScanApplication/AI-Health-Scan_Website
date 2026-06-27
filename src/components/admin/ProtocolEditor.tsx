@@ -194,6 +194,17 @@ const TYPE_TO_DATA: Record<string, { category: string; item_type: string }> = {
   supplement: { category: 'supplement', item_type: 'supplement' },
   sleep: { category: 'sleep', item_type: 'activity' },
 };
+// Quick-add presets: a new step's type chosen up-front so it is born correctly
+// shaped (category / item_type / subtype) instead of the generic activity default.
+type AddPreset = { type?: string; group_name?: string; display_name?: string; subtype?: string; scheduled_time?: string };
+// Meal-slot quick-adds: a recipe-consume step pre-tagged with a slot group_name +
+// slot-appropriate default time, so the slot-aware recipe suggester fires at once.
+const MEAL_PRESETS: { label: string; Icon: any; color: string; preset: AddPreset }[] = [
+  { label: 'Breakfast', Icon: Utensils, color: '#388E3C', preset: { type: 'recipe', group_name: 'Breakfast', display_name: 'Breakfast', subtype: 'meal', scheduled_time: '07:00:00' } },
+  { label: 'Lunch', Icon: Utensils, color: '#388E3C', preset: { type: 'recipe', group_name: 'Lunch', display_name: 'Lunch', subtype: 'meal', scheduled_time: '12:00:00' } },
+  { label: 'Dinner', Icon: Utensils, color: '#388E3C', preset: { type: 'recipe', group_name: 'Dinner', display_name: 'Dinner', subtype: 'meal', scheduled_time: '18:00:00' } },
+  { label: 'Snack', Icon: Apple, color: '#E64A19', preset: { type: 'recipe', group_name: 'Snack', display_name: 'Snack', subtype: 'snack', scheduled_time: '10:00:00' } },
+];
 function primaryTypeOf(it: AdminProtocolItem): string {
   if (it.category === 'do') return 'activity';
   if (it.category === 'sleep') return 'sleep';
@@ -524,28 +535,35 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     }
   }
 
-  async function addItem(kind: Kind, parentId?: string) {
+  async function addItem(kind: Kind, parentId?: string, preset?: AddPreset) {
     if (!selected) return;
     setAdding(true);
     const isRule = kind !== 'action';
     const maxSort = items.reduce((m, it) => Math.max(m, it.sort_order || 0), 0);
+    // A chosen type maps to the right stored category/item_type/subtype up front.
+    const td = preset?.type ? TYPE_TO_DATA[preset.type] : null;
+    const subs = td ? (SUB_OPTS[td.category] || []) : [];
     try {
       const created = await createProtocolItem(accessToken, {
         protocol_id: selected.id,
-        display_name: parentId ? 'New detail' : kind === 'rule_dont' ? 'New avoidance' : isRule ? 'New do' : 'New step',
-        item_type: 'activity',
+        display_name: preset?.display_name
+          ?? (parentId ? 'New detail' : kind === 'rule_dont' ? 'New avoidance' : isRule ? 'New do' : 'New step'),
+        item_type: td?.item_type ?? 'activity',
         kind,
         scope: isRule ? 'outside' : null,
-        scheduled_time: isRule || parentId ? null : '08:00:00',
+        scheduled_time: isRule || parentId ? null : (preset?.scheduled_time ?? '08:00:00'),
         day_number: 1,
         sort_order: maxSort + 1,
         parent_protocol_item_id: parentId || null,
-        category: kind === 'action' ? 'do' : null,
-        subtype: kind === 'action' ? 'wellness' : null,
+        group_name: preset?.group_name ?? null,
+        category: td ? td.category : (kind === 'action' ? 'do' : null),
+        subtype: preset?.subtype ?? (td ? (subs[0]?.value ?? null) : (kind === 'action' ? 'wellness' : null)),
         hidden: false,
       });
       setItems((its) => [...its, created]);
       baseline.current.set(created.id, { ...created });
+      // Born as a meal slot? Open the slot-aware recipe suggester straight away.
+      if (preset?.group_name && td?.category === 'consume') setTimeout(() => openLinker(created), 0);
       toast.success('Added');
     } catch (e: any) {
       toast.error(`Add failed: ${e?.message || e}`);
@@ -1083,6 +1101,54 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     );
   }
 
+  // "+ Add step" with a type/meal-slot picker so a new step is born correctly
+  // shaped (and meal slots open the recipe suggester immediately). Rules keep the
+  // plain button — they have no catalog type.
+  function AddStepMenu() {
+    const [open, setOpen] = useState(false);
+    const addBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.accent, background: '#fff', color: C.accent };
+    if (kindTab !== 'action') {
+      return (
+        <button onClick={() => addItem(kindTab)} disabled={adding} style={addBtn}>
+          {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add {kindTab === 'rule_do' ? 'do' : "don't"}
+        </button>
+      );
+    }
+    const hdr: React.CSSProperties = { fontSize: 9.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '7px 8px 3px' };
+    const item: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 8px', fontSize: 12.5, color: C.ink, background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer', textAlign: 'left' };
+    const pick = (preset?: AddPreset) => { setOpen(false); addItem('action', undefined, preset); };
+    return (
+      <div style={{ position: 'relative' }}>
+        <button onClick={() => setOpen((o) => !o)} disabled={adding} style={addBtn}>
+          {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add step <ChevronDown size={13} />
+        </button>
+        {open && (
+          <>
+            <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+            <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 41, width: 220, background: '#fff', border: '1px solid ' + C.hair, borderRadius: 10, boxShadow: '0 14px 30px -10px rgba(0,0,0,0.3)', padding: 6, maxHeight: 380, overflowY: 'auto' }}>
+              <div style={hdr}>Meal slots</div>
+              {MEAL_PRESETS.map((m) => (
+                <button key={m.label} onClick={() => pick(m.preset)} style={item}>
+                  <m.Icon size={14} color={m.color} style={{ flexShrink: 0 }} /> {m.label}
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: C.faint }}>{toTimeInput(m.preset.scheduled_time || null)}</span>
+                </button>
+              ))}
+              <div style={hdr}>Add by type</div>
+              {TYPE_OPTS.map((t) => (
+                <button key={t.value} onClick={() => pick({ type: t.value })} style={item}>
+                  {t.Icon && <t.Icon size={14} color={t.color} style={{ flexShrink: 0 }} />} {t.label}
+                </button>
+              ))}
+              <button onClick={() => pick()} style={{ ...item, color: C.sub, marginTop: 2, borderTop: '1px solid ' + C.hair, borderRadius: 0 }}>
+                <Plus size={14} style={{ flexShrink: 0 }} /> Blank step
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   /* ── render ── */
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minHeight: 560 }}>
@@ -1343,13 +1409,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                       );
                     })}
                   </div>
-                  <button
-                    onClick={() => addItem(kindTab)}
-                    disabled={adding}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.accent, background: '#fff', color: C.accent }}
-                  >
-                    {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add {kindTab === 'action' ? 'step' : kindTab === 'rule_do' ? 'do' : "don't"}
-                  </button>
+                  <AddStepMenu />
                 </div>
                 {/* Sleep & wake window — book-ends the day for every protocol (like the app) */}
                 {kindTab === 'action' && (
