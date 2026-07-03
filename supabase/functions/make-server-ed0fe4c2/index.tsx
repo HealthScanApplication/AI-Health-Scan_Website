@@ -3339,22 +3339,43 @@ app.get('/make-server-ed0fe4c2/blog/service-health', (c) => {
 const PROD_URL = 'https://ermbkttsyvpenjjxaxcf.supabase.co'
 const PROD_SERVICE_KEY = Deno.env.get('PROD_SUPABASE_SERVICE_ROLE_KEY') || ''
 
-// Parent tables first (order matters for FK constraints), then junction tables
+// Parent tables first (order matters for FK constraints), then junction tables.
+// 2026-07-03: rebuilt from the ACTUAL schema — the old list contained tables
+// that don't exist (recipe_ingredients, recipe_elements, symptom_elements,
+// activity_elements) and missed the real catalog_* junctions, so junction data
+// (catalog_recipe_ingredients, catalog_product_elements, aliases, …) silently
+// never synced. User tables are NEVER in this list. protocols/protocol_items
+// stay out too (protocols carries user_id — needs a scoped sync, not a mirror).
 const SYNC_TABLES = [
   // ── Parent catalog tables ──
-  'catalog_elements', 'catalog_ingredients', 'catalog_recipes',
-  'catalog_cooking_methods', 'catalog_equipment', 'catalog_activities', 'catalog_symptoms',
+  'catalog_elements', 'catalog_ingredients', 'catalog_cooking_methods', 'catalog_equipment',
+  'catalog_symptoms', 'catalog_activities', 'catalog_products', 'catalog_recipes',
   // ── HS tables ──
   'hs_tests', 'hs_supplements', 'hs_products', 'hs_experts', 'hs_services', 'hs_packages',
-  // ── Junction tables (depend on parents above) ──
-  'catalog_ingredient_elements',
-  'element_supplements', 'element_tests', 'element_products',
-  'cooking_method_elements',
-  'recipe_ingredients', 'recipe_cooking_methods', 'recipe_equipment', 'recipe_elements',
-  'symptom_elements', 'activity_elements',
-  'package_items',
+  // ── Junction/child tables (depend on parents above; deletes run in reverse) ──
+  'catalog_element_aliases', 'catalog_element_symptoms',
+  'catalog_ingredient_aliases', 'catalog_ingredient_elements',
+  'catalog_activity_aliases', 'catalog_activity_equipment', 'catalog_activity_related',
+  'catalog_activity_steps', 'catalog_activity_suggested_products',
+  'catalog_product_aliases', 'catalog_product_elements', 'catalog_product_ingredients', 'catalog_product_recipes',
+  'catalog_recipe_aliases', 'catalog_recipe_cooking_methods', 'catalog_recipe_equipment',
+  'catalog_recipe_elements', 'catalog_recipe_ingredients',
 ] as const
 type SyncTable = typeof SYNC_TABLES[number]
+
+// Persist every sync/merge run (incl. dry runs) to staging's sync_runs table —
+// the durable audit trail behind the console.log lines.
+async function logSyncRun(kind: string, actor: string | undefined, dryRun: boolean, tables: string[], results: any): Promise<void> {
+  try {
+    const stagingKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const stagingUrl = Deno.env.get('SUPABASE_URL')!
+    await fetch(`${stagingUrl}/rest/v1/sync_runs`, {
+      method: 'POST',
+      headers: { apikey: stagingKey, Authorization: `Bearer ${stagingKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ kind, actor: actor || null, dry_run: dryRun, tables, results }),
+    })
+  } catch (e) { console.warn('[Sync] sync_runs log failed:', e) }
+}
 
 async function fetchAllFromSupabase(baseUrl: string, serviceKey: string, table: string): Promise<any[]> {
   const all: any[] = []
@@ -3390,7 +3411,7 @@ async function fetchAllIds(baseUrl: string, serviceKey: string, table: string): 
   return all
 }
 
-async function upsertToSupabase(baseUrl: string, serviceKey: string, table: string, records: any[]): Promise<void> {
+async function upsertToSupabase(baseUrl: string, serviceKey: string, table: string, records: any[], actor?: string, syncSource?: string): Promise<void> {
   const batchSize = 100
   for (let i = 0; i < records.length; i += batchSize) {
     const batch = records.slice(i, i + batchSize)
@@ -3401,6 +3422,9 @@ async function upsertToSupabase(baseUrl: string, serviceKey: string, table: stri
         'Authorization': `Bearer ${serviceKey}`,
         'Content-Type': 'application/json',
         'Prefer': 'resolution=merge-duplicates,return=minimal',
+        // the audit_row_change() trigger reads these to attribute the write
+        ...(actor ? { 'x-admin-email': actor } : {}),
+        ...(syncSource ? { 'x-sync-source': syncSource } : {}),
       },
       body: JSON.stringify(batch),
     })
@@ -3497,13 +3521,14 @@ app.post('/make-server-ed0fe4c2/admin/sync/push-to-prod', async (c: any) => {
           delete c2._displayIndex
           return c2
         })
-        await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, clean)
+        await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, clean, adminValidation.user?.email, 'push-to-prod')
         results[table] = { pushed: clean.length, status: 'ok' }
         console.log(`[Sync] Pushed ${clean.length} ${table} records to production by ${adminValidation.user?.email}`)
       } catch (err: any) {
         results[table] = { status: 'error', error: err.message }
       }
     }
+    await logSyncRun('push-to-prod', adminValidation.user?.email, false, targetTables, results)
     return c.json({ success: true, results })
   } catch (error: any) {
     console.error('[Sync] Push-to-prod error:', error)
@@ -3531,13 +3556,14 @@ app.post('/make-server-ed0fe4c2/admin/sync/pull-from-prod', async (c: any) => {
       try {
         const records = await fetchAllFromSupabase(PROD_URL, PROD_SERVICE_KEY, table)
         const clean = records.map((r: any) => { const c2 = { ...r }; delete c2._displayIndex; return c2 })
-        await upsertToSupabase(stagingUrl, stagingKey, table, clean)
+        await upsertToSupabase(stagingUrl, stagingKey, table, clean, adminValidation.user?.email, 'pull-from-prod')
         results[table] = { pulled: clean.length, status: 'ok' }
         console.log(`[Sync] Pulled ${clean.length} ${table} records from production by ${adminValidation.user?.email}`)
       } catch (err: any) {
         results[table] = { status: 'error', error: err.message }
       }
     }
+    await logSyncRun('pull-from-prod', adminValidation.user?.email, false, targetTables, results)
     return c.json({ success: true, results })
   } catch (error: any) {
     console.error('[Sync] Pull-from-prod error:', error)
@@ -3587,11 +3613,12 @@ app.post('/make-server-ed0fe4c2/admin/catalog/merge-prod', async (c: any) => {
 
     // mirror the merged survivor row so prod matches staging
     if (survivorRow && typeof survivorRow === 'object') {
-      try { const clean = { ...survivorRow }; delete clean._displayIndex; await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, [clean]) }
+      try { const clean = { ...survivorRow }; delete clean._displayIndex; await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, [clean], adminValidation.user?.email, 'merge-prod') }
       catch (e: any) { console.warn(`[Sync] merge-prod survivor upsert failed: ${e?.message || e}`) }
     }
 
     console.log(`[Sync] merge-prod ${table}: folded ${duplicateIds.length} into ${survivorId} by ${adminValidation.user?.email}`)
+    await logSyncRun('merge-prod', adminValidation.user?.email, false, [table], { survivorId, duplicateIds, repointed })
     return c.json({ success: true, repointed })
   } catch (error: any) {
     console.error('[Sync] merge-prod error:', error)
@@ -3631,6 +3658,7 @@ app.post('/make-server-ed0fe4c2/admin/sync/mirror-to-prod', async (c: any) => {
           results[table] = { staging: stagingIds.length, prod: prodIds.length, willUpsert: stagingIds.length, willDelete, status: 'ok' }
         } catch (err: any) { results[table] = { status: 'error', error: err.message } }
       }
+      await logSyncRun('mirror-to-prod', adminValidation.user?.email, true, targetTables, results)
       return c.json({ success: true, dryRun: true, results })
     }
 
@@ -3641,7 +3669,7 @@ app.post('/make-server-ed0fe4c2/admin/sync/mirror-to-prod', async (c: any) => {
         const records = await fetchAllFromSupabase(stagingUrl, stagingKey, table)
         stagingIdsByTable[table] = records.map((r: any) => String(r.id))
         const clean = records.map((r: any) => { const c2 = { ...r }; delete c2._displayIndex; return c2 })
-        await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, clean)
+        await upsertToSupabase(PROD_URL, PROD_SERVICE_KEY, table, clean, adminValidation.user?.email, 'mirror-to-prod')
         results[table] = { upserted: clean.length, status: 'ok' }
       } catch (err: any) { results[table] = { status: 'error', error: err.message } }
     }
@@ -3652,7 +3680,10 @@ app.post('/make-server-ed0fe4c2/admin/sync/mirror-to-prod', async (c: any) => {
       try {
         const res = await fetch(`${PROD_URL}/rest/v1/rpc/mirror_delete_absent`, {
           method: 'POST',
-          headers: { apikey: PROD_SERVICE_KEY, Authorization: `Bearer ${PROD_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+          headers: {
+            apikey: PROD_SERVICE_KEY, Authorization: `Bearer ${PROD_SERVICE_KEY}`, 'Content-Type': 'application/json',
+            'x-admin-email': adminValidation.user?.email || '', 'x-sync-source': 'mirror-to-prod',
+          },
           body: JSON.stringify({ p_table: table, p_keep_ids: keep }),
         })
         const body = await res.json().catch(() => null)
@@ -3661,6 +3692,7 @@ app.post('/make-server-ed0fe4c2/admin/sync/mirror-to-prod', async (c: any) => {
       } catch (err: any) { results[table].deleteError = err.message }
     }
     console.log(`[Sync] mirror-to-prod (${targetTables.join(',')}) by ${adminValidation.user?.email}`)
+    await logSyncRun('mirror-to-prod', adminValidation.user?.email, false, targetTables, results)
     return c.json({ success: true, results })
   } catch (error: any) {
     console.error('[Sync] mirror-to-prod error:', error)
