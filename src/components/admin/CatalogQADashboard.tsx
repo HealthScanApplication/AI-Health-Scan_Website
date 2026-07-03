@@ -75,14 +75,20 @@ export function CatalogQADashboard({
     try {
       const recipeCols =
         'id,name_common,meal_slot,image_url,description,instructions,servings,nutrition_per_serving,nutrition_per_100g,health_score,elements_hazardous,tags';
+      // One broken source degrades to a warning instead of killing the whole run.
+      const warnings: string[] = [];
+      const safe = <T,>(p: Promise<T[]>, label: string) =>
+        p.catch((e: any) => { warnings.push(`${label}: ${e?.message || e}`); return [] as T[]; });
       const [recipes, recIngs, recEls, activities, ingredients, products] = await Promise.all([
-        fetchAll<QaRecipe>('catalog_recipes', recipeCols),
-        fetchAll<{ recipe_id: string }>('catalog_recipe_ingredients', 'recipe_id'),
-        fetchAll<{ recipe_id: string }>('catalog_recipe_elements', 'recipe_id'),
-        fetchAll<QaImageRow>('catalog_activities', 'id,name_common,image_url'),
-        fetchAll<QaImageRow>('catalog_ingredients', 'id,name_common,image_url'),
-        fetchAll<QaImageRow>('catalog_products', 'id,name_common,image_url'),
+        safe(fetchAll<QaRecipe>('catalog_recipes', recipeCols), 'catalog_recipes'),
+        safe(fetchAll<{ recipe_id: string }>('catalog_recipe_ingredients', 'recipe_id'), 'catalog_recipe_ingredients'),
+        safe(fetchAll<{ recipe_id: string }>('catalog_recipe_elements', 'recipe_id'), 'catalog_recipe_elements'),
+        // catalog_activities has `name`, not `name_common` (a name_common select 400s)
+        safe(fetchAll<QaImageRow>('catalog_activities', 'id,name,image_url'), 'catalog_activities'),
+        safe(fetchAll<QaImageRow>('catalog_ingredients', 'id,name_common,image_url'), 'catalog_ingredients'),
+        safe(fetchAll<QaImageRow>('catalog_products', 'id,name_common,image_url'), 'catalog_products'),
       ]);
+      setError(warnings.length ? `Some sources failed: ${warnings.join(' · ')}` : null);
 
       const ingCount = tallyByRecipe(recIngs);
       const elCount = tallyByRecipe(recEls);
