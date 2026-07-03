@@ -94,14 +94,17 @@ function createSupabaseClient(): SupabaseClient {
           controller.abort();
         }, timeoutMs);
 
+        // Merge via the Headers API: supabase-js v2.9x passes a Headers INSTANCE,
+        // which `{...headers}` spreads to {} — silently dropping apikey/Authorization
+        // ("No API key found in request"). new Headers() handles both shapes.
+        const mergedHeaders = new Headers(options.headers as HeadersInit | undefined);
+        mergedHeaders.set('Accept', 'application/json');
+        if (!mergedHeaders.has('Content-Type')) mergedHeaders.set('Content-Type', 'application/json');
+
         return fetch(url, {
           ...options,
           signal: options.signal || controller.signal,
-          headers: {
-            ...options.headers,
-            'Accept': 'application/json',
-            'Content-Type': options.headers?.['Content-Type'] || 'application/json',
-          }
+          headers: mergedHeaders,
         }).finally(() => {
           clearTimeout(timeoutId);
         }).catch((error) => {
