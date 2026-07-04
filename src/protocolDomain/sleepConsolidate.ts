@@ -71,11 +71,22 @@ function pickWinner<T extends SleepActionLike>(candidates: T[], bucket: 'wake' |
   })[0];
 }
 
+/** Stamped onto a recorded wake winner that displaced a PLANNED anchor, so the
+ *  wake-anchored rescheduler keeps its planned-vs-actual delta. Without this,
+ *  dropping the planned anchor makes computeSleepWindow read the recorded time
+ *  as "planned" too → delta 0 → the whole-day re-anchor silently disables
+ *  (8:00 items rendering above an 8:56 recorded wake — the reported bug). */
+export interface ConsolidatedSleepMeta {
+  _plannedWakeMin?: number;
+}
+
 /**
  * Collapse duplicate sleep action rows to one wake + one bed anchor.
  * Returns the SAME array reference when nothing needs merging.
  */
-export function consolidateSleepActions<T extends SleepActionLike>(items: T[]): T[] {
+export function consolidateSleepActions<T extends SleepActionLike>(
+  items: T[],
+): Array<T & ConsolidatedSleepMeta> {
   const wake: T[] = [];
   const bed: T[] = [];
   for (const i of items) {
@@ -86,7 +97,8 @@ export function consolidateSleepActions<T extends SleepActionLike>(items: T[]): 
   if (wake.length <= 1 && bed.length <= 1) return items;
 
   const drop = new Set<T>();
-  const carry = new Map<T, string>();
+  const carryNotes = new Map<T, string>();
+  const carryPlanned = new Map<T, number>();
   for (const [bucket, arr] of [['wake', wake], ['bed', bed]] as const) {
     if (arr.length <= 1) continue;
     const winner = pickWinner(arr, bucket);
@@ -94,10 +106,24 @@ export function consolidateSleepActions<T extends SleepActionLike>(items: T[]): 
       if (loser === winner) continue;
       drop.add(loser);
       // Preserve authored guidance when the winner carries none.
-      if (!winner.notes && loser.notes && !carry.has(winner)) carry.set(winner, loser.notes);
+      if (!winner.notes && loser.notes && !carryNotes.has(winner)) carryNotes.set(winner, loser.notes);
+      // Preserve the PLANNED wake time when a recorded measurement displaces a
+      // planned anchor — earliest planned candidate wins the stamp.
+      if (bucket === 'wake' && isRecorded(winner) && !isRecorded(loser)) {
+        const m = minutesOfTime(loser.scheduled_time);
+        if (m != null && (!carryPlanned.has(winner) || m < (carryPlanned.get(winner) as number))) {
+          carryPlanned.set(winner, m);
+        }
+      }
     }
   }
   return items
     .filter((i) => !drop.has(i))
-    .map((i) => (carry.has(i) ? { ...i, notes: carry.get(i) } : i));
+    .map((i) => {
+      if (!carryNotes.has(i) && !carryPlanned.has(i)) return i;
+      const out: T & ConsolidatedSleepMeta = { ...i };
+      if (carryNotes.has(i)) out.notes = carryNotes.get(i);
+      if (carryPlanned.has(i)) out._plannedWakeMin = carryPlanned.get(i);
+      return out;
+    });
 }
