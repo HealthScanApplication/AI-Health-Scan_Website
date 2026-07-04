@@ -2,10 +2,16 @@
  * AdminWorkspace (DEV-318) — thin tab shell around the existing admin panel so
  * the new Catalog Data-QA view sits alongside it without bloating the
  * 8k-line SimplifiedAdminPanel. PageRenderer renders this in the admin page.
+ *
+ * Also owns the admin theme (Supabase-style light/dark): the `.sb-admin` root
+ * class + `sb-dark` modifier drive the token layer in adminTheme.css. The
+ * choice persists in localStorage('admin-theme').
  */
 
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { CatalogQADashboard } from './CatalogQADashboard';
+import './adminTheme.css';
 
 // Keep SimplifiedAdminPanel lazy (it's large) — same code-split as before.
 const SimplifiedAdminPanel = React.lazy(() =>
@@ -31,6 +37,12 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export function AdminWorkspace({ user, accessToken }: { user: any; accessToken: string }): React.ReactElement {
   const [tab, setTab] = useState<AdminTab>('panel');
   const [jumpSearch, setJumpSearch] = useState<string | undefined>(undefined);
+  const [dark, setDark] = useState<boolean>(() => {
+    try { return localStorage.getItem('admin-theme') === 'dark'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('admin-theme', dark ? 'dark' : 'light'); } catch { /* noop */ }
+  }, [dark]);
 
   // DEV-318: from a Data-QA offender row → switch to the Admin Panel with its
   // search pre-filled so the admin lands on that item to fix it.
@@ -40,10 +52,21 @@ export function AdminWorkspace({ user, accessToken }: { user: any; accessToken: 
   };
 
   return (
-    <div>
-      <div className="mb-4 flex gap-2 border-b border-gray-200">
-        <TabButton active={tab === 'panel'} onClick={() => setTab('panel')}>Admin Panel</TabButton>
-        <TabButton active={tab === 'qa'} onClick={() => setTab('qa')}>Data QA</TabButton>
+    <div className={`sb-admin${dark ? ' sb-dark' : ''}`} style={{ background: 'var(--sb-page)', borderRadius: 12, padding: 16 }}>
+      <div className="mb-4 flex items-center justify-between border-b border-gray-200">
+        <div className="flex gap-2">
+          <TabButton active={tab === 'panel'} onClick={() => setTab('panel')}>Admin Panel</TabButton>
+          <TabButton active={tab === 'qa'} onClick={() => setTab('qa')}>Data QA</TabButton>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDark((d) => !d)}
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="mb-1 flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+        >
+          {dark ? <Sun size={13} /> : <Moon size={13} />}
+          {dark ? 'Light' : 'Dark'}
+        </button>
       </div>
 
       {tab === 'panel' ? (

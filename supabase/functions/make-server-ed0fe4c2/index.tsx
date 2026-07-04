@@ -1229,21 +1229,36 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
     cleanUpdates.updated_at = new Date().toISOString()
     const fieldCount = Object.keys(cleanUpdates).length
     console.log(`[Admin UPDATE] Table: ${table}, ID: ${id}, ${fieldCount} fields: ${Object.keys(cleanUpdates).join(', ')}`)
-    // Use UPDATE (not upsert) — upsert triggers an INSERT attempt which requires all NOT NULL cols
-    const { error, data: updatedRows } = await supabase.from(table).update(cleanUpdates).eq('id', id).select('id')
-    if (error) {
-      console.error(`[Admin UPDATE ERROR] ${error.message}`, error)
-      return c.json({ success: false, error: error.message }, 500)
+    // Write via REST (not the shared supabase-js client) so the request carries
+    // x-admin-email — the audit_row_change() trigger reads it to attribute this
+    // edit to the admin instead of the service role.
+    const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const restHeaders: Record<string, string> = {
+      apikey: svcKey, Authorization: `Bearer ${svcKey}`, 'Content-Type': 'application/json',
+      'x-admin-email': adminValidation.user?.email || '',
     }
+    // Use UPDATE (not upsert) — upsert triggers an INSERT attempt which requires all NOT NULL cols
+    const updRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&select=id`, {
+      method: 'PATCH', headers: { ...restHeaders, Prefer: 'return=representation' }, body: JSON.stringify(cleanUpdates),
+    })
+    if (!updRes.ok) {
+      const msg = await updRes.text()
+      console.error(`[Admin UPDATE ERROR] ${msg}`)
+      return c.json({ success: false, error: msg.slice(0, 300) }, 500)
+    }
+    const updatedRows = await updRes.json().catch(() => [])
     if (!updatedRows || updatedRows.length === 0) {
       // Record doesn't exist — attempt insert with slug auto-derived for tables that require it
       if (table === 'catalog_elements' && !cleanUpdates.slug) {
         cleanUpdates.slug = (cleanUpdates.name_common || id).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
       }
-      const { error: insertError } = await supabase.from(table).insert({ id, ...cleanUpdates })
-      if (insertError) {
-        console.error(`[Admin INSERT FALLBACK ERROR] ${insertError.message}`, insertError)
-        return c.json({ success: false, error: insertError.message }, 500)
+      const insRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/${table}`, {
+        method: 'POST', headers: { ...restHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ id, ...cleanUpdates }),
+      })
+      if (!insRes.ok) {
+        const msg = await insRes.text()
+        console.error(`[Admin INSERT FALLBACK ERROR] ${msg}`)
+        return c.json({ success: false, error: msg.slice(0, 300) }, 500)
       }
       console.log(`[Admin INSERT FALLBACK SUCCESS] ${table}/${id} (${fieldCount} fields)`)
     } else {

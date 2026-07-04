@@ -57,8 +57,10 @@ import {
   Filter,
   ClipboardList,
   GitMerge,
+  Table as TableIcon,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { RecordsTable, tableSupported } from './admin/RecordsTable';
 import { mergeCatalogRecords, mergeCatalogRecordsOnProd, updateCatalogFields, CATALOG_CFG, type CatalogKind } from '../utils/protocolAdmin';
 import { MarkdownField } from './admin/MarkdownField';
 import { getCurrentEnvironment, setCurrentEnvironment, getCurrentEnvironmentConfig, ENVIRONMENTS, type Environment } from '../utils/supabase/environments';
@@ -1787,6 +1789,15 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
   // Flatten tabs for backward compatibility
   const tabs = tabGroups.flatMap(g => g.tabs);
   
+  // Cards ⇄ Table view (Table = Supabase-style grid with server-side search/
+  // paging + inline + bulk editing — reaches past the cards' 1000-row fetch).
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    try { return localStorage.getItem('admin-view-mode') === 'table' ? 'table' : 'cards'; } catch { return 'cards'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('admin-view-mode', viewMode); } catch { /* noop */ }
+  }, [viewMode]);
+
   // Use React Query for data fetching (eliminates duplicate requests)
   const currentTab = tabs.find(t => t.id === activeTab);
   const { data: records = [], isLoading: loading, refetch: fetchRecords } = useAdminRecords({
@@ -5197,6 +5208,18 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     >
                       <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
+                    {tableSupported(currentTab?.table) && (
+                      <Button
+                        variant={viewMode === 'table' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode(m => (m === 'table' ? 'cards' : 'table'))}
+                        className="gap-1"
+                        title="Table view — spreadsheet-style inline + bulk editing over ALL records (server-side search & paging)"
+                      >
+                        <TableIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">Table</span>
+                      </Button>
+                    )}
                   </div>
 
                   {/* Sort Controls */}
@@ -5454,7 +5477,10 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                   </div>
                 )}
 
-                {/* Records Container */}
+                {/* Records Container — Table mode is the Supabase-style grid */}
+                {viewMode === 'table' && tableSupported(tab.table) ? (
+                  <RecordsTable table={tab.table} accessToken={accessToken} initialSearch={searchQuery.trim() || undefined} />
+                ) : (
                 <div className="space-y-3">
                   {loading ? (
                     <div className="text-center py-12 text-gray-500">Loading...</div>
@@ -5464,9 +5490,10 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     <div className="text-center py-12 text-gray-500">No records found</div>
                   )}
                 </div>
+                )}
 
-                {/* Pagination — always shown when multiple pages */}
-                {totalPages > 1 && (
+                {/* Pagination — always shown when multiple pages (cards mode) */}
+                {!(viewMode === 'table' && tableSupported(tab.table)) && totalPages > 1 && (
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600">
                       Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedRecords.length)} of {sortedRecords.length} records
