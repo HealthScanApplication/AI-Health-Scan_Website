@@ -9,6 +9,10 @@
  *     recipe suggester + recipe grouping so both agree on "a Lunch recipe".
  */
 
+// 'Supper' is retained in the union for cross-repo compile compatibility but
+// is NO LONGER PRODUCED: product decision 2026-07-03 folds Supper into the
+// Dinner slot everywhere (supper recipes bucket as Evening, "Supper" groups
+// merge into Dinner).
 export type MealSlot = 'Breakfast' | 'Lunch' | 'Dinner' | 'Supper' | 'Snack';
 export type MealBucket = 'Morning' | 'Afternoon' | 'Evening' | 'Snacks' | 'Beverages' | 'Anytime';
 
@@ -20,7 +24,8 @@ export type MealBucket = 'Morning' | 'Afternoon' | 'Evening' | 'Snacks' | 'Bever
  */
 export function mealSlotName(groupName?: string | null): MealSlot | null {
   const g = (groupName || '').toLowerCase().trim().replace(/^consume\s+/, '');
-  if (/^(breakfast|lunch|dinner|supper|snack)$/.test(g)) {
+  if (g === 'supper') return 'Dinner'; // Supper folds into Dinner (2026-07-03)
+  if (/^(breakfast|lunch|dinner|snack)$/.test(g)) {
     return (g.charAt(0).toUpperCase() + g.slice(1)) as MealSlot;
   }
   return null;
@@ -77,8 +82,7 @@ export function descriptiveMealSlot(groupName?: string | null): MealSlot | null 
   for (const t of tokens) {
     if (t === 'breakfast') return 'Breakfast';
     if (t === 'lunch') return 'Lunch';
-    if (t === 'dinner') return 'Dinner';
-    if (t === 'supper') return 'Supper';
+    if (t === 'dinner' || t === 'supper') return 'Dinner'; // Supper folds into Dinner
     if (t === 'snack' || t === 'snacks') return 'Snack';
   }
   return null;
@@ -109,6 +113,26 @@ export function slotDescriptors(name?: string | null): SlotDescriptors {
   if (/vegan|plant.?based|\bplant\b/.test(s)) d.vegan = true;
   if (/keto|low.?carb/.test(s)) d.keto = true;
   return d;
+}
+
+/**
+ * Default scheduled_time for each meal slot (HH:MM, editable per item after
+ * insert). Slotted meals must carry a time like every other protocol item so
+ * they sort correctly in the timeline — Breakfast < Lunch < Dinner.
+ */
+export const MEAL_SLOT_DEFAULT_TIMES: Record<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack', string> = {
+  Breakfast: '08:00',
+  Lunch: '13:00',
+  Dinner: '19:00',
+  Snack: '16:00',
+};
+
+/** Default HH:MM for a (possibly descriptive) slot/group name, or null when
+ *  the name isn't meal-slot-like. Supper resolves to Dinner's time. */
+export function mealSlotDefaultTime(slotOrGroupName?: string | null): string | null {
+  const slot = descriptiveMealSlot(slotOrGroupName);
+  if (!slot) return null;
+  return MEAL_SLOT_DEFAULT_TIMES[slot as keyof typeof MEAL_SLOT_DEFAULT_TIMES] ?? null;
 }
 
 /** Parse a recipe prep_time (free text like "15", "10-15 min") → minutes, or null. */

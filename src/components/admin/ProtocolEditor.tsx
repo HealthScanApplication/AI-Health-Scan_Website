@@ -288,6 +288,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [kindTab, setKindTab] = useState<Kind>('action');
+  // multi-day protocols (day_number cycles): which cycle day the editor shows
+  const [viewDay, setViewDay] = useState(1);
+  useEffect(() => { setViewDay(1); }, [selectedId]);
   // catalog linking
   const [linkInfo, setLinkInfo] = useState<Map<string, CatalogHit & { kind: CatalogKind }>>(new Map());
   const [linkerItemId, setLinkerItemId] = useState<string | null>(null);
@@ -552,7 +555,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
         kind,
         scope: isRule ? 'outside' : null,
         scheduled_time: isRule || parentId ? null : (preset?.scheduled_time ?? '08:00:00'),
-        day_number: 1,
+        day_number: viewDay,
         sort_order: maxSort + 1,
         parent_protocol_item_id: parentId || null,
         group_name: preset?.group_name ?? null,
@@ -572,8 +575,25 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     }
   }
 
-  // the day's sleep window (wake / bedtime anchors + computed hours) — shared logic.
-  const dayItems = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id);
+  // ── multi-day cycle (mirrors the app: useActiveProtocol's day_number logic) ──
+  // An item shows on cycle day D when day_number is null (= every day) or === D.
+  const allDayItems = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id);
+  const cycleLen = Math.max(selected?.total_days || 0, ...allDayItems.map((i) => i.day_number || 0), 1);
+  const showsOnDay = (it: AdminProtocolItem, d: number) => it.day_number == null || it.day_number === d;
+  // the app only cycles when total_days is set — surface + one-click-fix when it isn't
+  const totalDaysMissing = cycleLen > 1 && !(selected?.total_days && selected.total_days > 1);
+  async function fixTotalDays() {
+    if (!selected) return;
+    try {
+      const updated = await updateProtocol(accessToken, selected.id, { total_days: cycleLen });
+      setProtocols((ps) => ps.map((p) => (p.id === selected.id ? { ...p, ...updated } : p)));
+      setForm((f) => ({ ...f, total_days: updated.total_days ?? cycleLen }));
+      toast.success(`Total days set to ${cycleLen} — the app will now cycle days`);
+    } catch (e: any) { toast.error(`Update failed: ${e?.message || e}`); }
+  }
+
+  // the SELECTED day's sleep window (wake / bedtime anchors + computed hours) — shared logic.
+  const dayItems = allDayItems.filter((it) => cycleLen <= 1 || showsOnDay(it, viewDay));
   const sleepWin = computeSleepWindow(dayItems);
   const wakeItem = sleepWin.wakeItem;
   const bedItem = sleepWin.bedItem;
@@ -611,7 +631,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
           display_name: which === 'wake' ? 'End Sleep' : 'Start Sleep',
           item_type: 'activity', kind: 'action', scheduled_time: hhmmss,
           group_name: 'Sleep', category: 'sleep', subtype: 'sleep',
-          day_number: 1, sort_order: maxSort + 1, hidden: false,
+          day_number: viewDay, sort_order: maxSort + 1, hidden: false,
         });
         setItems((its) => [...its, created]);
         baseline.current.set(created.id, { ...created });
@@ -1400,7 +1420,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                   <div style={{ display: 'flex', gap: 6 }}>
                     {KIND_TABS.map(({ k, label }) => {
                       const on = kindTab === k;
-                      const count = items.filter((i) => i.kind === k && !i.parent_protocol_item_id).length;
+                      const count = items.filter((i) => i.kind === k && !i.parent_protocol_item_id
+                        && (k !== 'action' || cycleLen <= 1 || showsOnDay(i, viewDay))).length;
                       return (
                         <button key={k} onClick={() => setKindTab(k)}
                           style={{ fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? '#EEF4FF' : '#fff', color: on ? C.accent : C.sub }}>
@@ -1411,6 +1432,31 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                   </div>
                   <AddStepMenu />
                 </div>
+                {/* Day strip — one cycle day at a time (like the app's day_number cycling) */}
+                {kindTab === 'action' && cycleLen > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.sub }}>
+                      <CalendarDays size={13} /> Day
+                    </span>
+                    {Array.from({ length: cycleLen }, (_, i) => i + 1).map((d) => {
+                      const on = viewDay === d;
+                      const n = allDayItems.filter((i) => showsOnDay(i, d)).length;
+                      return (
+                        <button key={d} onClick={() => setViewDay(d)} title={`${n} steps on day ${d}`}
+                          style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, fontSize: 12.5, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.ink : C.hair), background: on ? C.ink : '#fff', color: on ? '#fff' : C.sub }}>
+                          {d}<span style={{ fontSize: 9.5, fontWeight: 600, opacity: 0.65 }}>{n}</span>
+                        </button>
+                      );
+                    })}
+                    {totalDaysMissing && (
+                      <button onClick={fixTotalDays}
+                        title="Items carry day numbers but the protocol has no total_days — without it the app can't cycle and shows every day at once."
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#B45309', padding: '5px 9px', borderRadius: 8, border: '1px solid #FCD34D', background: '#FFFBEB', cursor: 'pointer', marginLeft: 4 }}>
+                        <AlertCircle size={12} /> App shows all days at once — set total days = {cycleLen}
+                      </button>
+                    )}
+                  </div>
+                )}
                 {/* Sleep & wake window — book-ends the day for every protocol (like the app) */}
                 {kindTab === 'action' && (
                   <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 16px', padding: '10px 12px', marginBottom: 12, borderRadius: 10, border: '1px solid ' + C.hair, background: C.panel }}>
@@ -1456,7 +1502,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                 {loadingItems ? (
                   <div style={{ padding: 24, textAlign: 'center', color: C.faint }}><Loader2 size={18} className="animate-spin" style={{ display: 'inline' }} /></div>
                 ) : (() => {
-                  const tops = items.filter((i) => i.kind === kindTab && !i.parent_protocol_item_id);
+                  const tops = items.filter((i) => i.kind === kindTab && !i.parent_protocol_item_id
+                    && (kindTab !== 'action' || cycleLen <= 1 || showsOnDay(i, viewDay)));
                   if (!tops.length) return <div style={{ padding: 24, textAlign: 'center', color: C.faint, fontSize: 13 }}>Nothing here yet — add the first one.</div>;
 
                   // group helper
@@ -1517,12 +1564,14 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, position: 'sticky', top: 12 }}>
               <PhonePreview
                 name={form.name || selected.name}
-                items={items}
+                items={cycleLen > 1
+                  ? items.filter((i) => i.parent_protocol_item_id != null || (i.kind && i.kind !== 'action') || showsOnDay(i, viewDay))
+                  : items}
                 imageUrl={form.image_url || selected.image_url}
                 linkImages={new Map([...linkInfo].filter(([, v]) => v.image).map(([id, v]) => [id, v.image as string]))}
               />
               <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 280 }}>
-                Live preview — the home screen as it appears in the mobile app.
+                Live preview — the home screen as it appears in the mobile app{cycleLen > 1 ? ` (day ${viewDay} of ${cycleLen})` : ''}.
               </p>
             </div>
           </div>

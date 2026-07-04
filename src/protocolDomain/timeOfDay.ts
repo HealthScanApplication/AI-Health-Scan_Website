@@ -3,6 +3,7 @@
  * SHARED, portable (no DOM/RN/icon imports). Mirrored BYTE-FOR-BYTE in both repos
  * (web + mobile src/protocolDomain/timeOfDay.ts). Edit both together.
  */
+import { isWakeName, isBedName, isSleepCategory } from './sleepWindow';
 
 export type SimpleTod = 'Morning' | 'Afternoon' | 'Evening';
 export const TOD_ORDER: SimpleTod[] = ['Morning', 'Afternoon', 'Evening'];
@@ -23,9 +24,23 @@ export function parseHM(t?: string | null): { h: number; m: number; mins: number
  *      items (e.g. 04:00 when you wake at 07:00) fall into the previous Evening.
  */
 export function getItemTod(
-  item: { group_name?: string | null; scheduled_time?: string | null },
+  item: { group_name?: string | null; scheduled_time?: string | null; display_name?: string | null; category?: string | null },
   wakeHour = 5,
 ): SimpleTod {
+  // Sleep bookends are deterministic and take priority over both the group
+  // keyword regex and the wake-hour Morning floor:
+  //   • a WAKE anchor ("End Sleep"/"Wake"/a morning sleep-category item) is
+  //     ALWAYS Morning — otherwise a 07:00 End Sleep gets pushed to the previous
+  //     Evening whenever the computed wakeHour (e.g. a wearable wake of 08:00) is
+  //     later than the anchor's own time, and the '/sleep/' group regex would
+  //     also mis-file it.
+  //   • a BEDTIME anchor ("Start Sleep"/an afternoon-or-later sleep item) is
+  //     ALWAYS Evening.
+  const sleepHm = parseHM(item.scheduled_time);
+  const sleepCat = isSleepCategory(item.category);
+  if (isWakeName(item.display_name) || (sleepCat && sleepHm != null && sleepHm.h < 12)) return 'Morning';
+  if (isBedName(item.display_name) || (sleepCat && sleepHm != null && sleepHm.h >= 12)) return 'Evening';
+
   const g = (item.group_name || '').toLowerCase();
   if (g) {
     if (/morning|wake|(^|\s)am(\s|$)/.test(g)) return 'Morning';

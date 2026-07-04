@@ -12,7 +12,9 @@
 export type ProtocolCategory = 'supplements' | 'consume' | 'do' | 'sleep';
 export const CATEGORY_ORDER: ProtocolCategory[] = ['supplements', 'consume', 'do', 'sleep'];
 
-const SLEEP_NAME = /^sleep$|^start[\s-]?sleep|^end[\s-]?sleep|^wake(\s?up)?$|dream[\s-]?journal|nightly[\s-]?reflection|wind[\s-]?down|lights?[\s-]?out/i;
+// `^wake\b` (not `^wake$`) so timed variants — "Wake 5", "Wake at 4am",
+// "Wake up" — bucket as sleep cards too, matching sleepWindow's wake anchors.
+const SLEEP_NAME = /^sleep$|^start[\s-]?sleep|^end[\s-]?sleep|^wake\b|dream[\s-]?journal|nightly[\s-]?reflection|wind[\s-]?down|lights?[\s-]?out/i;
 
 /** True when a display name reads as a sleep / wind-down / wake card. */
 export function isSleepItemByName(displayName?: string | null): boolean {
