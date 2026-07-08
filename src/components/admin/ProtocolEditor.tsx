@@ -11,8 +11,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
-  Pencil, GitMerge, Download, Upload, Repeat, CalendarDays,
+  Pencil, GitMerge, Download, Upload, Repeat, CalendarDays, FileText,
 } from 'lucide-react';
+import { generateProtocolPdf } from '../../utils/protocolPdf';
 import { toast } from 'sonner';
 import {
   CATEGORY_TINTS, categorize, type ProtocolItem as CatItem,
@@ -284,6 +285,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
   const [form, setForm] = useState<Partial<AdminProtocol>>({});
   const [savingProtocol, setSavingProtocol] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -439,6 +441,22 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     'catalog_recipe_id', 'catalog_product_id', 'catalog_activity_id', 'catalog_ingredient_id', 'supplement_id',
     'recurrence_type', 'recurrence_days_of_week', 'recurrence_interval_days', 'recurrence_start_date', 'recurrence_end_date', 'scheduled_date',
   ];
+
+  async function downloadPdf() {
+    if (!selected) return;
+    setPdfBusy(true);
+    try {
+      await generateProtocolPdf({
+        accessToken,
+        protocol: { ...selected, ...form } as any,
+        items: items as any,
+        day: cycleLen > 1 ? viewDay : 1,
+      });
+      toast.success('PDF downloaded');
+    } catch (e: any) {
+      toast.error(`PDF failed: ${e?.message || e}`);
+    } finally { setPdfBusy(false); }
+  }
 
   function exportProtocol() {
     if (!selected) return;
@@ -1355,6 +1373,10 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
                     {/* export / import round-trip */}
                     <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }}
                       onChange={(e) => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) importProtocol(f); }} />
+                    <button onClick={downloadPdf} disabled={pdfBusy} title="Download a printable black-&-white weekly habit tracker PDF (instructions + recipes) to share with users"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: pdfBusy ? 'default' : 'pointer', border: '1px solid ' + C.ink, background: C.ink, color: '#fff', opacity: pdfBusy ? 0.7 : 1 }}>
+                      {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} PDF
+                    </button>
                     <button onClick={exportProtocol} title="Download this protocol + steps as JSON"
                       style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>
                       <Download size={14} /> Export
