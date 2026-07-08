@@ -62,18 +62,31 @@ async function fetchRecipes(accessToken: string, ids: string[]): Promise<Recipe[
   const ings: any[] = ingRes.ok ? await ingRes.json() : [];
   const byRecipe = new Map<string, any[]>();
   for (const g of ings) { const a = byRecipe.get(g.recipe_id) || []; a.push(g); byRecipe.set(g.recipe_id, a); }
-  return recs.map((r) => ({
-    id: r.id, name_common: r.name_common, description: r.description,
-    servings: r.servings, prep_time: r.prep_time, cook_time: r.cook_time, instructions: r.instructions,
-    ingredients: (byRecipe.get(r.id) || [])
+  return recs.map((r) => {
+    const mapped = (byRecipe.get(r.id) || [])
       .sort((a, b) => (a.display_order ?? a.sort_order ?? 0) - (b.display_order ?? b.sort_order ?? 0))
       .map((g) => {
         const qty = g.quantity != null ? String(g.quantity) : g.amount_g != null ? String(g.amount_g) : '';
         const unit = g.unit || (g.amount_g != null ? 'g' : '');
         const amount = [qty, unit].filter(Boolean).join(' ') + (g.preparation ? `, ${g.preparation}` : '');
         return { name: g.ingredient_name || 'Ingredient', amount: amount.trim(), optional: !!g.is_optional };
-      }),
-  }));
+      });
+    // De-duplicate by ingredient name (the catalog has repeat rows — e.g. two
+    // "Almond Milk" linked via different ids). Keep the first, but upgrade to a
+    // row that carries an amount if the first had none. Order is preserved.
+    const seen = new Map<string, { name: string; amount: string; optional: boolean }>();
+    for (const ing of mapped) {
+      const key = ing.name.toLowerCase().replace(/\s+/g, ' ').trim();
+      const cur = seen.get(key);
+      if (!cur) seen.set(key, ing);
+      else if (!cur.amount && ing.amount) seen.set(key, { ...ing, optional: cur.optional && ing.optional });
+    }
+    return {
+      id: r.id, name_common: r.name_common, description: r.description,
+      servings: r.servings, prep_time: r.prep_time, cook_time: r.cook_time, instructions: r.instructions,
+      ingredients: [...seen.values()],
+    };
+  });
 }
 
 function instructionSteps(instructions: any): string[] {
