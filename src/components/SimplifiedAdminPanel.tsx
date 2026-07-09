@@ -58,9 +58,11 @@ import {
   ClipboardList,
   GitMerge,
   Table as TableIcon,
+  ShoppingBag,
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { RecordsTable, tableSupported } from './admin/RecordsTable';
+import { KitsPanel } from './admin/KitsPanel';
 import { mergeCatalogRecords, mergeCatalogRecordsOnProd, updateCatalogFields, CATALOG_CFG, type CatalogKind } from '../utils/protocolAdmin';
 import { MarkdownField } from './admin/MarkdownField';
 import { getCurrentEnvironment, setCurrentEnvironment, getCurrentEnvironmentConfig, ENVIRONMENTS, type Environment } from '../utils/supabase/environments';
@@ -1774,6 +1776,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
         { id: 'hs_services', label: 'Services', icon: <Briefcase className="w-4 h-4 text-teal-600" />, table: 'hs_services' },
         { id: 'hs_experts', label: 'Experts', icon: <UserCheck className="w-4 h-4 text-teal-600" />, table: 'hs_experts' },
         { id: 'hs_packages', label: 'Packages', icon: <Gift className="w-4 h-4 text-teal-600" />, table: 'hs_packages' },
+        { id: 'kits', label: 'Kits', icon: <ShoppingBag className="w-4 h-4 text-teal-600" />, table: '' },
       ]
     },
     {
@@ -1806,7 +1809,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     accessToken,
     // 'protocols' is handled by the dedicated ProtocolEditor against the real
     // `protocols`/`protocol_items` tables — skip the legacy catalog fetch.
-    enabled: !!currentTab && activeTab !== 'sync' && activeTab !== 'protocols',
+    enabled: !!currentTab && activeTab !== 'sync' && activeTab !== 'protocols' && activeTab !== 'kits',
   });
   const [editingRecord, setEditingRecord] = useState<AdminRecord | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -4690,6 +4693,8 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                 {tab.id === 'protocols' ? (
                   <ProtocolEditor accessToken={accessToken} onOpenCatalogRecord={openCatalogRecord} />
+                ) : tab.id === 'kits' ? (
+                  <KitsPanel accessToken={accessToken} />
                 ) : (<>
                 {/* Waitlist Funnel Dashboard */}
                 {tab.id === 'waitlist' && validRecords.length > 0 && !showSearch && (
