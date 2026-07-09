@@ -45,11 +45,19 @@ export interface KitItem {
   variant_id: string | null; title: string | null; price_usd: number | null;
   image_url: string | null; affiliate_url: string | null; catalog_product_id: string | null;
   sort: number | null; sku: string | null;
+  // economics (20260710_kit_item_economics): margin_pct is a GENERATED column —
+  // read-only, recomputed from price_usd/supplier_cost_usd; never PATCH it.
+  supplier_cost_usd: number | null; supplier: string | null; commission_pct: number | null;
+  margin_pct: number | null;
 }
 export interface ProtocolLite { id: string; name: string; is_public: boolean | null; source: string | null }
+export interface RegionRule {
+  id: string; item_type: string; item_id: string; region: KitRegion;
+  action: 'block' | 'warn' | string; reason: string | null; substitute_item_id: string | null;
+}
 
 const KIT_COLS = 'id,protocol_id,slug,market,kind,title,subtitle,cart_url,partner_label,partner_cart_url,price_usd,is_live,items_slug,created_at';
-const ITEM_COLS = 'id,slug,market,lane,variant_id,title,price_usd,image_url,affiliate_url,catalog_product_id,sort,sku';
+const ITEM_COLS = 'id,slug,market,lane,variant_id,title,price_usd,image_url,affiliate_url,catalog_product_id,sort,sku,supplier_cost_usd,supplier,commission_pct,margin_pct';
 
 export async function listAllKits(accessToken: string): Promise<ProtocolKit[]> {
   const res = await fetch(`${rest()}/protocol_kits?select=${KIT_COLS}&order=slug.asc,market.asc`, { headers: headers(accessToken) });
@@ -58,6 +66,137 @@ export async function listAllKits(accessToken: string): Promise<ProtocolKit[]> {
 export async function listKitItemsBySlug(accessToken: string, slug: string, market: KitRegion): Promise<KitItem[]> {
   const res = await fetch(`${rest()}/protocol_kit_items?slug=eq.${encodeURIComponent(slug)}&market=eq.${market}&select=${ITEM_COLS}&order=sort.asc.nullslast`, { headers: headers(accessToken) });
   return (await handle(res, 'List kit items')) || [];
+}
+/** Every item row for one kit slug across ALL regions — feeds the region matrix. */
+export async function listKitItemsAllRegions(accessToken: string, slug: string): Promise<KitItem[]> {
+  const res = await fetch(`${rest()}/protocol_kit_items?slug=eq.${encodeURIComponent(slug)}&select=${ITEM_COLS}&order=sort.asc.nullslast`, { headers: headers(accessToken) });
+  return (await handle(res, 'List kit items')) || [];
+}
+
+/* ── region legality rules (catalog_region_rules — what the app blocks/warns per region) ── */
+export async function listRegionRules(accessToken: string): Promise<RegionRule[]> {
+  const res = await fetch(`${rest()}/catalog_region_rules?select=id,item_type,item_id,region,action,reason,substitute_item_id&order=region.asc`, { headers: headers(accessToken) });
+  return (await handle(res, 'List region rules')) || [];
+}
+export async function createRegionRule(accessToken: string, rule: Partial<RegionRule>): Promise<RegionRule> {
+  const res = await fetch(`${rest()}/catalog_region_rules`, { method: 'POST', headers: headers(accessToken, { Prefer: 'return=representation' }), body: JSON.stringify(rule) });
+  const rows = await handle(res, 'Create region rule');
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+export async function deleteRegionRule(accessToken: string, id: string): Promise<void> {
+  const res = await fetch(`${rest()}/catalog_region_rules?id=eq.${id}`, { method: 'DELETE', headers: headers(accessToken) });
+  await handle(res, 'Delete region rule');
+}
+
+/** Resolve mixed catalog item_ids (rules reference products / ingredients /
+ *  activities / supplements by id) → display names. Best-effort per table. */
+export async function resolveItemNames(accessToken: string, ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const uniq = [...new Set(ids.filter(Boolean))];
+  if (!uniq.length) return out;
+  const list = uniq.map(encodeURIComponent).join(',');
+  const sources: Array<[string, string]> = [
+    ['catalog_products', 'id,name_common'],
+    ['catalog_ingredients', 'id,name_common'],
+    ['catalog_activities', 'id,name'],
+    ['hs_supplements', 'id,name'],
+  ];
+  await Promise.all(sources.map(async ([table, cols]) => {
+    try {
+      const res = await fetch(`${rest()}/${table}?id=in.(${list})&select=${cols}`, { headers: headers(accessToken) });
+      if (!res.ok) return;
+      for (const r of await res.json()) if (!out.has(r.id)) out.set(r.id, r.name_common || r.name);
+    } catch { /* best-effort */ }
+  }));
+  return out;
+}
+
+/** Product search for linking a kit item / picking a rule target or substitute. */
+export async function searchProductsLite(accessToken: string, q: string, limit = 8): Promise<{ id: string; name: string; image: string | null }[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const res = await fetch(
+    `${rest()}/catalog_products?or=(name_common.ilike.*${encodeURIComponent(term)}*,name_brand.ilike.*${encodeURIComponent(term)}*)&select=id,name_common,name_brand,image_url&limit=${limit}`,
+    { headers: headers(accessToken) },
+  );
+  const rows = (await handle(res, 'Search products')) || [];
+  return rows.map((r: any) => ({ id: r.id, name: r.name_common || r.name_brand || r.id, image: r.image_url }));
+}
+
+/** Clone ONE kit item into a target market, honouring an optional BLOCK rule:
+ *  with a substitute defined the substitute PRODUCT is inserted instead — lane
+ *  derived the way the mobile app does (numeric shopify_variant_id → store,
+ *  else its affiliate/purchase URL → affiliate). Returns what happened. */
+export async function cloneKitItem(
+  accessToken: string, slug: string, it: KitItem, to: KitRegion, blockRule?: RegionRule,
+): Promise<{ outcome: 'copied' | 'substituted' | 'blocked'; detail: string }> {
+  const base: Partial<KitItem> = {
+    slug, market: to, lane: it.lane, variant_id: it.variant_id, title: it.title,
+    price_usd: it.price_usd, image_url: it.image_url, affiliate_url: it.affiliate_url,
+    catalog_product_id: it.catalog_product_id, sort: it.sort, sku: it.sku,
+    supplier_cost_usd: it.supplier_cost_usd, supplier: it.supplier, commission_pct: it.commission_pct,
+  };
+  if (blockRule) {
+    if (!blockRule.substitute_item_id) return { outcome: 'blocked', detail: it.title || it.id };
+    let sub: any = null;
+    try {
+      const res = await fetch(
+        `${rest()}/catalog_products?id=eq.${encodeURIComponent(blockRule.substitute_item_id)}&select=id,name_common,name_brand,price_usd,image_url,shopify_variant_id,purchase_url,affiliate_link_shopify,affiliate_url,affiliate_link_amazon&limit=1`,
+        { headers: headers(accessToken) },
+      );
+      if (res.ok) sub = (await res.json())[0] || null;
+    } catch { /* fall through to name-only */ }
+    const subName = sub?.name_common || sub?.name_brand || blockRule.substitute_item_id;
+    const subVariant = String(sub?.shopify_variant_id || '').trim();
+    const subAffiliate = sub?.purchase_url || sub?.affiliate_link_shopify || sub?.affiliate_url || sub?.affiliate_link_amazon || null;
+    await createKitItem(accessToken, {
+      ...base,
+      title: subName,
+      catalog_product_id: blockRule.substitute_item_id,
+      lane: /^\d+$/.test(subVariant) ? 'store' : 'affiliate',
+      variant_id: /^\d+$/.test(subVariant) ? subVariant : null,
+      affiliate_url: /^\d+$/.test(subVariant) ? null : subAffiliate,
+      price_usd: sub?.price_usd ?? it.price_usd,
+      image_url: sub?.image_url ?? null,
+      supplier_cost_usd: null, supplier: null, commission_pct: null, // economics don't transfer to a different product
+    });
+    return { outcome: 'substituted', detail: `${it.title} → ${subName}` };
+  }
+  await createKitItem(accessToken, base);
+  return { outcome: 'copied', detail: it.title || it.id };
+}
+
+/** Copy one region's kit items into another region, compliance-aware:
+ *  items already present in the target (same title) are left alone; items whose
+ *  linked product is BLOCKED in the target region are skipped (or swapped for
+ *  the rule's substitute when one is defined). Warn-level rules copy through
+ *  (the app shows the warning). Items with no catalog link copy as-is — flagged
+ *  in the summary so the admin reviews them manually. */
+export async function copyKitRegion(
+  accessToken: string, slug: string, from: KitRegion, to: KitRegion, rules: RegionRule[],
+): Promise<{ copied: number; skippedBlocked: string[]; substituted: string[]; unlinked: string[] }> {
+  const all = await listKitItemsAllRegions(accessToken, slug);
+  const src = all.filter((i) => i.market === from);
+  const dst = all.filter((i) => i.market === to);
+  const dstTitles = new Set(dst.map((i) => (i.title || '').toLowerCase()));
+  const dstProducts = new Set(dst.map((i) => i.catalog_product_id).filter(Boolean));
+  const blockRules = new Map(rules.filter((r) => r.region === to && r.action === 'block').map((r) => [r.item_id, r]));
+  const summary = { copied: 0, skippedBlocked: [] as string[], substituted: [] as string[], unlinked: [] as string[] };
+  for (const it of src) {
+    // already present in the target? Match by title, by linked product, or — for a
+    // blocked item — by its rule's SUBSTITUTE product (a re-run must not insert the
+    // substitute twice: the target holds the substitute's title/product, not the source's).
+    const rulePeek = it.catalog_product_id ? blockRules.get(it.catalog_product_id) : undefined;
+    if (dstTitles.has((it.title || '').toLowerCase())) continue;
+    if (it.catalog_product_id && dstProducts.has(it.catalog_product_id)) continue;
+    if (rulePeek?.substitute_item_id && dstProducts.has(rulePeek.substitute_item_id)) continue;
+    const rule = rulePeek;
+    const r = await cloneKitItem(accessToken, slug, it, to, rule);
+    if (r.outcome === 'copied') { summary.copied += 1; if (!it.catalog_product_id) summary.unlinked.push(it.title || it.id); }
+    else if (r.outcome === 'substituted') summary.substituted.push(r.detail);
+    else summary.skippedBlocked.push(r.detail);
+  }
+  return summary;
 }
 /** All protocols visible in the admin (id/name/public/source) — for resolving
  *  protocol_kits.protocol_id → a name, and for the "missing a kit" audit. */

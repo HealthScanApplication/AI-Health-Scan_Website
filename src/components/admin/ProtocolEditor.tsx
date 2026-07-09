@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
-  Pencil, GitMerge, Download, Upload, Repeat, CalendarDays, FileText,
+  Pencil, GitMerge, Download, Upload, Repeat, CalendarDays, FileText, ChevronUp,
 } from 'lucide-react';
 import { generateProtocolPdf } from '../../utils/protocolPdf';
 import { toast } from 'sonner';
@@ -216,6 +216,14 @@ function primaryTypeOf(it: AdminProtocolItem): string {
 }
 
 const VERB_OPTS: Opt[] = [{ value: '', label: '+ verb' }, ...DO_VERBS.map((v) => ({ value: v, label: v }))];
+// meal-slot group picker for consume items (group_name drives the app's slot cards)
+const SLOT_OPTS: Opt[] = [
+  { value: 'none', label: 'No slot' },
+  { value: 'Breakfast', label: 'Breakfast', Icon: Utensils, color: '#388E3C' },
+  { value: 'Lunch', label: 'Lunch', Icon: Utensils, color: '#388E3C' },
+  { value: 'Dinner', label: 'Dinner', Icon: Utensils, color: '#388E3C' },
+  { value: 'Snack', label: 'Snack', Icon: Apple, color: '#E64A19' },
+];
 const SCOPE_OPTS: Opt[] = SCOPES.map((s) => ({ value: s, label: s }));
 // cadence — maps to protocol_items.recurrence_type (the mobile app's itemShowsOnDate honours these)
 const REPEAT_OPTS: Opt[] = [
@@ -377,6 +385,12 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
     if (!selected) return false;
     return PROTO_FIELDS.some((f) => (form as any)[f] !== (selected as any)[f]);
   }, [form, selected]);
+  // switching protocols with unsaved form edits silently discarded them — guard it
+  function selectProtocol(id: string) {
+    if (id === selectedId) return;
+    if (dirty && !window.confirm('You have unsaved protocol changes — discard them and switch?')) return;
+    setSelectedId(id);
+  }
 
   // distinct, case-folded filter options drawn from the loaded protocols
   const distinctOf = (key: keyof AdminProtocol) => {
@@ -713,6 +727,33 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
       editItemLocal(it.id, prev);
       toast.error(`Update failed: ${e?.message || e}`);
     } finally { setBusyItem(null); }
+  }
+  // reorder a rule within its tab (Do's / Don'ts render in sort_order). Reindexes
+  // ALL siblings sequentially so equal/null sort_orders can't stick together.
+  async function moveRule(it: AdminProtocolItem, dir: -1 | 1) {
+    const sibs = items.filter((x) => x.kind === it.kind && !x.parent_protocol_item_id);
+    const idx = sibs.findIndex((x) => x.id === it.id);
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= sibs.length) return;
+    const order = [...sibs];
+    order.splice(idx, 1);
+    order.splice(j, 0, it);
+    const newSort = new Map(order.map((x, i) => [x.id, i + 1]));
+    setBusyItem(it.id);
+    try {
+      await Promise.all(order.filter((x) => x.sort_order !== newSort.get(x.id))
+        .map((x) => updateProtocolItem(accessToken, x.id, { sort_order: newSort.get(x.id)! })));
+      // mirror the fetch ordering locally (scheduled_time nulls-last, then sort_order)
+      setItems((its) => its
+        .map((x) => (newSort.has(x.id) ? { ...x, sort_order: newSort.get(x.id)! } : x))
+        .sort((a, b) => {
+          const ta = a.scheduled_time ? 0 : 1, tb = b.scheduled_time ? 0 : 1;
+          if (ta !== tb) return ta - tb;
+          if (a.scheduled_time && b.scheduled_time && a.scheduled_time !== b.scheduled_time) return a.scheduled_time < b.scheduled_time ? -1 : 1;
+          return (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9);
+        }));
+    } catch (e: any) { toast.error(`Reorder failed: ${e?.message || e}`); }
+    finally { setBusyItem(null); }
   }
   // primary "what is it?" → category + item_type + a valid subtype
   function setPrimaryType(it: AdminProtocolItem, t: string) {
@@ -1106,9 +1147,31 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
               {cat === 'do' && (
                 <IconSelect value={curVerb} options={VERB_OPTS} onChange={(v) => setVerb(it, v)} width={92} placeholder="+ verb" />
               )}
+              {cat === 'consume' && (
+                <IconSelect value={it.group_name || 'none'} options={SLOT_OPTS} width={104}
+                  placeholder={it.group_name || 'No slot'}
+                  onChange={(g) => commitField(it, { group_name: g === 'none' ? null : g })} />
+              )}
+              {cycleLen > 1 && (
+                <select value={it.day_number == null ? '' : String(it.day_number)}
+                  title="Which cycle day this step belongs to (empty = every day)"
+                  onChange={(e) => commitField(it, { day_number: e.target.value === '' ? null : Number(e.target.value) })}
+                  style={{ ...inputStyle, width: 88, flexShrink: 0, padding: '7px 4px' }}>
+                  <option value="">Every day</option>
+                  {Array.from({ length: cycleLen }, (_, i) => i + 1).map((d) => <option key={d} value={d}>Day {d}</option>)}
+                </select>
+              )}
             </>
           ) : (
-            <IconSelect value={it.scope || 'none'} options={SCOPE_OPTS} onChange={(s) => commitField(it, { scope: s === 'none' ? null : s })} width={116} />
+            <>
+              <IconSelect value={it.scope || 'none'} options={SCOPE_OPTS} onChange={(s) => commitField(it, { scope: s === 'none' ? null : s })} width={116} />
+              <button onClick={() => moveRule(it, -1)} disabled={busyItem === it.id} title="Move up" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 3, color: C.sub, flexShrink: 0, display: 'inline-flex' }}>
+                <ChevronUp size={14} />
+              </button>
+              <button onClick={() => moveRule(it, 1)} disabled={busyItem === it.id} title="Move down" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 3, color: C.sub, flexShrink: 0, display: 'inline-flex' }}>
+                <ChevronDown size={14} />
+              </button>
+            </>
           )}
           {/* action icons stay grouped (never split across a wrap) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, marginLeft: 'auto' }}>
@@ -1328,7 +1391,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
             return (
               <button
                 key={p.id}
-                onClick={() => setSelectedId(p.id)}
+                onClick={() => selectProtocol(p.id)}
                 style={{
                   width: '100%', textAlign: 'left', padding: '10px 12px', cursor: 'pointer',
                   border: 'none', borderBottom: '1px solid ' + C.hair,

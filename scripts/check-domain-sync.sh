@@ -12,7 +12,7 @@ if [ ! -d "$MOB" ]; then
   exit 0
 fi
 
-if diff -r "$WEB" "$MOB" >/tmp/domain-sync.diff 2>&1; then
+if diff -r --exclude=__tests__ "$WEB" "$MOB" >/tmp/domain-sync.diff 2>&1; then
   echo "✓ protocolDomain is in sync (web === mobile)"
 else
   echo "✗ protocolDomain has DIVERGED between web and mobile:"

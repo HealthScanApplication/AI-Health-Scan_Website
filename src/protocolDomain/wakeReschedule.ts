@@ -59,7 +59,19 @@ export interface WakeShiftOptions {
   actualWakeMins?: number | null;
   /** Safety cap on the shift, minutes. Default 240 (4h). */
   maxShiftMin?: number;
+  /**
+   * Bedtime anchor, minutes-of-day (computeSleepWindow.bedMins). When set,
+   * shifted items are clamped to `bedMins − BED_BUFFER_MIN` — the day must
+   * RESPECT the bedtime (product 2026-07-04): a 6:45pm post-dinner walk on a
+   * 10pm-bed protocol slid by a late wake must never land at 10:11pm. Items
+   * that pile up at the cap share the same time and keep their relative
+   * order via sort stability.
+   */
+  bedMins?: number | null;
 }
+
+/** Gap kept between the last shifted item and the bed anchor. */
+export const BED_BUFFER_MIN = 10;
 
 /** Format minutes-of-day to a 24h "HH:MM" clock string. */
 function fmtHHMM(mins: number): string {
@@ -102,6 +114,12 @@ export function applyWakeShift<T extends WakeShiftItemLike>(
 ): Array<T & WakeShiftMeta> {
   const shift = wakeShiftMinutes(opts);
   if (shift <= 0) return items as Array<T & WakeShiftMeta>;
+  // Ceiling for any shifted time: just before bed when a bedtime exists
+  // (evening bed only — a 1pm nap is not a day boundary), else 23:59.
+  const bedCapMins =
+    opts.bedMins != null && opts.bedMins >= 18 * 60
+      ? Math.max(0, opts.bedMins - BED_BUFFER_MIN)
+      : DAY_MAX_MIN;
 
   return items.map((it) => {
     const mins = minutesOfTime(it.scheduled_time ?? null);
@@ -118,7 +136,9 @@ export function applyWakeShift<T extends WakeShiftItemLike>(
     }
     if (!eligible) return it;
 
-    const shifted = Math.min(mins + shift, DAY_MAX_MIN);
+    // Items already inside the bed buffer stay put rather than moving BACKWARD.
+    const cap = Math.max(bedCapMins, Math.min(mins, DAY_MAX_MIN));
+    const shifted = Math.min(mins + shift, cap);
     if (shifted === mins) return it;
     return { ...it, scheduled_time: fmtHHMM(shifted), _wakeShiftedFromMin: mins };
   });

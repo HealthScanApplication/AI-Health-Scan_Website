@@ -1,137 +1,167 @@
 /**
  * KitsPanel — admin surface for the REAL "buy this protocol" kits
- * (protocol_kits / protocol_kit_items), which had ZERO admin visibility before
- * this (no tab, no CRUD — only reachable via raw SQL). This is a different
- * feature from the "Packages" tab (hs_packages/package_items), which has no
- * items in any package and is never read by the mobile app; this one IS what
- * ProtocolKitButton.tsx renders as the "Shop the Kit" button.
+ * (protocol_kits / protocol_kit_items), the tables the mobile app's
+ * ProtocolKitButton actually reads (unlike the dead hs_packages/package_items).
  *
- * Coverage: 129 protocols total; only ~31 have any kit row, ~10 have a live
- * kit. This panel makes that gap visible and lets an admin fix it: create the
- * 4 region rows for a protocol, edit kit metadata, and manage its line items.
+ * v2: each kit renders as a KitMatrix — items × regions (US/EU/UK/AU) with
+ * legality badges from catalog_region_rules, per-item economics (supplier cost,
+ * generated margin, affiliate commission) and compliance-aware region copying.
+ * Below the kits, RegionRulesManager edits the block/warn rules themselves
+ * (some items are illegal per region: melatonin AU/EU, NMN in the EU, …).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Loader2, Plus, RefreshCw, ShoppingBag, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Plus, RefreshCw, Scale, Search as SearchIcon, ShoppingBag, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  listAllKits, listAllProtocolsLite, listKitItemsBySlug, createKit, updateKit, deleteKit,
-  createKitItem, updateKitItem, deleteKitItem, createKitAllRegions, kitSlugFor, REGIONS,
-  type ProtocolKit, type KitItem, type ProtocolLite, type KitRegion,
+  listAllKits, listAllProtocolsLite, createKitAllRegions, listRegionRules, createRegionRule, deleteRegionRule,
+  resolveItemNames, searchProductsLite, REGIONS,
+  type ProtocolKit, type ProtocolLite, type RegionRule, type KitRegion,
 } from '../../utils/kitsAdmin';
+import { KitMatrix } from './KitMatrix';
 
-const inputCls = 'w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
+const inputCls = 'rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
 const btnCls = 'inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50';
 
-function commitField<T extends Record<string, any>>(save: (patch: Partial<T>) => Promise<void>, key: keyof T) {
-  return async (e: React.FocusEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    try { await save({ [key]: v === '' ? null : v } as Partial<T>); }
-    catch (err: any) { toast.error(`Save failed: ${err?.message || err}`); }
-  };
-}
-
-function KitItemRow({ item, accessToken, onChange, onDelete }: { item: KitItem; accessToken: string; onChange: (patch: Partial<KitItem>) => void; onDelete: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const save = async (patch: Partial<KitItem>) => {
-    setBusy(true);
-    try { await updateKitItem(accessToken, item.id, patch); onChange(patch); }
-    catch (e: any) { toast.error(`Save failed: ${e?.message || e}`); }
-    finally { setBusy(false); }
-  };
-  return (
-    <div className={`grid grid-cols-12 gap-2 items-center rounded-md border border-gray-100 p-2 ${busy ? 'opacity-60' : ''}`}>
-      <input className={`${inputCls} col-span-3`} defaultValue={item.title || ''} placeholder="Title" onBlur={commitField<KitItem>(save, 'title')} />
-      <select className={`${inputCls} col-span-2`} defaultValue={item.lane || 'store'} onChange={(e) => save({ lane: e.target.value })}>
-        <option value="store">Store</option>
-        <option value="affiliate">Affiliate</option>
-      </select>
-      <input className={`${inputCls} col-span-2`} defaultValue={item.variant_id || ''} placeholder="Variant id" onBlur={commitField<KitItem>(save, 'variant_id')} />
-      <input className={`${inputCls} col-span-3`} defaultValue={item.affiliate_url || ''} placeholder="Affiliate URL" onBlur={commitField<KitItem>(save, 'affiliate_url')} />
-      <input className={`${inputCls} col-span-1`} defaultValue={item.price_usd ?? ''} placeholder="$" onBlur={commitField<KitItem>(save, 'price_usd' as any)} />
-      <button onClick={onDelete} title="Remove item" className="col-span-1 flex justify-center text-red-500 hover:text-red-700">
-        <Trash2 size={14} />
-      </button>
-    </div>
-  );
-}
-
-function KitRegionRow({ kit, accessToken, onDeleted }: { kit: ProtocolKit; accessToken: string; onDeleted: () => void }) {
+/* ── region legality rules manager ── */
+function RegionRulesManager({ rules, accessToken, onChanged }: { rules: RegionRule[]; accessToken: string; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<KitItem[] | null>(null);
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [live, setLive] = useState(kit.is_live);
-  const [busy, setBusy] = useState(false);
+  const [names, setNames] = useState<Map<string, string>>(new Map());
+  const [adding, setAdding] = useState(false);
+  // add-rule form
+  const [region, setRegion] = useState<KitRegion>('EU');
+  const [action, setAction] = useState<'block' | 'warn'>('block');
+  const [reason, setReason] = useState('');
+  const [itemQ, setItemQ] = useState('');
+  const [itemHits, setItemHits] = useState<{ id: string; name: string }[]>([]);
+  const [itemSel, setItemSel] = useState<{ id: string; name: string } | null>(null);
+  const [subQ, setSubQ] = useState('');
+  const [subHits, setSubHits] = useState<{ id: string; name: string }[]>([]);
+  const [subSel, setSubSel] = useState<{ id: string; name: string } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoadingItems(true);
-    try { setItems(await listKitItemsBySlug(accessToken, kit.items_slug || kit.slug, kit.market)); }
-    catch (e: any) { toast.error(`Load items failed: ${e?.message || e}`); setItems([]); }
-    finally { setLoadingItems(false); }
-  }, [accessToken, kit.items_slug, kit.slug, kit.market]);
+  useEffect(() => {
+    const ids = rules.flatMap((r) => [r.item_id, r.substitute_item_id]).filter(Boolean) as string[];
+    resolveItemNames(accessToken, ids).then(setNames).catch(() => { /* best effort */ });
+  }, [rules, accessToken]);
 
-  useEffect(() => { if (open && items === null) load(); }, [open, items, load]);
-
-  const toggleLive = async () => {
-    const next = !live; setLive(next); setBusy(true);
-    try { await updateKit(accessToken, kit.id, { is_live: next }); toast.success(next ? 'Kit is live' : 'Kit hidden'); }
-    catch (e: any) { setLive(!next); toast.error(`Update failed: ${e?.message || e}`); }
-    finally { setBusy(false); }
+  const doSearch = (q: string, set: (h: { id: string; name: string }[]) => void) => {
+    if (!q.trim()) { set([]); return; }
+    searchProductsLite(accessToken, q, 6).then((hits) => set(hits.map((h) => ({ id: h.id, name: h.name })))).catch(() => set([]));
   };
-  const addItem = async () => {
+
+  const addRule = async () => {
+    if (!itemSel) { toast.error('Pick the product the rule applies to'); return; }
+    setAdding(true);
     try {
-      const created = await createKitItem(accessToken, { slug: kit.items_slug || kit.slug, market: kit.market, lane: 'store', title: 'New item', sort: (items?.length || 0) + 1 });
-      setItems((it) => [...(it || []), created]);
-    } catch (e: any) { toast.error(`Add item failed: ${e?.message || e}`); }
+      await createRegionRule(accessToken, {
+        item_type: 'product', item_id: itemSel.id, region, action,
+        reason: reason.trim() || null, substitute_item_id: subSel?.id || null,
+      });
+      toast.success(`${action.toUpperCase()} rule added for ${itemSel.name} in ${region}`);
+      setItemSel(null); setItemQ(''); setSubSel(null); setSubQ(''); setReason('');
+      onChanged();
+    } catch (e: any) { toast.error(`Add rule failed: ${e?.message || e}`); }
+    finally { setAdding(false); }
   };
-  const removeItem = async (id: string) => {
-    try { await deleteKitItem(accessToken, id); setItems((it) => (it || []).filter((i) => i.id !== id)); }
-    catch (e: any) { toast.error(`Remove failed: ${e?.message || e}`); }
-  };
-  const removeKit = async () => {
-    if (!window.confirm(`Delete the ${kit.market} kit row for "${kit.title || kit.slug}"? This does not delete its line items.`)) return;
-    try { await deleteKit(accessToken, kit.id); onDeleted(); toast.success('Kit region removed'); }
+  const removeRule = async (r: RegionRule) => {
+    const nm = names.get(r.item_id) || r.item_id;
+    if (!window.confirm(`Delete the ${r.region} ${r.action} rule for "${nm}"? The app will stop ${r.action === 'block' ? 'hiding' : 'warning about'} it there.`)) return;
+    try { await deleteRegionRule(accessToken, r.id); onChanged(); }
     catch (e: any) { toast.error(`Delete failed: ${e?.message || e}`); }
   };
 
-  const empty = items !== null && items.length === 0;
+  const byRegion = useMemo(() => {
+    const m = new Map<string, RegionRule[]>();
+    for (const r of rules) { const a = m.get(r.region) || []; a.push(r); m.set(r.region, a); }
+    return m;
+  }, [rules]);
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white">
-      <div className="flex items-center gap-2 p-2">
-        <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-gray-500">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
-        <span className="w-9 shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-gray-600">{kit.market}</span>
-        <input className={`${inputCls} flex-1`} defaultValue={kit.title || ''} placeholder="Kit title" onBlur={commitField<ProtocolKit>((p) => updateKit(accessToken, kit.id, p), 'title')} />
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${items === null ? 'bg-gray-100 text-gray-400' : empty ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
-          {items === null ? '…' : `${items.length} item${items.length === 1 ? '' : 's'}`}
-        </span>
-        <button onClick={toggleLive} disabled={busy} title={live ? 'Live — click to hide' : 'Hidden — click to go live'}
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${live ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-          {live ? 'Live' : 'Hidden'}
-        </button>
-        <button onClick={removeKit} title="Delete this region's kit row" className="shrink-0 text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
-      </div>
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 p-3 text-left">
+        {open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+        <Scale size={14} className="text-gray-500" />
+        <span className="text-sm font-semibold text-gray-900">Region legality rules</span>
+        <span className="text-xs text-gray-500">{rules.length} rules — what the app blocks or warns about per region (melatonin, NMN, ashwagandha…)</span>
+      </button>
       {open && (
-        <div className="space-y-2 border-t border-gray-100 p-2">
-          <div className="grid grid-cols-2 gap-2">
-            <input className={inputCls} defaultValue={kit.subtitle || ''} placeholder="Subtitle" onBlur={commitField<ProtocolKit>((p) => updateKit(accessToken, kit.id, p), 'subtitle')} />
-            <input className={inputCls} defaultValue={kit.cart_url || ''} placeholder="Cart URL (fixed-price bundle)" onBlur={commitField<ProtocolKit>((p) => updateKit(accessToken, kit.id, p), 'cart_url')} />
-            <input className={inputCls} defaultValue={kit.partner_label || ''} placeholder="Partner label" onBlur={commitField<ProtocolKit>((p) => updateKit(accessToken, kit.id, p), 'partner_label')} />
-            <input className={inputCls} defaultValue={kit.partner_cart_url || ''} placeholder="Partner cart URL" onBlur={commitField<ProtocolKit>((p) => updateKit(accessToken, kit.id, p), 'partner_cart_url')} />
-          </div>
-          {loadingItems ? (
-            <div className="py-3 text-center text-gray-400"><Loader2 size={14} className="mx-auto animate-spin" /></div>
-          ) : (
-            <div className="space-y-1.5">
-              {(items || []).map((it) => (
-                <KitItemRow key={it.id} item={it} accessToken={accessToken}
-                  onChange={(patch) => setItems((arr) => (arr || []).map((x) => (x.id === it.id ? { ...x, ...patch } : x)))}
-                  onDelete={() => removeItem(it.id)} />
-              ))}
-              {empty && <div className="rounded-md bg-amber-50 border border-amber-100 p-2 text-xs text-amber-700">No items — the app falls back to this protocol's linked catalog products instead of a curated kit.</div>}
-              <button onClick={addItem} className={btnCls}><Plus size={12} /> Add item</button>
+        <div className="space-y-3 border-t border-gray-100 p-3">
+          {REGIONS.filter((r) => byRegion.has(r)).map((r) => (
+            <div key={r}>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{r}</div>
+              <div className="space-y-1">
+                {(byRegion.get(r) || []).map((rule) => (
+                  <div key={rule.id} className="flex items-start gap-2 rounded-md border border-gray-100 p-1.5 text-sm">
+                    <span className={`mt-0.5 shrink-0 rounded px-1.5 text-[10px] font-bold ${rule.action === 'block' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                      {rule.action.toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium text-gray-800">{names.get(rule.item_id) || rule.item_id}</span>
+                      {rule.substitute_item_id && <span className="text-emerald-700"> → {names.get(rule.substitute_item_id) || rule.substitute_item_id}</span>}
+                      {rule.reason && <div className="truncate text-xs text-gray-500" title={rule.reason}>{rule.reason}</div>}
+                    </div>
+                    <button onClick={() => removeRule(rule)} className="shrink-0 text-red-400 hover:text-red-600"><Trash2 size={13} /></button>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
+          ))}
+          {/* add rule */}
+          <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
+            <div className="mb-1.5 text-xs font-semibold text-gray-600">Add rule (product-level)</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={region} onChange={(e) => setRegion(e.target.value as KitRegion)} className={inputCls}>
+                {REGIONS.map((r) => <option key={r}>{r}</option>)}
+              </select>
+              <select value={action} onChange={(e) => setAction(e.target.value as 'block' | 'warn')} className={inputCls}>
+                <option value="block">block</option>
+                <option value="warn">warn</option>
+              </select>
+              <div className="relative">
+                {itemSel ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-xs text-white">
+                    {itemSel.name}
+                    <button onClick={() => setItemSel(null)} className="text-gray-300 hover:text-white">×</button>
+                  </span>
+                ) : (
+                  <>
+                    <input value={itemQ} onChange={(e) => { setItemQ(e.target.value); doSearch(e.target.value, setItemHits); }}
+                      placeholder="Product it applies to…" className={inputCls + ' w-56'} />
+                    {itemHits.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-64 rounded-md border border-gray-200 bg-white shadow-md">
+                        {itemHits.map((h) => (
+                          <button key={h.id} onClick={() => { setItemSel(h); setItemHits([]); }} className="block w-full truncate px-2 py-1 text-left text-xs hover:bg-gray-50">{h.name}</button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="relative">
+                {subSel ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs text-white">
+                    → {subSel.name}
+                    <button onClick={() => setSubSel(null)} className="text-emerald-100 hover:text-white">×</button>
+                  </span>
+                ) : (
+                  <>
+                    <input value={subQ} onChange={(e) => { setSubQ(e.target.value); doSearch(e.target.value, setSubHits); }}
+                      placeholder="Substitute (optional)…" className={inputCls + ' w-48'} />
+                    {subHits.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-64 rounded-md border border-gray-200 bg-white shadow-md">
+                        {subHits.map((h) => (
+                          <button key={h.id} onClick={() => { setSubSel(h); setSubHits([]); }} className="block w-full truncate px-2 py-1 text-left text-xs hover:bg-gray-50">{h.name}</button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (shown to users)…" className={inputCls + ' flex-1 min-w-40'} />
+              <button onClick={addRule} disabled={adding} className={btnCls}>
+                {adding ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -141,6 +171,7 @@ function KitRegionRow({ kit, accessToken, onDeleted }: { kit: ProtocolKit; acces
 export function KitsPanel({ accessToken }: { accessToken: string }) {
   const [kits, setKits] = useState<ProtocolKit[] | null>(null);
   const [protocols, setProtocols] = useState<ProtocolLite[] | null>(null);
+  const [rules, setRules] = useState<RegionRule[]>([]);
   const [loading, setLoading] = useState(false);
   const [showMissing, setShowMissing] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
@@ -149,8 +180,8 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [k, p] = await Promise.all([listAllKits(accessToken), listAllProtocolsLite(accessToken)]);
-      setKits(k); setProtocols(p);
+      const [k, p, r] = await Promise.all([listAllKits(accessToken), listAllProtocolsLite(accessToken), listRegionRules(accessToken)]);
+      setKits(k); setProtocols(p); setRules(r);
     } catch (e: any) { toast.error(`Load failed: ${e?.message || e}`); }
     finally { setLoading(false); }
   }, [accessToken]);
@@ -177,7 +208,6 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
     [protocols, kittedProtocolIds],
   );
   const liveCount = (kits || []).filter((k) => k.is_live).length;
-  const protocolsWithKit = kittedProtocolIds.size;
 
   const makeKit = async (p: ProtocolLite) => {
     setCreating(p.id);
@@ -193,7 +223,7 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Protocol Kits — buy-this-protocol bundles</h3>
-          <p className="text-xs text-gray-500">The real "Shop the Kit" feature the app reads (region-aware, store + affiliate lanes). Different from the Packages tab, which has no items and isn't used by the app.</p>
+          <p className="text-xs text-gray-500">Items × regions matrix per kit. Badges show what's blocked/warned per region; expand a row for supplier cost, margin and affiliate commission.</p>
         </div>
         <button onClick={load} disabled={loading} className={btnCls}><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh</button>
       </div>
@@ -205,7 +235,7 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <div className="text-xs uppercase tracking-wide text-gray-500">With a kit</div>
-          <div className="text-2xl font-semibold text-gray-900">{protocolsWithKit}</div>
+          <div className="text-2xl font-semibold text-gray-900">{kittedProtocolIds.size}</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <div className="text-xs uppercase tracking-wide text-gray-500">Live kit rows</div>
@@ -235,9 +265,14 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
         </div>
       )}
 
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search kits or protocol name…" className={inputCls + ' max-w-sm'} />
+      <RegionRulesManager rules={rules} accessToken={accessToken} onChanged={load} />
 
-      <div className="space-y-4">
+      <div className="relative max-w-sm">
+        <SearchIcon size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search kits or protocol name…" className={inputCls + ' w-full pl-8'} />
+      </div>
+
+      <div className="space-y-5">
         {slugs.map((slug) => {
           const rows = (bySlug.get(slug) || []).slice().sort((a, b) => REGIONS.indexOf(a.market) - REGIONS.indexOf(b.market));
           const name = protocolName.get(rows[0]?.protocol_id) || rows[0]?.title || slug;
@@ -247,8 +282,9 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
                 <ShoppingBag size={13} className="text-gray-400" />
                 <span className="text-sm font-semibold text-gray-800">{name}</span>
                 <span className="text-xs text-gray-400">/{slug}</span>
+                {rows[0]?.partner_label && <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-600 border border-teal-100">Partner: {rows[0].partner_label}</span>}
               </div>
-              {rows.map((k) => <KitRegionRow key={k.id} kit={k} accessToken={accessToken} onDeleted={load} />)}
+              <KitMatrix slug={slug} kits={rows} rules={rules} accessToken={accessToken} protocolName={name} onKitsChanged={load} />
             </div>
           );
         })}
