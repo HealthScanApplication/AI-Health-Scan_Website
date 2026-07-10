@@ -13,7 +13,7 @@ import { Download, ExternalLink, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem,
-  fmtMoney, itemMarginPct, listFxRates,
+  fmtMoney, itemMarginPct, itemSellUsd, listFxRates,
   type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
 import { useEffect } from 'react';
@@ -55,6 +55,23 @@ function Thumb({ src, size = 20 }: { src: string | null | undefined; size?: numb
 
 /** a protocol-mentioned product that is NOT in this kit region yet */
 interface MissingRow { key: string; slug: string; market: KitRegion; kit: ProtocolKit; product: ProtocolSuggestion }
+
+type SortKey = 'region' | 'kit' | 'protocol' | 'product' | 'supplier' | 'cost' | 'sell' | 'margin';
+/** clickable header cell: click cycles asc → desc → default grouping */
+function SortTh({ k, sortCol, onSort, children, style, title }: {
+  k: SortKey; sortCol: { key: SortKey; dir: 1 | -1 } | null; onSort: (k: SortKey) => void;
+  children: React.ReactNode; style?: React.CSSProperties; title?: string;
+}) {
+  const active = sortCol?.key === k;
+  return (
+    <th style={{ ...style, cursor: 'pointer', userSelect: 'none' }} onClick={() => onSort(k)}
+      title={title || 'Click to sort (again to flip, third click restores kit grouping)'}>
+      <span style={active ? { color: 'var(--sb-brand-strong)' } : undefined}>
+        {children}{active ? (sortCol!.dir === 1 ? ' ↑' : ' ↓') : ''}
+      </span>
+    </th>
+  );
+}
 
 export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, productLinkCounts, mentions, accessToken, onOpenKit, onOpenProtocol, onOpenProduct, onItemsChanged }: {
   items: KitItem[]; kits: ProtocolKit[]; protocols: ProtocolLite[]; rules: RegionRule[];
@@ -145,7 +162,13 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     });
   }, [missingAll, fRegion, fLane, fLinked, fBuy, fText, protoName]);
 
-  // merged display: per kit+region, real items first, then its missing products
+  // column sort (click a header): null = the default kit/region grouping
+  const [sortCol, setSortCol] = useState<null | { key: 'region' | 'kit' | 'protocol' | 'product' | 'supplier' | 'cost' | 'sell' | 'margin'; dir: 1 | -1 }>(null);
+  const clickSort = (key: NonNullable<typeof sortCol>['key']) =>
+    setSortCol((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }));
+
+  // merged display: per kit+region, real items first, then its missing products;
+  // an active column sort flattens item rows (missing rows sink to the end)
   const display = useMemo(() => {
     const key = (slug: string, market: KitRegion, missing: 0 | 1, name: string) =>
       `${slug}\u0000${REGIONS.indexOf(market)}\u0000${missing}\u0000${name.toLowerCase()}`;
@@ -153,8 +176,33 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
       ...(fLane === 'missing' ? [] : rows).map((i) => ({ t: 'item' as const, i, k: key(i.slug, i.market, 0, i.title || '') })),
       ...missingRows.map((m) => ({ t: 'missing' as const, m, k: key(m.slug, m.market, 1, m.product.name) })),
     ];
-    return all.sort((a, b) => a.k.localeCompare(b.k));
-  }, [rows, missingRows, fLane]);
+    if (!sortCol) return all.sort((a, b) => a.k.localeCompare(b.k));
+    const val = (r: (typeof all)[number]): string | number => {
+      if (r.t === 'missing') {
+        return sortCol.key === 'product' ? r.m.product.name.toLowerCase()
+          : sortCol.key === 'kit' ? r.m.slug : sortCol.key === 'region' ? r.m.market
+          : sortCol.key === 'protocol' ? (protoName.get(r.m.kit.protocol_id) || '').toLowerCase()
+          : sortCol.key === 'sell' ? Number(r.m.product.price_usd) || 0 : '';
+      }
+      const i = r.i;
+      switch (sortCol.key) {
+        case 'region': return i.market;
+        case 'kit': return i.slug;
+        case 'protocol': { const kit = kitBySlugMarket.get(`${i.slug}:${i.market}`); return (kit ? protoName.get(kit.protocol_id) || '' : '').toLowerCase(); }
+        case 'product': return (i.title || '').toLowerCase();
+        case 'supplier': return (i.supplier || '').toLowerCase();
+        case 'cost': return Number(i.supplier_cost_usd) || 0;
+        case 'sell': return itemSellUsd(i, fx) ?? 0; // fx-normalized so €/£/A$ sort together
+        case 'margin': return itemMarginPct(i, fx) ?? -1;
+      }
+    };
+    return all.sort((a, b) => {
+      if (a.t !== b.t) return a.t === 'item' ? -1 : 1; // missing rows last while sorting
+      const va = val(a), vb = val(b);
+      const c = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+      return c * sortCol.dir;
+    });
+  }, [rows, missingRows, fLane, sortCol, protoName, kitBySlugMarket, fx]);
 
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const addMissing = async (m: MissingRow) => {
@@ -281,19 +329,19 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
         <table className="sb-table">
           <thead>
             <tr>
-              <th style={{ width: 46 }}>Region</th>
-              <th>Kit</th>
-              <th>Protocol</th>
-              <th>Product</th>
+              <SortTh k="region" sortCol={sortCol} onSort={clickSort} style={{ width: 46 }}>Region</SortTh>
+              <SortTh k="kit" sortCol={sortCol} onSort={clickSort}>Kit</SortTh>
+              <SortTh k="protocol" sortCol={sortCol} onSort={clickSort}>Protocol</SortTh>
+              <SortTh k="product" sortCol={sortCol} onSort={clickSort}>Product</SortTh>
               <th style={{ width: 60 }}>Lane</th>
               <th style={{ width: 72 }}>Buy path</th>
               <th style={{ width: 78 }} title="Has a real Shopify variant — i.e. published on the HealthScan Shopify store (Supliful/HS)">Published</th>
               <th style={{ width: 64 }}>Linked</th>
-              <th>Supplier</th>
+              <SortTh k="supplier" sortCol={sortCol} onSort={clickSort}>Supplier</SortTh>
               <th title="Partner affiliate link — opens the partner storefront">Affiliate</th>
-              <th style={{ width: 64 }}>Cost</th>
-              <th style={{ width: 64 }}>Sell</th>
-              <th style={{ width: 64 }}>Margin</th>
+              <SortTh k="cost" sortCol={sortCol} onSort={clickSort} style={{ width: 64 }}>Cost</SortTh>
+              <SortTh k="sell" sortCol={sortCol} onSort={clickSort} style={{ width: 64 }} title="Sorts on the fx-converted USD value, so regions compare fairly">Sell</SortTh>
+              <SortTh k="margin" sortCol={sortCol} onSort={clickSort} style={{ width: 64 }}>Margin</SortTh>
               <th style={{ width: 64 }}>Comm.</th>
               <th style={{ width: 56 }}>Live</th>
               <th style={{ width: 70 }}>Rule</th>

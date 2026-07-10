@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import {
   listKitItemsAllRegions, createKitItem, updateKitItem, deleteKitItem, updateKit, updateKitProtocol,
   copyKitRegion, cloneKitItem, searchProductsLite, kitItemFieldsFromProduct, listProtocolBuyableProducts,
-  linkKitItemToProduct, kitItemBuyPath, listFxRates, itemMarginPct, fmtMoney, convertKitRegionPrices,
+  linkKitItemToProduct, kitItemBuyPath, listFxRates, itemMarginPct, itemSellUsd, fmtMoney, convertKitRegionPrices,
   REGION_CURRENCY, CURRENCY_SYMBOL, fetchKitAiSuggestions, playbookSuggestionCards, type KitSuggestionCard,
   REGIONS, REGION_FLAG, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
   type ProtocolLite, type ProtocolSuggestion,
@@ -88,12 +88,39 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
     }
     return m;
   }, [items]);
+  // row ordering: manual (the kit's `sort` field — what mobile renders) or a
+  // computed order-by; drag-to-reorder is only live in manual mode
+  const [orderBy, setOrderBy] = useState<'manual' | 'name' | 'price' | 'margin'>('manual');
   const rowKeys = useMemo(() => {
-    // preserve source sort order: order rows by the min sort across markets
     const entries = [...byRow.entries()];
+    const firstOf = (cells: Partial<Record<KitRegion, KitItem>>) => cells.US || Object.values(cells).find(Boolean)!;
     const sortOf = (cells: Partial<Record<KitRegion, KitItem>>) => Math.min(...Object.values(cells).map((i) => i?.sort ?? 9999));
-    return entries.sort((a, b) => sortOf(a[1]) - sortOf(b[1])).map(([k]) => k);
-  }, [byRow]);
+    const cmp: Record<typeof orderBy, (a: Partial<Record<KitRegion, KitItem>>, b: Partial<Record<KitRegion, KitItem>>) => number> = {
+      manual: (a, b) => sortOf(a) - sortOf(b),
+      name: (a, b) => (firstOf(a).title || '').localeCompare(firstOf(b).title || ''),
+      price: (a, b) => (Number(firstOf(b).price_usd) || 0) - (Number(firstOf(a).price_usd) || 0),
+      margin: (a, b) => (itemMarginPct(firstOf(b), fx) ?? -1) - (itemMarginPct(firstOf(a), fx) ?? -1),
+    };
+    return entries.sort((a, b) => cmp[orderBy](a[1], b[1])).map(([k]) => k);
+  }, [byRow, orderBy, fx]);
+
+  // drag-to-reorder (manual mode): persists `sort` on every region cell so the
+  // mobile app's item order follows
+  const [dragRk, setDragRk] = useState<string | null>(null);
+  const dropOn = async (targetRk: string) => {
+    if (!dragRk || dragRk === targetRk || orderBy !== 'manual') { setDragRk(null); return; }
+    const order = rowKeys.filter((k) => k !== dragRk);
+    order.splice(order.indexOf(targetRk) + (rowKeys.indexOf(dragRk) < rowKeys.indexOf(targetRk) ? 1 : 0), 0, dragRk);
+    setDragRk(null);
+    const patches: Array<{ id: string; sort: number }> = [];
+    order.forEach((rk, idx) => {
+      for (const it of Object.values(byRow.get(rk) || {})) {
+        if (it && it.sort !== idx * 10) { patches.push({ id: it.id, sort: idx * 10 }); patchLocal(it.id, { sort: idx * 10 }); }
+      }
+    });
+    try { for (const p of patches) await updateKitItem(accessToken, p.id, { sort: p.sort }); }
+    catch (e: any) { toast.error(`Reorder failed: ${e?.message || e}`); await load(); }
+  };
 
   const ruleFor = useCallback((productId: string | null, region: KitRegion): RegionRule | undefined => {
     if (!productId) return undefined;
@@ -340,7 +367,19 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
           <table className="w-full text-sm" style={{ minWidth: 760 }}>
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-xs text-gray-500">
-                <th className="px-2 py-1.5 text-left font-medium" style={{ minWidth: 220 }}>Item</th>
+                <th className="px-2 py-1.5 text-left font-medium" style={{ minWidth: 220 }}>
+                  <span className="inline-flex items-center gap-1.5">
+                    Item
+                    <select value={orderBy} onChange={(e) => setOrderBy(e.target.value as typeof orderBy)}
+                      className="rounded border border-gray-300 bg-transparent px-1 py-0 text-[10px] font-normal text-gray-500"
+                      title="Row order. 'manual' is the kit's saved order (what the app shows) — drag the ≡ handle to change it.">
+                      <option value="manual">manual ≡</option>
+                      <option value="name">name A–Z</option>
+                      <option value="price">price ↓</option>
+                      <option value="margin">margin ↓</option>
+                    </select>
+                  </span>
+                </th>
                 {markets.map((m) => {
                   const k = kitByMarket.get(m)!;
                   return (
@@ -371,7 +410,9 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
                   <FragmentRow key={rk} rk={rk} cells={cells} first={first} markets={markets} isOpen={isOpen}
                     onToggle={() => setExpanded(isOpen ? null : rk)} ruleFor={ruleFor} busyCell={busyCell}
                     commit={commit} cloneCell={cloneCell} removeItem={removeItem}
-                    accessToken={accessToken} onLinkRow={linkRow} fx={fx} />
+                    accessToken={accessToken} onLinkRow={linkRow} fx={fx}
+                    draggable={orderBy === 'manual'} isDragging={dragRk === rk}
+                    onDragStart={() => setDragRk(rk)} onDragEnd={() => setDragRk(null)} onDropRow={() => dropOn(rk)} />
                 );
               })}
               {/* footer: per-region economics */}
@@ -401,7 +442,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
   );
 }
 
-function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, busyCell, commit, cloneCell, removeItem, accessToken, onLinkRow, fx }: {
+function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, busyCell, commit, cloneCell, removeItem, accessToken, onLinkRow, fx, draggable, isDragging, onDragStart, onDragEnd, onDropRow }: {
   rk: string; cells: Partial<Record<KitRegion, KitItem>>; first: KitItem; markets: KitRegion[]; isOpen: boolean;
   fx: Record<string, number>;
   onToggle: () => void; ruleFor: (pid: string | null, r: KitRegion) => RegionRule | undefined; busyCell: string | null;
@@ -409,14 +450,20 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
   cloneCell: (source: KitItem, to: KitRegion) => Promise<void>;
   removeItem: (it: KitItem) => Promise<void>;
   accessToken: string; onLinkRow: (cells: Partial<Record<KitRegion, KitItem>>, p: ProductHit) => Promise<void>;
+  draggable: boolean; isDragging: boolean;
+  onDragStart: () => void; onDragEnd: () => void; onDropRow: () => void;
 }) {
   const linked = !!first.catalog_product_id;
   const buyPath = kitItemBuyPath(first); // store | affiliate | null — same product across regions
   return (
     <>
-      <tr className="border-b border-gray-100 hover:bg-gray-50">
+      <tr className={`border-b border-gray-100 hover:bg-gray-50 ${isDragging ? 'opacity-40' : ''}`}
+        onDragOver={(e) => e.preventDefault()} onDrop={onDropRow}>
         <td className="px-2 py-1.5">
           <div className="flex items-center gap-1.5">
+            <span draggable={draggable} onDragStart={onDragStart} onDragEnd={onDragEnd}
+              title={draggable ? 'Drag to reorder — saves the kit order the app shows' : 'Switch order to "manual" to drag'}
+              className={`select-none text-gray-300 ${draggable ? 'cursor-grab hover:text-gray-500' : 'cursor-not-allowed opacity-40'}`}>≡</span>
             <button onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
               {isOpen ? <ChevronDown size={12} className="shrink-0 text-gray-400" /> : <ChevronRight size={12} className="shrink-0 text-gray-400" />}
               {first.image_url
@@ -454,23 +501,30 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
             <td key={m} className={`px-2 py-1.5 ${busyCell === it.id ? 'opacity-50' : ''}`}>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400">{CURRENCY_SYMBOL[it.currency || REGION_CURRENCY[m]] || it.currency}</span>
-                <input defaultValue={it.price_usd ?? ''} placeholder="0.00"
+                <input defaultValue={it.price_usd ?? ''} placeholder="0.00" title="Sale price (region currency)"
                   className="w-16 rounded border border-gray-200 bg-white px-1 py-0.5 text-xs"
                   onBlur={(e) => { const v = num(e.target.value); if (v !== it.price_usd) commit(it, { price_usd: v }); }} />
                 <span title={it.lane === 'store' ? 'HealthScan store (Shopify variant)' : 'Affiliate / external link'}
                   className={`rounded px-1 text-[10px] font-bold ${it.lane === 'store' ? 'bg-gray-900 text-white' : 'bg-purple-50 text-purple-600 border border-purple-300'}`}>
                   {it.lane === 'store' ? 'S' : 'A'}
                 </span>
-                {(() => { const mp = itemMarginPct(it, fx); return mp != null && (
-                  <span title={`Margin: sell ${fmtMoney(it.price_usd, it.currency)} → USD via FX, minus cost ${fmtMoney(it.supplier_cost_usd, 'USD')}`}
-                    className={`text-[10px] font-semibold ${mp >= 40 ? 'text-emerald-700' : mp >= 20 ? 'text-amber-600' : 'text-red-600'}`}>{mp}%</span>
-                ); })()}
                 {rule && (
                   <span title={`${rule.reason || ''}${rule.substitute_item_id ? ` (substitute defined)` : ''}`}
                     className={`rounded px-1 text-[9px] font-bold ${rule.action === 'block' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                     {rule.action === 'block' ? 'BLOCK' : 'WARN'}
                   </span>
                 )}
+              </div>
+              {/* cost + margin, per region, without expanding the row */}
+              <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
+                <span title="Supplier cost (always USD)">cost $</span>
+                <input defaultValue={it.supplier_cost_usd ?? ''} placeholder="—" title="Supplier cost (USD)"
+                  className="w-12 rounded border border-gray-200 bg-white px-1 py-0 text-[10px] text-gray-700"
+                  onBlur={(e) => { const v = num(e.target.value); if (v !== it.supplier_cost_usd) commit(it, { supplier_cost_usd: v }); }} />
+                {(() => { const mp = itemMarginPct(it, fx); return mp != null
+                  ? <span title={`Margin: sell ${fmtMoney(it.price_usd, it.currency)} → USD via FX (${fmtMoney(itemSellUsd(it, fx), 'USD')}) − cost ${fmtMoney(it.supplier_cost_usd, 'USD')}`}
+                      className={`font-semibold ${mp >= 40 ? 'text-emerald-700' : mp >= 20 ? 'text-amber-600' : 'text-red-600'}`}>{mp}% m</span>
+                  : <span title="Enter a supplier cost to see the margin">— m</span>; })()}
               </div>
             </td>
           );
