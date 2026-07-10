@@ -20,9 +20,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Copy as CopyIcon, Loader2, Plus, Settings2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  listKitItemsAllRegions, createKitItem, updateKitItem, deleteKitItem, updateKit,
-  copyKitRegion, cloneKitItem, searchProductsLite, kitItemFieldsFromProduct,
+  listKitItemsAllRegions, createKitItem, updateKitItem, deleteKitItem, updateKit, updateKitProtocol,
+  copyKitRegion, cloneKitItem, searchProductsLite, kitItemFieldsFromProduct, listProtocolBuyableProducts,
   REGIONS, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
+  type ProtocolLite, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
 
 const inputCls = 'w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
@@ -38,9 +39,9 @@ function num(v: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKitsChanged }: {
+export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protocols, onKitsChanged }: {
   slug: string; kits: ProtocolKit[]; rules: RegionRule[]; accessToken: string;
-  protocolName: string; onKitsChanged: () => void;
+  protocolName: string; protocols: ProtocolLite[]; onKitsChanged: () => void;
 }) {
   const [items, setItems] = useState<KitItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,9 +51,12 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
   const [copyTo, setCopyTo] = useState<KitRegion>('EU');
   const [copying, setCopying] = useState(false);
   const [busyCell, setBusyCell] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<ProtocolSuggestion[] | null>(null);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
 
   const kitByMarket = useMemo(() => new Map(kits.map((k) => [k.market, k])), [kits]);
   const markets = REGIONS.filter((r) => kitByMarket.has(r));
+  const protocolId = kits[0]?.protocol_id;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +65,11 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
     finally { setLoading(false); }
   }, [accessToken, slug]);
   useEffect(() => { load(); }, [load]);
+  // products the PROTOCOL mentions — candidates to link into the kit
+  useEffect(() => {
+    if (!protocolId) { setSuggestions([]); return; }
+    listProtocolBuyableProducts(accessToken, protocolId).then(setSuggestions).catch(() => setSuggestions([]));
+  }, [accessToken, protocolId]);
 
   const byRow = useMemo(() => {
     const m = new Map<string, Partial<Record<KitRegion, KitItem>>>();
@@ -168,6 +177,22 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
     catch (e: any) { toast.error(`Remove failed: ${e?.message || e}`); }
   };
 
+  // products the protocol references but the kit hasn't linked yet
+  const linkedProductIds = useMemo(() => new Set((items || []).map((i) => i.catalog_product_id).filter(Boolean)), [items]);
+  const unlinkedSuggestions = useMemo(() => (suggestions || []).filter((s) => !linkedProductIds.has(s.id)), [suggestions, linkedProductIds]);
+  const linkSuggestion = async (s: ProtocolSuggestion) => {
+    setLinkingId(s.id);
+    try { await addProduct(s, markets[0], true); await load(); }
+    finally { setLinkingId(null); }
+  };
+  const linkAllSuggestions = async () => {
+    if (!unlinkedSuggestions.length) return;
+    if (!window.confirm(`Link all ${unlinkedSuggestions.length} product(s) this protocol mentions into the kit (every region, skipping any that are blocked)?`)) return;
+    setLinkingId('__all__');
+    try { for (const s of unlinkedSuggestions) await addProduct(s, markets[0], true); await load(); }
+    finally { setLinkingId(null); }
+  };
+
   // per-region economics
   const totals = useMemo(() => {
     const t: Partial<Record<KitRegion, { sell: number; cost: number; costMissing: number; commission: number }>> = {};
@@ -208,6 +233,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
 
       {settingsOpen && (
         <div className="space-y-2 border-b border-gray-100 bg-gray-50 p-2">
+          <ProtocolReassign slug={slug} protocolId={protocolId} protocols={protocols} accessToken={accessToken} onChanged={onKitsChanged} />
           {markets.map((m) => {
             const k = kitByMarket.get(m)!;
             return (
@@ -229,6 +255,37 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* suggested from protocol — products the protocol mentions but the kit hasn't linked */}
+      {unlinkedSuggestions.length > 0 && (
+        <div className="border-b border-gray-100 bg-emerald-50 p-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-emerald-800">
+              This protocol mentions {unlinkedSuggestions.length} product{unlinkedSuggestions.length === 1 ? '' : 's'} not in the kit — link them in
+            </span>
+            <button onClick={linkAllSuggestions} disabled={linkingId === '__all__'}
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700">
+              {linkingId === '__all__' ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Link all
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {unlinkedSuggestions.map((s) => {
+              const isStore = /^\d+$/.test(String(s.shopify_variant_id || ''));
+              return (
+                <button key={s.id} onClick={() => linkSuggestion(s)} disabled={!!linkingId}
+                  title={`Mentioned ${s.mentions}× · links to every region (skips blocked)`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-2 py-1 text-[11px] text-gray-700 hover:border-emerald-400">
+                  {linkingId === s.id ? <Loader2 size={10} className="animate-spin" /> : <Plus size={10} className="text-emerald-600" />}
+                  {s.image && <img src={s.image} alt="" className="h-4 w-4 rounded object-cover" />}
+                  <span className="max-w-48 truncate">{s.protocolTitle}</span>
+                  {s.mentions > 1 && <span className="rounded bg-emerald-50 px-1 text-[9px] font-semibold text-emerald-700">{s.mentions}×</span>}
+                  <span className={`rounded px-1 text-[9px] font-bold ${isStore ? 'bg-gray-900 text-white' : 'bg-purple-50 text-purple-600 border border-purple-300'}`}>{isStore ? 'S' : 'A'}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -389,6 +446,52 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
         </tr>
       )}
     </>
+  );
+}
+
+/** Change which protocol a kit is displayed under (updates protocol_id on all
+ *  region rows; slug + items stay put). Typeahead over the protocol list. */
+function ProtocolReassign({ slug, protocolId, protocols, accessToken, onChanged }: {
+  slug: string; protocolId?: string; protocols: ProtocolLite[]; accessToken: string; onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const current = protocols.find((p) => p.id === protocolId);
+  const hits = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return [];
+    return protocols.filter((p) => p.name.toLowerCase().includes(t)).slice(0, 8);
+  }, [q, protocols]);
+  const pick = async (p: ProtocolLite) => {
+    setBusy(true);
+    try { await updateKitProtocol(accessToken, slug, p.id); toast.success(`Kit re-linked to "${p.name}"`); setEditing(false); setQ(''); onChanged(); }
+    catch (e: any) { toast.error(`Re-link failed: ${e?.message || e}`); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-white p-1.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Linked protocol</span>
+      {!editing ? (
+        <>
+          <span className="text-sm font-medium text-gray-800">{current?.name || protocolId || '—'}</span>
+          <button onClick={() => setEditing(true)} className="text-[11px] text-gray-500 underline hover:text-gray-800">change</button>
+        </>
+      ) : (
+        <div className="relative flex-1">
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search protocols…"
+            className="w-full rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-900"
+            onKeyDown={(e) => { if (e.key === 'Escape') { setEditing(false); setQ(''); } }} />
+          {hits.length > 0 && (
+            <div className="absolute z-30 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-md">
+              {hits.map((p) => (
+                <button key={p.id} onClick={() => pick(p)} disabled={busy} className="block w-full truncate px-2 py-1 text-left text-xs hover:bg-gray-50">{p.name}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

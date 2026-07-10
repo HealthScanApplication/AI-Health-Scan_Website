@@ -1775,8 +1775,9 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
         { id: 'hs_products', label: 'Products', icon: <Package className="w-4 h-4 text-teal-600" />, table: 'hs_products' },
         { id: 'hs_services', label: 'Services', icon: <Briefcase className="w-4 h-4 text-teal-600" />, table: 'hs_services' },
         { id: 'hs_experts', label: 'Experts', icon: <UserCheck className="w-4 h-4 text-teal-600" />, table: 'hs_experts' },
-        { id: 'hs_packages', label: 'Packages', icon: <Gift className="w-4 h-4 text-teal-600" />, table: 'hs_packages' },
-        { id: 'kits', label: 'Kits', icon: <ShoppingBag className="w-4 h-4 text-teal-600" />, table: '' },
+        // "Packages" (hs_packages/package_items) was dead — 0 items anywhere, never
+        // read by the app. Merged into Kits, which is the real buy-this-protocol feature.
+        { id: 'kits', label: 'Kits & Packages', icon: <ShoppingBag className="w-4 h-4 text-teal-600" />, table: '' },
       ]
     },
     {

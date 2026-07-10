@@ -136,6 +136,53 @@ export async function searchProductsLite(accessToken: string, q: string, limit =
   }));
 }
 
+export interface ProtocolSuggestion extends ProductHit { mentions: number; protocolTitle: string; kinds: string[] }
+/** Products the PROTOCOL already references (protocol_items.catalog_product_id)
+ *  — the natural candidates to fill an empty/partial kit. Deduped by product,
+ *  with the protocol's own display name (e.g. "Wild Yam Cream — Male") and how
+ *  many steps mention it. This is the junction to link: protocol → product →
+ *  kit item. */
+export async function listProtocolBuyableProducts(accessToken: string, protocolId: string): Promise<ProtocolSuggestion[]> {
+  const itRes = await fetch(
+    `${rest()}/protocol_items?protocol_id=eq.${protocolId}&catalog_product_id=not.is.null&select=display_name,catalog_product_id,kind,sort_order&order=sort_order.asc.nullslast&limit=500`,
+    { headers: headers(accessToken) },
+  );
+  const items: any[] = (await handle(itRes, 'Protocol items')) || [];
+  if (!items.length) return [];
+  const byProduct = new Map<string, { title: string; mentions: number; kinds: Set<string> }>();
+  for (const it of items) {
+    const cur = byProduct.get(it.catalog_product_id) || { title: it.display_name || it.catalog_product_id, mentions: 0, kinds: new Set<string>() };
+    cur.mentions += 1;
+    if (it.kind) cur.kinds.add(it.kind);
+    byProduct.set(it.catalog_product_id, cur);
+  }
+  const ids = [...byProduct.keys()];
+  const prodRes = await fetch(
+    `${rest()}/catalog_products?id=in.(${ids.map(encodeURIComponent).join(',')})`
+    + `&select=id,name_common,name_brand,image_url,price_usd,shopify_variant_id,purchase_url,affiliate_link_shopify,affiliate_url,affiliate_link_amazon`,
+    { headers: headers(accessToken) },
+  );
+  const prodById = new Map<string, any>(((await handle(prodRes, 'Products')) || []).map((p: any) => [p.id, p]));
+  return ids.map((id) => {
+    const meta = byProduct.get(id)!; const p = prodById.get(id) || {};
+    return {
+      id, name: meta.title, protocolTitle: meta.title, mentions: meta.mentions, kinds: [...meta.kinds],
+      image: p.image_url ?? null, price_usd: p.price_usd ?? null, shopify_variant_id: p.shopify_variant_id ?? null,
+      purchase_url: p.purchase_url ?? null, affiliate_link_shopify: p.affiliate_link_shopify ?? null,
+      affiliate_url: p.affiliate_url ?? null, affiliate_link_amazon: p.affiliate_link_amazon ?? null,
+    };
+  }).sort((a, b) => b.mentions - a.mentions);
+}
+
+/** Re-point a whole kit (all its region rows, matched by slug) to a different
+ *  protocol. Keeps slug + items stable — only which protocol it displays under. */
+export async function updateKitProtocol(accessToken: string, slug: string, protocolId: string): Promise<void> {
+  const res = await fetch(`${rest()}/protocol_kits?slug=eq.${encodeURIComponent(slug)}`, {
+    method: 'PATCH', headers: headers(accessToken), body: JSON.stringify({ protocol_id: protocolId }),
+  });
+  await handle(res, 'Re-point kit');
+}
+
 /** Kit-item fields for a picked catalog product — lane derived exactly like the
  *  mobile app (numeric shopify_variant_id → store lane, else its affiliate /
  *  purchase URL → affiliate lane). The item arrives LINKED (catalog_product_id
