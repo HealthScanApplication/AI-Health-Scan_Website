@@ -1,89 +1,177 @@
 /*
- * adminTheme.css — Supabase-flavoured light/dark skin for the admin workspace.
+ * adminTheme.css — a faithful Supabase-Studio skin for the admin workspace.
  *
  * The site ships a PREBUILT static stylesheet (no Tailwind JIT), so `dark:`
- * variants can't be generated. Instead this file defines design tokens on the
- * `.sb-admin` root and, in dark mode (`.sb-admin.sb-dark`), re-skins the
- * compiled Tailwind utilities the admin actually uses. Scoped strictly under
+ * variants can't be generated. Instead this file defines Supabase design tokens
+ * on the `.sb-admin` root and, in dark mode (`.sb-admin.sb-dark`), re-skins the
+ * compiled Tailwind utilities the admin actually uses so existing markup renders
+ * Supabase-faithful without touching every component. Scoped strictly under
  * .sb-admin so the rest of the site is untouched. Portalled UI (toasts) keeps
  * the light look.
+ *
+ * Tokens track Supabase's own scale: brand #3ecf8e, dark surfaces #1c1c1c /
+ * #171717, borders #2e2e2e (default) / #3e3e3e (strong), foreground #ededed.
  */
 
 .sb-admin {
-  --sb-page: #fafafa;
+  /* light — Supabase light theme */
+  --sb-page: #fbfbfb;
   --sb-panel: #ffffff;
-  --sb-panel-soft: #f6f6f6;
-  --sb-hover: #f2f2f2;
-  --sb-border: #e6e6e6;
-  --sb-text: #171717;
-  --sb-text-soft: #525252;
-  --sb-text-faint: #8f8f8f;
+  --sb-panel-soft: #f5f6f7;
+  --sb-hover: #f0f1f2;
+  --sb-border: #e6e8eb;
+  --sb-border-strong: #dcdfe3;
+  --sb-text: #1c1c1c;
+  --sb-text-soft: #4a4a4a;
+  --sb-text-faint: #8b8f94;
   --sb-brand: #3ecf8e;
-  --sb-brand-strong: #00875a;
+  --sb-brand-hover: #24b47e;
+  --sb-brand-strong: #008861;   /* readable brand text on light */
   --sb-brand-soft: rgba(62, 207, 142, 0.12);
+  --sb-radius: 6px;
+  --sb-radius-lg: 8px;
   color-scheme: light;
+
+  font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--sb-text);
+  font-size: 14px;
+  line-height: 1.45;
 }
 .sb-admin.sb-dark {
-  --sb-page: #121212;
+  /* dark — Supabase Studio */
+  --sb-page: #171717;
   --sb-panel: #1c1c1c;
-  --sb-panel-soft: #171717;
-  --sb-hover: #232323;
+  --sb-panel-soft: #232323;
+  --sb-hover: #2a2a2a;
   --sb-border: #2e2e2e;
+  --sb-border-strong: #3e3e3e;
   --sb-text: #ededed;
-  --sb-text-soft: #b4b4b4;
-  --sb-text-faint: #7e7e7e;
+  --sb-text-soft: #a0a0a0;
+  --sb-text-faint: #707070;
   --sb-brand: #3ecf8e;
+  --sb-brand-hover: #4ade9e;
   --sb-brand-strong: #3ecf8e;
-  --sb-brand-soft: rgba(62, 207, 142, 0.14);
+  --sb-brand-soft: rgba(62, 207, 142, 0.13);
   color-scheme: dark;
   color: var(--sb-text);
   background: var(--sb-page);
-}
 
-/* ── Standard control sizes (both modes) — ONE height/font for every input,
-     select and button in the admin, Supabase-style. Apply `sb-input`,
-     `sb-select`, `sb-btn` (+`sb-btn-primary`) instead of ad-hoc Tailwind
-     stacks so nothing drifts in size again. ── */
+  /* Re-map the shadcn/ui theme variables so every bg-card / bg-background /
+     bg-muted / text-foreground / border-border utility flips to the dark
+     tokens automatically (they resolve to these vars, not literal .bg-white). */
+  --card: var(--sb-panel);
+  --card-foreground: var(--sb-text);
+  --background: var(--sb-page);
+  --foreground: var(--sb-text);
+  --popover: var(--sb-panel);
+  --popover-foreground: var(--sb-text);
+  --muted: var(--sb-panel-soft);
+  --muted-foreground: var(--sb-text-faint);
+  --border: var(--sb-border);
+  --input: var(--sb-border-strong);
+  --ring: var(--sb-brand);
+  --accent: var(--sb-brand);
+  --secondary: var(--sb-panel-soft);
+}
+/* belt-and-braces for the arbitrary/utility forms of the same surfaces */
+.sb-admin.sb-dark .bg-card, .sb-admin.sb-dark .bg-popover { background-color: var(--sb-panel) !important; }
+.sb-admin.sb-dark .bg-background { background-color: var(--sb-page) !important; }
+.sb-admin.sb-dark .bg-muted, .sb-admin.sb-dark .bg-secondary { background-color: var(--sb-panel-soft) !important; }
+.sb-admin.sb-dark .text-card-foreground, .sb-admin.sb-dark .text-foreground, .sb-admin.sb-dark .text-popover-foreground { color: var(--sb-text) !important; }
+.sb-admin.sb-dark .text-muted-foreground { color: var(--sb-text-faint) !important; }
+.sb-admin.sb-dark .border-border { border-color: var(--sb-border) !important; }
+
+/* thin Supabase-style scrollbars inside the admin */
+.sb-admin *::-webkit-scrollbar { width: 10px; height: 10px; }
+.sb-admin *::-webkit-scrollbar-thumb { background: var(--sb-border-strong); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+.sb-admin *::-webkit-scrollbar-thumb:hover { background: var(--sb-text-faint); background-clip: content-box; }
+.sb-admin *::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Standard controls — ONE height/font for every input, select and button,
+     Supabase-style. Apply `sb-input` / `sb-select` / `sb-btn`
+     (+`sb-btn-primary`) instead of ad-hoc Tailwind so nothing drifts. ── */
 .sb-admin .sb-input, .sb-admin .sb-select {
-  height: 30px; padding: 0 10px; font-size: 12.5px; line-height: 28px;
-  border-radius: 6px; border: 1px solid var(--sb-border);
-  background: var(--sb-panel); color: var(--sb-text);
+  height: 32px; padding: 0 10px; font-size: 13px; line-height: 30px;
+  border-radius: var(--sb-radius); border: 1px solid var(--sb-border-strong);
+  background: var(--sb-panel); color: var(--sb-text); transition: border-color .15s, box-shadow .15s;
 }
-.sb-admin .sb-select { padding-right: 24px; }
+.sb-admin .sb-select { padding-right: 26px; cursor: pointer; }
 .sb-admin .sb-input::placeholder { color: var(--sb-text-faint); }
-.sb-admin .sb-input:focus, .sb-admin .sb-select:focus { outline: 1.5px solid var(--sb-brand); outline-offset: -1px; }
-.sb-admin textarea.sb-input { height: auto; line-height: 1.45; padding: 6px 10px; }
-.sb-admin .sb-btn {
-  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px;
-  font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: pointer;
-  border-radius: 6px; border: 1px solid var(--sb-border);
-  background: var(--sb-panel); color: var(--sb-text-soft);
+.sb-admin .sb-input:focus, .sb-admin .sb-select:focus,
+.sb-admin .sb-input:focus-visible, .sb-admin .sb-select:focus-visible {
+  outline: none; border-color: var(--sb-brand);
+  box-shadow: 0 0 0 1px var(--sb-brand);
 }
-.sb-admin .sb-btn:hover { background: var(--sb-hover); }
+.sb-admin textarea.sb-input { height: auto; line-height: 1.5; padding: 7px 10px; }
+
+.sb-admin .sb-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 12px; font-size: 13px; font-weight: 400; white-space: nowrap;
+  cursor: pointer; border-radius: var(--sb-radius); border: 1px solid var(--sb-border-strong);
+  background: var(--sb-panel-soft); color: var(--sb-text); transition: background .15s, border-color .15s;
+}
+.sb-admin .sb-btn:hover { background: var(--sb-hover); border-color: var(--sb-text-faint); }
 .sb-admin .sb-btn:disabled { opacity: 0.5; cursor: default; }
-.sb-admin .sb-btn-primary { background: var(--sb-brand); border-color: var(--sb-brand); color: #0c0c0c; }
-.sb-admin .sb-btn-primary:hover { background: var(--sb-brand-strong); color: #ffffff; }
+.sb-admin .sb-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--sb-page), 0 0 0 3px var(--sb-brand); }
+.sb-admin .sb-btn-primary { background: var(--sb-brand); border-color: var(--sb-brand); color: #10221b; font-weight: 500; }
+.sb-admin .sb-btn-primary:hover { background: var(--sb-brand-hover); border-color: var(--sb-brand-hover); color: #10221b; }
 .sb-admin .sb-btn-on { background: var(--sb-brand-soft); border-color: var(--sb-brand); color: var(--sb-brand-strong); }
+.sb-admin .sb-btn-sm { height: 26px; padding: 0 9px; font-size: 12px; }
+
+/* Supabase surface + nav helpers (opt-in classes) */
+.sb-admin .sb-card { background: var(--sb-panel); border: 1px solid var(--sb-border); border-radius: var(--sb-radius-lg); }
+.sb-admin .sb-nav-tab {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 8px 4px; margin-right: 18px;
+  font-size: 13px; font-weight: 400; color: var(--sb-text-faint); background: none; border: none; cursor: pointer;
+  border-bottom: 1px solid transparent; margin-bottom: -1px; transition: color .15s;
+}
+.sb-admin .sb-nav-tab:hover { color: var(--sb-text); }
+.sb-admin .sb-nav-tab-active { color: var(--sb-text); border-bottom-color: var(--sb-brand); }
+/* segmented group pill (top group nav) */
+.sb-admin .sb-seg {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; font-size: 13px; font-weight: 400;
+  color: var(--sb-text-faint); background: none; border: 1px solid transparent; border-radius: var(--sb-radius); cursor: pointer;
+}
+.sb-admin .sb-seg:hover { color: var(--sb-text); background: var(--sb-hover); }
+.sb-admin .sb-seg-active { color: var(--sb-text); background: var(--sb-panel-soft); border-color: var(--sb-border); }
+/* sub-tab chip row */
+.sb-admin .sb-subtabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--sb-panel-soft); border: 1px solid var(--sb-border); border-radius: var(--sb-radius); }
+.sb-admin .sb-subtab { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12.5px; font-weight: 400; color: var(--sb-text-soft); background: none; border: none; border-radius: 5px; cursor: pointer; }
+.sb-admin .sb-subtab:hover { color: var(--sb-text); background: var(--sb-hover); }
+.sb-admin .sb-subtab-active { color: var(--sb-text); background: var(--sb-panel); box-shadow: 0 1px 2px rgba(0,0,0,.16); font-weight: 500; }
 
 /* ── Supabase-green accent (both modes): remap the admin's blue accents ── */
 .sb-admin .text-blue-600, .sb-admin .text-blue-700, .sb-admin .text-blue-500 { color: var(--sb-brand-strong) !important; }
 .sb-admin .bg-blue-50, .sb-admin .bg-blue-100 { background-color: var(--sb-brand-soft) !important; }
 .sb-admin .border-blue-200, .sb-admin .border-blue-300, .sb-admin .border-blue-500, .sb-admin .border-blue-600 { border-color: var(--sb-brand) !important; }
-.sb-admin .bg-blue-600, .sb-admin .bg-blue-500 { background-color: var(--sb-brand) !important; color: #0c0c0c !important; }
-.sb-admin .hover\:bg-blue-700:hover, .sb-admin .hover\:bg-blue-600:hover { background-color: var(--sb-brand-strong) !important; color: #ffffff !important; }
+.sb-admin .bg-blue-600, .sb-admin .bg-blue-500 { background-color: var(--sb-brand) !important; color: #10221b !important; }
+.sb-admin .hover\:bg-blue-700:hover, .sb-admin .hover\:bg-blue-600:hover { background-color: var(--sb-brand-hover) !important; color: #10221b !important; }
 .sb-admin .ring-blue-500, .sb-admin .focus\:ring-blue-500:focus { --tw-ring-color: var(--sb-brand) !important; }
+
+/* ── Radii + shadows: Supabase is flat — borders, not shadows ── */
+.sb-admin .rounded, .sb-admin .rounded-md { border-radius: var(--sb-radius) !important; }
+.sb-admin .rounded-lg, .sb-admin .rounded-xl { border-radius: var(--sb-radius-lg) !important; }
+.sb-admin .shadow-sm, .sb-admin .shadow { box-shadow: none !important; }
+
+/* ── Light mode: soften surfaces to Supabase light ── */
+.sb-admin:not(.sb-dark) .bg-gray-50 { background-color: var(--sb-panel-soft) !important; }
+.sb-admin:not(.sb-dark) .border-gray-200, .sb-admin:not(.sb-dark) .border-gray-100 { border-color: var(--sb-border) !important; }
+.sb-admin:not(.sb-dark) .shadow-md, .sb-admin:not(.sb-dark) .shadow-lg { box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04) !important; }
 
 /* ── Dark mode: surfaces ── */
 .sb-admin.sb-dark .bg-white { background-color: var(--sb-panel) !important; }
 .sb-admin.sb-dark .bg-gray-50 { background-color: var(--sb-panel-soft) !important; }
-.sb-admin.sb-dark .bg-gray-100, .sb-admin.sb-dark .bg-gray-200 { background-color: #262626 !important; }
-.sb-admin.sb-dark .bg-white\/70 { background-color: rgba(38, 38, 38, 0.8) !important; }
+.sb-admin.sb-dark .bg-gray-100, .sb-admin.sb-dark .bg-gray-200 { background-color: #2a2a2a !important; }
+.sb-admin.sb-dark .bg-white\/70 { background-color: rgba(35, 35, 35, 0.8) !important; }
 .sb-admin.sb-dark .hover\:bg-gray-50:hover, .sb-admin.sb-dark .hover\:bg-gray-100:hover { background-color: var(--sb-hover) !important; }
 
 /* dark primary buttons (bg-gray-900 CTAs) → Supabase green */
-.sb-admin.sb-dark .bg-gray-900 { background-color: var(--sb-brand) !important; color: #0c0c0c !important; }
-.sb-admin.sb-dark .bg-gray-900 * { color: #0c0c0c !important; }
-.sb-admin.sb-dark .hover\:bg-gray-800:hover { background-color: #2fb67c !important; }
+.sb-admin.sb-dark .bg-gray-900 { background-color: var(--sb-brand) !important; color: #10221b !important; }
+.sb-admin.sb-dark .bg-gray-900 * { color: #10221b !important; }
+.sb-admin.sb-dark .hover\:bg-gray-800:hover { background-color: var(--sb-brand-hover) !important; }
 
 /* ── Dark mode: text ── */
 .sb-admin.sb-dark .text-gray-900, .sb-admin.sb-dark .text-black { color: var(--sb-text) !important; }
@@ -97,30 +185,30 @@
 .sb-admin.sb-dark .divide-gray-100 > *, .sb-admin.sb-dark .divide-gray-200 > * { border-color: var(--sb-border) !important; }
 .sb-admin.sb-dark .border-b-2 { border-color: var(--sb-border); }
 .sb-admin.sb-dark .border-gray-900 { border-color: var(--sb-brand) !important; }
-.sb-admin.sb-dark .shadow-sm, .sb-admin.sb-dark .shadow, .sb-admin.sb-dark .shadow-md { box-shadow: none !important; }
+.sb-admin.sb-dark .shadow-sm, .sb-admin.sb-dark .shadow, .sb-admin.sb-dark .shadow-md, .sb-admin.sb-dark .shadow-lg { box-shadow: none !important; }
 
-/* ── Dark mode: form controls ── */
+/* ── Dark mode: form controls (ad-hoc inputs pick up the token look) ── */
 .sb-admin.sb-dark input:not([type='checkbox']):not([type='radio']),
 .sb-admin.sb-dark select,
 .sb-admin.sb-dark textarea {
   background-color: var(--sb-panel-soft);
-  border-color: var(--sb-border);
+  border-color: var(--sb-border-strong);
   color: var(--sb-text);
 }
 .sb-admin.sb-dark input::placeholder, .sb-admin.sb-dark textarea::placeholder { color: #6b6b6b; }
 
-/* ── Dark mode: status tints stay readable ── */
+/* ── Status tints stay readable in dark ── */
 .sb-admin.sb-dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
-.sb-admin.sb-dark .border-red-300 { border-color: #7f1d1d !important; }
+.sb-admin.sb-dark .border-red-300, .sb-admin.sb-dark .border-red-200 { border-color: #7f1d1d !important; }
 .sb-admin.sb-dark .text-red-700, .sb-admin.sb-dark .text-red-600 { color: #f87171 !important; }
 .sb-admin.sb-dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
-.sb-admin.sb-dark .border-amber-300 { border-color: #92400e !important; }
-.sb-admin.sb-dark .text-amber-700 { color: #fbbf24 !important; }
+.sb-admin.sb-dark .border-amber-300, .sb-admin.sb-dark .border-amber-200 { border-color: #92400e !important; }
+.sb-admin.sb-dark .text-amber-700, .sb-admin.sb-dark .text-amber-600 { color: #fbbf24 !important; }
 .sb-admin.sb-dark .bg-green-50 { background-color: var(--sb-brand-soft) !important; }
 .sb-admin.sb-dark .border-green-300 { border-color: #14532d !important; }
 .sb-admin.sb-dark .text-green-700, .sb-admin.sb-dark .text-green-600 { color: var(--sb-brand) !important; }
 .sb-admin.sb-dark .bg-emerald-50, .sb-admin.sb-dark .bg-emerald-100 { background-color: var(--sb-brand-soft) !important; }
-.sb-admin.sb-dark .bg-emerald-600 { background-color: var(--sb-brand) !important; color: #0c0c0c !important; }
+.sb-admin.sb-dark .bg-emerald-600 { background-color: var(--sb-brand) !important; color: #10221b !important; }
 .sb-admin.sb-dark .text-emerald-600, .sb-admin.sb-dark .text-emerald-700 { color: var(--sb-brand) !important; }
 .sb-admin.sb-dark .border-emerald-100, .sb-admin.sb-dark .border-emerald-200 { border-color: #14532d !important; }
 .sb-admin.sb-dark .bg-teal-100 { background-color: rgba(20, 184, 166, 0.16) !important; }
@@ -134,10 +222,10 @@
 /* ── sb-table — the Supabase-style records grid (used by RecordsTable) ── */
 .sb-admin .sb-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .sb-admin .sb-table th {
-  position: sticky; top: 0; z-index: 2; text-align: left; font-weight: 600; white-space: nowrap;
+  position: sticky; top: 0; z-index: 2; text-align: left; font-weight: 500; white-space: nowrap;
   padding: 8px 10px; background: var(--sb-panel-soft); color: var(--sb-text-soft);
   border-bottom: 1px solid var(--sb-border); border-right: 1px solid var(--sb-border);
-  user-select: none; cursor: pointer;
+  user-select: none; font-size: 12px;
 }
 .sb-admin .sb-table th:last-child { border-right: none; }
 .sb-admin .sb-table td {

@@ -4435,31 +4435,27 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(val: string) => { setActiveTab(val); setSelectedRecords(new Set()); setBulkMode(false); setBulkAction(null); setCurrentPage(1); setSubFilter('all'); setCategoryFilter('all'); setRegionFilter('all'); setShowDuplicates(false); setShowNoImage(false); }} className="w-full">
-            {/* Main Group Tabs */}
-            <div className="flex gap-2 mb-3 border-b pb-2">
+            {/* Main Group Tabs — Supabase segmented control */}
+            <div className="flex gap-1 mb-3">
               {tabGroups.map(group => (
                 <button
                   key={group.id}
                   onClick={() => { setActiveGroup(group.id); setActiveTab(group.tabs[0].id); }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium text-sm transition-all ${
-                    activeGroup === group.id
-                      ? 'bg-white text-blue-700 shadow-sm border-t border-x border-blue-200 -mb-[1px]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
+                  className={`sb-seg${activeGroup === group.id ? ' sb-seg-active' : ''}`}
                 >
                   {group.icon}
                   <span>{group.label}</span>
-                  <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0">
+                  <span style={{ fontSize: 10, opacity: 0.6, border: '1px solid var(--sb-border)', borderRadius: 4, padding: '0 4px', lineHeight: '15px' }}>
                     {group.tabs.length}
-                  </Badge>
+                  </span>
                 </button>
               ))}
             </div>
-            
-            {/* Sub-tabs for active group */}
-            <TabsList className="flex flex-wrap w-full h-auto gap-1 p-1 bg-gray-50">
+
+            {/* Sub-tabs for active group — Supabase chip row */}
+            <TabsList className="sb-subtabs">
               {tabGroups.find(g => g.id === activeGroup)?.tabs.map(tab => (
-                <TabsTrigger key={tab.id} value={tab.id} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md flex-shrink-0 ${activeTab === tab.id ? 'bg-white text-blue-700 shadow-md font-semibold border border-blue-200' : ''}`}>
+                <TabsTrigger key={tab.id} value={tab.id} className={`sb-subtab${activeTab === tab.id ? ' sb-subtab-active' : ''}`}>
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
                 </TabsTrigger>

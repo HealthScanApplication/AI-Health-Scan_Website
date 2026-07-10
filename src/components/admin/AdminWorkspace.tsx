@@ -22,13 +22,7 @@ type AdminTab = 'panel' | 'qa';
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-        active ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
-      }`}
-    >
+    <button type="button" onClick={onClick} className={`sb-nav-tab${active ? ' sb-nav-tab-active' : ''}`}>
       {children}
     </button>
   );
@@ -54,17 +48,13 @@ export function AdminWorkspace({ user, accessToken }: { user: any; accessToken: 
 
   return (
     <div className={`sb-admin${dark ? ' sb-dark' : ''}`} style={{ background: 'var(--sb-page)', borderRadius: 12, padding: 16 }}>
-      <div className="mb-4 flex items-center justify-between border-b border-gray-200">
-        <div className="flex gap-2">
+      <div className="mb-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--sb-border)' }}>
+        <div className="flex">
           <TabButton active={tab === 'panel'} onClick={() => setTab('panel')}>Admin Panel</TabButton>
           <TabButton active={tab === 'qa'} onClick={() => setTab('qa')}>Data QA</TabButton>
         </div>
-        <button
-          type="button"
-          onClick={() => setDark((d) => !d)}
-          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="mb-1 flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-        >
+        <button type="button" onClick={() => setDark((d) => !d)} className="sb-btn sb-btn-sm" style={{ marginBottom: 6 }}
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
           {dark ? <Sun size={13} /> : <Moon size={13} />}
           {dark ? 'Light' : 'Dark'}
         </button>
