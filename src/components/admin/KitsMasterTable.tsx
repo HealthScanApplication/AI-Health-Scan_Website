@@ -10,7 +10,7 @@
  */
 import { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
-import { REGIONS, type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule } from '../../utils/kitsAdmin';
+import { REGIONS, kitItemBuyPath, type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule } from '../../utils/kitsAdmin';
 
 const sel = 'rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900';
 
@@ -22,6 +22,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
   const [fRegion, setFRegion] = useState('');
   const [fLane, setFLane] = useState('');
   const [fLinked, setFLinked] = useState('');
+  const [fBuy, setFBuy] = useState('');
   const [fText, setFText] = useState('');
 
   const protoName = useMemo(() => new Map(protocols.map((p) => [p.id, p.name])), [protocols]);
@@ -32,6 +33,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     if (fLane && i.lane !== fLane) return false;
     if (fLinked === 'yes' && !i.catalog_product_id) return false;
     if (fLinked === 'no' && i.catalog_product_id) return false;
+    if (fBuy === 'yes' && !kitItemBuyPath(i)) return false;
+    if (fBuy === 'no' && kitItemBuyPath(i)) return false;
     if (fText.trim()) {
       const t = fText.trim().toLowerCase();
       const kit = kitBySlugMarket.get(`${i.slug}:${i.market}`);
@@ -63,11 +66,11 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
 
   const exportCsv = () => {
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const head = ['region', 'kit', 'protocol', 'product', 'lane', 'linked_product_id', 'supplier', 'cost_usd', 'sell_usd', 'margin_pct', 'commission_pct', 'affiliate_url', 'variant_id', 'kit_live', 'region_rule'];
+    const head = ['region', 'kit', 'protocol', 'product', 'lane', 'buy_path', 'linked_product_id', 'supplier', 'cost_usd', 'sell_usd', 'margin_pct', 'commission_pct', 'affiliate_url', 'variant_id', 'kit_live', 'region_rule'];
     const lines = rows.map((i) => {
       const kit = kitBySlugMarket.get(`${i.slug}:${i.market}`);
       const rule = ruleFor(i);
-      return [i.market, i.slug, kit ? protoName.get(kit.protocol_id) || '' : '', i.title, i.lane, i.catalog_product_id || '',
+      return [i.market, i.slug, kit ? protoName.get(kit.protocol_id) || '' : '', i.title, i.lane, kitItemBuyPath(i) || 'none', i.catalog_product_id || '',
         i.supplier || '', i.supplier_cost_usd ?? '', i.price_usd ?? '', i.margin_pct ?? '', i.commission_pct ?? '',
         i.affiliate_url || '', i.variant_id || '', kit?.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
     });
@@ -122,6 +125,11 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
           <option value="yes">linked only</option>
           <option value="no">unlinked only</option>
         </select>
+        <select value={fBuy} onChange={(e) => setFBuy(e.target.value)} className={sel}>
+          <option value="">Any buy path</option>
+          <option value="yes">sellable only</option>
+          <option value="no">NO buy path</option>
+        </select>
         <input value={fText} onChange={(e) => setFText(e.target.value)} placeholder="Filter product / kit / supplier / protocol…" className={sel + ' w-72'} />
         <span className="text-xs text-gray-500">{rows.length} rows</span>
         <span className="flex-1" />
@@ -140,6 +148,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               <th>Protocol</th>
               <th>Product</th>
               <th style={{ width: 60 }}>Lane</th>
+              <th style={{ width: 72 }}>Buy path</th>
               <th style={{ width: 64 }}>Linked</th>
               <th>Supplier</th>
               <th style={{ width: 64 }}>Cost</th>
@@ -166,6 +175,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                     </span>
                   </td>
                   <td><span className="sb-cell">{i.lane}</span></td>
+                  <td><span className="sb-cell" style={{ color: kitItemBuyPath(i) ? 'var(--sb-brand-strong)' : '#d97706', fontWeight: kitItemBuyPath(i) ? 400 : 600 }}>{kitItemBuyPath(i) || 'NONE'}</span></td>
                   <td><span className="sb-cell" style={{ color: i.catalog_product_id ? 'var(--sb-brand-strong)' : '#d97706' }}>{i.catalog_product_id ? 'yes' : 'NO'}</span></td>
                   <td><span className="sb-cell">{i.supplier || '—'}</span></td>
                   <td><span className="sb-cell">{i.supplier_cost_usd != null ? `$${i.supplier_cost_usd}` : '—'}</span></td>
@@ -177,7 +187,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                 </tr>
               );
             })}
-            {!rows.length && <tr><td colSpan={13} style={{ textAlign: 'center', padding: 20, color: 'var(--sb-text-faint)' }}>No rows match.</td></tr>}
+            {!rows.length && <tr><td colSpan={14} style={{ textAlign: 'center', padding: 20, color: 'var(--sb-text-faint)' }}>No rows match.</td></tr>}
           </tbody>
         </table>
       </div>

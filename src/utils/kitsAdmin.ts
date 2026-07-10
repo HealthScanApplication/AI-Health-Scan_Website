@@ -199,6 +199,33 @@ export function kitItemFieldsFromProduct(p: ProductHit): Partial<KitItem> {
   };
 }
 
+/** A kit item is sellable when it has a purchase path: a numeric Shopify
+ *  variant (store lane) OR an affiliate URL. Linking a catalog product is the
+ *  usual way to get one, but items can also be filled in by hand. */
+export function kitItemBuyPath(i: { variant_id?: string | null; affiliate_url?: string | null }): 'store' | 'affiliate' | null {
+  if (/^\d+$/.test(String(i.variant_id || ''))) return 'store';
+  if (i.affiliate_url) return 'affiliate';
+  return null;
+}
+
+/** Link an EXISTING kit item to a catalog product: sets catalog_product_id (so
+ *  region-legality + coverage work) and upgrades its purchase path from the
+ *  product — a Shopify variant → store lane, else the product's affiliate/
+ *  purchase URL → affiliate lane. Never clobbers a title or a purchase path the
+ *  admin already set (only fills blanks). */
+export async function linkKitItemToProduct(accessToken: string, item: KitItem, p: ProductHit): Promise<void> {
+  const variant = String(p.shopify_variant_id || '').trim();
+  const isStore = /^\d+$/.test(variant);
+  const affiliate = p.purchase_url || p.affiliate_link_shopify || p.affiliate_url || p.affiliate_link_amazon || null;
+  const patch: Partial<KitItem> = { catalog_product_id: p.id };
+  const hadPath = !!kitItemBuyPath(item);
+  if (isStore) { patch.lane = 'store'; patch.variant_id = variant; patch.affiliate_url = null; }
+  else if (affiliate && !hadPath) { patch.lane = 'affiliate'; patch.affiliate_url = affiliate; }
+  if (p.image && !item.image_url) patch.image_url = p.image;
+  if (p.price_usd != null && item.price_usd == null) patch.price_usd = p.price_usd;
+  await updateKitItem(accessToken, item.id, patch);
+}
+
 /** slug+market of every kit item — one lightweight fetch for overview counts. */
 export async function listKitItemCounts(accessToken: string): Promise<Map<string, Partial<Record<KitRegion, number>>>> {
   const res = await fetch(`${rest()}/protocol_kit_items?select=slug,market`, { headers: headers(accessToken) });

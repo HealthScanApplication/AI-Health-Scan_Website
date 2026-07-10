@@ -22,9 +22,11 @@ import { toast } from 'sonner';
 import {
   listKitItemsAllRegions, createKitItem, updateKitItem, deleteKitItem, updateKit, updateKitProtocol,
   copyKitRegion, cloneKitItem, searchProductsLite, kitItemFieldsFromProduct, listProtocolBuyableProducts,
+  linkKitItemToProduct, kitItemBuyPath,
   REGIONS, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
   type ProtocolLite, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
+import { Link2 } from 'lucide-react';
 
 const inputCls = 'w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
 const miniInput = 'w-full rounded border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-900';
@@ -176,6 +178,17 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
     try { await deleteKitItem(accessToken, it.id); setItems((arr) => (arr || []).filter((x) => x.id !== it.id)); }
     catch (e: any) { toast.error(`Remove failed: ${e?.message || e}`); }
   };
+  // link a whole row (all its region items) to a chosen catalog product
+  const linkRow = async (cells: Partial<Record<KitRegion, KitItem>>, p: ProductHit) => {
+    const targets = Object.values(cells).filter(Boolean) as KitItem[];
+    setBusyCell(`link:${rowKeyOf(targets[0])}`);
+    try {
+      for (const it of targets) await linkKitItemToProduct(accessToken, it, p);
+      await load();
+      toast.success(`Linked ${targets.length} region item${targets.length === 1 ? '' : 's'} to "${p.name}"`);
+    } catch (e: any) { toast.error(`Link failed: ${e?.message || e}`); }
+    finally { setBusyCell(null); }
+  };
 
   // products the protocol references but the kit hasn't linked yet
   const linkedProductIds = useMemo(() => new Set((items || []).map((i) => i.catalog_product_id).filter(Boolean)), [items]);
@@ -319,7 +332,8 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
                 return (
                   <FragmentRow key={rk} rk={rk} cells={cells} first={first} markets={markets} isOpen={isOpen}
                     onToggle={() => setExpanded(isOpen ? null : rk)} ruleFor={ruleFor} busyCell={busyCell}
-                    commit={commit} cloneCell={cloneCell} removeItem={removeItem} />
+                    commit={commit} cloneCell={cloneCell} removeItem={removeItem}
+                    accessToken={accessToken} onLinkRow={linkRow} />
                 );
               })}
               {/* footer: per-region economics */}
@@ -347,23 +361,32 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
   );
 }
 
-function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, busyCell, commit, cloneCell, removeItem }: {
+function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, busyCell, commit, cloneCell, removeItem, accessToken, onLinkRow }: {
   rk: string; cells: Partial<Record<KitRegion, KitItem>>; first: KitItem; markets: KitRegion[]; isOpen: boolean;
   onToggle: () => void; ruleFor: (pid: string | null, r: KitRegion) => RegionRule | undefined; busyCell: string | null;
   commit: (it: KitItem, patch: Partial<KitItem>) => Promise<void>;
   cloneCell: (source: KitItem, to: KitRegion) => Promise<void>;
   removeItem: (it: KitItem) => Promise<void>;
+  accessToken: string; onLinkRow: (cells: Partial<Record<KitRegion, KitItem>>, p: ProductHit) => Promise<void>;
 }) {
+  const linked = !!first.catalog_product_id;
+  const buyPath = kitItemBuyPath(first); // store | affiliate | null — same product across regions
   return (
     <>
       <tr className="border-b border-gray-100 hover:bg-gray-50">
         <td className="px-2 py-1.5">
-          <button onClick={onToggle} className="flex w-full items-center gap-1.5 text-left">
-            {isOpen ? <ChevronDown size={12} className="shrink-0 text-gray-400" /> : <ChevronRight size={12} className="shrink-0 text-gray-400" />}
-            {first.image_url && <img src={first.image_url} alt="" className="h-6 w-6 shrink-0 rounded object-cover" />}
-            <span className="truncate text-gray-800" title={first.title || ''}>{first.title || '(untitled)'}</span>
-            {!first.catalog_product_id && <span title="No catalog product link — region legality can't be checked automatically" className="shrink-0 text-[10px] text-amber-600">unlinked</span>}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+              {isOpen ? <ChevronDown size={12} className="shrink-0 text-gray-400" /> : <ChevronRight size={12} className="shrink-0 text-gray-400" />}
+              {first.image_url
+                ? <img src={first.image_url} alt="" className="h-6 w-6 shrink-0 rounded object-cover" />
+                : <span className="h-6 w-6 shrink-0 rounded bg-gray-100" />}
+              <span className="truncate text-gray-800" title={first.title || ''}>{first.title || '(untitled)'}</span>
+              {/* consistent status chips on every row */}
+              {!buyPath && <span title="No buy path — needs a Shopify variant (store) or an affiliate URL to be sellable" className="shrink-0 rounded bg-amber-50 px-1 text-[9px] font-bold text-amber-700 border border-amber-200">NO BUY PATH</span>}
+            </button>
+            <RowLinkPicker linked={linked} busy={busyCell === `link:${rk}`} accessToken={accessToken} onPick={(p) => onLinkRow(cells, p)} />
+          </div>
         </td>
         {markets.map((m) => {
           const it = cells[m];
@@ -498,6 +521,54 @@ function ProtocolReassign({ slug, protocolId, protocols, accessToken, onChanged 
 /** "+ add product" per region: catalog typeahead (e.g. type "coconut oil"),
  *  pick a product → it lands LINKED (legality badges + compliant copy work),
  *  either in this region only or across all the kit's regions. */
+/** Per-row "link to catalog product" — search the catalog and attach the product
+ *  to every region's item in this row (store lane if it has a Shopify variant,
+ *  else affiliate). "linked" just recolours the chip; you can always re-link. */
+function RowLinkPicker({ linked, busy, accessToken, onPick }: {
+  linked: boolean; busy: boolean; accessToken: string; onPick: (p: ProductHit) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [hits, setHits] = useState<ProductHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const run = (term: string) => {
+    setQ(term);
+    if (!term.trim()) { setHits([]); return; }
+    setSearching(true);
+    searchProductsLite(accessToken, term, 6).then(setHits).catch(() => setHits([])).finally(() => setSearching(false));
+  };
+  return (
+    <div className="relative shrink-0">
+      <button onClick={() => setOpen((o) => !o)} disabled={busy}
+        title={linked ? 'Linked to a catalog product — click to re-link' : 'Link this item to a catalog product (Shopify store or affiliate)'}
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${linked ? 'text-emerald-700 hover:bg-emerald-50' : 'text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100'}`}>
+        {busy ? <Loader2 size={10} className="animate-spin" /> : <Link2 size={10} />}
+        {linked ? 'linked' : 'link'}
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1 w-64 rounded-md border border-gray-200 bg-white shadow-md">
+          <input autoFocus value={q} onChange={(e) => run(e.target.value)} placeholder="Search catalog products…"
+            className="w-full rounded-t-md border-b border-gray-100 px-2 py-1.5 text-xs text-gray-900"
+            onKeyDown={(e) => { if (e.key === 'Escape') { setOpen(false); setQ(''); setHits([]); } }} />
+          {searching && <div className="p-2 text-center text-gray-400"><Loader2 size={12} className="mx-auto animate-spin" /></div>}
+          {hits.map((h) => {
+            const isStore = /^\d+$/.test(String(h.shopify_variant_id || ''));
+            return (
+              <button key={h.id} onClick={() => { setOpen(false); setQ(''); setHits([]); onPick(h); }}
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-50">
+                {h.image ? <img src={h.image} alt="" className="h-5 w-5 rounded object-cover" /> : <span className="h-5 w-5 rounded bg-gray-100" />}
+                <span className="min-w-0 flex-1 truncate text-gray-800">{h.name}</span>
+                <span className={`shrink-0 rounded px-1 text-[9px] font-bold ${isStore ? 'bg-gray-900 text-white' : 'bg-purple-50 text-purple-600 border border-purple-300'}`}>{isStore ? 'S' : 'A'}</span>
+              </button>
+            );
+          })}
+          {!searching && q.trim() && !hits.length && <div className="p-2 text-center text-[11px] text-gray-400">No products match</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddProductPicker({ market, accessToken, onPick, onBlank }: {
   market: KitRegion; accessToken: string;
   onPick: (p: ProductHit, market: KitRegion, allRegions: boolean) => Promise<void>;
