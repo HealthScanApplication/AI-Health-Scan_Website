@@ -213,10 +213,11 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
             return (
               <div key={k.id} className="grid grid-cols-12 items-center gap-2">
                 <span className="col-span-1 rounded bg-gray-200 px-1.5 py-0.5 text-center text-[11px] font-semibold text-gray-700">{m}</span>
-                <input className={`${miniInput} col-span-3`} defaultValue={k.title || ''} placeholder="Title" onBlur={(e) => updateKit(accessToken, k.id, { title: e.target.value || null }).catch((err) => toast.error(String(err)))} />
+                <input className={`${miniInput} col-span-2`} defaultValue={k.title || ''} placeholder="Title" onBlur={(e) => updateKit(accessToken, k.id, { title: e.target.value || null }).catch((err) => toast.error(String(err)))} />
                 <input className={`${miniInput} col-span-2`} defaultValue={k.partner_label || ''} placeholder="Partner (e.g. Tre Lune)" onBlur={(e) => updateKit(accessToken, k.id, { partner_label: e.target.value || null }).catch((err) => toast.error(String(err)))} />
-                <input className={`${miniInput} col-span-3`} defaultValue={k.partner_cart_url || ''} placeholder="Partner cart URL" onBlur={(e) => updateKit(accessToken, k.id, { partner_cart_url: e.target.value || null }).catch((err) => toast.error(String(err)))} />
+                <input className={`${miniInput} col-span-2`} defaultValue={k.partner_cart_url || ''} placeholder="Partner cart URL" onBlur={(e) => updateKit(accessToken, k.id, { partner_cart_url: e.target.value || null }).catch((err) => toast.error(String(err)))} />
                 <input className={`${miniInput} col-span-2`} defaultValue={k.cart_url || ''} placeholder="Bundle cart URL" onBlur={(e) => updateKit(accessToken, k.id, { cart_url: e.target.value || null }).catch((err) => toast.error(String(err)))} />
+                <input className={`${miniInput} col-span-2`} defaultValue={k.image_url || ''} placeholder="Kit image URL (falls back to protocol)" onBlur={(e) => updateKit(accessToken, k.id, { image_url: e.target.value || null }).catch((err) => toast.error(String(err)))} />
                 <button
                   onClick={async () => {
                     try { await updateKit(accessToken, k.id, { is_live: !k.is_live }); onKitsChanged(); }

@@ -39,6 +39,7 @@ export interface ProtocolKit {
   title: string | null; subtitle: string | null; cart_url: string | null;
   partner_label: string | null; partner_cart_url: string | null;
   price_usd: number | null; is_live: boolean; items_slug: string | null; created_at?: string;
+  image_url: string | null; // kit image (falls back to the protocol's image in the UI)
 }
 export interface KitItem {
   id: string; slug: string; market: KitRegion; lane: 'store' | 'affiliate' | string;
@@ -50,13 +51,13 @@ export interface KitItem {
   supplier_cost_usd: number | null; supplier: string | null; commission_pct: number | null;
   margin_pct: number | null;
 }
-export interface ProtocolLite { id: string; name: string; is_public: boolean | null; source: string | null }
+export interface ProtocolLite { id: string; name: string; is_public: boolean | null; source: string | null; image_url: string | null }
 export interface RegionRule {
   id: string; item_type: string; item_id: string; region: KitRegion;
   action: 'block' | 'warn' | string; reason: string | null; substitute_item_id: string | null;
 }
 
-const KIT_COLS = 'id,protocol_id,slug,market,kind,title,subtitle,cart_url,partner_label,partner_cart_url,price_usd,is_live,items_slug,created_at';
+const KIT_COLS = 'id,protocol_id,slug,market,kind,title,subtitle,cart_url,partner_label,partner_cart_url,price_usd,is_live,items_slug,created_at,image_url';
 const ITEM_COLS = 'id,slug,market,lane,variant_id,title,price_usd,image_url,affiliate_url,catalog_product_id,sort,sku,supplier_cost_usd,supplier,commission_pct,margin_pct';
 
 export async function listAllKits(accessToken: string): Promise<ProtocolKit[]> {
@@ -242,8 +243,25 @@ export async function copyKitRegion(
 /** All protocols visible in the admin (id/name/public/source) — for resolving
  *  protocol_kits.protocol_id → a name, and for the "missing a kit" audit. */
 export async function listAllProtocolsLite(accessToken: string): Promise<ProtocolLite[]> {
-  const res = await fetch(`${rest()}/protocols?select=id,name,is_public,source&order=name.asc`, { headers: headers(accessToken) });
+  const res = await fetch(`${rest()}/protocols?select=id,name,is_public,source,image_url&order=name.asc`, { headers: headers(accessToken) });
   return (await handle(res, 'List protocols')) || [];
+}
+
+/** Every kit item across every kit and region — the flat master table. */
+export async function listAllKitItems(accessToken: string): Promise<KitItem[]> {
+  const res = await fetch(`${rest()}/protocol_kit_items?select=${ITEM_COLS}&order=slug.asc,market.asc,sort.asc.nullslast`, { headers: headers(accessToken) });
+  return (await handle(res, 'List all kit items')) || [];
+}
+
+/** protocol_id → number of protocol_items linked to a catalog product. Feeds
+ *  the "which protocols are missing products" audit (a protocol with no kit
+ *  items AND no product links has nothing sellable at all). */
+export async function listProtocolProductLinkCounts(accessToken: string): Promise<Map<string, number>> {
+  const res = await fetch(`${rest()}/protocol_items?select=protocol_id&catalog_product_id=not.is.null&limit=5000`, { headers: headers(accessToken) });
+  const rows: { protocol_id: string }[] = (await handle(res, 'Count product links')) || [];
+  const m = new Map<string, number>();
+  for (const r of rows) m.set(r.protocol_id, (m.get(r.protocol_id) || 0) + 1);
+  return m;
 }
 
 export async function createKit(accessToken: string, kit: Partial<ProtocolKit>): Promise<ProtocolKit> {

@@ -14,11 +14,12 @@ import { ChevronDown, ChevronRight, Loader2, Plus, RefreshCw, Scale, Search as S
 import { toast } from 'sonner';
 import {
   listAllKits, listAllProtocolsLite, createKitAllRegions, listRegionRules, createRegionRule, deleteRegionRule,
-  resolveItemNames, searchProductsLite, listKitItemCounts, REGIONS,
-  type ProtocolKit, type ProtocolLite, type RegionRule, type KitRegion,
+  resolveItemNames, searchProductsLite, listKitItemCounts, listAllKitItems, listProtocolProductLinkCounts, REGIONS,
+  type ProtocolKit, type ProtocolLite, type RegionRule, type KitRegion, type KitItem,
 } from '../../utils/kitsAdmin';
 import { KitMatrix } from './KitMatrix';
-import { X } from 'lucide-react';
+import { KitsMasterTable } from './KitsMasterTable';
+import { X, LayoutGrid, Table as TableIcon } from 'lucide-react';
 
 const inputCls = 'rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
 const btnCls = 'inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50';
@@ -179,6 +180,9 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
   const [creating, setCreating] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [openSlug, setOpenSlug] = useState<string | null>(null);
+  const [view, setView] = useState<'cards' | 'master'>('cards');
+  const [masterItems, setMasterItems] = useState<KitItem[] | null>(null);
+  const [productLinks, setProductLinks] = useState<Map<string, number>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -189,8 +193,16 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
     finally { setLoading(false); }
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
+  // master-view data loads on first switch (and refreshes with Refresh)
+  useEffect(() => {
+    if (view !== 'master') return;
+    Promise.all([listAllKitItems(accessToken), listProtocolProductLinkCounts(accessToken)])
+      .then(([mi, pl]) => { setMasterItems(mi); setProductLinks(pl); })
+      .catch((e: any) => toast.error(`Master view load failed: ${e?.message || e}`));
+  }, [view, accessToken, kits]);
 
   const protocolName = useMemo(() => new Map((protocols || []).map((p) => [p.id, p.name])), [protocols]);
+  const protocolImage = useMemo(() => new Map((protocols || []).map((p) => [p.id, p.image_url])), [protocols]);
   const bySlug = useMemo(() => {
     const m = new Map<string, ProtocolKit[]>();
     for (const k of kits || []) { const a = m.get(k.slug) || []; a.push(k); m.set(k.slug, a); }
@@ -228,8 +240,24 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
           <h3 className="text-sm font-semibold text-gray-900">Protocol Kits — buy-this-protocol bundles</h3>
           <p className="text-xs text-gray-500">Items × regions matrix per kit. Badges show what's blocked/warned per region; expand a row for supplier cost, margin and affiliate commission.</p>
         </div>
-        <button onClick={load} disabled={loading} className={btnCls}><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh</button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setView('cards')} className={`${btnCls} ${view === 'cards' ? 'bg-gray-100' : ''}`} title="Kit cards">
+            <LayoutGrid size={12} /> Kits
+          </button>
+          <button onClick={() => setView('master')} className={`${btnCls} ${view === 'master' ? 'bg-gray-100' : ''}`} title="Every product × region in one flat table — supplier/margin/linked columns, CSV export">
+            <TableIcon size={12} /> Master table
+          </button>
+          <button onClick={load} disabled={loading} className={btnCls}><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh</button>
+        </div>
       </div>
+
+      {view === 'master' ? (
+        masterItems ? (
+          <KitsMasterTable items={masterItems} kits={kits || []} protocols={protocols || []} rules={rules} itemCounts={counts} productLinkCounts={productLinks} />
+        ) : (
+          <div className="p-6 text-center text-gray-400"><Loader2 size={16} className="mx-auto animate-spin" /></div>
+        )
+      ) : (<>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-3">
@@ -287,11 +315,18 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
             <button key={slug} onClick={() => setOpenSlug(slug)}
               className="rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm hover:bg-gray-50">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-xl font-semibold text-gray-900" title={kitTitle}>{kitTitle}</div>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-sm text-gray-600">
-                    <ShoppingBag size={13} className="shrink-0 text-gray-400" />
-                    <span className="truncate" title={proto}>Protocol: {proto}</span>
+                <div className="flex min-w-0 items-start gap-3">
+                  {(() => {
+                    const img = rows[0]?.image_url || protocolImage.get(rows[0]?.protocol_id) || null;
+                    return img
+                      ? <img src={img} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover border border-gray-200" />
+                      : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gray-100"><ShoppingBag size={18} className="text-gray-400" /></span>;
+                  })()}
+                  <div className="min-w-0">
+                    <div className="truncate text-xl font-semibold text-gray-900" title={kitTitle}>{kitTitle}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-sm text-gray-600">
+                      <span className="truncate" title={proto}>Protocol: {proto}</span>
+                    </div>
                   </div>
                 </div>
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${liveN ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -318,6 +353,7 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
         })}
         {!slugs.length && <div className="py-8 text-center text-sm text-gray-400" style={{ gridColumn: '1 / -1' }}>No kits match.</div>}
       </div>
+      </>)}
 
       {/* kit detail modal */}
       {openSlug && (() => {
@@ -329,10 +365,18 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
           <div onClick={() => setOpenSlug(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 16px' }}>
             <div onClick={(e) => e.stopPropagation()} className="w-full rounded-xl bg-white shadow-md" style={{ maxWidth: 1040, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
               <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4">
-                <div className="min-w-0">
-                  <div className="text-xl font-semibold text-gray-900">{kitTitle}</div>
-                  <div className="mt-0.5 text-sm text-gray-600">Protocol: <span className="font-medium text-gray-800">{proto}</span> <span className="text-gray-400">· /{openSlug}</span>
-                    {rows[0].partner_label && <span className="ml-2 rounded-full border border-teal-100 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-600">{rows[0].partner_label}</span>}
+                <div className="flex min-w-0 items-start gap-3">
+                  {(() => {
+                    const img = rows[0].image_url || protocolImage.get(rows[0].protocol_id) || null;
+                    return img
+                      ? <img src={img} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover border border-gray-200" />
+                      : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-gray-100"><ShoppingBag size={20} className="text-gray-400" /></span>;
+                  })()}
+                  <div className="min-w-0">
+                    <div className="text-xl font-semibold text-gray-900">{kitTitle}</div>
+                    <div className="mt-0.5 text-sm text-gray-600">Protocol: <span className="font-medium text-gray-800">{proto}</span> <span className="text-gray-400">· /{openSlug}</span>
+                      {rows[0].partner_label && <span className="ml-2 rounded-full border border-teal-100 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-600">{rows[0].partner_label}</span>}
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => setOpenSlug(null)} className="rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 hover:bg-gray-50" title="Close"><X size={15} /></button>
