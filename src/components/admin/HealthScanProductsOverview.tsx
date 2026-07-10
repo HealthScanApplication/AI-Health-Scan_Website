@@ -78,16 +78,34 @@ export function HealthScanProductsOverview({ accessToken }: HealthScanProductsOv
       const [testsRes, suppsRes, prodsRes] = await Promise.all([
         fetch(`https://${projectId}.supabase.co/rest/v1/hs_tests?select=*&order=name`, { headers }),
         fetch(`https://${projectId}.supabase.co/rest/v1/hs_supplements?select=*&order=name`, { headers }),
-        fetch(`https://${projectId}.supabase.co/rest/v1/hs_products?select=*&order=name`, { headers }),
+        // hs_products was merged into catalog_products (20260710) and dropped — read the
+        // HealthScan store SKUs (product_hs_*) from the single catalog_products table instead.
+        fetch(`https://${projectId}.supabase.co/rest/v1/catalog_products?id=like.product_hs_*&select=*&order=name`, { headers }),
       ]);
-      const [testsData, suppsData, prodsData] = await Promise.all([
-        testsRes.json(),
-        suppsRes.json(),
-        prodsRes.json(),
-      ]);
-      setTests(testsData || []);
-      setSupplements(suppsData || []);
-      setProducts(prodsData || []);
+      // Guard every response — a non-2xx returns a PostgREST error *object*, not an array,
+      // which would blow up the .filter/.map below. Coerce anything non-array to [].
+      const testsData = testsRes.ok ? await testsRes.json() : [];
+      const suppsData = suppsRes.ok ? await suppsRes.json() : [];
+      const prodsRaw = prodsRes.ok ? await prodsRes.json() : [];
+      setTests(Array.isArray(testsData) ? testsData : []);
+      setSupplements(Array.isArray(suppsData) ? suppsData : []);
+      // Map catalog_products rows into the shape this overview expects.
+      setProducts((Array.isArray(prodsRaw) ? prodsRaw : []).map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        slug: p.slug as string,
+        name: (p.name as string) || (p.name_common as string),
+        product_type: (p.category as string) || 'device',
+        category: p.category as string,
+        retail_price: Number(p.price_usd) || 0,
+        currency: 'USD',
+        buy_url: p.purchase_url as string | undefined,
+        source_url: p.purchase_url as string | undefined,
+        affiliate_available: !!p.affiliate_link_amazon,
+        affiliate_connected: !!p.affiliate_link_amazon,
+        is_active: true,
+        is_featured: false,
+        image_url: p.image_url as string | undefined,
+      })));
     } catch (err) {
       console.error('Failed to fetch HS data:', err);
     } finally {
