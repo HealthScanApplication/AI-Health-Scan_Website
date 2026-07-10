@@ -40,6 +40,31 @@
   background: var(--sb-page);
 }
 
+/* ── Standard control sizes (both modes) — ONE height/font for every input,
+     select and button in the admin, Supabase-style. Apply `sb-input`,
+     `sb-select`, `sb-btn` (+`sb-btn-primary`) instead of ad-hoc Tailwind
+     stacks so nothing drifts in size again. ── */
+.sb-admin .sb-input, .sb-admin .sb-select {
+  height: 30px; padding: 0 10px; font-size: 12.5px; line-height: 28px;
+  border-radius: 6px; border: 1px solid var(--sb-border);
+  background: var(--sb-panel); color: var(--sb-text);
+}
+.sb-admin .sb-select { padding-right: 24px; }
+.sb-admin .sb-input::placeholder { color: var(--sb-text-faint); }
+.sb-admin .sb-input:focus, .sb-admin .sb-select:focus { outline: 1.5px solid var(--sb-brand); outline-offset: -1px; }
+.sb-admin textarea.sb-input { height: auto; line-height: 1.45; padding: 6px 10px; }
+.sb-admin .sb-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px;
+  font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  border-radius: 6px; border: 1px solid var(--sb-border);
+  background: var(--sb-panel); color: var(--sb-text-soft);
+}
+.sb-admin .sb-btn:hover { background: var(--sb-hover); }
+.sb-admin .sb-btn:disabled { opacity: 0.5; cursor: default; }
+.sb-admin .sb-btn-primary { background: var(--sb-brand); border-color: var(--sb-brand); color: #0c0c0c; }
+.sb-admin .sb-btn-primary:hover { background: var(--sb-brand-strong); color: #ffffff; }
+.sb-admin .sb-btn-on { background: var(--sb-brand-soft); border-color: var(--sb-brand); color: var(--sb-brand-strong); }
+
 /* ── Supabase-green accent (both modes): remap the admin's blue accents ── */
 .sb-admin .text-blue-600, .sb-admin .text-blue-700, .sb-admin .text-blue-500 { color: var(--sb-brand-strong) !important; }
 .sb-admin .bg-blue-50, .sb-admin .bg-blue-100 { background-color: var(--sb-brand-soft) !important; }

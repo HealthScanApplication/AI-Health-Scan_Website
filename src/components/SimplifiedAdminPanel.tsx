@@ -1733,6 +1733,8 @@ function ContentLinksField({ fieldKey, val, updateField, accessToken, projectId,
 
 export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: SimplifiedAdminPanelProps) {
   const [activeTab, setActiveTab] = useState('waitlist');
+  // deep-link target for the Protocols editor (set when a kit row's Protocol cell is clicked)
+  const [protocolDeepLink, setProtocolDeepLink] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState('users');
   
@@ -4694,9 +4696,11 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
             {tabs.filter(tab => tab.id !== 'sync' && tab.id !== 'notifications').map(tab => (
               <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                 {tab.id === 'protocols' ? (
-                  <ProtocolEditor accessToken={accessToken} onOpenCatalogRecord={openCatalogRecord} />
+                  <ProtocolEditor accessToken={accessToken} onOpenCatalogRecord={openCatalogRecord} initialProtocolId={protocolDeepLink} />
                 ) : tab.id === 'kits' ? (
-                  <KitsPanel accessToken={accessToken} />
+                  <KitsPanel accessToken={accessToken}
+                    onOpenProtocol={(pid) => { setProtocolDeepLink(pid); setActiveGroup('health_records'); setActiveTab('protocols'); }}
+                    onOpenProduct={(id) => openCatalogRecord('product', id)} />
                 ) : (<>
                 {/* Waitlist Funnel Dashboard */}
                 {tab.id === 'waitlist' && validRecords.length > 0 && !showSearch && (

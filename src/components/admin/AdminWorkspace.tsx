@@ -37,8 +37,9 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export function AdminWorkspace({ user, accessToken }: { user: any; accessToken: string }): React.ReactElement {
   const [tab, setTab] = useState<AdminTab>('panel');
   const [jumpSearch, setJumpSearch] = useState<string | undefined>(undefined);
+  // dark is the DEFAULT (Supabase look) — light only when explicitly chosen
   const [dark, setDark] = useState<boolean>(() => {
-    try { return localStorage.getItem('admin-theme') === 'dark'; } catch { return false; }
+    try { return localStorage.getItem('admin-theme') !== 'light'; } catch { return true; }
   });
   useEffect(() => {
     try { localStorage.setItem('admin-theme', dark ? 'dark' : 'light'); } catch { /* noop */ }

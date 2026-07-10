@@ -277,7 +277,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ── main editor ── */
-export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessToken: string; onOpenCatalogRecord?: (kind: CatalogKind, id: string) => void }) {
+export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtocolId }: {
+  accessToken: string;
+  onOpenCatalogRecord?: (kind: CatalogKind, id: string) => void;
+  /** deep-open a protocol (e.g. clicking a Protocol cell in the Kits master table) */
+  initialProtocolId?: string | null;
+}) {
   const [protocols, setProtocols] = useState<AdminProtocol[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -286,6 +291,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord }: { accessTok
   const [fCategory, setFCategory] = useState('');
   const [fType, setFType] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // deep-open wins over the "first row" default; list-load keeps it (see setSelectedId((cur) => …))
+  useEffect(() => { if (initialProtocolId) setSelectedId(initialProtocolId); }, [initialProtocolId]);
 
   const [items, setItems] = useState<AdminProtocolItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);

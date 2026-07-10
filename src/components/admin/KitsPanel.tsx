@@ -14,15 +14,17 @@ import { ChevronDown, ChevronRight, Loader2, Plus, RefreshCw, Scale, Search as S
 import { toast } from 'sonner';
 import {
   listAllKits, listAllProtocolsLite, createKitAllRegions, listRegionRules, createRegionRule, deleteRegionRule,
-  resolveItemNames, searchProductsLite, listKitItemCounts, listAllKitItems, listProtocolProductLinkCounts, REGIONS,
-  type ProtocolKit, type ProtocolLite, type RegionRule, type KitRegion, type KitItem,
+  resolveItemNames, searchProductsLite, listKitItemCounts, listAllKitItems, listProtocolProductLinkCounts,
+  listAllProtocolProductMentions, REGIONS,
+  type ProtocolKit, type ProtocolLite, type RegionRule, type KitRegion, type KitItem, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
 import { KitMatrix } from './KitMatrix';
 import { KitsMasterTable } from './KitsMasterTable';
 import { X, LayoutGrid, Table as TableIcon } from 'lucide-react';
 
-const inputCls = 'rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
-const btnCls = 'inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50';
+// standard admin control classes (adminTheme.css) — ONE size everywhere
+const inputCls = 'sb-input';
+const btnCls = 'sb-btn';
 
 /* ── region legality rules manager ── */
 function RegionRulesManager({ rules, accessToken, onChanged }: { rules: RegionRule[]; accessToken: string; onChanged: () => void }) {
@@ -170,7 +172,11 @@ function RegionRulesManager({ rules, accessToken, onChanged }: { rules: RegionRu
   );
 }
 
-export function KitsPanel({ accessToken }: { accessToken: string }) {
+export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct }: {
+  accessToken: string;
+  onOpenProtocol?: (protocolId: string) => void;
+  onOpenProduct?: (catalogProductId: string) => void;
+}) {
   const [kits, setKits] = useState<ProtocolKit[] | null>(null);
   const [protocols, setProtocols] = useState<ProtocolLite[] | null>(null);
   const [rules, setRules] = useState<RegionRule[]>([]);
@@ -183,6 +189,7 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
   const [view, setView] = useState<'cards' | 'master'>('cards');
   const [masterItems, setMasterItems] = useState<KitItem[] | null>(null);
   const [productLinks, setProductLinks] = useState<Map<string, number>>(new Map());
+  const [mentions, setMentions] = useState<Map<string, ProtocolSuggestion[]>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,13 +200,16 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
     finally { setLoading(false); }
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
-  // master-view data loads on first switch (and refreshes with Refresh)
+  // master-view data loads on first switch (and refreshes with Refresh / after an add)
+  const loadMaster = useCallback(() => {
+    Promise.all([listAllKitItems(accessToken), listProtocolProductLinkCounts(accessToken), listAllProtocolProductMentions(accessToken)])
+      .then(([mi, pl, me]) => { setMasterItems(mi); setProductLinks(pl); setMentions(me); })
+      .catch((e: any) => toast.error(`Master view load failed: ${e?.message || e}`));
+  }, [accessToken]);
   useEffect(() => {
     if (view !== 'master') return;
-    Promise.all([listAllKitItems(accessToken), listProtocolProductLinkCounts(accessToken)])
-      .then(([mi, pl]) => { setMasterItems(mi); setProductLinks(pl); })
-      .catch((e: any) => toast.error(`Master view load failed: ${e?.message || e}`));
-  }, [view, accessToken, kits]);
+    loadMaster();
+  }, [view, loadMaster, kits]);
 
   const protocolName = useMemo(() => new Map((protocols || []).map((p) => [p.id, p.name])), [protocols]);
   const protocolImage = useMemo(() => new Map((protocols || []).map((p) => [p.id, p.image_url])), [protocols]);
@@ -253,7 +263,8 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
 
       {view === 'master' ? (
         masterItems ? (
-          <KitsMasterTable items={masterItems} kits={kits || []} protocols={protocols || []} rules={rules} itemCounts={counts} productLinkCounts={productLinks} onOpenKit={setOpenSlug} />
+          <KitsMasterTable items={masterItems} kits={kits || []} protocols={protocols || []} rules={rules} itemCounts={counts} productLinkCounts={productLinks}
+            mentions={mentions} accessToken={accessToken} onOpenKit={setOpenSlug} onOpenProtocol={onOpenProtocol} onOpenProduct={onOpenProduct} onItemsChanged={loadMaster} />
         ) : (
           <div className="p-6 text-center text-gray-400"><Loader2 size={16} className="mx-auto animate-spin" /></div>
         )

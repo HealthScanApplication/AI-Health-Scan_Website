@@ -19,6 +19,7 @@ const rest = () => `https://${projectId}.supabase.co/rest/v1`;
 const REGIONS = ['US', 'EU', 'UK', 'AU'] as const;
 export type KitRegion = (typeof REGIONS)[number];
 export { REGIONS };
+export const REGION_FLAG: Record<KitRegion, string> = { US: '🇺🇸', EU: '🇪🇺', UK: '🇬🇧', AU: '🇦🇺' };
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return { apikey: publicAnonKey, Authorization: `Bearer ${accessToken || publicAnonKey}`, 'Content-Type': 'application/json', ...extra };
@@ -172,6 +173,55 @@ export async function listProtocolBuyableProducts(accessToken: string, protocolI
       affiliate_url: p.affiliate_url ?? null, affiliate_link_amazon: p.affiliate_link_amazon ?? null,
     };
   }).sort((a, b) => b.mentions - a.mentions);
+}
+
+/** BULK version of listProtocolBuyableProducts for the master table: every
+ *  product any protocol's steps link to, grouped by protocol_id — so the table
+ *  can render "the protocol mentions this but it's NOT in the kit" rows without
+ *  one request per protocol. Two round-trips (items + chunked product resolve). */
+export async function listAllProtocolProductMentions(accessToken: string): Promise<Map<string, ProtocolSuggestion[]>> {
+  const itRes = await fetch(
+    `${rest()}/protocol_items?catalog_product_id=not.is.null&select=protocol_id,display_name,catalog_product_id,kind&limit=10000`,
+    { headers: headers(accessToken) },
+  );
+  const rows: any[] = (await handle(itRes, 'Protocol product links')) || [];
+  if (!rows.length) return new Map();
+  // per (protocol, product): display name + mention count
+  const byProto = new Map<string, Map<string, { title: string; mentions: number; kinds: Set<string> }>>();
+  const allIds = new Set<string>();
+  for (const it of rows) {
+    allIds.add(it.catalog_product_id);
+    const m = byProto.get(it.protocol_id) || new Map();
+    const cur = m.get(it.catalog_product_id) || { title: it.display_name || it.catalog_product_id, mentions: 0, kinds: new Set<string>() };
+    cur.mentions += 1;
+    if (it.kind) cur.kinds.add(it.kind);
+    m.set(it.catalog_product_id, cur);
+    byProto.set(it.protocol_id, m);
+  }
+  // resolve products in chunks — in.() URLs get long
+  const prodById = new Map<string, any>();
+  const ids = [...allIds];
+  for (let at = 0; at < ids.length; at += 80) {
+    const res = await fetch(
+      `${rest()}/catalog_products?id=in.(${ids.slice(at, at + 80).map(encodeURIComponent).join(',')})`
+      + `&select=id,name_common,image_url,price_usd,shopify_variant_id,purchase_url,affiliate_link_shopify,affiliate_url,affiliate_link_amazon`,
+      { headers: headers(accessToken) },
+    );
+    for (const p of ((await handle(res, 'Products')) || [])) prodById.set(p.id, p);
+  }
+  const out = new Map<string, ProtocolSuggestion[]>();
+  for (const [protoId, prods] of byProto) {
+    out.set(protoId, [...prods.entries()].map(([id, meta]) => {
+      const p = prodById.get(id) || {};
+      return {
+        id, name: meta.title, protocolTitle: meta.title, mentions: meta.mentions, kinds: [...meta.kinds],
+        image: p.image_url ?? null, price_usd: p.price_usd ?? null, shopify_variant_id: p.shopify_variant_id ?? null,
+        purchase_url: p.purchase_url ?? null, affiliate_link_shopify: p.affiliate_link_shopify ?? null,
+        affiliate_url: p.affiliate_url ?? null, affiliate_link_amazon: p.affiliate_link_amazon ?? null,
+      };
+    }).sort((a, b) => b.mentions - a.mentions));
+  }
+  return out;
 }
 
 /** Re-point a whole kit (all its region rows, matched by slug) to a different

@@ -23,14 +23,15 @@ import {
   listKitItemsAllRegions, createKitItem, updateKitItem, deleteKitItem, updateKit, updateKitProtocol,
   copyKitRegion, cloneKitItem, searchProductsLite, kitItemFieldsFromProduct, listProtocolBuyableProducts,
   linkKitItemToProduct, kitItemBuyPath,
-  REGIONS, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
+  REGIONS, REGION_FLAG, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
   type ProtocolLite, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
 import { Link2 } from 'lucide-react';
 
-const inputCls = 'w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
-const miniInput = 'w-full rounded border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-900';
-const btnCls = 'inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50';
+// standard admin control classes (adminTheme.css) — ONE size for inputs/buttons
+const inputCls = 'sb-input w-full';
+const miniInput = 'sb-input w-full';
+const btnCls = 'sb-btn';
 
 const fmt = (n: number | null | undefined) => (n == null ? '—' : `$${Number(n).toFixed(2)}`);
 const rowKeyOf = (it: KitItem) => it.catalog_product_id || (it.title || '').toLowerCase().trim() || it.id;
@@ -232,12 +233,12 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
         </button>
         <span className="flex-1" />
         <span className="text-xs text-gray-500">Copy</span>
-        <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value as KitRegion)} className="rounded-md border border-gray-200 bg-white px-1.5 py-1 text-xs">
-          {REGIONS.map((r) => <option key={r}>{r}</option>)}
+        <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value as KitRegion)} className="sb-select">
+          {REGIONS.map((r) => <option key={r} value={r}>{REGION_FLAG[r]} {r}</option>)}
         </select>
         <span className="text-xs text-gray-400">→</span>
-        <select value={copyTo} onChange={(e) => setCopyTo(e.target.value as KitRegion)} className="rounded-md border border-gray-200 bg-white px-1.5 py-1 text-xs">
-          {REGIONS.map((r) => <option key={r}>{r}</option>)}
+        <select value={copyTo} onChange={(e) => setCopyTo(e.target.value as KitRegion)} className="sb-select">
+          {REGIONS.map((r) => <option key={r} value={r}>{REGION_FLAG[r]} {r}</option>)}
         </select>
         <button onClick={runCopyRegion} disabled={copying} className={btnCls}>
           {copying ? <Loader2 size={12} className="animate-spin" /> : <CopyIcon size={12} />} Copy region
@@ -251,7 +252,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
             const k = kitByMarket.get(m)!;
             return (
               <div key={k.id} className="grid grid-cols-12 items-center gap-2">
-                <span className="col-span-1 rounded bg-gray-200 px-1.5 py-0.5 text-center text-[11px] font-semibold text-gray-700">{m}</span>
+                <span className="col-span-1 rounded bg-gray-200 px-1.5 py-0.5 text-center text-[11px] font-semibold text-gray-700">{REGION_FLAG[m]} {m}</span>
                 <input className={`${miniInput} col-span-2`} defaultValue={k.title || ''} placeholder="Title" onBlur={(e) => updateKit(accessToken, k.id, { title: e.target.value || null }).catch((err) => toast.error(String(err)))} />
                 <input className={`${miniInput} col-span-2`} defaultValue={k.partner_label || ''} placeholder="Partner (e.g. Tre Lune)" onBlur={(e) => updateKit(accessToken, k.id, { partner_label: e.target.value || null }).catch((err) => toast.error(String(err)))} />
                 <input className={`${miniInput} col-span-2`} defaultValue={k.partner_cart_url || ''} placeholder="Partner cart URL" onBlur={(e) => updateKit(accessToken, k.id, { partner_cart_url: e.target.value || null }).catch((err) => toast.error(String(err)))} />
@@ -316,7 +317,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
                   return (
                     <th key={m} className="px-2 py-1.5 text-left font-medium" style={{ minWidth: 120 }}>
                       <span className="inline-flex items-center gap-1.5">
-                        {m}
+                        {REGION_FLAG[m]} {m}
                         <span className={`rounded-full px-1.5 text-[10px] font-semibold ${k.is_live ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>{k.is_live ? 'live' : 'hidden'}</span>
                       </span>
                     </th>
