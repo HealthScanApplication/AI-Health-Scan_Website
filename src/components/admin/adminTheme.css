@@ -94,6 +94,12 @@
 .sb-admin.sb-dark .bg-green-50 { background-color: var(--sb-brand-soft) !important; }
 .sb-admin.sb-dark .border-green-300 { border-color: #14532d !important; }
 .sb-admin.sb-dark .text-green-700, .sb-admin.sb-dark .text-green-600 { color: var(--sb-brand) !important; }
+.sb-admin.sb-dark .bg-emerald-50, .sb-admin.sb-dark .bg-emerald-100 { background-color: var(--sb-brand-soft) !important; }
+.sb-admin.sb-dark .bg-emerald-600 { background-color: var(--sb-brand) !important; color: #0c0c0c !important; }
+.sb-admin.sb-dark .text-emerald-600, .sb-admin.sb-dark .text-emerald-700 { color: var(--sb-brand) !important; }
+.sb-admin.sb-dark .border-emerald-100, .sb-admin.sb-dark .border-emerald-200 { border-color: #14532d !important; }
+.sb-admin.sb-dark .bg-teal-100 { background-color: rgba(20, 184, 166, 0.16) !important; }
+.sb-admin.sb-dark .border-teal-100 { border-color: #134e4a !important; }
 .sb-admin.sb-dark .bg-purple-50 { background-color: rgba(168, 85, 247, 0.12) !important; }
 .sb-admin.sb-dark .text-purple-600, .sb-admin.sb-dark .text-purple-700 { color: #c084fc !important; }
 .sb-admin.sb-dark .border-purple-300 { border-color: #6b21a8 !important; }

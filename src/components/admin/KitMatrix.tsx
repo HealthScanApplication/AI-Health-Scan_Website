@@ -21,7 +21,8 @@ import { ChevronDown, ChevronRight, Copy as CopyIcon, Loader2, Plus, Settings2, 
 import { toast } from 'sonner';
 import {
   listKitItemsAllRegions, createKitItem, updateKitItem, deleteKitItem, updateKit,
-  copyKitRegion, cloneKitItem, REGIONS, type ProtocolKit, type KitItem, type RegionRule, type KitRegion,
+  copyKitRegion, cloneKitItem, searchProductsLite, kitItemFieldsFromProduct,
+  REGIONS, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
 } from '../../utils/kitsAdmin';
 
 const inputCls = 'w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
@@ -133,7 +134,28 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
     finally { setCopying(false); }
   };
 
-  const addItem = async (market: KitRegion) => {
+  /** Add a picked catalog product as a kit item — to one market ("a special
+   *  product in a region", e.g. AU-only coconut oil) or to every region the kit
+   *  has, skipping regions where the product is BLOCKED. */
+  const addProduct = async (p: ProductHit, market: KitRegion, allRegions: boolean) => {
+    const targets = allRegions ? markets : [market];
+    let added = 0; const skipped: string[] = [];
+    for (const m of targets) {
+      const rule = rules.find((r) => r.region === m && r.item_id === p.id && r.action === 'block');
+      if (rule) { skipped.push(`${m} (${rule.reason || 'blocked'})`); continue; }
+      try {
+        const created = await createKitItem(accessToken, {
+          slug, market: m, ...kitItemFieldsFromProduct(p),
+          sort: ((items || []).filter((i) => i.market === m).length || 0) + 1,
+        });
+        setItems((arr) => [...(arr || []), created]);
+        added += 1;
+      } catch (e: any) { toast.error(`Add to ${m} failed: ${e?.message || e}`); }
+    }
+    if (added) toast.success(`Added "${p.name}" to ${added} region${added === 1 ? '' : 's'}${skipped.length ? ` — skipped ${skipped.join(', ')}` : ''}`);
+    else if (skipped.length) toast.warning(`Not added — blocked in ${skipped.join(', ')}`);
+  };
+  const addBlank = async (market: KitRegion) => {
     try {
       const created = await createKitItem(accessToken, { slug, market, lane: 'store', title: 'New item', sort: ((items || []).filter((i) => i.market === market).length || 0) + 1 });
       setItems((arr) => [...(arr || []), created]);
@@ -254,7 +276,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, onKits
                       <div className="text-gray-500">Cost {t.cost > 0 ? fmt(t.cost) : '—'}{t.costMissing > 0 && <span className="text-amber-600"> ({t.costMissing} no cost)</span>}</div>
                       <div className={margin != null ? 'font-semibold text-emerald-700' : 'text-gray-400'}>Margin {margin != null ? `${margin}%` : '—'}</div>
                       {t.commission > 0 && <div className="text-gray-500">Aff. est. {fmt(t.commission)}</div>}
-                      <button onClick={() => addItem(m)} className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-800"><Plus size={10} /> add item</button>
+                      <AddProductPicker market={m} accessToken={accessToken} onPick={addProduct} onBlank={() => addBlank(m)} />
                     </td>
                   );
                 })}
@@ -329,7 +351,7 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
         })}
       </tr>
       {isOpen && (
-        <tr className="border-b border-gray-100 bg-gray-50/60">
+        <tr className="border-b border-gray-100 bg-gray-50">
           <td className="px-2 py-2 align-top text-[11px] text-gray-500">
             Economics & sourcing per region
             <div className="mt-1 text-[10px] text-gray-400">Margin is computed by the database from sell − cost.</div>
@@ -366,6 +388,65 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
         </tr>
       )}
     </>
+  );
+}
+
+/** "+ add product" per region: catalog typeahead (e.g. type "coconut oil"),
+ *  pick a product → it lands LINKED (legality badges + compliant copy work),
+ *  either in this region only or across all the kit's regions. */
+function AddProductPicker({ market, accessToken, onPick, onBlank }: {
+  market: KitRegion; accessToken: string;
+  onPick: (p: ProductHit, market: KitRegion, allRegions: boolean) => Promise<void>;
+  onBlank: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [hits, setHits] = useState<ProductHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [allRegions, setAllRegions] = useState(false);
+
+  const run = (term: string) => {
+    setQ(term);
+    if (!term.trim()) { setHits([]); return; }
+    setSearching(true);
+    searchProductsLite(accessToken, term, 6).then(setHits).catch(() => setHits([])).finally(() => setSearching(false));
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-800">
+        <Plus size={10} /> add product
+      </button>
+    );
+  }
+  return (
+    <div className="relative mt-1">
+      <input autoFocus value={q} onChange={(e) => run(e.target.value)} placeholder="Search products…"
+        className="w-full rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-900"
+        onKeyDown={(e) => { if (e.key === 'Escape') { setOpen(false); setQ(''); setHits([]); } }} />
+      <div className="absolute z-20 mt-1 w-64 rounded-md border border-gray-200 bg-white shadow-md">
+        {searching && <div className="p-2 text-center text-gray-400"><Loader2 size={12} className="mx-auto animate-spin" /></div>}
+        {hits.map((h) => (
+          <button key={h.id} onClick={async () => { setOpen(false); setQ(''); setHits([]); await onPick(h, market, allRegions); }}
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-50">
+            {h.image ? <img src={h.image} alt="" className="h-5 w-5 rounded object-cover" /> : <span className="h-5 w-5 rounded bg-gray-100" />}
+            <span className="min-w-0 flex-1 truncate text-gray-800">{h.name}</span>
+            {h.price_usd != null && <span className="shrink-0 text-gray-500">${h.price_usd}</span>}
+            <span className={`shrink-0 rounded px-1 text-[9px] font-bold ${/^\d+$/.test(String(h.shopify_variant_id || '')) ? 'bg-gray-900 text-white' : 'bg-purple-50 text-purple-600 border border-purple-300'}`}>
+              {/^\d+$/.test(String(h.shopify_variant_id || '')) ? 'S' : 'A'}
+            </span>
+          </button>
+        ))}
+        {!searching && q.trim() && !hits.length && <div className="p-2 text-center text-[11px] text-gray-400">No products match</div>}
+        <div className="flex items-center justify-between border-t border-gray-100 px-2 py-1.5">
+          <label className="flex items-center gap-1.5 text-[10px] text-gray-500">
+            <input type="checkbox" checked={allRegions} onChange={(e) => setAllRegions(e.target.checked)} />
+            all regions (skips blocked)
+          </label>
+          <button onClick={() => { setOpen(false); onBlank(); }} className="text-[10px] text-gray-400 hover:text-gray-700">custom item</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

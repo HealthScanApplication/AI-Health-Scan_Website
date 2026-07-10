@@ -14,10 +14,11 @@ import { ChevronDown, ChevronRight, Loader2, Plus, RefreshCw, Scale, Search as S
 import { toast } from 'sonner';
 import {
   listAllKits, listAllProtocolsLite, createKitAllRegions, listRegionRules, createRegionRule, deleteRegionRule,
-  resolveItemNames, searchProductsLite, REGIONS,
+  resolveItemNames, searchProductsLite, listKitItemCounts, REGIONS,
   type ProtocolKit, type ProtocolLite, type RegionRule, type KitRegion,
 } from '../../utils/kitsAdmin';
 import { KitMatrix } from './KitMatrix';
+import { X } from 'lucide-react';
 
 const inputCls = 'rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900';
 const btnCls = 'inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50';
@@ -172,16 +173,18 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
   const [kits, setKits] = useState<ProtocolKit[] | null>(null);
   const [protocols, setProtocols] = useState<ProtocolLite[] | null>(null);
   const [rules, setRules] = useState<RegionRule[]>([]);
+  const [counts, setCounts] = useState<Map<string, Partial<Record<KitRegion, number>>>>(new Map());
   const [loading, setLoading] = useState(false);
   const [showMissing, setShowMissing] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [openSlug, setOpenSlug] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [k, p, r] = await Promise.all([listAllKits(accessToken), listAllProtocolsLite(accessToken), listRegionRules(accessToken)]);
-      setKits(k); setProtocols(p); setRules(r);
+      const [k, p, r, c] = await Promise.all([listAllKits(accessToken), listAllProtocolsLite(accessToken), listRegionRules(accessToken), listKitItemCounts(accessToken)]);
+      setKits(k); setProtocols(p); setRules(r); setCounts(c);
     } catch (e: any) { toast.error(`Load failed: ${e?.message || e}`); }
     finally { setLoading(false); }
   }, [accessToken]);
@@ -272,24 +275,75 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search kits or protocol name…" className={inputCls + ' w-full pl-8'} />
       </div>
 
-      <div className="space-y-5">
+      {/* kit overview — one card per kit; click opens the detail modal */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {slugs.map((slug) => {
           const rows = (bySlug.get(slug) || []).slice().sort((a, b) => REGIONS.indexOf(a.market) - REGIONS.indexOf(b.market));
-          const name = protocolName.get(rows[0]?.protocol_id) || rows[0]?.title || slug;
+          const proto = protocolName.get(rows[0]?.protocol_id) || slug;
+          const kitTitle = rows[0]?.title || `${proto} Kit`;
+          const slugCounts = counts.get(slug) || {};
+          const liveN = rows.filter((r) => r.is_live).length;
           return (
-            <div key={slug} className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <ShoppingBag size={13} className="text-gray-400" />
-                <span className="text-sm font-semibold text-gray-800">{name}</span>
-                <span className="text-xs text-gray-400">/{slug}</span>
-                {rows[0]?.partner_label && <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-600 border border-teal-100">Partner: {rows[0].partner_label}</span>}
+            <button key={slug} onClick={() => setOpenSlug(slug)}
+              className="rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm hover:bg-gray-50">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-xl font-semibold text-gray-900" title={kitTitle}>{kitTitle}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-sm text-gray-600">
+                    <ShoppingBag size={13} className="shrink-0 text-gray-400" />
+                    <span className="truncate" title={proto}>Protocol: {proto}</span>
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${liveN ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {liveN ? `${liveN} live` : 'hidden'}
+                </span>
               </div>
-              <KitMatrix slug={slug} kits={rows} rules={rules} accessToken={accessToken} protocolName={name} onKitsChanged={load} />
-            </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {rows.map((r) => (
+                  <span key={r.id} title={`${r.market}: ${slugCounts[r.market] || 0} item(s) · ${r.is_live ? 'live' : 'hidden'}`}
+                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium border ${r.is_live ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
+                    {r.market}
+                    <span className="font-semibold">{slugCounts[r.market] || 0}</span>
+                  </span>
+                ))}
+                {rows[0]?.partner_label && (
+                  <span className="rounded-full border border-teal-100 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-600">{rows[0].partner_label}</span>
+                )}
+              </div>
+              {Object.values(slugCounts).every((n) => !n) && (
+                <div className="mt-2 text-[11px] text-amber-600">No items yet — the app falls back to the protocol's linked products.</div>
+              )}
+            </button>
           );
         })}
-        {!slugs.length && <div className="py-8 text-center text-sm text-gray-400">No kits match.</div>}
+        {!slugs.length && <div className="py-8 text-center text-sm text-gray-400" style={{ gridColumn: '1 / -1' }}>No kits match.</div>}
       </div>
+
+      {/* kit detail modal */}
+      {openSlug && (() => {
+        const rows = (bySlug.get(openSlug) || []).slice().sort((a, b) => REGIONS.indexOf(a.market) - REGIONS.indexOf(b.market));
+        if (!rows.length) return null;
+        const proto = protocolName.get(rows[0].protocol_id) || openSlug;
+        const kitTitle = rows[0].title || `${proto} Kit`;
+        return (
+          <div onClick={() => setOpenSlug(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 16px' }}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full rounded-xl bg-white shadow-md" style={{ maxWidth: 1040, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4">
+                <div className="min-w-0">
+                  <div className="text-xl font-semibold text-gray-900">{kitTitle}</div>
+                  <div className="mt-0.5 text-sm text-gray-600">Protocol: <span className="font-medium text-gray-800">{proto}</span> <span className="text-gray-400">· /{openSlug}</span>
+                    {rows[0].partner_label && <span className="ml-2 rounded-full border border-teal-100 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-600">{rows[0].partner_label}</span>}
+                  </div>
+                </div>
+                <button onClick={() => setOpenSlug(null)} className="rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 hover:bg-gray-50" title="Close"><X size={15} /></button>
+              </div>
+              <div className="p-3" style={{ overflowY: 'auto' }}>
+                <KitMatrix slug={openSlug} kits={rows} rules={rules} accessToken={accessToken} protocolName={proto} onKitsChanged={load} />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

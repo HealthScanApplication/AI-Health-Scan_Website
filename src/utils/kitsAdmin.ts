@@ -111,16 +111,57 @@ export async function resolveItemNames(accessToken: string, ids: string[]): Prom
   return out;
 }
 
-/** Product search for linking a kit item / picking a rule target or substitute. */
-export async function searchProductsLite(accessToken: string, q: string, limit = 8): Promise<{ id: string; name: string; image: string | null }[]> {
+export interface ProductHit {
+  id: string; name: string; image: string | null; price_usd: number | null;
+  shopify_variant_id: string | null; purchase_url: string | null;
+  affiliate_link_shopify: string | null; affiliate_url: string | null; affiliate_link_amazon: string | null;
+}
+/** Product search for adding kit items / picking rule targets & substitutes.
+ *  Returns the purchase fields so a picked product can be turned into a fully
+ *  linked kit item (see kitItemFieldsFromProduct). */
+export async function searchProductsLite(accessToken: string, q: string, limit = 8): Promise<ProductHit[]> {
   const term = q.trim();
   if (!term) return [];
   const res = await fetch(
-    `${rest()}/catalog_products?or=(name_common.ilike.*${encodeURIComponent(term)}*,name_brand.ilike.*${encodeURIComponent(term)}*)&select=id,name_common,name_brand,image_url&limit=${limit}`,
+    `${rest()}/catalog_products?or=(name_common.ilike.*${encodeURIComponent(term)}*,name_brand.ilike.*${encodeURIComponent(term)}*)`
+    + `&select=id,name_common,name_brand,image_url,price_usd,shopify_variant_id,purchase_url,affiliate_link_shopify,affiliate_url,affiliate_link_amazon&limit=${limit}`,
     { headers: headers(accessToken) },
   );
   const rows = (await handle(res, 'Search products')) || [];
-  return rows.map((r: any) => ({ id: r.id, name: r.name_common || r.name_brand || r.id, image: r.image_url }));
+  return rows.map((r: any) => ({
+    id: r.id, name: r.name_common || r.name_brand || r.id, image: r.image_url, price_usd: r.price_usd ?? null,
+    shopify_variant_id: r.shopify_variant_id ?? null, purchase_url: r.purchase_url ?? null,
+    affiliate_link_shopify: r.affiliate_link_shopify ?? null, affiliate_url: r.affiliate_url ?? null, affiliate_link_amazon: r.affiliate_link_amazon ?? null,
+  }));
+}
+
+/** Kit-item fields for a picked catalog product — lane derived exactly like the
+ *  mobile app (numeric shopify_variant_id → store lane, else its affiliate /
+ *  purchase URL → affiliate lane). The item arrives LINKED (catalog_product_id
+ *  set) so region-legality badges and compliant copying work automatically. */
+export function kitItemFieldsFromProduct(p: ProductHit): Partial<KitItem> {
+  const variant = String(p.shopify_variant_id || '').trim();
+  const isStore = /^\d+$/.test(variant);
+  const affiliate = p.purchase_url || p.affiliate_link_shopify || p.affiliate_url || p.affiliate_link_amazon || null;
+  return {
+    title: p.name, catalog_product_id: p.id, price_usd: p.price_usd, image_url: p.image,
+    lane: isStore ? 'store' : 'affiliate',
+    variant_id: isStore ? variant : null,
+    affiliate_url: isStore ? null : affiliate,
+  };
+}
+
+/** slug+market of every kit item — one lightweight fetch for overview counts. */
+export async function listKitItemCounts(accessToken: string): Promise<Map<string, Partial<Record<KitRegion, number>>>> {
+  const res = await fetch(`${rest()}/protocol_kit_items?select=slug,market`, { headers: headers(accessToken) });
+  const rows: { slug: string; market: KitRegion }[] = (await handle(res, 'Count kit items')) || [];
+  const m = new Map<string, Partial<Record<KitRegion, number>>>();
+  for (const r of rows) {
+    const cur = m.get(r.slug) || {};
+    cur[r.market] = (cur[r.market] || 0) + 1;
+    m.set(r.slug, cur);
+  }
+  return m;
 }
 
 /** Clone ONE kit item into a target market, honouring an optional BLOCK rule:
