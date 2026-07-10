@@ -3366,7 +3366,8 @@ const SYNC_TABLES = [
   'catalog_elements', 'catalog_ingredients', 'catalog_cooking_methods', 'catalog_equipment',
   'catalog_symptoms', 'catalog_activities', 'catalog_products', 'catalog_recipes',
   // ── HS tables ──
-  'hs_tests', 'hs_supplements', 'hs_products', 'hs_experts', 'hs_services', 'hs_packages',
+  // hs_products merged into catalog_products + dropped (20260710); hs_packages is dead but kept for now
+  'hs_tests', 'hs_supplements', 'hs_experts', 'hs_services', 'hs_packages',
   // ── Junction/child tables (depend on parents above; deletes run in reverse) ──
   'catalog_element_aliases', 'catalog_element_symptoms',
   'catalog_ingredient_aliases', 'catalog_ingredient_elements',

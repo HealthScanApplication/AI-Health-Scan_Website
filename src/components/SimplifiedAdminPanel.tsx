@@ -1772,7 +1772,8 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
         { id: 'hs_overview', label: 'Overview', icon: <Eye className="w-4 h-4 text-teal-600" />, table: '' },
         { id: 'hs_tests', label: 'Tests', icon: <FlaskConical className="w-4 h-4 text-teal-600" />, table: 'hs_tests' },
         { id: 'hs_supplements', label: 'Supplements', icon: <Pill className="w-4 h-4 text-teal-600" />, table: 'hs_supplements' },
-        { id: 'hs_products', label: 'Products', icon: <Package className="w-4 h-4 text-teal-600" />, table: 'hs_products' },
+        // hs_products was an orphan (unpublished device stubs) merged into catalog_products
+        // and dropped (20260710) — the real store SKUs live in Health Records → Products.
         { id: 'hs_services', label: 'Services', icon: <Briefcase className="w-4 h-4 text-teal-600" />, table: 'hs_services' },
         { id: 'hs_experts', label: 'Experts', icon: <UserCheck className="w-4 h-4 text-teal-600" />, table: 'hs_experts' },
         // "Packages" (hs_packages/package_items) was dead — 0 items anywhere, never
