@@ -253,7 +253,7 @@ export function KitsPanel({ accessToken }: { accessToken: string }) {
 
       {view === 'master' ? (
         masterItems ? (
-          <KitsMasterTable items={masterItems} kits={kits || []} protocols={protocols || []} rules={rules} itemCounts={counts} productLinkCounts={productLinks} />
+          <KitsMasterTable items={masterItems} kits={kits || []} protocols={protocols || []} rules={rules} itemCounts={counts} productLinkCounts={productLinks} onOpenKit={setOpenSlug} />
         ) : (
           <div className="p-6 text-center text-gray-400"><Loader2 size={16} className="mx-auto animate-spin" /></div>
         )
