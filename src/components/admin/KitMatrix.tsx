@@ -17,7 +17,7 @@
  * inserts rule substitutes with the mobile app's store/affiliate lane logic).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Copy as CopyIcon, Loader2, Plus, Settings2, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy as CopyIcon, ExternalLink, Loader2, Plus, Settings2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   listKitItemsAllRegions, createKitItem, updateKitItem, deleteKitItem, updateKit, updateKitProtocol,
@@ -43,9 +43,22 @@ function num(v: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protocols, onKitsChanged }: {
+/** labeled field — a persistent caption above the control so a filled value
+ *  (a supplier name, a bare variant id) is never ambiguous */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protocols, onKitsChanged, onOpenProduct }: {
   slug: string; kits: ProtocolKit[]; rules: RegionRule[]; accessToken: string;
   protocolName: string; protocols: ProtocolLite[]; onKitsChanged: () => void;
+  /** open a linked catalog product in the record modal */
+  onOpenProduct?: (catalogProductId: string) => void;
 }) {
   const [items, setItems] = useState<KitItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -410,7 +423,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
                   <FragmentRow key={rk} rk={rk} cells={cells} first={first} markets={markets} isOpen={isOpen}
                     onToggle={() => setExpanded(isOpen ? null : rk)} ruleFor={ruleFor} busyCell={busyCell}
                     commit={commit} cloneCell={cloneCell} removeItem={removeItem}
-                    accessToken={accessToken} onLinkRow={linkRow} fx={fx}
+                    accessToken={accessToken} onLinkRow={linkRow} fx={fx} onOpenProduct={onOpenProduct}
                     draggable={orderBy === 'manual'} isDragging={dragRk === rk}
                     onDragStart={() => setDragRk(rk)} onDragEnd={() => setDragRk(null)} onDropRow={() => dropOn(rk)} />
                 );
@@ -450,6 +463,7 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
   cloneCell: (source: KitItem, to: KitRegion) => Promise<void>;
   removeItem: (it: KitItem) => Promise<void>;
   accessToken: string; onLinkRow: (cells: Partial<Record<KitRegion, KitItem>>, p: ProductHit) => Promise<void>;
+  onOpenProduct?: (catalogProductId: string) => void;
   draggable: boolean; isDragging: boolean;
   onDragStart: () => void; onDragEnd: () => void; onDropRow: () => void;
 }) {
@@ -473,6 +487,14 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
               {/* consistent status chips on every row */}
               {!buyPath && <span title="No buy path — needs a Shopify variant (store) or an affiliate URL to be sellable" className="shrink-0 rounded bg-amber-50 px-1 text-[9px] font-bold text-amber-700 border border-amber-200">NO BUY PATH</span>}
             </button>
+            {/* linked → open the catalog product record; unlinked → link picker */}
+            {linked && onOpenProduct ? (
+              <button onClick={() => onOpenProduct(first.catalog_product_id!)}
+                title={`Open the linked product record (${first.catalog_product_id})`}
+                className="inline-flex shrink-0 items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-100">
+                <ExternalLink size={10} /> open
+              </button>
+            ) : null}
             <RowLinkPicker linked={linked} busy={busyCell === `link:${rk}`} accessToken={accessToken} onPick={(p) => onLinkRow(cells, p)} />
           </div>
         </td>
@@ -541,25 +563,35 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
             if (!it) return <td key={m} className="px-2 py-2 align-top text-xs text-gray-300">—</td>;
             return (
               <td key={m} className="px-2 py-2 align-top">
-                <div className="space-y-1">
-                  <input defaultValue={it.supplier_cost_usd ?? ''} placeholder="Supplier cost $" className={miniInput}
-                    onBlur={(e) => { const v = num(e.target.value); if (v !== it.supplier_cost_usd) commit(it, { supplier_cost_usd: v }); }} />
-                  <input defaultValue={it.supplier ?? ''} placeholder="Supplier (Tre Lune…)" className={miniInput}
-                    onBlur={(e) => commit(it, { supplier: e.target.value || null })} />
+                <div className="space-y-1.5">
+                  <Field label="Supplier cost (USD/unit)">
+                    <input defaultValue={it.supplier_cost_usd ?? ''} placeholder="0.00" className={miniInput}
+                      onBlur={(e) => { const v = num(e.target.value); if (v !== it.supplier_cost_usd) commit(it, { supplier_cost_usd: v }); }} />
+                  </Field>
+                  <Field label="Supplier">
+                    <input defaultValue={it.supplier ?? ''} placeholder="Supliful, Tre Lune…" className={miniInput}
+                      onBlur={(e) => commit(it, { supplier: e.target.value || null })} />
+                  </Field>
                   {it.lane === 'affiliate' && (
-                    <input defaultValue={it.commission_pct ?? ''} placeholder="Commission %" className={miniInput}
-                      onBlur={(e) => { const v = num(e.target.value); if (v !== it.commission_pct) commit(it, { commission_pct: v }); }} />
+                    <Field label="Affiliate commission %">
+                      <input defaultValue={it.commission_pct ?? ''} placeholder="e.g. 15" className={miniInput}
+                        onBlur={(e) => { const v = num(e.target.value); if (v !== it.commission_pct) commit(it, { commission_pct: v }); }} />
+                    </Field>
                   )}
-                  <input defaultValue={it.lane === 'store' ? (it.variant_id ?? '') : (it.affiliate_url ?? '')}
-                    placeholder={it.lane === 'store' ? 'Shopify variant id' : 'Affiliate URL'} className={miniInput}
-                    onBlur={(e) => commit(it, it.lane === 'store' ? { variant_id: e.target.value || null } : { affiliate_url: e.target.value || null })} />
-                  <div className="flex items-center justify-between">
-                    <select defaultValue={it.lane} className="rounded border border-gray-200 bg-white px-1 py-0.5 text-[10px]"
-                      onChange={(e) => commit(it, { lane: e.target.value })}>
-                      <option value="store">store</option>
-                      <option value="affiliate">affiliate</option>
-                    </select>
-                    <button onClick={() => removeItem(it)} className="text-red-400 hover:text-red-600" title={`Remove from ${m}`}><Trash2 size={12} /></button>
+                  <Field label={it.lane === 'store' ? 'Shopify variant ID' : 'Affiliate URL'}>
+                    <input defaultValue={it.lane === 'store' ? (it.variant_id ?? '') : (it.affiliate_url ?? '')}
+                      placeholder={it.lane === 'store' ? '5791129…' : 'https://…'} className={miniInput}
+                      onBlur={(e) => commit(it, it.lane === 'store' ? { variant_id: e.target.value || null } : { affiliate_url: e.target.value || null })} />
+                  </Field>
+                  <div className="flex items-end justify-between gap-1">
+                    <Field label="Buy lane">
+                      <select defaultValue={it.lane} className="rounded border border-gray-200 bg-white px-1 py-0.5 text-[10px]"
+                        onChange={(e) => commit(it, { lane: e.target.value })}>
+                        <option value="store">store (Shopify)</option>
+                        <option value="affiliate">affiliate (external)</option>
+                      </select>
+                    </Field>
+                    <button onClick={() => removeItem(it)} className="mb-0.5 text-red-400 hover:text-red-600" title={`Remove from ${m}`}><Trash2 size={12} /></button>
                   </div>
                 </div>
               </td>

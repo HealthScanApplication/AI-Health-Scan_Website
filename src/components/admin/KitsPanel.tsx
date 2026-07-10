@@ -393,7 +393,7 @@ export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct }: {
                 <button onClick={() => setOpenSlug(null)} className="rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 hover:bg-gray-50" title="Close"><X size={15} /></button>
               </div>
               <div className="p-3" style={{ overflowY: 'auto' }}>
-                <KitMatrix slug={openSlug} kits={rows} rules={rules} accessToken={accessToken} protocolName={proto} protocols={protocols || []} onKitsChanged={load} />
+                <KitMatrix slug={openSlug} kits={rows} rules={rules} accessToken={accessToken} protocolName={proto} protocols={protocols || []} onKitsChanged={load} onOpenProduct={onOpenProduct} />
               </div>
             </div>
           </div>
