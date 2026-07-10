@@ -13,8 +13,10 @@ import { Download, ExternalLink, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem,
+  fmtMoney, itemMarginPct, listFxRates,
   type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
+import { useEffect } from 'react';
 
 const sel = 'sb-select';
 
@@ -75,6 +77,9 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
   const [fLinked, setFLinked] = useState('');
   const [fBuy, setFBuy] = useState('');
   const [fText, setFText] = useState('');
+  // FX for margin display — sell prices are region-local, costs are USD
+  const [fx, setFx] = useState<Record<string, number>>({ USD: 1 });
+  useEffect(() => { if (accessToken) listFxRates(accessToken).then(setFx).catch(() => {}); }, [accessToken]);
 
   const protoName = useMemo(() => new Map(protocols.map((p) => [p.id, p.name])), [protocols]);
   const protoImage = useMemo(() => new Map(protocols.map((p) => [p.id, p.image_url])), [protocols]);
@@ -185,7 +190,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
 
   const exportCsv = () => {
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const head = ['region', 'kit', 'protocol', 'product', 'lane', 'buy_path', 'published_shopify', 'linked_product_id', 'supplier', 'store_url', 'cost_usd', 'sell_usd', 'margin_pct', 'commission_pct', 'affiliate_url', 'variant_id', 'kit_live', 'region_rule'];
+    const head = ['region', 'kit', 'protocol', 'product', 'lane', 'buy_path', 'published_shopify', 'linked_product_id', 'supplier', 'store_url', 'cost_usd', 'sell_local', 'currency', 'margin_pct_fx', 'commission_pct', 'affiliate_url', 'variant_id', 'kit_live', 'region_rule'];
     const lines = rows.map((i) => {
       const kit = kitBySlugMarket.get(`${i.slug}:${i.market}`);
       const rule = ruleFor(i);
@@ -193,7 +198,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
       // which is the whole point of this export; the channel lives in buy_path/store_url.
       return [i.market, i.slug, kit ? protoName.get(kit.protocol_id) || '' : '', i.title, i.lane, kitItemBuyPath(i) || 'none',
         kitItemBuyPath(i) === 'store' ? 'yes' : (i.lane === 'store' ? (kit?.partner_cart_url ? 'partner' : 'NO') : ''), i.catalog_product_id || '',
-        i.supplier || '', itemStoreUrl(i) || '', i.supplier_cost_usd ?? '', i.price_usd ?? '', i.margin_pct ?? '', i.commission_pct ?? '',
+        i.supplier || '', itemStoreUrl(i) || '', i.supplier_cost_usd ?? '', i.price_usd ?? '', i.currency || 'USD', itemMarginPct(i, fx) ?? '', i.commission_pct ?? '',
         i.affiliate_url || '', i.variant_id || '', kit?.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
     });
     // protocol-mentioned products missing from the kit — the sourcing to-do list
@@ -201,7 +206,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
       const f = kitItemFieldsFromProduct(m.product);
       const rule = rules.find((r) => r.region === m.market && r.item_id === m.product.id);
       return [m.market, m.slug, protoName.get(m.kit.protocol_id) || '', m.product.name, '', 'NOT_IN_KIT', '', m.product.id,
-        '', '', '', m.product.price_usd ?? '', '', '',
+        '', '', '', m.product.price_usd ?? '', 'USD', '', '',
         f.affiliate_url || '', f.variant_id || '', m.kit.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
     });
     const blob = new Blob([[head.join(','), ...lines, ...missingLines].join('\n')], { type: 'text/csv' });
@@ -449,9 +454,14 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         </a>
                       : <span className="sb-cell">—</span>}
                   </td>
-                  <td><span className="sb-cell">{i.supplier_cost_usd != null ? `$${i.supplier_cost_usd}` : '—'}</span></td>
-                  <td><span className="sb-cell">{i.price_usd != null ? `$${i.price_usd}` : '—'}</span></td>
-                  <td><span className="sb-cell">{i.margin_pct != null ? `${i.margin_pct}%` : '—'}</span></td>
+                  <td><span className="sb-cell">{i.supplier_cost_usd != null ? fmtMoney(i.supplier_cost_usd, 'USD') : '—'}</span></td>
+                  <td><span className="sb-cell">{fmtMoney(i.price_usd, i.currency)}</span></td>
+                  <td>{(() => { const mp = itemMarginPct(i, fx); return (
+                    <span className="sb-cell" title={mp != null ? `(sell→USD via FX − cost) / sell` : 'Set a supplier cost to see margin'}
+                      style={mp != null ? { fontWeight: 600, color: mp >= 40 ? 'var(--sb-brand-strong)' : mp >= 20 ? '#d97706' : '#dc2626' } : undefined}>
+                      {mp != null ? `${mp}%` : '—'}
+                    </span>
+                  ); })()}</td>
                   <td><span className="sb-cell">{i.commission_pct != null ? `${i.commission_pct}%` : '—'}</span></td>
                   <td><span className="sb-cell">{kit?.is_live ? 'live' : 'hidden'}</span></td>
                   <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>

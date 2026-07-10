@@ -21,6 +21,13 @@ export type KitRegion = (typeof REGIONS)[number];
 export { REGIONS };
 export const REGION_FLAG: Record<KitRegion, string> = { US: '🇺🇸', EU: '🇪🇺', UK: '🇬🇧', AU: '🇦🇺' };
 
+/* ── currency (20260710_kit_region_currency): each region row carries its own
+   currency + local price; fx_rates converts to USD for margin math ── */
+export const REGION_CURRENCY: Record<KitRegion, string> = { US: 'USD', EU: 'EUR', UK: 'GBP', AU: 'AUD' };
+export const CURRENCY_SYMBOL: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', AUD: 'A$' };
+export const fmtMoney = (n: number | null | undefined, currency?: string | null) =>
+  n == null ? '—' : `${CURRENCY_SYMBOL[currency || 'USD'] || `${currency} `}${Number(n).toFixed(2)}`;
+
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return { apikey: publicAnonKey, Authorization: `Bearer ${accessToken || publicAnonKey}`, 'Content-Type': 'application/json', ...extra };
 }
@@ -41,6 +48,7 @@ export interface ProtocolKit {
   partner_label: string | null; partner_cart_url: string | null;
   price_usd: number | null; is_live: boolean; items_slug: string | null; created_at?: string;
   image_url: string | null; // kit image (falls back to the protocol's image in the UI)
+  currency: string | null; // region-local currency (USD/EUR/GBP/AUD)
 }
 export interface KitItem {
   id: string; slug: string; market: KitRegion; lane: 'store' | 'affiliate' | string;
@@ -49,8 +57,11 @@ export interface KitItem {
   sort: number | null; sku: string | null;
   // economics (20260710_kit_item_economics): margin_pct is a GENERATED column —
   // read-only, recomputed from price_usd/supplier_cost_usd; never PATCH it.
+  // NOTE: for non-USD rows the DB column mixes currencies — use itemMarginPct
+  // (fx-aware) for display instead.
   supplier_cost_usd: number | null; supplier: string | null; commission_pct: number | null;
   margin_pct: number | null;
+  currency: string | null; // region-local currency of price_usd (USD/EUR/GBP/AUD)
 }
 export interface ProtocolLite { id: string; name: string; is_public: boolean | null; source: string | null; image_url: string | null }
 export interface RegionRule {
@@ -58,8 +69,114 @@ export interface RegionRule {
   action: 'block' | 'warn' | string; reason: string | null; substitute_item_id: string | null;
 }
 
-const KIT_COLS = 'id,protocol_id,slug,market,kind,title,subtitle,cart_url,partner_label,partner_cart_url,price_usd,is_live,items_slug,created_at,image_url';
-const ITEM_COLS = 'id,slug,market,lane,variant_id,title,price_usd,image_url,affiliate_url,catalog_product_id,sort,sku,supplier_cost_usd,supplier,commission_pct,margin_pct';
+const KIT_COLS = 'id,protocol_id,slug,market,kind,title,subtitle,cart_url,partner_label,partner_cart_url,price_usd,is_live,items_slug,created_at,image_url,currency';
+const ITEM_COLS = 'id,slug,market,lane,variant_id,title,price_usd,image_url,affiliate_url,catalog_product_id,sort,sku,supplier_cost_usd,supplier,commission_pct,margin_pct,currency';
+
+/* ── FX rates (fx_rates table, usd_per_unit; admin-editable) ── */
+export async function listFxRates(accessToken: string): Promise<Record<string, number>> {
+  const res = await fetch(`${rest()}/fx_rates?select=currency,usd_per_unit`, { headers: headers(accessToken) });
+  const rows = (await handle(res, 'List FX rates')) || [];
+  const out: Record<string, number> = { USD: 1 };
+  for (const r of rows) out[String(r.currency).trim()] = Number(r.usd_per_unit);
+  return out;
+}
+export async function updateFxRate(accessToken: string, currency: string, usdPerUnit: number): Promise<void> {
+  const res = await fetch(`${rest()}/fx_rates?currency=eq.${encodeURIComponent(currency)}`, {
+    method: 'PATCH', headers: headers(accessToken),
+    body: JSON.stringify({ usd_per_unit: usdPerUnit, updated_at: new Date().toISOString() }),
+  });
+  await handle(res, 'Update FX rate');
+}
+
+/** Sell price converted to USD via fx (price is region-local since 20260710). */
+export const itemSellUsd = (i: KitItem, fx: Record<string, number>): number | null =>
+  i.price_usd == null ? null : i.price_usd * (fx[i.currency || 'USD'] ?? 1);
+/** FX-aware margin % — supplier costs are USD, sell prices are region-local. */
+export function itemMarginPct(i: KitItem, fx: Record<string, number>): number | null {
+  const sell = itemSellUsd(i, fx);
+  if (sell == null || sell === 0 || i.supplier_cost_usd == null) return null;
+  return Math.round(((sell - i.supplier_cost_usd) / sell) * 1000) / 10;
+}
+
+/* ── AI sourcing suggestions (edge: /admin/kits/ai-suggest) ── */
+export interface KitSuggestionCard {
+  type: 'quality' | 'supplier' | 'dropship' | 'affiliate' | 'pricing' | string;
+  title: string; detail: string; item_title: string | null;
+  action?: { kind: 'set_supplier'; supplier: string } | { kind: 'info' };
+  confidence?: 'high' | 'medium' | 'low';
+  source?: 'ai' | 'playbook'; // playbook = deterministic, no LLM involved
+}
+export async function fetchKitAiSuggestions(accessToken: string, slug: string, region?: KitRegion): Promise<{ cards: KitSuggestionCard[]; provider: string }> {
+  const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/kits/ai-suggest`, {
+    method: 'POST', headers: headers(accessToken), body: JSON.stringify({ slug, region }),
+  });
+  const j = await handle(res, 'AI suggestions');
+  if (!j?.success) throw new Error(j?.error || 'AI suggestions failed');
+  return { cards: (j.cards || []).map((c: KitSuggestionCard) => ({ ...c, source: 'ai' as const })), provider: j.provider };
+}
+
+/** Deterministic sourcing cards from the fulfilment playbook — no LLM, always available.
+ *  (docs/kit-fulfilment-strategy.md: Supliful US ≥97% COA, Suplify EU, UK domestic,
+ *  AU partner cart, Momentous ≈15% affiliate.) */
+export function playbookSuggestionCards(items: KitItem[]): KitSuggestionCard[] {
+  const cards: KitSuggestionCard[] = [];
+  const dropshipBy: Record<string, { name: string; note: string }> = {
+    US: { name: 'Supliful', note: 'US white-label dropship; publishes ≥97% third-party COA lab results, organic options' },
+    EU: { name: 'Suplify', note: 'EU dropship equivalent — ships from inside the EU, no customs surprises' },
+    UK: { name: 'UK domestic dropship', note: 'post-Brexit, avoid EU cross-shipping; source a UK-warehouse supplier' },
+    AU: { name: 'AU partner cart', note: 'TGA restricts supplement imports — use a local partner cart (Tre Lune model)' },
+  };
+  for (const region of REGIONS) {
+    const rs = items.filter((i) => i.market === region);
+    const noSupplier = rs.filter((i) => i.lane === 'store' && !i.supplier);
+    if (noSupplier.length) {
+      const d = dropshipBy[region];
+      cards.push({
+        type: 'dropship', source: 'playbook', confidence: 'high',
+        title: `${REGION_FLAG[region]} ${region}: ${noSupplier.length} store item(s) have no supplier`,
+        detail: `Set up ${d.name} — ${d.note}. Apply it to the unset items, then fill supplier costs to see margins.`,
+        item_title: null, action: { kind: 'set_supplier', supplier: d.name },
+      });
+    }
+  }
+  const noPath = items.filter((i) => !kitItemBuyPath(i));
+  if (noPath.length) {
+    cards.push({
+      type: 'supplier', source: 'playbook', confidence: 'high',
+      title: `${noPath.length} item(s) have NO buy path`,
+      detail: `Nothing to sell until each gets a Shopify variant (store lane) or an affiliate URL: ${[...new Set(noPath.map((i) => i.title))].slice(0, 4).join(', ')}${noPath.length > 4 ? '…' : ''}.`,
+      item_title: null, action: { kind: 'info' },
+    });
+  }
+  const affNoCommission = items.filter((i) => i.lane === 'affiliate' && i.affiliate_url && i.commission_pct == null);
+  if (affNoCommission.length) {
+    cards.push({
+      type: 'affiliate', source: 'playbook', confidence: 'medium',
+      title: `${affNoCommission.length} affiliate item(s) missing a commission %`,
+      detail: 'Record the program rate so the economics footer can estimate revenue — Amazon Associates ≈3%, Momentous ≈15% (NSF-certified; also a quality upgrade for generic supplements).',
+      item_title: null, action: { kind: 'info' },
+    });
+  }
+  return cards;
+}
+
+/** Re-derive one region's prices from the US column at a given FX rate
+ *  (local = ceil(us × rate) − 0.01 → retail x.99). Matches rows by product
+ *  link or normalized title, same as the matrix rows. Returns #updated. */
+export async function convertKitRegionPrices(accessToken: string, slug: string, to: Exclude<KitRegion, 'US'>, rate: number): Promise<number> {
+  const items = await listKitItemsAllRegions(accessToken, slug);
+  const keyOf = (it: KitItem) => it.catalog_product_id || (it.title || '').toLowerCase().trim() || it.id;
+  const usPrice = new Map<string, number>();
+  for (const i of items) if (i.market === 'US' && i.price_usd != null) usPrice.set(keyOf(i), i.price_usd);
+  const targets = items.filter((i) => i.market === to && usPrice.has(keyOf(i)));
+  let n = 0;
+  for (const t of targets) {
+    const local = Math.ceil(usPrice.get(keyOf(t))! * rate) - 0.01;
+    await updateKitItem(accessToken, t.id, { price_usd: local, currency: REGION_CURRENCY[to] });
+    n++;
+  }
+  return n;
+}
 
 export async function listAllKits(accessToken: string): Promise<ProtocolKit[]> {
   const res = await fetch(`${rest()}/protocol_kits?select=${KIT_COLS}&order=slug.asc,market.asc`, { headers: headers(accessToken) });

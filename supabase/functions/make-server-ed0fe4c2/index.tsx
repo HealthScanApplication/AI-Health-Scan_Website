@@ -181,7 +181,10 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; retr
 app.use('*', cors({
   origin: '*', // In production, replace with your domain
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
+  // 'apikey' is required — supabase-js and our REST helpers send it on every
+  // call; without it here the browser preflight silently kills the request
+  // (net::ERR_FAILED "Failed to fetch") even though curl works.
+  allowHeaders: ['Content-Type', 'Authorization', 'apikey', 'x-client-info'],
   credentials: true
 }))
 
@@ -1027,6 +1030,80 @@ app.post('/make-server-ed0fe4c2/admin/waitlist/bulk-delete', async (c: any) => {
     let deleted = 0, failed = 0
     for (const em of emails) { try { await kv.del(`waitlist_user_${em.trim().toLowerCase()}`); deleted++ } catch { failed++ } }
     return c.json({ success: true, deleted, failed })
+  } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
+})
+
+// Admin: AI sourcing suggestions for a protocol kit — quality (organic /
+// third-party-tested) upgrades, dropship supplier setup, affiliate programs.
+// Prefers ANTHROPIC_API_KEY (Claude), falls back to OPENAI_API_KEY; the admin
+// UI adds deterministic playbook cards client-side, so no key ≠ no feature.
+app.post('/make-server-ed0fe4c2/admin/kits/ai-suggest', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const adminValidation = await validateAdminAccess(accessToken)
+    if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
+    const { slug, region } = await c.req.json()
+    if (!slug) return c.json({ success: false, error: 'slug is required' }, 400)
+
+    const { data: kits } = await supabase.from('protocol_kits').select('slug,market,title,protocol_id,partner_label').eq('slug', slug)
+    const { data: items } = await supabase.from('protocol_kit_items')
+      .select('market,lane,title,price_usd,currency,supplier,supplier_cost_usd,commission_pct,affiliate_url,variant_id,catalog_product_id')
+      .eq('slug', slug)
+    if (!kits?.length) return c.json({ success: false, error: `No kit found for slug ${slug}` }, 404)
+    let protocolName = slug
+    if (kits[0].protocol_id) {
+      const { data: proto } = await supabase.from('catalog_protocols').select('name').eq('id', kits[0].protocol_id).limit(1)
+      protocolName = proto?.[0]?.name || slug
+    }
+    const scoped = region ? (items || []).filter((i: any) => i.market === region) : (items || [])
+    const itemLines = scoped.map((i: any) =>
+      `- [${i.market}/${i.lane}] ${i.title} | sell ${i.price_usd ?? '?'} ${i.currency || 'USD'} | cost ${i.supplier_cost_usd ?? 'UNKNOWN'} USD | supplier ${i.supplier || 'NONE'} | ${i.variant_id ? 'shopify' : (i.affiliate_url ? new URL(i.affiliate_url).hostname : 'NO BUY PATH')}${i.commission_pct ? ` | commission ${i.commission_pct}%` : ''}`
+    ).join('\n')
+
+    const prompt = `You are a sourcing analyst for HealthScan, a health-brand that sells protocol kits (product bundles) via a Shopify store (dropship) and affiliate links.
+
+Kit: "${kits[0].title || slug}" for protocol "${protocolName}"${region ? ` — region ${region}` : ' — regions US/EU/UK/AU'}.
+Current items:
+${itemLines || '(no items)'}
+
+Known fulfilment playbook: Supliful (US dropship, white-label supplements, publishes ≥97% third-party COA lab results, organic options); Suplify (EU dropship equivalent); UK: domestic dropship suppliers preferred post-Brexit (avoid EU cross-shipping); AU: partner-cart model (TGA rules restrict supplement imports); Momentous affiliate ≈15% (NSF-certified, third-party tested); Amazon Associates ≈3%; Thorne/Fullscript pro channels exist.
+
+Return STRICT JSON: {"cards":[{"type":"quality"|"supplier"|"dropship"|"affiliate"|"pricing","title":"...","detail":"2-3 sentences, concrete and specific to an item or the kit","item_title":"exact item title or null","action":{"kind":"set_supplier","supplier":"..."}|{"kind":"info"},"confidence":"high"|"medium"|"low"}]}
+Rules: max 8 cards, prioritize (1) items with NO supplier or NO BUY PATH — name a real supplier/program to set up; (2) quality upgrades where a third-party-tested or certified-organic equivalent exists (name the brand/program); (3) commission_pct or margin improvements. No fluff, no generic advice.`
+
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    let raw = ''
+    let provider = ''
+    if (anthropicKey) {
+      provider = 'anthropic'
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
+      })
+      const j = await r.json()
+      if (!r.ok) return c.json({ success: false, error: `Anthropic: ${j?.error?.message || r.status}` }, 502)
+      raw = j?.content?.[0]?.text || ''
+    } else if (openaiKey) {
+      provider = 'openai'
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${openaiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] }),
+      })
+      const j = await r.json()
+      if (!r.ok) return c.json({ success: false, error: `OpenAI: ${j?.error?.message || r.status}` }, 502)
+      raw = j?.choices?.[0]?.message?.content || ''
+    } else {
+      return c.json({ success: false, error: 'No AI key configured (set ANTHROPIC_API_KEY or OPENAI_API_KEY in edge secrets)' }, 501)
+    }
+
+    const jsonText = raw.replace(/^```(json)?/m, '').replace(/```\s*$/m, '').trim()
+    const start = jsonText.indexOf('{')
+    const parsed = JSON.parse(jsonText.slice(start >= 0 ? start : 0))
+    const cards = Array.isArray(parsed?.cards) ? parsed.cards.slice(0, 8) : []
+    return c.json({ success: true, provider, cards })
   } catch (error: any) { return c.json({ success: false, error: error?.message || 'Internal server error' }, 500) }
 })
 
