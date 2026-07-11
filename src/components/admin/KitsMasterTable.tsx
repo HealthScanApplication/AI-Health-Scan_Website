@@ -206,6 +206,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     });
   }, [rows, missingRows, fLane, sortCol, protoName, kitBySlugMarket, fx]);
 
+  // which coverage bucket's protocol list is expanded (click a card to toggle)
+  const [auditOpen, setAuditOpen] = useState<null | 'nothing' | 'fallbackOnly' | 'curated'>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const addMissing = async (m: MissingRow) => {
     if (!accessToken) return;
@@ -267,32 +269,59 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
 
   return (
     <div className="space-y-4">
-      {/* protocol product-coverage audit */}
+      {/* protocol product-coverage audit — click a card to open its list; each
+          protocol row deep-links into the editor to fix it */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-          <div className="text-xs uppercase tracking-wide text-red-600">Nothing to sell</div>
-          <div className="text-2xl font-semibold text-red-600">{coverage.nothing.length}</div>
-          <div className="text-[11px] text-red-600">no kit items AND no product-linked steps</div>
-        </div>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <div className="text-xs uppercase tracking-wide text-amber-700">Fallback only</div>
-          <div className="text-2xl font-semibold text-amber-700">{coverage.fallbackOnly.length}</div>
-          <div className="text-[11px] text-amber-700">no curated kit — app sells the protocol's linked products</div>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-          <div className="text-xs uppercase tracking-wide text-emerald-700">Curated kit</div>
-          <div className="text-2xl font-semibold text-emerald-700">{coverage.curated.length}</div>
-          <div className="text-[11px] text-emerald-700">has kit items</div>
-        </div>
+        {([
+          { key: 'nothing' as const, label: 'Nothing to sell', hint: 'no kit items AND no product-linked steps', tone: 'red', list: coverage.nothing },
+          { key: 'fallbackOnly' as const, label: 'Fallback only', hint: "no curated kit — app sells the protocol's linked products", tone: 'amber', list: coverage.fallbackOnly },
+          { key: 'curated' as const, label: 'Curated kit', hint: 'has kit items', tone: 'emerald', list: coverage.curated },
+        ]).map((c) => {
+          const on = auditOpen === c.key;
+          const cls = c.tone === 'red' ? 'border-red-200 bg-red-50 text-red-600' : c.tone === 'amber' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+          return (
+            <button key={c.key} onClick={() => setAuditOpen(on ? null : c.key)}
+              className={`rounded-lg border p-3 text-left transition ${cls} ${on ? 'ring-2 ring-offset-1' : 'hover:brightness-95'}`}
+              style={on ? { boxShadow: '0 0 0 2px var(--sb-brand)' } : undefined}
+              title={`${on ? 'Hide' : 'Show'} the ${c.list.length} protocol(s)`}>
+              <div className="flex items-center justify-between text-xs uppercase tracking-wide">{c.label}<span className="text-[10px] normal-case opacity-70">{on ? 'hide ▲' : 'view ▼'}</span></div>
+              <div className="text-2xl font-semibold">{c.list.length}</div>
+              <div className="text-[11px]">{c.hint}</div>
+            </button>
+          );
+        })}
       </div>
-      {coverage.nothing.length > 0 && (
-        <details className="rounded-lg border border-red-200 bg-white">
-          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-red-600">Protocols with nothing to sell ({coverage.nothing.length}) — need products linked or a kit built</summary>
-          <div className="max-h-56 overflow-auto border-t border-red-100 px-3 py-2 text-sm text-gray-700">
-            {coverage.nothing.map((a) => <div key={a.p.id} className="py-0.5">{a.p.name}</div>)}
+      {auditOpen && (() => {
+        const list = coverage[auditOpen];
+        const tone = auditOpen === 'nothing' ? 'red' : auditOpen === 'fallbackOnly' ? 'amber' : 'emerald';
+        const border = tone === 'red' ? 'border-red-200' : tone === 'amber' ? 'border-amber-200' : 'border-emerald-200';
+        return (
+          <div className={`rounded-lg border ${border} bg-white`}>
+            <div className="flex items-center justify-between px-3 py-2 text-sm font-medium" style={{ borderBottom: '1px solid var(--sb-border)' }}>
+              <span>{auditOpen === 'nothing' ? 'Nothing to sell' : auditOpen === 'fallbackOnly' ? 'Fallback only' : 'Curated kit'} — {list.length} protocol(s){auditOpen === 'nothing' ? ' · click one to link products or build a kit' : auditOpen === 'fallbackOnly' ? ' · has linked products; build a curated kit to upsell' : ''}</span>
+            </div>
+            <div className="max-h-64 overflow-auto p-1.5">
+              {list.map((a) => (
+                <button key={a.p.id} onClick={onOpenProtocol ? () => onOpenProtocol(a.p.id) : undefined}
+                  disabled={!onOpenProtocol}
+                  className="flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-sm hover:bg-[var(--sb-hover)]"
+                  style={{ cursor: onOpenProtocol ? 'pointer' : 'default' }}
+                  title={onOpenProtocol ? `Open "${a.p.name}" in the Protocols editor` : a.p.name}>
+                  <span className="flex items-center gap-2 overflow-hidden">
+                    {a.p.image_url && <img src={a.p.image_url} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.p.name}</span>
+                  </span>
+                  <span className="flex flex-shrink-0 items-center gap-2 text-[11px] text-gray-400">
+                    {a.productLinks > 0 && <span title={`${a.productLinks} product-linked step(s)`}>{a.productLinks} linked</span>}
+                    {a.kitItems > 0 && <span title={`${a.kitItems} kit item(s)`}>{a.kitItems} kit</span>}
+                    {onOpenProtocol && <span style={{ color: 'var(--sb-brand-strong)' }}>open →</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-        </details>
-      )}
+        );
+      })()}
 
       {/* filters */}
       <div className="flex flex-wrap items-center gap-2">
