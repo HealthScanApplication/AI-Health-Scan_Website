@@ -9,7 +9,7 @@
  * NOTHING to sell (no kit items and no product-linked steps) vs. fallback-only.
  */
 import { useMemo, useState } from 'react';
-import { Download, ExternalLink, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem,
@@ -209,6 +209,36 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
   // which coverage bucket's protocol list is expanded (click a card to toggle)
   const [auditOpen, setAuditOpen] = useState<null | 'nothing' | 'fallbackOnly' | 'curated'>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
+
+  // ── tree view: kit (parent) → region → products, all collapsible ──
+  const [expandedKits, setExpandedKits] = useState<Set<string>>(new Set());
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const toggleKit = (slug: string) => setExpandedKits((s) => { const n = new Set(s); n.has(slug) ? n.delete(slug) : n.add(slug); return n; });
+  const toggleRegion = (key: string) => setExpandedRegions((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
+
+  // group the filtered+sorted display rows into kit → region → rows (kit order =
+  // first appearance; within-region order preserves the active column sort)
+  const tree = useMemo(() => {
+    const order: string[] = [];
+    const map = new Map<string, { slug: string; protocolId: string | undefined; name: string; kitImg: string | null; protoImg: string | null; marketsOrder: KitRegion[]; markets: Map<KitRegion, { kit: ProtocolKit | undefined; rows: typeof display }> }>();
+    for (const row of display) {
+      const slug = row.t === 'item' ? row.i.slug : row.m.slug;
+      const market = (row.t === 'item' ? row.i.market : row.m.market) as KitRegion;
+      const kit = kitBySlugMarket.get(`${slug}:${market}`) || (row.t === 'missing' ? row.m.kit : undefined);
+      const protocolId = kit?.protocol_id;
+      if (!map.has(slug)) {
+        const anyKit = kits.find((k) => k.slug === slug);
+        const img = anyKit?.image_url || (protocolId ? protoImage.get(protocolId) : null) || null;
+        map.set(slug, { slug, protocolId, name: (protocolId && protoName.get(protocolId)) || slug, kitImg: img, protoImg: protocolId ? protoImage.get(protocolId) || null : null, marketsOrder: [], markets: new Map() });
+        order.push(slug);
+      }
+      const K = map.get(slug)!;
+      if (!K.markets.has(market)) { K.markets.set(market, { kit, rows: [] as any }); K.marketsOrder.push(market); }
+      (K.markets.get(market)!.rows as any).push(row);
+    }
+    return order.map((s) => map.get(s)!);
+  }, [display, kits, protoName, protoImage, kitBySlugMarket]);
+  const COLS = 13; // leaf columns (Region/Kit/Protocol live in the parent rows now)
   const addMissing = async (m: MissingRow) => {
     if (!accessToken) return;
     setAddingKey(m.key);
@@ -360,50 +390,31 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
         <table className="sb-table">
           <thead>
             <tr>
-              <SortTh k="region" sortCol={sortCol} onSort={clickSort} style={{ width: 46 }}>Region</SortTh>
-              <SortTh k="kit" sortCol={sortCol} onSort={clickSort}>Kit</SortTh>
-              <SortTh k="protocol" sortCol={sortCol} onSort={clickSort}>Protocol</SortTh>
-              <SortTh k="product" sortCol={sortCol} onSort={clickSort}>Product</SortTh>
-              <th style={{ width: 60 }}>Lane</th>
-              <th style={{ width: 72 }}>Buy path</th>
-              <th style={{ width: 78 }} title="Has a real Shopify variant — i.e. published on the HealthScan Shopify store (Supliful/HS)">Published</th>
-              <th style={{ width: 64 }}>Linked</th>
-              <SortTh k="supplier" sortCol={sortCol} onSort={clickSort}>Supplier</SortTh>
-              <th title="Partner affiliate link — opens the partner storefront">Affiliate</th>
-              <SortTh k="cost" sortCol={sortCol} onSort={clickSort} style={{ width: 64 }}>Cost</SortTh>
-              <SortTh k="sell" sortCol={sortCol} onSort={clickSort} style={{ width: 64 }} title="Sorts on the fx-converted USD value, so regions compare fairly">Sell</SortTh>
-              <SortTh k="margin" sortCol={sortCol} onSort={clickSort} style={{ width: 64 }}>Margin</SortTh>
-              <th style={{ width: 64 }}>Comm.</th>
-              <th style={{ width: 56 }}>Live</th>
-              <th style={{ width: 70 }}>Rule</th>
+              <SortTh k="product" sortCol={sortCol} onSort={clickSort} style={{ minWidth: 220 }}>Product</SortTh>
+              <th style={{ width: 58 }}>Lane</th>
+              <th style={{ width: 66 }}>Buy path</th>
+              <th style={{ width: 74 }} title="Has a real Shopify variant — i.e. published on the HealthScan Shopify store (Supliful/HS)">Publ.</th>
+              <th style={{ width: 52 }}>Linked</th>
+              <SortTh k="supplier" sortCol={sortCol} onSort={clickSort} style={{ maxWidth: 150 }}>Supplier</SortTh>
+              <th style={{ width: 60 }} title="Partner affiliate link — opens the partner storefront">Affil.</th>
+              <SortTh k="cost" sortCol={sortCol} onSort={clickSort} style={{ width: 56 }}>Cost</SortTh>
+              <SortTh k="sell" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }} title="Sorts on the fx-converted USD value, so regions compare fairly">Sell</SortTh>
+              <SortTh k="margin" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }}>Margin</SortTh>
+              <th style={{ width: 54 }}>Comm.</th>
+              <th style={{ width: 50 }}>Live</th>
+              <th style={{ width: 58 }}>Rule</th>
             </tr>
           </thead>
           <tbody>
-            {display.map((row) => {
+            {(() => {
+              const renderLeaf = (row: (typeof display)[number]) => {
               if (row.t === 'missing') {
                 const m = row.m;
-                const pImg = protoImage.get(m.kit.protocol_id) || null;
-                const kitImg = m.kit.image_url || pImg;
                 const f = kitItemFieldsFromProduct(m.product);
                 const rule = rules.find((r) => r.region === m.market && r.item_id === m.product.id);
-                const openProto = onOpenProtocol ? () => onOpenProtocol(m.kit.protocol_id) : (onOpenKit ? () => onOpenKit(m.slug) : undefined);
-                const linkBtn = { display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: 'pointer', background: 'none', border: 'none', textAlign: 'left' as const, font: 'inherit', color: 'var(--sb-brand-strong)' };
                 return (
                   <tr key={m.key} style={{ background: 'rgba(245, 158, 11, 0.06)' }}>
-                    <td><span className="sb-cell sb-cell-ro">{REGION_FLAG[m.market]} {m.market}</span></td>
-                    <td>
-                      <button onClick={onOpenKit ? () => onOpenKit(m.slug) : undefined} className="sb-cell" title={`Open /${m.slug} — edit items, prices, image`} style={linkBtn}>
-                        <Thumb src={kitImg} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.slug}</span>
-                      </button>
-                    </td>
-                    <td>
-                      <button onClick={openProto} className="sb-cell" title="Open this protocol in the Protocols editor" style={linkBtn}>
-                        <Thumb src={pImg} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{protoName.get(m.kit.protocol_id) || '—'}</span>
-                      </button>
-                    </td>
-                    <td>
+                    <td style={{ paddingLeft: 46 }}>
                       <button onClick={onOpenProduct ? () => onOpenProduct(m.product.id, m.product.name) : undefined} className="sb-cell"
                         title={`The protocol links this product in ${m.product.mentions} step(s) but it's not in the ${m.market} kit — click to open the product record`}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: onOpenProduct ? 'pointer' : 'text', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: onOpenProduct ? 'var(--sb-brand-strong)' : 'inherit' }}>
@@ -452,8 +463,6 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               }
               const i = row.i;
               const kit = kitBySlugMarket.get(`${i.slug}:${i.market}`);
-              const kitImg = kit?.image_url || (kit ? protoImage.get(kit.protocol_id) : null) || null;
-              const pImg = kit ? protoImage.get(kit.protocol_id) || null : null;
               const rule = ruleFor(i);
               const buyPath = kitItemBuyPath(i);
               const storeUrl = itemStoreUrl(i);
@@ -461,25 +470,9 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               // can never claim Shopify while the link opens a partner site (or vice versa)
               const fav = faviconFor(buyPath === 'store' ? `${SHOPIFY_ADMIN}/` : i.affiliate_url);
               const partnerCart = i.lane === 'store' && buyPath !== 'store' ? kit?.partner_cart_url || null : null;
-              const openKit = onOpenKit ? () => onOpenKit(i.slug) : undefined;
-              const openProto = kit && onOpenProtocol ? () => onOpenProtocol(kit.protocol_id) : openKit;
-              const linkBtn = { display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: openKit ? 'pointer' : 'text', background: 'none', border: 'none', textAlign: 'left' as const, font: 'inherit', color: openKit ? 'var(--sb-brand-strong)' : 'inherit' };
               return (
                 <tr key={i.id}>
-                  <td><span className="sb-cell sb-cell-ro">{REGION_FLAG[i.market as KitRegion] || ''} {i.market}</span></td>
-                  <td>
-                    <button onClick={openKit} className="sb-cell" title={`Open /${i.slug} — edit items, prices, image, protocol`} style={linkBtn}>
-                      <Thumb src={kitImg} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.slug}</span>
-                    </button>
-                  </td>
-                  <td>
-                    <button onClick={openProto} className="sb-cell" title="Open this protocol in the Protocols editor" style={linkBtn}>
-                      <Thumb src={pImg} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{kit ? protoName.get(kit.protocol_id) || '—' : '—'}</span>
-                    </button>
-                  </td>
-                  <td>
+                  <td style={{ paddingLeft: 46 }}>
                     {onOpenProduct
                       ? <button onClick={() => onOpenProduct(i.catalog_product_id, i.title || undefined)} className="sb-cell"
                           title={i.catalog_product_id
@@ -545,8 +538,55 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                   <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>
                 </tr>
               );
-            })}
-            {!display.length && <tr><td colSpan={16} style={{ textAlign: 'center', padding: 20, color: 'var(--sb-text-faint)' }}>No rows match.</td></tr>}
+              }; // end renderLeaf
+
+              const nodes: any[] = [];
+              tree.forEach((K, ki) => {
+                const kitOpen = expandedKits.has(K.slug);
+                const totalProducts = K.marketsOrder.reduce((s, m) => s + K.markets.get(m)!.rows.length, 0);
+                const liveCount = K.marketsOrder.filter((m) => K.markets.get(m)!.kit?.is_live).length;
+                nodes.push(
+                  <tr key={`kit:${K.slug}`} style={{ background: 'var(--sb-panel-soft)', cursor: 'pointer', borderTop: '2px solid var(--sb-border)' }} onClick={() => toggleKit(K.slug)}>
+                    <td colSpan={COLS} style={{ padding: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px' }}>
+                        <span style={{ width: 24, textAlign: 'right', color: 'var(--sb-text-faint)', fontVariantNumeric: 'tabular-nums', fontSize: 12, flexShrink: 0 }}>{ki + 1}</span>
+                        {kitOpen ? <ChevronDown size={14} className="shrink-0 text-gray-400" /> : <ChevronRight size={14} className="shrink-0 text-gray-400" />}
+                        <Thumb src={K.kitImg} size={22} />
+                        <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{K.name}</span>
+                        <span style={{ color: 'var(--sb-text-faint)', fontSize: 11, flexShrink: 0 }}>/{K.slug}</span>
+                        <span style={{ flex: 1 }} />
+                        <span style={{ fontSize: 11.5, color: 'var(--sb-text-faint)', flexShrink: 0 }}>{K.marketsOrder.length} region{K.marketsOrder.length !== 1 ? 's' : ''} · {totalProducts} product{totalProducts !== 1 ? 's' : ''} · {liveCount} live</span>
+                        {onOpenProtocol && K.protocolId && (
+                          <button onClick={(e) => { e.stopPropagation(); onOpenProtocol!(K.protocolId!); }} className="sb-btn sb-btn-sm" style={{ flexShrink: 0 }} title="Open the protocol editor">protocol →</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+                if (!kitOpen) return;
+                K.marketsOrder.forEach((market) => {
+                  const R = K.markets.get(market)!;
+                  const rKey = `${K.slug}:${market}`;
+                  const regionOpen = expandedRegions.has(rKey);
+                  nodes.push(
+                    <tr key={`reg:${rKey}`} style={{ cursor: 'pointer' }} onClick={() => toggleRegion(rKey)}>
+                      <td colSpan={COLS} style={{ padding: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px 5px 40px' }}>
+                          {regionOpen ? <ChevronDown size={13} className="shrink-0 text-gray-400" /> : <ChevronRight size={13} className="shrink-0 text-gray-400" />}
+                          <span style={{ fontWeight: 500 }}>{REGION_FLAG[market]} {market}</span>
+                          <span style={{ flexShrink: 0, borderRadius: 999, padding: '0 7px', fontSize: 10, fontWeight: 600, color: R.kit?.is_live ? 'var(--sb-brand-strong)' : 'var(--sb-text-faint)', background: R.kit?.is_live ? 'var(--sb-brand-soft)' : 'var(--sb-hover)' }}>{R.kit?.is_live ? 'live' : 'hidden'}</span>
+                          <span style={{ color: 'var(--sb-text-faint)', fontSize: 11.5 }}>{R.rows.length} item{R.rows.length !== 1 ? 's' : ''}</span>
+                          <span style={{ flex: 1 }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                  if (regionOpen) R.rows.forEach((row) => nodes.push(renderLeaf(row)));
+                });
+              });
+              if (!tree.length) nodes.push(<tr key="empty"><td colSpan={COLS} style={{ textAlign: 'center', padding: 20, color: 'var(--sb-text-faint)' }}>No rows match.</td></tr>);
+              return nodes;
+            })()}
           </tbody>
         </table>
       </div>
