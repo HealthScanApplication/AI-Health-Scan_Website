@@ -88,21 +88,26 @@ export function WaitlistFunnelDashboard({ records, accessToken, ipGeoData }: Wai
     const refLinkOpens = evt['referral_link_open'] || Math.round(totalReferrals * 1.5);
     const refSignups = evt['referral_signup_submit'] || referredUsers;
 
-    // Unique visitors (approximate from anonymous IDs — use lp_view as proxy)
-    const uniqueVisitors = lpViews;
+    // The top of the funnel must be >= every step below it. lp_view events are
+    // often not logged while downstream events (cta_click, signup_submit) are,
+    // so lpViews can be smaller than steps under it — dividing by it gives
+    // negative bounce / >100% conversion. Use the max as the visitor base and
+    // clamp every rate to [0,100].
+    const uniqueVisitors = Math.max(lpViews, ctaClicks, signupStarts, signupSubmits, total, 1);
+    const clampPct = (n: number) => Math.max(0, Math.min(100, n));
     // Bounce rate: visited but didn't click CTA
-    const bounceRate = lpViews > 0 ? Math.round(((lpViews - ctaClicks) / lpViews) * 100) : 0;
+    const bounceRate = clampPct(Math.round(((uniqueVisitors - ctaClicks) / uniqueVisitors) * 100));
     // Avg time to signup (from medianTimes)
     const avgTimeToSignup = medians.view_to_submit;
     // Conversion rate: visitors → signed up
-    const conversionRate = lpViews > 0 ? ((signupSubmits / lpViews) * 100).toFixed(1) : '0';
+    const conversionRate = clampPct((signupSubmits / uniqueVisitors) * 100).toFixed(1);
 
     // Visitor stats row
     const visitorStats: { label: string; value: string; color: string; sub: string }[] = [
       { label: 'Total Visits', value: uniqueVisitors.toLocaleString(), color: 'bg-sky-500', sub: `${totalEvts.toLocaleString()} total events` },
-      { label: 'Bounce Rate', value: `${bounceRate}%`, color: bounceRate > 70 ? 'bg-red-500' : bounceRate > 50 ? 'bg-amber-500' : 'bg-green-500', sub: `${lpViews - ctaClicks} left without action` },
+      { label: 'Bounce Rate', value: `${bounceRate}%`, color: bounceRate > 70 ? 'bg-red-500' : bounceRate > 50 ? 'bg-amber-500' : 'bg-green-500', sub: `${Math.max(0, uniqueVisitors - ctaClicks)} left without action` },
       { label: 'Avg Time to Sign Up', value: avgTimeToSignup != null ? (avgTimeToSignup < 60 ? `${Math.round(avgTimeToSignup)}m` : `${(avgTimeToSignup / 60).toFixed(1)}h`) : '—', color: 'bg-indigo-500', sub: avgTimeToSignup != null ? 'Median visitor → signup' : 'Not enough data' },
-      { label: 'Conversion Rate', value: `${conversionRate}%`, color: 'bg-emerald-500', sub: `${signupSubmits} of ${lpViews} visitors signed up` },
+      { label: 'Conversion Rate', value: `${conversionRate}%`, color: 'bg-emerald-500', sub: `${signupSubmits} of ${uniqueVisitors} visitors signed up` },
     ];
 
     // Funnel steps (horizontal)
