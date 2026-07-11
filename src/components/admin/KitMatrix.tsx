@@ -58,7 +58,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
   slug: string; kits: ProtocolKit[]; rules: RegionRule[]; accessToken: string;
   protocolName: string; protocols: ProtocolLite[]; onKitsChanged: () => void;
   /** open a linked catalog product in the record modal */
-  onOpenProduct?: (catalogProductId: string) => void;
+  onOpenProduct?: (catalogProductId: string | null, title?: string) => void;
 }) {
   const [items, setItems] = useState<KitItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -455,7 +455,7 @@ export function KitMatrix({ slug, kits, rules, accessToken, protocolName, protoc
   );
 }
 
-function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, busyCell, commit, cloneCell, removeItem, accessToken, onLinkRow, fx, draggable, isDragging, onDragStart, onDragEnd, onDropRow }: {
+function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, busyCell, commit, cloneCell, removeItem, accessToken, onLinkRow, fx, onOpenProduct, draggable, isDragging, onDragStart, onDragEnd, onDropRow }: {
   rk: string; cells: Partial<Record<KitRegion, KitItem>>; first: KitItem; markets: KitRegion[]; isOpen: boolean;
   fx: Record<string, number>;
   onToggle: () => void; ruleFor: (pid: string | null, r: KitRegion) => RegionRule | undefined; busyCell: string | null;
@@ -463,7 +463,7 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
   cloneCell: (source: KitItem, to: KitRegion) => Promise<void>;
   removeItem: (it: KitItem) => Promise<void>;
   accessToken: string; onLinkRow: (cells: Partial<Record<KitRegion, KitItem>>, p: ProductHit) => Promise<void>;
-  onOpenProduct?: (catalogProductId: string) => void;
+  onOpenProduct?: (catalogProductId: string | null, title?: string) => void;
   draggable: boolean; isDragging: boolean;
   onDragStart: () => void; onDragEnd: () => void; onDropRow: () => void;
 }) {

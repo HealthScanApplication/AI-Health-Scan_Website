@@ -79,8 +79,9 @@ export function Header({
   const adminInfo = getAdminUserInfo(user);
   const userIsAdmin = isAdminUser(user);
 
-  // Debug logging for header positioning
-  if (process.env.NODE_ENV === "development") {
+  // Debug logging (opt-in: localStorage 'hs-debug'='1') — this ran on every
+  // render and flooded the console, so it's gated off by default.
+  if (process.env.NODE_ENV === "development" && typeof window !== "undefined" && localStorage.getItem("hs-debug") === "1") {
     console.log('🎯 Header Component Debug:', {
       propIsAdmin: isAdmin,
       userIsAdmin: userIsAdmin,
@@ -200,7 +201,6 @@ export function Header({
   const handleNavClick = (callback?: () => void) => {
     setMobileMenuOpen(false);
     if (callback) {
-      console.log('🔗 Navigation callback triggered');
       callback();
     } else {
       console.warn('⚠️ Navigation callback is undefined');
@@ -255,40 +255,22 @@ export function Header({
     }
   };
 
-  // Enhanced admin panel click handler with comprehensive debugging
+  // Admin panel click handler (verbose logs gated behind localStorage 'hs-debug'='1')
   const handleAdminClick = () => {
-    console.log('🛡️ Admin panel clicked - COMPREHENSIVE DEBUG:');
-    console.log('🔍 Props received:', {
-      propIsAdmin: isAdmin,
-      hasAdminCallback: !!onNavigateToAdmin,
-      callbackType: typeof onNavigateToAdmin
-    });
-    console.log('🔍 User validation:', {
-      userEmail: user?.email,
-      userIsAdmin: userIsAdmin,
-      adminInfoIsAdmin: adminInfo.isAdmin,
-      adminLevel: adminInfo.level
-    });
-    
+    const dbg = process.env.NODE_ENV === "development" && typeof window !== "undefined" && localStorage.getItem("hs-debug") === "1";
+    if (dbg) {
+      console.log('🛡️ Admin panel clicked:', { propIsAdmin: isAdmin, userIsAdmin, adminInfoIsAdmin: adminInfo.isAdmin, adminLevel: adminInfo.level, userEmail: user?.email, hasCallback: !!onNavigateToAdmin });
+    }
+
     // Use the most permissive admin check
     const shouldAllowAdmin = isAdmin || userIsAdmin || adminInfo.isAdmin;
-    
+
     if (shouldAllowAdmin && onNavigateToAdmin) {
-      console.log('✅ Admin access granted - navigating...');
       toast.info('🛡️ Opening Admin Dashboard...');
       handleNavClick(onNavigateToAdmin);
     } else {
-      console.error('❌ Admin navigation failed:', {
-        shouldAllowAdmin,
-        hasCallback: !!onNavigateToAdmin,
-        reasons: {
-          propIsAdmin: isAdmin,
-          userIsAdmin: userIsAdmin,
-          adminInfoIsAdmin: adminInfo.isAdmin,
-          hasCallback: !!onNavigateToAdmin
-        }
-      });
-      
+      if (dbg) console.error('❌ Admin navigation failed:', { shouldAllowAdmin, hasCallback: !!onNavigateToAdmin });
+
       if (!shouldAllowAdmin) {
         toast.error('🚫 Admin access denied - insufficient privileges');
       } else if (!onNavigateToAdmin) {

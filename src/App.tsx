@@ -110,35 +110,16 @@ function AppContent() {
   useEffect(() => {
     try {
       if (process.env.NODE_ENV === "development") {
-        console.group("🔧 HealthScan Development Tools");
-        console.log(
-          "🎨 DESIGN SYSTEM: Use keyboard shortcut Ctrl+Shift+T to toggle theme manager (admin only)",
-        );
-        console.log(
-          '🔍 LOGIN DIAGNOSTIC: To access login diagnostic tool, add "?page=login-diagnostic" to the URL',
-        );
-        console.log(
-          '📧 AUTH INFO: "Invalid login credentials" and "User already registered" are expected responses, not errors',
-        );
-        console.log(
-          "🔑 AUTH DEBUG: Console shows detailed information to help with troubleshooting",
-        );
-        console.log(
-          "⚡ AUTHENTICATION: The system is working correctly when you see these authentication messages",
-        );
-        console.log(
-          '🚨 IMPORTANT: Authentication errors like "invalid_credentials" mean the AUTH SYSTEM IS WORKING!',
-        );
-        console.log(
-          '✅ EXPECTED BEHAVIOR: Wrong password = "invalid_credentials" error (this is correct!)',
-        );
-        console.log(
-          '✅ EXPECTED BEHAVIOR: Account exists = "User already registered" (this is correct!)',
-        );
-        console.log(
-          '🔄 REFRESH TOKEN: If you see "Invalid Refresh Token" errors, the system will automatically clear tokens and reload',
-        );
-        console.groupEnd();
+        // Verbose dev banner is opt-in — set localStorage 'hs-debug'='1' to see it.
+        // Keeps the console clean by default (the banner is reference text, not signal).
+        if (typeof window !== "undefined" && localStorage.getItem("hs-debug") === "1") {
+          console.group("🔧 HealthScan Development Tools");
+          console.log('🎨 Ctrl+Shift+T toggles the theme manager (admin only)');
+          console.log('🔍 "?page=login-diagnostic" opens the login diagnostic tool');
+          console.log('📧 "Invalid login credentials" / "User already registered" are expected auth responses, not errors');
+          console.log('🧪 window.HealthScanAuthDebug.testConnection() tests the Supabase session');
+          console.groupEnd();
+        }
 
         // Add global helper for auth debugging
         if (typeof window !== "undefined") {
