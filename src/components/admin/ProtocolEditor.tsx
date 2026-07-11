@@ -33,10 +33,13 @@ import {
 } from '../../utils/protocolAdmin';
 
 /* ── palette (neutral admin) ── */
+// Reference the .sb-admin design tokens (adminTheme.css) so the editor — and
+// the kit protocol modal — follow light/dark automatically instead of being
+// hardcoded light. `accent`/`good` become the Supabase green.
 const C = {
-  ink: '#111827', sub: '#6B7280', faint: '#9CA3AF', hair: '#E5E7EB',
-  panel: '#F9FAFB', paper: '#FFFFFF', accent: '#2563EB', danger: '#DC2626',
-  good: '#15803D', goodBg: '#ECFDF5', goodBorder: '#BBF7D0',
+  ink: 'var(--sb-text)', sub: 'var(--sb-text-soft)', faint: 'var(--sb-text-faint)', hair: 'var(--sb-border)',
+  panel: 'var(--sb-panel-soft)', paper: 'var(--sb-panel)', accent: 'var(--sb-brand-strong)', danger: '#ef4444',
+  good: 'var(--sb-brand-strong)', goodBg: 'var(--sb-brand-soft)', goodBorder: 'var(--sb-brand)',
 };
 
 const PROTO_FIELDS: (keyof AdminProtocol)[] = [
@@ -168,7 +171,7 @@ const TYPE_OPTS: Opt[] = [
   { value: 'product', label: 'Product', Icon: Package, color: '#6B7280' },
   { value: 'activity', label: 'Activity', Icon: Dumbbell, color: '#D45B0A' },
   { value: 'supplement', label: 'Supplement', Icon: Pill, color: '#0097A7' },
-  { value: 'sleep', label: 'Sleep', Icon: Moon, color: '#5C6B7A' },
+  { value: 'sleep', label: 'Sleep', Icon: Moon, color: 'var(--sb-text-soft)' },
 ];
 // secondary sub-type, keyed by the stored `category` the primary maps to.
 const SUB_OPTS: Record<string, Opt[]> = {
@@ -183,7 +186,7 @@ const SUB_OPTS: Record<string, Opt[]> = {
     { value: 'wellness', label: 'Wellness', Icon: Wind, color: '#26A69A' },
     { value: 'exercise', label: 'Exercise', Icon: Activity, color: '#43A047' },
   ],
-  sleep: [{ value: 'sleep', label: 'Sleep', Icon: Moon, color: '#5C6B7A' }],
+  sleep: [{ value: 'sleep', label: 'Sleep', Icon: Moon, color: 'var(--sb-text-soft)' }],
   supplement: [{ value: 'supplement', label: 'Supplement', Icon: Pill, color: '#0097A7' }],
 };
 // primary type → stored fields (category drives the app; do = "Activity" in the UI)
@@ -257,10 +260,10 @@ function IconSelect({ value, options, onChange, width = 132, placeholder }: { va
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: '100%', zIndex: 41, background: '#fff', border: '1px solid ' + C.hair, borderRadius: 8, boxShadow: '0 10px 28px -10px rgba(0,0,0,0.3)', padding: 4, maxHeight: 260, overflowY: 'auto' }}>
+          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: '100%', zIndex: 41, background: 'var(--sb-panel)', border: '1px solid ' + C.hair, borderRadius: 8, boxShadow: '0 10px 28px -10px rgba(0,0,0,0.3)', padding: 4, maxHeight: 260, overflowY: 'auto' }}>
             {options.map((o) => (
               <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', background: o.value === value ? '#EEF4FF' : 'transparent', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, color: C.ink, textAlign: 'left' }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', border: 'none', background: o.value === value ? 'var(--sb-brand-soft)' : 'transparent', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, color: C.ink, textAlign: 'left' }}>
                 {o.Icon && <o.Icon size={15} color={o.color || C.sub} style={{ flexShrink: 0 }} />}
                 <span>{o.label}</span>
               </button>
@@ -1004,7 +1007,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               const on = (it.recurrence_days_of_week || []).includes(d);
               return (
                 <button key={d} onClick={() => toggleDow(it, d)} title={lbl}
-                  style={{ width: 26, height: 26, borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? '#EEF4FF' : '#fff', color: on ? C.accent : C.sub }}>{lbl[0]}</button>
+                  style={{ width: 26, height: 26, borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? 'var(--sb-brand-soft)' : 'var(--sb-panel)', color: on ? C.accent : C.sub }}>{lbl[0]}</button>
               );
             })}
           </div>
@@ -1055,7 +1058,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           <button onClick={() => openLinker(it)} style={{ ...linkBtnStyle, color: C.accent }}><Link2 size={12} /> Link {defaultKind(it)}…</button>
         )}
         {open && (
-          <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: '#fff' }}>
+          <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: 'var(--sb-panel)' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
               <IconSelect value={linkKind} options={LINK_OPTS} width={132}
                 onChange={(k) => { setLinkKind(k as CatalogKind); runSearch(k as CatalogKind, linkQuery, it); }} />
@@ -1076,7 +1079,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
                 {linkResults.map((h) => (
                   <button key={h.id} onClick={() => linkItemTo(it, linkKind, h)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: 'var(--sb-panel)', cursor: 'pointer', textAlign: 'left' }}>
                     {thumb(h.image)}
                     <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
                     {h.healthScore != null && (
@@ -1128,7 +1131,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
       <div style={{ opacity: it.hidden ? 0.55 : 1, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
         {/* horizontal controls — wraps within the column so nothing overhangs */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? '#FEE2E2' : '#EEF4FF', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
+          <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? 'rgba(239,68,68,0.14)' : 'var(--sb-brand-soft)', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
           {(() => {
             const lk = linkInfo.get(it.id);
             return lk?.image ? (
@@ -1219,7 +1222,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   // plain button — they have no catalog type.
   function AddStepMenu() {
     const [open, setOpen] = useState(false);
-    const addBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.accent, background: '#fff', color: C.accent };
+    const addBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.accent, background: 'var(--sb-panel)', color: C.accent };
     if (kindTab !== 'action') {
       return (
         <button onClick={() => addItem(kindTab)} disabled={adding} style={addBtn}>
@@ -1238,7 +1241,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
         {open && (
           <>
             <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-            <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 41, width: 220, background: '#fff', border: '1px solid ' + C.hair, borderRadius: 10, boxShadow: '0 14px 30px -10px rgba(0,0,0,0.3)', padding: 6, maxHeight: 380, overflowY: 'auto' }}>
+            <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 41, width: 220, background: 'var(--sb-panel)', border: '1px solid ' + C.hair, borderRadius: 10, boxShadow: '0 14px 30px -10px rgba(0,0,0,0.3)', padding: 6, maxHeight: 380, overflowY: 'auto' }}>
               <div style={hdr}>Meal slots</div>
               {MEAL_PRESETS.map((m) => (
                 <button key={m.label} onClick={() => pick(m.preset)} style={item}>
@@ -1268,7 +1271,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
       {/* linked-record lightbox (view / re-link) */}
       {viewRec && (
         <div onClick={() => setViewRec(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', maxWidth: 420, width: '100%', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--sb-panel)', borderRadius: 14, overflow: 'hidden', maxWidth: 420, width: '100%', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)' }}>
             {viewRec.image
               ? <img src={viewRec.image} alt="" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block', background: C.panel }} />
               : <div style={{ height: 160, background: C.panel, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.faint, fontSize: 13 }}>{linkBusy ? <Loader2 size={20} className="animate-spin" /> : 'No image on this record yet'}</div>}
@@ -1295,18 +1298,18 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
 
               {/* primary actions */}
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                <label style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: linkBusy ? 'default' : 'pointer', border: '1px solid ' + C.accent, background: C.accent, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: linkBusy ? 'default' : 'pointer', border: '1px solid ' + C.accent, background: C.accent, color: 'var(--sb-panel)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {linkBusy ? 'Uploading…' : viewRec.image ? 'Replace image' : 'Upload image'}
                   <input type="file" accept="image/*" disabled={linkBusy} style={{ display: 'none' }}
                     onChange={(e) => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) uploadLinkedImage(f); }} />
                 </label>
                 <button onClick={() => setMergeOpen((o) => { const n = !o; if (n && !mergeResults.length) runMergeSearch(''); return n; })}
-                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + (mergeOpen ? C.accent : C.hair), background: mergeOpen ? '#EEF4FF' : '#fff', color: mergeOpen ? C.accent : C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}><GitMerge size={14} /> Merge duplicate</button>
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + (mergeOpen ? C.accent : C.hair), background: mergeOpen ? 'var(--sb-brand-soft)' : 'var(--sb-panel)', color: mergeOpen ? C.accent : C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}><GitMerge size={14} /> Merge duplicate</button>
                 <button onClick={() => { const it = items.find((x) => x.id === viewRec.itemId); setViewRec(null); if (it) openLinker(it); }}
-                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Link2 size={14} /> Change link</button>
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: 'var(--sb-panel)', color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Link2 size={14} /> Change link</button>
                 {viewRec.buyUrl && <a href={viewRec.buyUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid ' + C.hair, color: C.good, textDecoration: 'none' }}>Buy ↗</a>}
                 <button onClick={deleteRecord} disabled={recBusy}
-                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: recBusy ? 'default' : 'pointer', border: '1px solid ' + C.danger, background: '#fff', color: C.danger, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Trash2 size={14} /> Delete</button>
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8, cursor: recBusy ? 'default' : 'pointer', border: '1px solid ' + C.danger, background: 'var(--sb-panel)', color: C.danger, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Trash2 size={14} /> Delete</button>
               </div>
 
               {/* merge panel — fold another record of the same kind into this one */}
@@ -1328,7 +1331,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
                       {mergeResults.map((h) => (
                         <button key={h.id} onClick={() => doMerge(h)} disabled={mergeBusy}
-                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: 'var(--sb-panel)', cursor: 'pointer', textAlign: 'left' }}>
                           {thumb(h.image)}
                           <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
                           <span style={{ fontSize: 11, fontWeight: 600, color: C.accent, display: 'inline-flex', alignItems: 'center', gap: 3 }}><GitMerge size={12} /> merge in</span>
@@ -1407,7 +1410,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 style={{
                   width: '100%', textAlign: 'left', padding: '10px 12px', cursor: 'pointer',
                   border: 'none', borderBottom: '1px solid ' + C.hair,
-                  background: on ? '#EEF4FF' : 'transparent',
+                  background: on ? 'var(--sb-brand-soft)' : 'transparent',
                   borderLeft: `3px solid ${on ? C.accent : 'transparent'}`,
                   display: 'flex', alignItems: 'center', gap: 10,
                 }}
@@ -1449,15 +1452,15 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }}
                       onChange={(e) => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) importProtocol(f); }} />
                     <button onClick={downloadPdf} disabled={pdfBusy} title="Download a printable black-&-white weekly habit tracker PDF (instructions + recipes) to share with users"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: pdfBusy ? 'default' : 'pointer', border: '1px solid ' + C.ink, background: C.ink, color: '#fff', opacity: pdfBusy ? 0.7 : 1 }}>
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: pdfBusy ? 'default' : 'pointer', border: '1px solid ' + C.ink, background: C.ink, color: 'var(--sb-panel)', opacity: pdfBusy ? 0.7 : 1 }}>
                       {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} PDF
                     </button>
                     <button onClick={exportProtocol} title="Download this protocol + steps as JSON"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub }}>
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + C.hair, background: 'var(--sb-panel)', color: C.sub }}>
                       <Download size={14} /> Export
                     </button>
                     <button onClick={() => importInputRef.current?.click()} disabled={importing} title="Replace this protocol from an edited JSON export"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: importing ? 'default' : 'pointer', border: '1px solid ' + C.hair, background: '#fff', color: C.sub, opacity: importing ? 0.7 : 1 }}>
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: importing ? 'default' : 'pointer', border: '1px solid ' + C.hair, background: 'var(--sb-panel)', color: C.sub, opacity: importing ? 0.7 : 1 }}>
                       {importing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Import
                     </button>
                     <button
@@ -1521,7 +1524,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                         && (k !== 'action' || cycleLen <= 1 || showsOnDay(i, viewDay))).length;
                       return (
                         <button key={k} onClick={() => setKindTab(k)}
-                          style={{ fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? '#EEF4FF' : '#fff', color: on ? C.accent : C.sub }}>
+                          style={{ fontSize: 13, fontWeight: 600, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid ' + (on ? C.accent : C.hair), background: on ? 'var(--sb-brand-soft)' : 'var(--sb-panel)', color: on ? C.accent : C.sub }}>
                           {label} ({count})
                         </button>
                       );
@@ -1540,7 +1543,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                       const n = allDayItems.filter((i) => showsOnDay(i, d)).length;
                       return (
                         <button key={d} onClick={() => setViewDay(d)} title={`${n} steps on day ${d}`}
-                          style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, fontSize: 12.5, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.ink : C.hair), background: on ? C.ink : '#fff', color: on ? '#fff' : C.sub }}>
+                          style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, fontSize: 12.5, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.ink : C.hair), background: on ? C.ink : 'var(--sb-panel)', color: on ? '#fff' : C.sub }}>
                           {d}<span style={{ fontSize: 9.5, fontWeight: 600, opacity: 0.65 }}>{n}</span>
                         </button>
                       );
@@ -1548,7 +1551,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     {totalDaysMissing && (
                       <button onClick={fixTotalDays}
                         title="Items carry day numbers but the protocol has no total_days — without it the app can't cycle and shows every day at once."
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#B45309', padding: '5px 9px', borderRadius: 8, border: '1px solid #FCD34D', background: '#FFFBEB', cursor: 'pointer', marginLeft: 4 }}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#B45309', padding: '5px 9px', borderRadius: 8, border: '1px solid #FCD34D', background: 'rgba(245,158,11,0.12)', cursor: 'pointer', marginLeft: 4 }}>
                         <AlertCircle size={12} /> App shows all days at once — set total days = {cycleLen}
                       </button>
                     )}
@@ -1573,20 +1576,20 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                       <span style={{ fontSize: 10.5, color: C.faint }}>Start&nbsp;Sleep</span>
                     </label>
                     {sleepWin.durationLabel && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#5C6B7A', padding: '4px 9px', borderRadius: 999, background: '#EEF1F5' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--sb-text-soft)', padding: '4px 9px', borderRadius: 999, background: 'var(--sb-panel-soft)' }}>
                         <Moon size={12} color="#5C6B7A" /> {sleepWin.durationLabel} sleep
                       </span>
                     )}
                     <span style={{ flex: 1 }} />
                     {extraAnchors.length > 0 ? (
                       <button onClick={cleanupAnchors} disabled={busyItem === 'anchor-cleanup'}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.danger, padding: '5px 9px', borderRadius: 8, border: '1px solid #FCA5A5', background: '#FEF2F2', cursor: 'pointer' }}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.danger, padding: '5px 9px', borderRadius: 8, border: '1px solid #FCA5A5', background: 'rgba(239,68,68,0.08)', cursor: 'pointer' }}>
                         {busyItem === 'anchor-cleanup' ? <Loader2 size={12} className="animate-spin" /> : <AlertCircle size={12} />} Remove {extraAnchors.length} duplicate anchor{extraAnchors.length === 1 ? '' : 's'}
                       </button>
                     ) : (!wakeItem && derivedWake) ? (
                       <button onClick={linkAnchorsToSchedule} disabled={!!busyItem}
                         title={`Pin wake (End Sleep) to your first step at ${derivedWake}`}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.accent, padding: '5px 9px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF', cursor: 'pointer' }}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.accent, padding: '5px 9px', borderRadius: 8, border: '1px solid #BFDBFE', background: 'var(--sb-brand-soft)', cursor: 'pointer' }}>
                         <Link2 size={12} /> Link wake to first step ({derivedWake})
                       </button>
                     ) : (

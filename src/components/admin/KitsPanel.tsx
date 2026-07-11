@@ -191,7 +191,7 @@ export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct, onOpenCa
   const [creating, setCreating] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [openSlug, setOpenSlug] = useState<string | null>(null);
-  const [view, setView] = useState<'cards' | 'master'>('cards');
+  const [view, setView] = useState<'cards' | 'master'>('master');
   const [masterItems, setMasterItems] = useState<KitItem[] | null>(null);
   const [productLinks, setProductLinks] = useState<Map<string, number>>(new Map());
   const [mentions, setMentions] = useState<Map<string, ProtocolSuggestion[]>>(new Map());

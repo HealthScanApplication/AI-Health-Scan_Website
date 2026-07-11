@@ -197,6 +197,14 @@
 }
 .sb-admin.sb-dark input::placeholder, .sb-admin.sb-dark textarea::placeholder { color: #6b6b6b; }
 
+/* ── Dark mode: gradient cards. Tailwind `from-*-50 to-white` gradients aren't
+     caught by the flat bg remaps and render as light cards. Flatten any
+     `to-white` / `from-white` gradient to a dark panel; the accent survives via
+     the card's border + icon colours. ── */
+.sb-admin.sb-dark [class*="to-white"], .sb-admin.sb-dark [class*="from-white"] {
+  background-image: none !important; background-color: var(--sb-panel-soft) !important;
+}
+
 /* ── Status tints stay readable in dark ── */
 .sb-admin.sb-dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
 .sb-admin.sb-dark .border-red-300, .sb-admin.sb-dark .border-red-200 { border-color: #7f1d1d !important; }
