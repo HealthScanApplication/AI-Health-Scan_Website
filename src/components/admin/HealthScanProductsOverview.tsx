@@ -65,6 +65,7 @@ export function HealthScanProductsOverview({ accessToken }: HealthScanProductsOv
   const [tests, setTests] = useState<HsTest[]>([]);
   const [supplements, setSupplements] = useState<HsSupplement[]>([]);
   const [products, setProducts] = useState<HsProduct[]>([]);
+  const [kitStats, setKitStats] = useState<null | { kits: number; liveKits: number; protocols: number; regionRows: number; items: number; store: number; affiliate: number; linked: number; costed: number }>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,12 +76,15 @@ export function HealthScanProductsOverview({ accessToken }: HealthScanProductsOv
     setLoading(true);
     try {
       const headers = { apikey: publicAnonKey };
-      const [testsRes, suppsRes, prodsRes] = await Promise.all([
+      const [testsRes, suppsRes, prodsRes, kitsRes, kitItemsRes] = await Promise.all([
         fetch(`https://${projectId}.supabase.co/rest/v1/hs_tests?select=*&order=name`, { headers }),
         fetch(`https://${projectId}.supabase.co/rest/v1/hs_supplements?select=*&order=name`, { headers }),
         // hs_products was merged into catalog_products (20260710) and dropped — read the
         // HealthScan store SKUs (product_hs_*) from the single catalog_products table instead.
         fetch(`https://${projectId}.supabase.co/rest/v1/catalog_products?id=like.product_hs_*&select=*&order=name`, { headers }),
+        // the buyable "Shop the kit" bundles per protocol × region + their line items
+        fetch(`https://${projectId}.supabase.co/rest/v1/protocol_kits?select=slug,market,protocol_id,is_live`, { headers }),
+        fetch(`https://${projectId}.supabase.co/rest/v1/protocol_kit_items?select=lane,catalog_product_id,supplier_cost_usd`, { headers }),
       ]);
       // Guard every response — a non-2xx returns a PostgREST error *object*, not an array,
       // which would blow up the .filter/.map below. Coerce anything non-array to [].
@@ -106,6 +110,24 @@ export function HealthScanProductsOverview({ accessToken }: HealthScanProductsOv
         is_featured: false,
         image_url: p.image_url as string | undefined,
       })));
+      // kit coverage summary — one card so the overview carries the "Shop the kit" info too
+      const kitRows = kitsRes.ok ? await kitsRes.json() : [];
+      const kitItems = kitItemsRes.ok ? await kitItemsRes.json() : [];
+      if (Array.isArray(kitRows) && Array.isArray(kitItems)) {
+        const slugs = new Set(kitRows.map((k: any) => k.slug));
+        const liveSlugs = new Set(kitRows.filter((k: any) => k.is_live).map((k: any) => k.slug));
+        setKitStats({
+          kits: slugs.size,
+          liveKits: liveSlugs.size,
+          protocols: new Set(kitRows.map((k: any) => k.protocol_id)).size,
+          regionRows: kitRows.length,
+          items: kitItems.length,
+          store: kitItems.filter((i: any) => i.lane === 'store').length,
+          affiliate: kitItems.filter((i: any) => i.lane === 'affiliate').length,
+          linked: kitItems.filter((i: any) => i.catalog_product_id).length,
+          costed: kitItems.filter((i: any) => i.supplier_cost_usd != null).length,
+        });
+      }
     } catch (err) {
       console.error('Failed to fetch HS data:', err);
     } finally {
@@ -268,6 +290,36 @@ export function HealthScanProductsOverview({ accessToken }: HealthScanProductsOv
           </CardContent>
         </Card>
       </div>
+
+      {/* Kits & Bundles — the buyable "Shop the kit" coverage lives here too */}
+      {kitStats && (
+        <Card className="border-teal-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShoppingCart className="w-5 h-5 text-teal-600" />
+              <span>Kits &amp; Bundles</span>
+              <Badge className="ml-auto bg-teal-600">{kitStats.liveKits}/{kitStats.kits} live</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+              {([
+                ['Kits', `${kitStats.kits}`, `${kitStats.protocols} protocols · ${kitStats.regionRows} region rows`],
+                ['Live kits', `${kitStats.liveKits}`, `${kitStats.kits - kitStats.liveKits} hidden`],
+                ['Kit items', `${kitStats.items}`, `${kitStats.store} store · ${kitStats.affiliate} affiliate`],
+                ['Linked to a product', `${kitStats.linked}/${kitStats.items}`, `${kitStats.costed} with a cost`],
+              ] as const).map(([label, big, sub]) => (
+                <div key={label}>
+                  <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
+                  <div className="text-xl font-semibold text-gray-900">{big}</div>
+                  <div className="text-[11px] text-gray-500">{sub}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 border-t pt-2 text-[11px] text-gray-500">Full coverage audit, per-region pricing and the product tree live under the <span className="font-medium text-gray-700">Kits &amp; Packages</span> tab.</div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Detailed Product Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
