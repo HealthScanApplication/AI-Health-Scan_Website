@@ -584,11 +584,12 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
                       onBlur={(e) => commit(it, it.lane === 'store' ? { variant_id: e.target.value || null } : { affiliate_url: e.target.value || null })} />
                   </Field>
                   <div className="flex items-end justify-between gap-1">
-                    <Field label="Buy lane">
+                    <Field label="Sold via">
                       <select defaultValue={it.lane} className="rounded border border-gray-200 bg-white px-1 py-0.5 text-[10px]"
+                        title="Our store = we sell & fulfil on Shopify. Partner link = we link out to the brand for commission."
                         onChange={(e) => commit(it, { lane: e.target.value })}>
-                        <option value="store">store (Shopify)</option>
-                        <option value="affiliate">affiliate (external)</option>
+                        <option value="store">Our store (Shopify)</option>
+                        <option value="affiliate">Partner link (external)</option>
                       </select>
                     </Field>
                     <button onClick={() => removeItem(it)} className="mb-0.5 text-red-400 hover:text-red-600" title={`Remove from ${m}`}><Trash2 size={12} /></button>

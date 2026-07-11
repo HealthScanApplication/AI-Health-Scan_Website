@@ -160,7 +160,7 @@ function PhonePreview({ name, items, imageUrl, linkImages }: { name: string; ite
 /* ── small field primitives ── */
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: C.sub, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4, display: 'block' };
 const inputStyle: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: 13, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, outline: 'none', boxSizing: 'border-box' };
-const filterSel: React.CSSProperties = { flex: '1 1 72px', minWidth: 0, padding: '5px 6px', fontSize: 11, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 7, background: C.paper, outline: 'none', cursor: 'pointer' };
+const filterSel: React.CSSProperties = { flex: '1 1 116px', minWidth: 108, padding: '6px 8px', fontSize: 12, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 7, background: C.paper, outline: 'none', cursor: 'pointer' };
 
 /* ── clean icon+label dropdown (native <select> can't show icons) ── */
 interface Opt { value: string; label: string; Icon?: any; color?: string }

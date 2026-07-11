@@ -5779,6 +5779,24 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
           const selectCls = "w-full h-10 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none";
           const textareaCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors min-h-20 resize-y";
 
+          // per-data-type guidance shown under a field, so every input explains
+          // itself. Explicit field.hint wins; only the less-obvious types get a
+          // default (text/number/textarea are self-evident → no hint).
+          const TYPE_HINT: Record<string, string> = {
+            select: 'Pick one option.',
+            tags: 'Type and press Enter to add each tag.',
+            multi_tags: 'Type and press Enter to add as many as apply.',
+            boolean: 'Toggle on or off.',
+            image: 'Paste an image URL, or drop / click to upload.',
+            media_upload: 'Drop or click to upload, or paste a URL.',
+            video: 'Paste a video URL (e.g. YouTube).',
+            date: 'Pick a date.',
+            json: 'Advanced — must be valid JSON.',
+            icon_picker: 'Pick an icon, or paste an image URL.',
+            linked_elements: 'Search the catalog and click to link; click a chip to remove.',
+          };
+          const hintFor = (f: FieldConfig) => (f.hint || TYPE_HINT[f.type] || '');
+
           const renderEditField = (field: FieldConfig) => {
             const val = editingRecord[field.key];
             const updateField = (newVal: any) => setEditingRecord({ ...editingRecord, [field.key]: newVal });
@@ -8207,10 +8225,11 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                     )}
 
                     {secOpen && (
-                      <div className={`grid gap-${isMediaSection ? '3' : '4'}`} style={{ gridTemplateColumns: `repeat(${sectionCols}, minmax(0, 1fr))` }}>
+                      <div className={`grid gap-${isMediaSection ? '4' : '5'}`} style={{ gridTemplateColumns: `repeat(${sectionCols}, minmax(0, 1fr))` }}>
                         {fields.map(f => (
                           <div key={f.key} style={f.colSpan === 2 && !isMediaSection ? { gridColumn: `span ${sectionCols} / span ${sectionCols}` } : undefined}>
                             {renderEditField(f)}
+                            {hintFor(f) && <p className="mt-1 text-[11px] leading-snug text-gray-400">{hintFor(f)}</p>}
                           </div>
                         ))}
                       </div>
@@ -8224,10 +8243,11 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
             <div className="space-y-4">
               {/* Priority fields — always at top */}
               {(priorityFields.length > 0 || unsectioned.length > 0) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-5">
                   {[...priorityFields, ...unsectioned].map(f => (
                     <div key={f.key} className={f.colSpan === 2 ? 'col-span-2' : 'col-span-1'}>
                       {renderEditField(f)}
+                      {hintFor(f) && <p className="mt-1 text-[11px] leading-snug text-gray-400">{hintFor(f)}</p>}
                     </div>
                   ))}
                 </div>

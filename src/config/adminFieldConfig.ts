@@ -79,6 +79,9 @@ export interface FieldConfig {
   showInEdit?: boolean;
   required?: boolean;
   placeholder?: string;
+  /** one-line guidance shown under the field in the edit modal (falls back to a
+   *  per-type default in SimplifiedAdminPanel) */
+  hint?: string;
   aiSuggest?: boolean;
   aiPrompt?: string;
   colSpan?: 1 | 2;

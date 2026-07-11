@@ -20,6 +20,15 @@ import { useEffect } from 'react';
 
 const sel = 'sb-select';
 
+/* "lane" is jargon — show plain language. store = we sell + fulfil it on our
+   Shopify; affiliate = we link out to the brand and earn commission (they fulfil). */
+const LANE_LABEL: Record<string, string> = { store: 'Our store', affiliate: 'Partner link' };
+const LANE_HELP: Record<string, string> = {
+  store: 'Our store — we sell & fulfil this on the HealthScan Shopify store (needs a Shopify variant).',
+  affiliate: 'Partner link — we link out to the brand/partner and earn affiliate commission; they fulfil.',
+};
+const laneLabel = (lane: string) => LANE_LABEL[lane] || lane;
+
 /* HealthScan's Shopify admin (DEV-354/DEV-416) — store-lane rows deep-link here */
 const SHOPIFY_ADMIN = 'https://admin.shopify.com/store/healthscan';
 
@@ -390,11 +399,11 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
           <option value="">All regions</option>
           {REGIONS.map((r) => <option key={r} value={r}>{REGION_FLAG[r]} {r}</option>)}
         </select>
-        <select value={fLane} onChange={(e) => setFLane(e.target.value)} className={sel}>
-          <option value="">All lanes</option>
-          <option value="store">store</option>
-          <option value="affiliate">affiliate</option>
-          <option value="missing">missing (not in kit)</option>
+        <select value={fLane} onChange={(e) => setFLane(e.target.value)} className={sel} title="How the item is sold">
+          <option value="">All — sold via any</option>
+          <option value="store">Our store (Shopify)</option>
+          <option value="affiliate">Partner link</option>
+          <option value="missing">Missing (mentioned, not in kit)</option>
         </select>
         <select value={fLinked} onChange={(e) => setFLinked(e.target.value)} className={sel}>
           <option value="">Linked + unlinked</option>
@@ -425,8 +434,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
           {batchBusy && <Loader2 size={13} className="animate-spin" />}
           <button className="sb-btn sb-btn-sm" onClick={batchSetAffiliate} disabled={batchBusy}>Affiliate link…</button>
           <button className="sb-btn sb-btn-sm" onClick={batchSetSupplier} disabled={batchBusy}>Supplier / dropship…</button>
-          <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('store')} disabled={batchBusy}>Lane → store</button>
-          <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('affiliate')} disabled={batchBusy}>Lane → affiliate</button>
+          <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('store')} disabled={batchBusy} title="Sell & fulfil on our Shopify store">Sold via → Our store</button>
+          <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('affiliate')} disabled={batchBusy} title="Link out to the brand for commission">Sold via → Partner</button>
           <button className="sb-btn sb-btn-sm" onClick={() => setSelected(new Set())} disabled={batchBusy}>Clear</button>
         </div>
       )}
@@ -440,8 +449,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               <SortTh k="product" sortCol={sortCol} onSort={clickSort} style={{ minWidth: 220 }}>Product</SortTh>
               <th style={{ width: 52 }} title="Linked to a catalog product? (a key gap signal)">Linked</th>
               <th style={{ width: 74 }} title="Has a real Shopify variant — i.e. published on the HealthScan Shopify store (Supliful/HS)">Publ.</th>
-              <th style={{ width: 66 }}>Buy path</th>
-              <th style={{ width: 58 }}>Lane</th>
+              <th style={{ width: 66 }} title="Where the buy button goes: 'shopify' = our Shopify store; 'partner' = the kit's partner cart; NONE = not sellable yet">Buy path</th>
+              <th style={{ width: 84 }} title="How this item is sold — 'Our store' = we sell & fulfil on Shopify; 'Partner link' = we link out to the brand for a commission">Sold via</th>
               <SortTh k="supplier" sortCol={sortCol} onSort={clickSort} style={{ maxWidth: 150 }}>Supplier</SortTh>
               <SortTh k="cost" sortCol={sortCol} onSort={clickSort} style={{ width: 56 }}>Cost</SortTh>
               <SortTh k="sell" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }} title="Sorts on the fx-converted USD value, so regions compare fairly">Sell</SortTh>
@@ -555,7 +564,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                           </span>}
                   </td>
                   <td><span className="sb-cell" style={{ color: buyPath ? 'var(--sb-brand-strong)' : '#d97706', fontWeight: buyPath ? 400 : 600 }}>{buyPath || 'NONE'}</span></td>
-                  <td><span className="sb-cell">{i.lane}</span></td>
+                  <td><span className="sb-cell" title={LANE_HELP[i.lane] || ''}>{laneLabel(i.lane)}</span></td>
                   <td>
                     <span className="sb-cell" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {fav && <img src={fav} alt="" loading="lazy" style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0 }} />}
