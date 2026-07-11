@@ -93,6 +93,9 @@ export function RecordsTable({ table, accessToken, initialSearch }: { table: str
 
   // reload on table change / page / sort; debounce search
   useEffect(() => { setPage(0); setSel(new Set()); setQ(initialSearch || ''); }, [table]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a deep-link may change initialSearch while this table is already mounted
+  // (e.g. clicking a kit product → Products tab pre-searched) — sync + jump to page 1
+  useEffect(() => { if (initialSearch) { setQ(initialSearch); setPage(0); } }, [initialSearch]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load(page, q, sort); }, [table, page, sort]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (qDebounce.current) clearTimeout(qDebounce.current);

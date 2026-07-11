@@ -85,7 +85,9 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
   /** open the protocol itself in the Protocols editor */
   onOpenProtocol?: (protocolId: string) => void;
   /** open a catalog product in the record modal (linked items + missing rows) */
-  onOpenProduct?: (catalogProductId: string) => void;
+  /** open the product to edit: with an id → the catalog record modal; without
+   *  (unlinked kit item) → the Products tab pre-searched by title */
+  onOpenProduct?: (catalogProductId: string | null, title?: string) => void;
   /** refresh the master items after an add */
   onItemsChanged?: () => void;
 }) {
@@ -373,7 +375,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                       </button>
                     </td>
                     <td>
-                      <button onClick={onOpenProduct ? () => onOpenProduct(m.product.id) : undefined} className="sb-cell"
+                      <button onClick={onOpenProduct ? () => onOpenProduct(m.product.id, m.product.name) : undefined} className="sb-cell"
                         title={`The protocol links this product in ${m.product.mentions} step(s) but it's not in the ${m.market} kit — click to open the product record`}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: onOpenProduct ? 'pointer' : 'text', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: onOpenProduct ? 'var(--sb-brand-strong)' : 'inherit' }}>
                         <Thumb src={m.product.image} size={18} />
@@ -449,17 +451,16 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                     </button>
                   </td>
                   <td>
-                    {i.catalog_product_id && onOpenProduct
-                      ? <button onClick={() => onOpenProduct(i.catalog_product_id!)} className="sb-cell"
-                          title={`${i.title || ''} — click to open the linked product record (${i.catalog_product_id})`}
+                    {onOpenProduct
+                      ? <button onClick={() => onOpenProduct(i.catalog_product_id, i.title || undefined)} className="sb-cell"
+                          title={i.catalog_product_id
+                            ? `${i.title || ''} — open the linked product record (${i.catalog_product_id})`
+                            : `${i.title || ''} — not linked; opens the Products tab searched by name so you can edit or link it`}
                           style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: 'pointer', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: 'inherit' }}>
                           {i.image_url && <img src={i.image_url} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />}
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>{i.title || '(untitled)'}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: i.catalog_product_id ? 'underline dotted' : 'underline dashed', textUnderlineOffset: 3, textDecorationColor: i.catalog_product_id ? undefined : 'var(--sb-text-faint)' }}>{i.title || '(untitled)'}</span>
                         </button>
-                      : <span className="sb-cell" title={i.title ? `${i.title} — not linked to a catalog product yet (use the kit modal's "link" to connect it)` : ''}>
-                          {i.image_url && <img src={i.image_url} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', display: 'inline-block', verticalAlign: '-4px', marginRight: 6 }} />}
-                          {i.title || '(untitled)'}
-                        </span>}
+                      : <span className="sb-cell">{i.title || '(untitled)'}</span>}
                   </td>
                   <td><span className="sb-cell">{i.lane}</span></td>
                   <td><span className="sb-cell" style={{ color: buyPath ? 'var(--sb-brand-strong)' : '#d97706', fontWeight: buyPath ? 400 : 600 }}>{buyPath || 'NONE'}</span></td>

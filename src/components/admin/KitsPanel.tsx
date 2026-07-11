@@ -175,7 +175,7 @@ function RegionRulesManager({ rules, accessToken, onChanged }: { rules: RegionRu
 export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct }: {
   accessToken: string;
   onOpenProtocol?: (protocolId: string) => void;
-  onOpenProduct?: (catalogProductId: string) => void;
+  onOpenProduct?: (catalogProductId: string | null, title?: string) => void;
 }) {
   const [kits, setKits] = useState<ProtocolKit[] | null>(null);
   const [protocols, setProtocols] = useState<ProtocolLite[] | null>(null);

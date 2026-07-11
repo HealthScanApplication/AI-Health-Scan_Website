@@ -4696,7 +4696,15 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                 ) : tab.id === 'kits' ? (
                   <KitsPanel accessToken={accessToken}
                     onOpenProtocol={(pid) => { setProtocolDeepLink(pid); setActiveGroup('health_records'); setActiveTab('protocols'); }}
-                    onOpenProduct={(id) => openCatalogRecord('product', id)} />
+                    onOpenProduct={(id, title) => {
+                      if (id) { openCatalogRecord('product', id); return; }
+                      // unlinked kit item → land on the Products records grid, pre-searched
+                      // by the product name (HS •/size stripped) so you can edit or link it
+                      const term = (title || '').replace(/^HS\s*[•·]\s*/i, '').replace(/\s*[—•·]\s*[\d].*$/, '').trim();
+                      setActiveGroup('health_records');
+                      setActiveTab('products');
+                      setSearchQuery(term || title || '');
+                    }} />
                 ) : (<>
                 {/* Waitlist Funnel Dashboard */}
                 {tab.id === 'waitlist' && validRecords.length > 0 && !showSearch && (
