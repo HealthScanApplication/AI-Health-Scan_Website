@@ -115,11 +115,91 @@ function ProductRow({ pg, accessToken, onSaved }: { pg: ProductGroup; accessToke
   );
 }
 
+/** One product row in the table view: brand · product · program · a paste-link
+ *  field that writes affiliate_url across all its region rows. Needs-setup rows
+ *  (no link yet) float to the top so the gaps are obvious and one click away. */
+function AffiliateTableRow({ brand, pg, accessToken, onSaved }: { brand: string; pg: ProductGroup; accessToken: string; onSaved: (url: string) => void }) {
+  const prog = programFor(brand);
+  const has = pg.urls.length > 0;
+  const [val, setVal] = useState('');
+  const [saving, setSaving] = useState(false);
+  const apply = async () => {
+    const url = val.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) { toast.error('Enter a full URL starting with http(s)://'); return; }
+    setSaving(true);
+    try {
+      await Promise.all(pg.rows.map((r) => updateKitItem(accessToken, r.id, { affiliate_url: url })));
+      toast.success(`Updated ${pg.rows.length} link${pg.rows.length === 1 ? '' : 's'} for ${pg.title}`);
+      onSaved(url); setVal('');
+    } catch (e: any) { toast.error(`Save failed: ${e?.message || e}`); }
+    finally { setSaving(false); }
+  };
+  return (
+    <tr>
+      <td><span className="sb-cell" title={brand}>{brand}</span></td>
+      <td><span className="sb-cell" title={pg.title}>{pg.title}</span></td>
+      <td>
+        <span className="sb-cell" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {prog.commission || (prog.hasProgram ? prog.network : '—')}
+          {prog.signupUrl && <a href={prog.signupUrl} target="_blank" rel="noopener noreferrer" title={`Sign up: ${prog.network}`} style={{ color: 'var(--sb-brand-strong)' }}><ExternalLink size={11} /></a>}
+        </span>
+      </td>
+      <td><span className="sb-cell sb-cell-ro">{pg.markets.map((m) => REGION_FLAG[m]).join(' ')}</span></td>
+      <td>
+        <span className="sb-cell" style={{ padding: '4px 6px' }}>
+          {has
+            ? <a href={pg.urls[0]} target="_blank" rel="noopener noreferrer" title={pg.urls[0]} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--sb-brand-strong)', overflow: 'hidden', textOverflow: 'ellipsis' }}><Check size={12} style={{ flexShrink: 0 }} /> linked</a>
+            : <span style={{ display: 'flex', gap: 6 }}>
+                <input className="sb-input" style={{ flex: 1, height: 26, fontSize: 12 }} placeholder="Paste approved tagged link…" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && apply()} />
+                <button className="sb-btn sb-btn-sm" onClick={apply} disabled={saving || !val.trim()} title={`Write affiliate_url to ${pg.rows.length} region row(s)`}>
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `Apply · ${pg.rows.length}`}
+                </button>
+              </span>}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+/** Table of every affiliate product, needs-setup first. */
+function AffiliateTable({ brands, accessToken, onSaved }: { brands: BrandGroup[]; accessToken: string; onSaved: (brandKey: string, productKey: string, url: string) => void }) {
+  const rows = useMemo(() => {
+    const flat: { brand: string; pg: ProductGroup }[] = [];
+    for (const b of brands) for (const pg of b.products) flat.push({ brand: b.brand, pg });
+    // needs-setup (no link) first, then by brand → product
+    return flat.sort((a, b) => (a.pg.urls.length ? 1 : 0) - (b.pg.urls.length ? 1 : 0) || a.brand.localeCompare(b.brand) || a.pg.title.localeCompare(b.pg.title));
+  }, [brands]);
+  const missing = rows.filter((r) => !r.pg.urls.length).length;
+  return (
+    <div className="overflow-auto rounded-lg border border-gray-200" style={{ maxHeight: '64vh' }}>
+      <table className="sb-table">
+        <thead>
+          <tr>
+            <th style={{ width: 150 }}>Brand</th>
+            <th>Product</th>
+            <th style={{ width: 200 }}>Program / commission</th>
+            <th style={{ width: 90 }}>Regions</th>
+            <th style={{ minWidth: 280 }}>Affiliate link {missing > 0 && <span style={{ color: '#d97706' }}>· {missing} to set up</span>}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ brand, pg }) => (
+            <AffiliateTableRow key={`${brand}:${pg.key}`} brand={brand} pg={pg} accessToken={accessToken} onSaved={(url) => onSaved(brand, pg.key, url)} />
+          ))}
+          {!rows.length && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--sb-text-faint)' }}>No affiliate products.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function AffiliateSetupPanel({ accessToken }: { accessToken: string }) {
   const [items, setItems] = useState<KitItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [view, setView] = useState<'cards' | 'table'>('table');
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -156,9 +236,15 @@ export function AffiliateSetupPanel({ accessToken }: { accessToken: string }) {
             Sign up for each brand&rsquo;s program, then paste your approved tagged link per product — it writes <code className="rounded bg-gray-100 px-1 font-mono text-[11px]">affiliate_url</code> across all region rows. {brands.length} brands · {totalProducts} products · {withProgram} with a network program.
           </p>
         </div>
-        <button className={btnCls} onClick={load} disabled={loading}>
-          <RefreshCw className={'h-4 w-4' + (loading ? ' animate-spin' : '')} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="sb-subtabs">
+            <button className={`sb-subtab${view === 'table' ? ' sb-subtab-active' : ''}`} onClick={() => setView('table')}>Needs setup</button>
+            <button className={`sb-subtab${view === 'cards' ? ' sb-subtab-active' : ''}`} onClick={() => setView('cards')}>By brand</button>
+          </div>
+          <button className={btnCls} onClick={load} disabled={loading}>
+            <RefreshCw className={'h-4 w-4' + (loading ? ' animate-spin' : '')} /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="relative max-w-sm">
@@ -169,26 +255,30 @@ export function AffiliateSetupPanel({ accessToken }: { accessToken: string }) {
       {loading && <div className="flex items-center gap-2 py-8 text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading affiliate products…</div>}
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-[13px] text-red-700">Couldn&rsquo;t load kit items: {error}</div>}
 
-      {!loading && !error && (
+      {!loading && !error && view === 'table' && (
+        <AffiliateTable brands={filtered} accessToken={accessToken} onSaved={onSaved} />
+      )}
+
+      {!loading && !error && view === 'cards' && (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((bg) => {
             const prog = programFor(bg.brand);
             return (
-              <section key={bg.brand} className="flex flex-col gap-2.5 rounded-lg border border-gray-200 bg-white p-3.5 shadow-sm">
+              <section key={bg.brand} className="sb-card flex flex-col gap-2.5 p-3.5">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-[15px] font-semibold text-gray-900">{bg.brand}</h3>
-                  <span className={'whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ' + (prog.hasProgram ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700')}>
+                  <h3 className="text-[13.5px] font-semibold text-gray-900">{bg.brand}</h3>
+                  <span className={'whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ' + (prog.hasProgram ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700')}>
                     {prog.hasProgram ? 'Program' : 'Amazon / manual'}
                   </span>
                 </div>
                 <p className="text-[11.5px] text-gray-500">
-                  {prog.network}{prog.commission ? <span className="ml-1 font-mono text-teal-700">· {prog.commission}</span> : null}
+                  {prog.network}{prog.commission ? <span className="ml-1 font-medium text-gray-700">· {prog.commission}</span> : null}
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {bg.kits.map((k) => (<span key={k} className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{kitLabel(k)}</span>))}
                 </div>
-                <a className={btnCls + ' sb-btn-primary justify-center'} href={prog.signupUrl || 'https://affiliate-program.amazon.com/signup'} target="_blank" rel="noopener noreferrer">
-                  {prog.hasProgram ? 'Sign up' : 'Join via Amazon'} <ExternalLink className="h-3.5 w-3.5" />
+                <a className={btnCls + ' sb-btn-sm justify-center'} href={prog.signupUrl || 'https://affiliate-program.amazon.com/signup'} target="_blank" rel="noopener noreferrer">
+                  {prog.hasProgram ? 'Sign up for program' : 'Join via Amazon'} <ExternalLink className="h-3.5 w-3.5" />
                 </a>
                 <div className="mt-1 flex flex-col gap-1.5">
                   {bg.products.map((pg) => (
