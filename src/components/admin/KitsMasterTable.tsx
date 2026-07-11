@@ -438,16 +438,16 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
             <tr>
               <th style={{ width: 30 }} title="Select rows for batch actions"></th>
               <SortTh k="product" sortCol={sortCol} onSort={clickSort} style={{ minWidth: 220 }}>Product</SortTh>
-              <th style={{ width: 58 }}>Lane</th>
-              <th style={{ width: 66 }}>Buy path</th>
+              <th style={{ width: 52 }} title="Linked to a catalog product? (a key gap signal)">Linked</th>
               <th style={{ width: 74 }} title="Has a real Shopify variant — i.e. published on the HealthScan Shopify store (Supliful/HS)">Publ.</th>
-              <th style={{ width: 52 }}>Linked</th>
+              <th style={{ width: 66 }}>Buy path</th>
+              <th style={{ width: 58 }}>Lane</th>
               <SortTh k="supplier" sortCol={sortCol} onSort={clickSort} style={{ maxWidth: 150 }}>Supplier</SortTh>
-              <th style={{ width: 60 }} title="Partner affiliate link — opens the partner storefront">Affil.</th>
               <SortTh k="cost" sortCol={sortCol} onSort={clickSort} style={{ width: 56 }}>Cost</SortTh>
               <SortTh k="sell" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }} title="Sorts on the fx-converted USD value, so regions compare fairly">Sell</SortTh>
               <SortTh k="margin" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }}>Margin</SortTh>
               <th style={{ width: 54 }}>Comm.</th>
+              <th style={{ width: 60 }} title="Partner affiliate link — opens the partner storefront">Affil.</th>
               <th style={{ width: 50 }}>Live</th>
               <th style={{ width: 58 }}>Rule</th>
             </tr>
@@ -482,8 +482,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         </button>
                       </span>
                     </td>
-                    <td><span className="sb-cell" style={{ color: '#d97706', fontWeight: 600 }}>MISSING</span></td>
                     <td><span className="sb-cell">—</span></td>
+                    <td><span className="sb-cell" style={{ color: '#d97706', fontWeight: 600 }}>MISSING</span></td>
                     <td><span className="sb-cell" title="Will arrive linked to the catalog product">→ {f.lane}</span></td>
                     <td>
                       <span className="sb-cell" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -491,6 +491,10 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.lane === 'store' ? 'HealthScan store' : hostOf(f.affiliate_url || null) || '—'}</span>
                       </span>
                     </td>
+                    <td><span className="sb-cell">—</span></td>
+                    <td><span className="sb-cell">{m.product.price_usd != null ? `$${m.product.price_usd}` : '—'}</span></td>
+                    <td><span className="sb-cell">—</span></td>
+                    <td><span className="sb-cell">—</span></td>
                     <td>
                       {f.affiliate_url
                         ? <a className="sb-cell" href={f.affiliate_url} target="_blank" rel="noopener noreferrer" title={f.affiliate_url}
@@ -500,10 +504,6 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                           </a>
                         : <span className="sb-cell">—</span>}
                     </td>
-                    <td><span className="sb-cell">—</span></td>
-                    <td><span className="sb-cell">{m.product.price_usd != null ? `$${m.product.price_usd}` : '—'}</span></td>
-                    <td><span className="sb-cell">—</span></td>
-                    <td><span className="sb-cell">—</span></td>
                     <td><span className="sb-cell">{m.kit.is_live ? 'live' : 'hidden'}</span></td>
                     <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>
                   </tr>
@@ -535,8 +535,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         </button>
                       : <span className="sb-cell">{i.title || '(untitled)'}</span>}
                   </td>
-                  <td><span className="sb-cell">{i.lane}</span></td>
-                  <td><span className="sb-cell" style={{ color: buyPath ? 'var(--sb-brand-strong)' : '#d97706', fontWeight: buyPath ? 400 : 600 }}>{buyPath || 'NONE'}</span></td>
+                  <td><span className="sb-cell" style={{ color: i.catalog_product_id ? 'var(--sb-brand-strong)' : '#d97706' }}>{i.catalog_product_id ? 'yes' : 'NO'}</span></td>
                   <td>
                     {buyPath === 'store'
                       ? <a className="sb-cell" href={itemStoreUrl(i)!} target="_blank" rel="noopener noreferrer"
@@ -555,7 +554,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                             {i.lane === 'store' ? 'NO' : '—'}
                           </span>}
                   </td>
-                  <td><span className="sb-cell" style={{ color: i.catalog_product_id ? 'var(--sb-brand-strong)' : '#d97706' }}>{i.catalog_product_id ? 'yes' : 'NO'}</span></td>
+                  <td><span className="sb-cell" style={{ color: buyPath ? 'var(--sb-brand-strong)' : '#d97706', fontWeight: buyPath ? 400 : 600 }}>{buyPath || 'NONE'}</span></td>
+                  <td><span className="sb-cell">{i.lane}</span></td>
                   <td>
                     <span className="sb-cell" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {fav && <img src={fav} alt="" loading="lazy" style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0 }} />}
@@ -567,15 +567,6 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         : <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{supplierLabel(i)}</span>}
                     </span>
                   </td>
-                  <td>
-                    {i.affiliate_url
-                      ? <a className="sb-cell" href={i.affiliate_url} target="_blank" rel="noopener noreferrer" title={i.affiliate_url}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--sb-brand-strong)', cursor: 'pointer' }}>
-                          <ExternalLink size={11} style={{ flexShrink: 0 }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{hostOf(i.affiliate_url) || 'link'}</span>
-                        </a>
-                      : <span className="sb-cell">—</span>}
-                  </td>
                   <td><span className="sb-cell">{i.supplier_cost_usd != null ? fmtMoney(i.supplier_cost_usd, 'USD') : '—'}</span></td>
                   <td><span className="sb-cell">{fmtMoney(i.price_usd, i.currency)}</span></td>
                   <td>{(() => { const mp = itemMarginPct(i, fx); return (
@@ -585,6 +576,15 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                     </span>
                   ); })()}</td>
                   <td><span className="sb-cell">{i.commission_pct != null ? `${i.commission_pct}%` : '—'}</span></td>
+                  <td>
+                    {i.affiliate_url
+                      ? <a className="sb-cell" href={i.affiliate_url} target="_blank" rel="noopener noreferrer" title={i.affiliate_url}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--sb-brand-strong)', cursor: 'pointer' }}>
+                          <ExternalLink size={11} style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{hostOf(i.affiliate_url) || 'link'}</span>
+                        </a>
+                      : <span className="sb-cell">—</span>}
+                  </td>
                   <td><span className="sb-cell">{kit?.is_live ? 'live' : 'hidden'}</span></td>
                   <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>
                 </tr>
