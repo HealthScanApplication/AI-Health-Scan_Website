@@ -380,13 +380,18 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
       setLoadingItems(false);
     }
   }
+  // Populate the form from the list. Depends on `protocols` too: when opened via
+  // initialProtocolId (modal), selectedId is set BEFORE the list finishes loading,
+  // so the first run misses — re-run when the list arrives. Guard prevents
+  // clobbering an already-loaded/edited form for the same protocol.
   useEffect(() => {
     if (!selectedId) return;
     const p = protocols.find((x) => x.id === selectedId);
-    if (p) setForm({ ...p });
-    loadItems(selectedId);
+    if (p) setForm((cur) => (cur.id === selectedId ? cur : { ...p }));
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [selectedId]);
+  }, [selectedId, protocols]);
+  // load the protocol's steps once per selection (not on every list refresh)
+  useEffect(() => { if (selectedId) loadItems(selectedId); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [selectedId]);
 
   const dirty = useMemo(() => {
     if (!selected) return false;

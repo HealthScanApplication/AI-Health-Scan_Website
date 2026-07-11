@@ -4701,6 +4701,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                 ) : tab.id === 'kits' ? (
                   <KitsPanel accessToken={accessToken}
                     onOpenProtocol={(pid) => { setProtocolDeepLink(pid); setActiveGroup('health_records'); setActiveTab('protocols'); }}
+                    onOpenCatalogRecord={openCatalogRecord}
                     onOpenProduct={(id, title) => {
                       if (id) { openCatalogRecord('product', id); return; }
                       // unlinked kit item → land on the Products records grid, pre-searched

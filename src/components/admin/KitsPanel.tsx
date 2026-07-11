@@ -20,6 +20,7 @@ import {
 } from '../../utils/kitsAdmin';
 import { KitMatrix } from './KitMatrix';
 import { KitsMasterTable } from './KitsMasterTable';
+import { ProtocolEditor } from './ProtocolEditor';
 import { X, LayoutGrid, Table as TableIcon } from 'lucide-react';
 
 // standard admin control classes (adminTheme.css) — ONE size everywhere
@@ -172,11 +173,15 @@ function RegionRulesManager({ rules, accessToken, onChanged }: { rules: RegionRu
   );
 }
 
-export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct }: {
+export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct, onOpenCatalogRecord }: {
   accessToken: string;
   onOpenProtocol?: (protocolId: string) => void;
   onOpenProduct?: (catalogProductId: string | null, title?: string) => void;
+  /** open a catalog record from inside the protocol modal (product/recipe/…) */
+  onOpenCatalogRecord?: (kind: any, id: string) => void;
 }) {
+  // protocol opened as a full-editor modal (stays in the kits flow)
+  const [protocolModalId, setProtocolModalId] = useState<string | null>(null);
   const [kits, setKits] = useState<ProtocolKit[] | null>(null);
   const [protocols, setProtocols] = useState<ProtocolLite[] | null>(null);
   const [rules, setRules] = useState<RegionRule[]>([]);
@@ -264,7 +269,7 @@ export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct }: {
       {view === 'master' ? (
         masterItems ? (
           <KitsMasterTable items={masterItems} kits={kits || []} protocols={protocols || []} rules={rules} itemCounts={counts} productLinkCounts={productLinks}
-            mentions={mentions} accessToken={accessToken} onOpenKit={setOpenSlug} onOpenProtocol={onOpenProtocol} onOpenProduct={onOpenProduct} onItemsChanged={loadMaster} />
+            mentions={mentions} accessToken={accessToken} onOpenKit={setOpenSlug} onOpenProtocol={setProtocolModalId} onOpenProduct={onOpenProduct} onItemsChanged={loadMaster} />
         ) : (
           <div className="p-6 text-center text-gray-400"><Loader2 size={16} className="mx-auto animate-spin" /></div>
         )
@@ -399,6 +404,23 @@ export function KitsPanel({ accessToken, onOpenProtocol, onOpenProduct }: {
           </div>
         );
       })()}
+
+      {/* protocol opened as a full editor in a dialog — stays in the kits flow */}
+      {protocolModalId && (
+        <div onClick={() => setProtocolModalId(null)} style={{ position: 'fixed', inset: 0, zIndex: 95, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '3vh 16px' }}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full rounded-xl bg-white shadow-md" style={{ maxWidth: 1180, maxHeight: '94vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 p-3">
+              <div className="text-sm font-medium text-gray-800">Protocol editor
+                <span className="ml-2 text-xs font-normal text-gray-500">{protocolName.get(protocolModalId) || ''}</span>
+              </div>
+              <button onClick={() => setProtocolModalId(null)} className="rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 hover:bg-gray-50" title="Close"><X size={15} /></button>
+            </div>
+            <div style={{ overflowY: 'auto' }}>
+              <ProtocolEditor accessToken={accessToken} initialProtocolId={protocolModalId} onOpenCatalogRecord={onOpenCatalogRecord} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
