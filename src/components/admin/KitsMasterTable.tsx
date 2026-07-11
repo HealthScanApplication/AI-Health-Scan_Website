@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem,
+  REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem, updateKitItem,
   fmtMoney, itemMarginPct, itemSellUsd, listFxRates,
   type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
@@ -210,6 +210,37 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
   const [auditOpen, setAuditOpen] = useState<null | 'nothing' | 'fallbackOnly' | 'curated'>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
 
+  // ── batch actions: multi-select leaf items → bulk-set affiliate link /
+  //    supplier / lane across the selection (build & fix kits fast) ──
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const selectMany = (ids: string[], on: boolean) => setSelected((s) => { const n = new Set(s); ids.forEach((id) => on ? n.add(id) : n.delete(id)); return n; });
+  const bulkUpdate = async (patch: Partial<KitItem>, label: string) => {
+    const ids = [...selected];
+    if (!ids.length || !accessToken) return;
+    setBatchBusy(true);
+    try {
+      for (const id of ids) await updateKitItem(accessToken, id, patch);
+      toast.success(`${label} — ${ids.length} item${ids.length === 1 ? '' : 's'}`);
+      setSelected(new Set());
+      onItemsChanged?.();
+    } catch (e: any) { toast.error(`Batch failed: ${e?.message || e}`); }
+    finally { setBatchBusy(false); }
+  };
+  const batchSetAffiliate = () => {
+    const url = window.prompt('Affiliate URL to write to the selected items (also sets lane = affiliate):');
+    if (url == null) return;
+    if (!/^https?:\/\//i.test(url.trim())) { toast.error('Enter a full http(s):// URL'); return; }
+    bulkUpdate({ affiliate_url: url.trim(), lane: 'affiliate' }, 'Set affiliate link');
+  };
+  const batchSetSupplier = () => {
+    const s = window.prompt('Supplier / dropship provider name for the selected items (e.g. Supliful, Suplify EU, Specialist UK):');
+    if (s == null) return;
+    bulkUpdate({ supplier: s.trim() || null }, 'Set supplier');
+  };
+  const batchSetLane = (lane: 'store' | 'affiliate') => bulkUpdate({ lane }, `Set lane → ${lane}`);
+
   // ── tree view: kit (parent) → region → products, all collapsible ──
   const [expandedKits, setExpandedKits] = useState<Set<string>>(new Set());
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
@@ -238,7 +269,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     }
     return order.map((s) => map.get(s)!);
   }, [display, kits, protoName, protoImage, kitBySlugMarket]);
-  const COLS = 13; // leaf columns (Region/Kit/Protocol live in the parent rows now)
+  const COLS = 14; // leaf columns incl. the select checkbox (Region/Kit/Protocol are the parent rows)
   const addMissing = async (m: MissingRow) => {
     if (!accessToken) return;
     setAddingKey(m.key);
@@ -385,11 +416,27 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
         </button>
       </div>
 
+      {/* batch action bar — appears when leaf items are selected */}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border p-2" style={{ borderColor: 'var(--sb-brand)', background: 'var(--sb-brand-soft)' }}>
+          <span className="text-[13px] font-medium">{selected.size} selected</span>
+          <span className="text-[11px] text-gray-500">bulk-set across every selected region row:</span>
+          <span className="flex-1" />
+          {batchBusy && <Loader2 size={13} className="animate-spin" />}
+          <button className="sb-btn sb-btn-sm" onClick={batchSetAffiliate} disabled={batchBusy}>Affiliate link…</button>
+          <button className="sb-btn sb-btn-sm" onClick={batchSetSupplier} disabled={batchBusy}>Supplier / dropship…</button>
+          <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('store')} disabled={batchBusy}>Lane → store</button>
+          <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('affiliate')} disabled={batchBusy}>Lane → affiliate</button>
+          <button className="sb-btn sb-btn-sm" onClick={() => setSelected(new Set())} disabled={batchBusy}>Clear</button>
+        </div>
+      )}
+
       {/* master table */}
       <div className="overflow-auto rounded-lg border border-gray-200" style={{ maxHeight: '62vh' }}>
         <table className="sb-table">
           <thead>
             <tr>
+              <th style={{ width: 30 }} title="Select rows for batch actions"></th>
               <SortTh k="product" sortCol={sortCol} onSort={clickSort} style={{ minWidth: 220 }}>Product</SortTh>
               <th style={{ width: 58 }}>Lane</th>
               <th style={{ width: 66 }}>Buy path</th>
@@ -414,7 +461,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                 const rule = rules.find((r) => r.region === m.market && r.item_id === m.product.id);
                 return (
                   <tr key={m.key} style={{ background: 'rgba(245, 158, 11, 0.06)' }}>
-                    <td style={{ paddingLeft: 46 }}>
+                    <td></td>
+                    <td style={{ paddingLeft: 24 }}>
                       <button onClick={onOpenProduct ? () => onOpenProduct(m.product.id, m.product.name) : undefined} className="sb-cell"
                         title={`The protocol links this product in ${m.product.mentions} step(s) but it's not in the ${m.market} kit — click to open the product record`}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: onOpenProduct ? 'pointer' : 'text', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: onOpenProduct ? 'var(--sb-brand-strong)' : 'inherit' }}>
@@ -471,8 +519,11 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               const fav = faviconFor(buyPath === 'store' ? `${SHOPIFY_ADMIN}/` : i.affiliate_url);
               const partnerCart = i.lane === 'store' && buyPath !== 'store' ? kit?.partner_cart_url || null : null;
               return (
-                <tr key={i.id}>
-                  <td style={{ paddingLeft: 46 }}>
+                <tr key={i.id} style={selected.has(i.id) ? { background: 'var(--sb-brand-soft)' } : undefined}>
+                  <td style={{ textAlign: 'center', paddingLeft: 24 }}>
+                    <input type="checkbox" checked={selected.has(i.id)} onChange={() => toggleSel(i.id)} style={{ cursor: 'pointer' }} title="Select for batch actions" />
+                  </td>
+                  <td>
                     {onOpenProduct
                       ? <button onClick={() => onOpenProduct(i.catalog_product_id, i.title || undefined)} className="sb-cell"
                           title={i.catalog_product_id
@@ -576,6 +627,9 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                           <span style={{ fontWeight: 500 }}>{REGION_FLAG[market]} {market}</span>
                           <span style={{ flexShrink: 0, borderRadius: 999, padding: '0 7px', fontSize: 10, fontWeight: 600, color: R.kit?.is_live ? 'var(--sb-brand-strong)' : 'var(--sb-text-faint)', background: R.kit?.is_live ? 'var(--sb-brand-soft)' : 'var(--sb-hover)' }}>{R.kit?.is_live ? 'live' : 'hidden'}</span>
                           <span style={{ color: 'var(--sb-text-faint)', fontSize: 11.5 }}>{R.rows.length} item{R.rows.length !== 1 ? 's' : ''}</span>
+                          {(() => { const ids = R.rows.filter((r) => r.t === 'item').map((r: any) => r.i.id); const allSel = ids.length > 0 && ids.every((id) => selected.has(id)); return ids.length > 0 && (
+                            <button onClick={(e) => { e.stopPropagation(); selectMany(ids, !allSel); }} className="text-[11px]" style={{ color: 'var(--sb-brand-strong)', background: 'none', border: 'none', cursor: 'pointer' }}>{allSel ? 'deselect' : 'select all'}</button>
+                          ); })()}
                           <span style={{ flex: 1 }} />
                         </div>
                       </td>
