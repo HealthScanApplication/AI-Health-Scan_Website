@@ -9,10 +9,11 @@
  * NOTHING to sell (no kit items and no product-linked steps) vs. fallback-only.
  */
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Plus, Trash2, Unlink, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem, updateKitItem,
+  REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem, updateKitItem, deleteKitItem,
+  itemCustomerBuyUrl,
   fmtMoney, itemMarginPct, itemSellUsd, listFxRates,
   type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
@@ -250,6 +251,40 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
   };
   const batchSetLane = (lane: 'store' | 'affiliate') => bulkUpdate({ lane }, `Set lane → ${lane}`);
 
+  // ── per-row + batch: de-link (clear the product link, keep the row) and
+  //    remove (delete the kit item row entirely; never touches catalog_products) ──
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const delinkItem = async (i: KitItem) => {
+    if (!accessToken || !i.catalog_product_id) return;
+    if (!window.confirm(`De-link "${i.title || i.id}" from its catalog product?\n\nThe kit item stays in the ${i.market} kit — only the product link (catalog_product_id) is cleared.`)) return;
+    setRowBusy(i.id);
+    try { await updateKitItem(accessToken, i.id, { catalog_product_id: null }); toast.success('De-linked'); onItemsChanged?.(); }
+    catch (e: any) { toast.error(`De-link failed: ${e?.message || e}`); }
+    finally { setRowBusy(null); }
+  };
+  const removeItem = async (i: KitItem) => {
+    if (!accessToken) return;
+    if (!window.confirm(`Remove "${i.title || i.id}" from the ${i.market} kit?\n\nThis deletes the kit item row. The catalog product itself is NOT affected.`)) return;
+    setRowBusy(i.id);
+    try { await deleteKitItem(accessToken, i.id); toast.success('Item removed'); onItemsChanged?.(); }
+    catch (e: any) { toast.error(`Remove failed: ${e?.message || e}`); }
+    finally { setRowBusy(null); }
+  };
+  const batchDelink = () => bulkUpdate({ catalog_product_id: null } as Partial<KitItem>, 'De-linked');
+  const batchRemove = async () => {
+    const ids = [...selected];
+    if (!ids.length || !accessToken) return;
+    if (!window.confirm(`Remove ${ids.length} kit item${ids.length === 1 ? '' : 's'} from their kits?\n\nThis deletes the row(s). Catalog products are untouched.`)) return;
+    setBatchBusy(true);
+    try {
+      for (const id of ids) await deleteKitItem(accessToken, id);
+      toast.success(`Removed ${ids.length} item${ids.length === 1 ? '' : 's'}`);
+      setSelected(new Set());
+      onItemsChanged?.();
+    } catch (e: any) { toast.error(`Batch remove failed: ${e?.message || e}`); }
+    finally { setBatchBusy(false); }
+  };
+
   // ── tree view: kit (parent) → region → products, all collapsible ──
   const [expandedKits, setExpandedKits] = useState<Set<string>>(new Set());
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
@@ -278,7 +313,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     }
     return order.map((s) => map.get(s)!);
   }, [display, kits, protoName, protoImage, kitBySlugMarket]);
-  const COLS = 14; // leaf columns incl. the select checkbox (Region/Kit/Protocol are the parent rows)
+  const COLS = 15; // leaf columns incl. the select checkbox + trailing actions (Region/Kit/Protocol are the parent rows)
   const addMissing = async (m: MissingRow) => {
     if (!accessToken) return;
     setAddingKey(m.key);
@@ -436,6 +471,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
           <button className="sb-btn sb-btn-sm" onClick={batchSetSupplier} disabled={batchBusy}>Supplier / dropship…</button>
           <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('store')} disabled={batchBusy} title="Sell & fulfil on our Shopify store">Sold via → Our store</button>
           <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('affiliate')} disabled={batchBusy} title="Link out to the brand for commission">Sold via → Partner</button>
+          <button className="sb-btn sb-btn-sm" onClick={batchDelink} disabled={batchBusy} title="Clear the catalog-product link on the selected items (keeps the rows)">De-link</button>
+          <button className="sb-btn sb-btn-sm" onClick={batchRemove} disabled={batchBusy} title="Delete the selected kit items (catalog products untouched)" style={{ color: '#dc2626', borderColor: '#dc2626' }}>Remove…</button>
           <button className="sb-btn sb-btn-sm" onClick={() => setSelected(new Set())} disabled={batchBusy}>Clear</button>
         </div>
       )}
@@ -459,6 +496,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               <th style={{ width: 60 }} title="Partner affiliate link — opens the partner storefront">Affil.</th>
               <th style={{ width: 50 }}>Live</th>
               <th style={{ width: 58 }}>Rule</th>
+              <th style={{ width: 92 }} title="Buy = open the real customer purchase URL (Shopify cart for store, partner link for affiliate). Unlink = clear the product link. Trash = remove this kit item.">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -515,6 +553,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                     </td>
                     <td><span className="sb-cell">{m.kit.is_live ? 'live' : 'hidden'}</span></td>
                     <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>
+                    <td><span className="sb-cell" style={{ color: 'var(--sb-text-faint)' }} title="Add it to the kit first (← Add) to get buy / unlink / remove actions">—</span></td>
                   </tr>
                 );
               }
@@ -596,6 +635,32 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                   </td>
                   <td><span className="sb-cell">{kit?.is_live ? 'live' : 'hidden'}</span></td>
                   <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>
+                  <td>
+                    {(() => {
+                      const buyUrl = itemCustomerBuyUrl(i, kit);
+                      const busy = rowBusy === i.id;
+                      return (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          {buyUrl
+                            ? <a href={buyUrl} target="_blank" rel="noopener noreferrer" title={buyPath === 'store' ? `Add to cart on the HealthScan Shopify store — ${buyUrl}` : `Buy via partner — ${buyUrl}`}
+                                style={{ display: 'inline-flex', padding: 3, color: 'var(--sb-brand-strong)' }}>
+                                <ShoppingCart size={13} />
+                              </a>
+                            : <span title="Not sellable yet — no Shopify variant or affiliate link" style={{ display: 'inline-flex', padding: 3, color: 'var(--sb-text-faint)' }}><ShoppingCart size={13} /></span>}
+                          {i.catalog_product_id && (
+                            <button onClick={() => delinkItem(i)} disabled={busy} title="De-link from its catalog product (keeps the kit item)"
+                              style={{ border: 'none', background: 'none', cursor: busy ? 'default' : 'pointer', padding: 3, color: 'var(--sb-text-soft)', display: 'inline-flex' }}>
+                              <Unlink size={13} />
+                            </button>
+                          )}
+                          <button onClick={() => removeItem(i)} disabled={busy} title="Remove this kit item (does not touch the catalog product)"
+                            style={{ border: 'none', background: 'none', cursor: busy ? 'default' : 'pointer', padding: 3, color: '#dc2626', display: 'inline-flex' }}>
+                            {busy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                          </button>
+                        </span>
+                      );
+                    })()}
+                  </td>
                 </tr>
               );
               }; // end renderLeaf

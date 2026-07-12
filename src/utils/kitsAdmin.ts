@@ -375,6 +375,30 @@ export function kitItemBuyPath(i: { variant_id?: string | null; affiliate_url?: 
   return null;
 }
 
+/** HealthScan's Shopify storefront (customer-facing), mirroring the mobile app's
+ *  HEALTHSCAN_STORE_DOMAIN — distinct from the admin.shopify.com backend. */
+export const HEALTHSCAN_STORE_DOMAIN = 'healthscan.myshopify.com';
+const SHOPIFY_COUNTRY: Record<string, string> = { US: 'US', UK: 'GB', AU: 'AU' };
+/** The REAL CUSTOMER purchase URL for a kit item — the same dual-lane buy the
+ *  mobile app builds. Store lane → a Shopify cart permalink
+ *  (`/cart/{variant}:1`, mirrors mobile's buildCartPermalink); affiliate lane →
+ *  the partner affiliate URL; a store-lane row with no Shopify variant → the
+ *  kit's partner_cart_url. Lets the admin open/verify the actual buy path for
+ *  either lane, exactly like the app. Returns null when nothing is sellable yet. */
+export function itemCustomerBuyUrl(
+  i: { variant_id?: string | null; affiliate_url?: string | null; lane?: string | null; market?: string | null },
+  kit?: { partner_cart_url?: string | null } | null,
+): string | null {
+  const path = kitItemBuyPath(i);
+  if (path === 'store') {
+    const cc = SHOPIFY_COUNTRY[String(i.market || '')] || '';
+    return `https://${HEALTHSCAN_STORE_DOMAIN}/cart/${i.variant_id}:1?storefront=true${cc ? `&country=${cc}` : ''}`;
+  }
+  if (path === 'affiliate') return i.affiliate_url || null;
+  if (i.lane === 'store' && kit?.partner_cart_url) return kit.partner_cart_url;
+  return null;
+}
+
 /** Link an EXISTING kit item to a catalog product: sets catalog_product_id (so
  *  region-legality + coverage work) and upgrades its purchase path from the
  *  product — a Shopify variant → store lane, else the product's affiliate/
