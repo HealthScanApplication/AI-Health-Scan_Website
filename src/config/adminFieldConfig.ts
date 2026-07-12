@@ -95,6 +95,9 @@ export interface FieldConfig {
   // Unlike showWhen, an empty/unset value is NOT hidden — so gating a field on a
   // type discriminator won't hide it on legacy records that predate the field.
   hideWhen?: { field: string; is: string[] };
+  // Render this field in the right-hand "organization" sidebar (Shopify-style)
+  // instead of inline in its section. The field's `section` is ignored for layout.
+  sidebar?: boolean;
   accentColor?: 'orange' | 'green' | 'red';
 }
 
@@ -2070,7 +2073,7 @@ const productsFields: FieldConfig[] = [
   },
   {
     key: "brand",
-    label: "Brand",
+    label: "Brand / Vendor",
     type: "text",
     showInList: true,
     showInDetail: true,
@@ -2078,6 +2081,7 @@ const productsFields: FieldConfig[] = [
     required: true,
     placeholder: "e.g. Nature Valley",
     section: "Basic Info",
+    sidebar: true,
   },
   {
     // What this record actually IS. Reuses the existing (previously unwired)
@@ -2091,6 +2095,7 @@ const productsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     section: "Basic Info",
+    sidebar: true,
     options: ["product", "supplement", "food", "drink", "activity"],
     colorMap: {
       product: "bg-cyan-100 text-cyan-800",
@@ -2156,6 +2161,7 @@ const productsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     section: "Basic Info",
+    sidebar: true,
     options: ["Apply", "Use", "Take", "Drink", "Massage", "Cleanse", "Rinse", "Exfoliate", "Moisturize", "Soak", "Steam", "Spray", "Rest", "Avoid", "Limit"],
     showWhen: { field: "product_kind", is: ["activity", "product", "supplement", "drink"] },
     hint: "How it reads when it becomes a protocol step (Apply / Take / Drink …). This is the bridge that lets a product act as an activity.",

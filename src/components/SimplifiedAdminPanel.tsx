@@ -8153,8 +8153,12 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
           const priorityKeys = ['name', 'name_common', 'email'];
           const priorityFields = editFields.filter(f => priorityKeys.includes(f.key));
           const rest = editFields.filter(f => !priorityKeys.includes(f.key));
+          // Fields flagged `sidebar` render in the right-hand organization column,
+          // not inline in their section — so pull them out of the section grouping.
+          const sidebarFields = rest.filter(f => (f as any).sidebar);
 
           rest.forEach(f => {
+            if ((f as any).sidebar) return;
             if (f.section) {
               if (!sections.has(f.section)) sections.set(f.section, []);
               sections.get(f.section)!.push(f);
@@ -8368,9 +8372,30 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
               });
           };
 
+          // Shopify-style right sidebar ("Product organization") — collects the
+          // fields flagged `sidebar` into a card beside the main section column.
+          const renderSidebar = () => {
+            if (!sidebarFields.length) return null;
+            return (
+              <aside style={{ flex: '1 1 280px', minWidth: 0, maxWidth: 340 }}>
+                <div className="sb-shopify-card">
+                  <h4 className="text-[13px] font-semibold text-foreground mb-3">Product organization</h4>
+                  <div className="space-y-3.5">
+                    {sidebarFields.map(f => (
+                      <div key={f.key}>
+                        {renderEditField(f)}
+                        {hintFor(f) && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{hintFor(f)}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </aside>
+            );
+          };
+
           return (
             <div className="space-y-4">
-              {/* Priority fields — always at top */}
+              {/* Priority fields — always at top (full width, like a Shopify title) */}
               {(priorityFields.length > 0 || unsectioned.length > 0) && (
                 <div className="grid grid-cols-2 gap-5">
                   {[...priorityFields, ...unsectioned].map(f => (
@@ -8382,6 +8407,11 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                 </div>
               )}
 
+              {/* Main content column + organization sidebar (Shopify layout).
+                  Inline flex (not lg: utilities — those aren't in the prebuilt CSS);
+                  flex-wrap lets the sidebar drop below the main column when narrow. */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+                <div style={{ flex: '999 1 420px', minWidth: 0 }} className="space-y-4">
               {useModalTabs ? (
                 <>
                   {/* Culinary / Health / Content tab switcher */}
@@ -8489,6 +8519,9 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                   {renderSections()}
                 </div>
               )}
+                </div>
+                {renderSidebar()}
+              </div>
             </div>
           );
         })()}
