@@ -210,12 +210,18 @@ const MEAL_PRESETS: { label: string; Icon: any; color: string; preset: AddPreset
   { label: 'Snack', Icon: Apple, color: '#E64A19', preset: { type: 'recipe', group_name: 'Snack', display_name: 'Snack', subtype: 'snack', scheduled_time: '10:00:00' } },
 ];
 function primaryTypeOf(it: AdminProtocolItem): string {
-  if (it.category === 'do') return 'activity';
-  if (it.category === 'sleep') return 'sleep';
-  if (it.category === 'supplement') return 'supplement';
-  if (it.item_type === 'recipe') return 'recipe';
+  // item_type is the source of truth for the definitive types — a supplement or
+  // product mis-filed under category 'do' must still read as Supplement/Product,
+  // not "Activity" (the old category-first order caused exactly that bug). Only
+  // the ambiguous 'activity'/null item_type falls back to category.
+  if (it.item_type === 'supplement') return 'supplement';
   if (it.item_type === 'product') return 'product';
-  return 'ingredient'; // consume default
+  if (it.item_type === 'recipe') return 'recipe';
+  if (it.item_type === 'consume') return 'ingredient';
+  if (it.category === 'supplement') return 'supplement';
+  if (it.category === 'sleep') return 'sleep';
+  if (it.category === 'consume') return 'ingredient';
+  return 'activity'; // item_type 'activity'/null under category 'do' or none
 }
 
 const VERB_OPTS: Opt[] = [{ value: '', label: '+ verb' }, ...DO_VERBS.map((v) => ({ value: v, label: v }))];
@@ -1155,6 +1161,10 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           )}
           {!isRule ? (
             <>
+              <span title={`Stored type: item_type="${it.item_type || 'null'}", category="${it.category || 'none'}". Change it with the dropdown →`}
+                style={{ fontSize: 9.5, fontFamily: 'ui-monospace, monospace', color: C.faint, border: '1px solid ' + C.hair, borderRadius: 4, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                {it.item_type || '—'}
+              </span>
               <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={116} />
               {subOpts2.length > 1 && (
                 <IconSelect value={it.subtype || subOpts2[0].value} options={subOpts2} onChange={(s) => commitField(it, { subtype: s })} width={104} />
