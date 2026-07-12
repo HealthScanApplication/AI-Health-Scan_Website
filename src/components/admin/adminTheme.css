@@ -18,6 +18,7 @@
   --sb-page: #fbfbfb;
   --sb-panel: #ffffff;
   --sb-panel-soft: #f5f6f7;
+  --sb-canvas: #eef1f4;   /* Shopify-style page behind cards (grayer than panel) */
   --sb-hover: #f0f1f2;
   --sb-border: #e6e8eb;
   --sb-border-strong: #dcdfe3;
@@ -45,6 +46,7 @@
   --sb-page: #171717;
   --sb-panel: #1c1c1c;
   --sb-panel-soft: #232323;
+  --sb-canvas: #131313;   /* darker than panel so cards read as raised */
   --sb-hover: #2a2a2a;
   --sb-border: #2e2e2e;
   --sb-border-strong: #3e3e3e;
@@ -123,6 +125,18 @@
 
 /* Supabase surface + nav helpers (opt-in classes) */
 .sb-admin .sb-card { background: var(--sb-panel); border: 1px solid var(--sb-border); border-radius: var(--sb-radius-lg); }
+
+/* Shopify-style product-detail cards: white panel, soft border, gentle lift,
+   sitting on a grayer canvas. Used for the edit-modal sections. */
+.sb-admin .sb-canvas { background: var(--sb-canvas); }
+.sb-admin .sb-shopify-card {
+  background: var(--sb-panel);
+  border: 1px solid var(--sb-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 16px 20px;
+}
+.sb-admin.sb-dark .sb-shopify-card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
 .sb-admin .sb-nav-tab {
   position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 8px 4px; margin-right: 18px;
   font-size: 13px; font-weight: 400; color: var(--sb-text-faint); background: none; border: none; cursor: pointer;

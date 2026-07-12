@@ -91,6 +91,10 @@ export interface FieldConfig {
   dynamicOptionsMap?: Record<string, string[]>;
   conditionalOn?: string;
   showWhen?: { field: string; not?: string[]; is?: string[] };
+  // Hide ONLY when the watched field's value matches one of `is` (case-insensitive).
+  // Unlike showWhen, an empty/unset value is NOT hidden — so gating a field on a
+  // type discriminator won't hide it on legacy records that predate the field.
+  hideWhen?: { field: string; is: string[] };
   accentColor?: 'orange' | 'green' | 'red';
 }
 
@@ -107,6 +111,11 @@ export const badgeColorMap: Record<string, string> = {
   beneficial: "bg-green-100 text-green-800",
   hazardous: "bg-red-100 text-red-800",
   both: "bg-amber-100 text-amber-800",
+  // catalog record Type (product_kind) — matches the protocol editor kind colors
+  product: "bg-cyan-100 text-cyan-800",
+  activity: "bg-orange-100 text-orange-800",
+  food: "bg-green-100 text-green-800",
+  drink: "bg-blue-100 text-blue-800",
   meal: "bg-green-100 text-green-800",
   beverage: "bg-cyan-100 text-cyan-800",
   condiment: "bg-amber-100 text-amber-800",
@@ -2071,6 +2080,35 @@ const productsFields: FieldConfig[] = [
     section: "Basic Info",
   },
   {
+    // What this record actually IS. Reuses the existing (previously unwired)
+    // catalog_products.product_kind column. Drives the Category options below,
+    // which fields are shown, and whether the action verb applies. Colours match
+    // the protocol editor's kind badges (orange=do, cyan=buyable, green=food).
+    key: "product_kind",
+    label: "Type",
+    type: "tags", // single-select chip group (the "tags" renderer stores one string)
+    showInList: true,
+    showInDetail: true,
+    showInEdit: true,
+    section: "Basic Info",
+    options: ["product", "supplement", "food", "drink", "activity"],
+    colorMap: {
+      product: "bg-cyan-100 text-cyan-800",
+      supplement: "bg-teal-100 text-teal-800",
+      food: "bg-green-100 text-green-800",
+      drink: "bg-blue-100 text-blue-800",
+      activity: "bg-orange-100 text-orange-800",
+    },
+    optionDescriptions: {
+      product: "A buyable physical product — cream, oil, soap, device…",
+      supplement: "A pill / powder / tincture you take",
+      food: "A meal, snack or edible item you eat",
+      drink: "A beverage / tonic you drink",
+      activity: "Something you DO — apply, cleanse, exercise…",
+    },
+    hint: "What this record actually is. Sets the Category options, which fields show, and the action verb. Change it if e.g. a cream or an activity is mis-filed as a generic product.",
+  },
+  {
     key: "category",
     label: "Category",
     type: "tags",
@@ -2078,20 +2116,24 @@ const productsFields: FieldConfig[] = [
     showInDetail: true,
     showInEdit: true,
     section: "Basic Info",
+    conditionalOn: "product_kind",
+    hint: "The form / sub-type within the Type — the options change with the Type above.",
+    dynamicOptionsMap: {
+      food: ["meal", "snack", "condiment", "sauce", "dairy", "bakery", "frozen", "canned", "fresh", "cereal", "protein bar", "dessert"],
+      drink: ["beverage", "tea", "tonic", "smoothie", "juice", "water", "coffee"],
+      supplement: ["capsule", "powder", "tincture", "liquid", "tablet", "gummy", "softgel"],
+      product: ["cream", "oil", "balm", "serum", "soap", "tonic", "powder", "spray", "salve", "device", "accessory", "other"],
+      activity: ["hygiene", "wellness", "exercise", "recovery", "cleanse"],
+    },
+    // Fallback shown when Type is unset (legacy products that predate product_kind).
+    // The union of every option so no existing category value becomes unselectable.
     options: [
-      "meal",
-      "snack",
-      "beverage",
-      "condiment",
-      "supplement",
-      "dairy",
-      "bakery",
-      "frozen",
-      "canned",
-      "fresh",
-      "cereal",
-      "protein bar",
-      "sauce",
+      "meal", "snack", "beverage", "condiment", "supplement", "dairy", "bakery",
+      "frozen", "canned", "fresh", "cereal", "protein bar", "sauce", "dessert",
+      "tea", "tonic", "smoothie", "juice", "water", "coffee",
+      "capsule", "powder", "tincture", "liquid", "tablet", "gummy", "softgel",
+      "cream", "oil", "balm", "serum", "soap", "spray", "salve", "device", "accessory", "other",
+      "hygiene", "wellness", "exercise", "recovery", "cleanse",
     ],
   },
   {
@@ -2102,6 +2144,21 @@ const productsFields: FieldConfig[] = [
     showInEdit: true,
     placeholder: "e.g. Fermented foods",
     section: "Basic Info",
+  },
+  {
+    // Action verb for when this record is used as a protocol step — "Apply Oil
+    // Cleanser", "Drink Cayenne Water", "Take Magnesium". Persists to the new
+    // catalog_products.verb column (DEV-491). Only shown for kinds that are
+    // done/applied/taken/drunk — food is eaten, so its verb is implicit.
+    key: "verb",
+    label: "Action verb",
+    type: "select",
+    showInDetail: true,
+    showInEdit: true,
+    section: "Basic Info",
+    options: ["Apply", "Use", "Take", "Drink", "Massage", "Cleanse", "Rinse", "Exfoliate", "Moisturize", "Soak", "Steam", "Spray", "Rest", "Avoid", "Limit"],
+    showWhen: { field: "product_kind", is: ["activity", "product", "supplement", "drink"] },
+    hint: "How it reads when it becomes a protocol step (Apply / Take / Drink …). This is the bridge that lets a product act as an activity.",
   },
   {
     key: "barcode",
@@ -2139,6 +2196,7 @@ const productsFields: FieldConfig[] = [
     showInEdit: true,
     colSpan: 2,
     section: "Ingredients",
+    hideWhen: { field: "product_kind", is: ["activity"] },
   },
   {
     key: "allergen_info",
@@ -2148,6 +2206,7 @@ const productsFields: FieldConfig[] = [
     showInEdit: true,
     colSpan: 2,
     section: "Ingredients",
+    hideWhen: { field: "product_kind", is: ["activity"] },
   },
 
   // --- Descriptions ---

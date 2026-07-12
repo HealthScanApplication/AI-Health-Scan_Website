@@ -1885,6 +1885,14 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     );
   };
   const [listUploadingId, setListUploadingId] = useState<string | null>(null);
+  // Per-product commercial rollup keyed by catalog_product_id, aggregated from
+  // protocol_kit_items (the affiliate/store lane data lives per product × market).
+  // Lets each product row show: is it sold via a partner affiliate, in which
+  // regions, at what cost/commission. Fetched once when the Products tab opens.
+  const [commercialByProduct, setCommercialByProduct] = useState<Record<string, {
+    markets: string[]; lanes: string[]; currencies: string[]; affiliateHosts: string[];
+    commissionPct: number | null; supplierCostUsd: number | null; kitPriceUsd: number | null; supplier: string | null;
+  }>>({});
   const [subFilter, setSubFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
@@ -2110,6 +2118,42 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
       setEditModalTab('health');
     }
   }, [activeTab, editModalTab]);
+
+  // Roll up per-product commercial data from protocol_kit_items when the Products
+  // tab is open, so each product row can show its affiliate/store lane, regions,
+  // cost and commission. Fetched once; keyed by catalog_product_id.
+  useEffect(() => {
+    if (activeTab !== 'products' || Object.keys(commercialByProduct).length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const sel = 'catalog_product_id,market,lane,affiliate_url,commission_pct,supplier_cost_usd,price_usd,currency,supplier';
+        const url = `https://${projectId}.supabase.co/rest/v1/protocol_kit_items?select=${sel}&catalog_product_id=not.is.null&limit=5000`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, apikey: publicAnonKey } });
+        if (!res.ok) return;
+        const rows: any[] = await res.json();
+        if (cancelled) return;
+        const map: typeof commercialByProduct = {};
+        const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+        const push = (arr: string[], v?: string | null) => { if (v && !arr.includes(v)) arr.push(v); };
+        for (const r of rows) {
+          const id = r.catalog_product_id as string;
+          if (!id) continue;
+          const e = (map[id] ||= { markets: [], lanes: [], currencies: [], affiliateHosts: [], commissionPct: null, supplierCostUsd: null, kitPriceUsd: null, supplier: null });
+          push(e.markets, r.market);
+          push(e.lanes, r.lane);
+          push(e.currencies, r.currency ? String(r.currency).trim() : null);
+          if (r.affiliate_url) push(e.affiliateHosts, host(r.affiliate_url));
+          if (r.commission_pct != null) e.commissionPct = Math.max(e.commissionPct ?? 0, Number(r.commission_pct));
+          if (r.supplier_cost_usd != null) e.supplierCostUsd = e.supplierCostUsd == null ? Number(r.supplier_cost_usd) : Math.min(e.supplierCostUsd, Number(r.supplier_cost_usd));
+          if (r.price_usd != null) e.kitPriceUsd = e.kitPriceUsd == null ? Number(r.price_usd) : Math.min(e.kitPriceUsd, Number(r.price_usd));
+          if (r.supplier && !e.supplier) e.supplier = r.supplier;
+        }
+        setCommercialByProduct(map);
+      } catch { /* non-fatal — the strip just won't show regional data */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // localStorage-backed collapse state for ALL sections/categories
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -4102,6 +4146,33 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     );
   };
 
+  // A barcode is "generic" when it isn't a real 6–14 digit UPC/EAN — i.e. it's a
+  // slug/placeholder (activity_oneill_…) or missing. 198 of ~1785 products.
+  const isGenericBarcode = (bc?: string | null) => !bc || !/^[0-9]{6,14}$/.test(String(bc).trim());
+  const REGION_CCY: Record<string, string> = { US: '$', EU: '€', UK: '£', AU: 'A$', CA: 'C$' };
+  const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  // Merge the kit rollup with the product's own affiliate/purchase links + price
+  // into one display summary: is it a partner-affiliate product, in which regions,
+  // at what cost/commission, and who's the partner.
+  const productCommercial = (record: AdminRecord) => {
+    const kit = commercialByProduct[record.id];
+    const ownAff = [record.affiliate_url, record.affiliate_link_amazon, record.affiliate_link_shopify, record.purchase_url].filter(Boolean) as string[];
+    const hasAffiliate = !!kit?.lanes.includes('affiliate') || ownAff.length > 0;
+    const hosts = [...new Set([...(kit?.affiliateHosts || []), ...ownAff.map(hostOf)].filter(Boolean))];
+    const brandIsPartner = record.brand && String(record.brand).toLowerCase() !== 'generic';
+    return {
+      hasAffiliate,
+      isStore: !!kit?.lanes.includes('store'),
+      markets: kit?.markets || [],
+      currencies: kit?.currencies || [],
+      hosts,
+      commissionPct: kit?.commissionPct ?? null,
+      cost: kit?.supplierCostUsd ?? null,
+      price: record.price_usd != null ? Number(record.price_usd) : (kit?.kitPriceUsd ?? null),
+      partner: brandIsPartner ? String(record.brand) : (kit?.supplier || null),
+    };
+  };
+
   const renderRecordRow = (record: AdminRecord & { _displayIndex?: number }) => {
     const imageUrl = getImageUrl(record);
     const displayName = getDisplayName(record);
@@ -4278,6 +4349,48 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                   )}
                 </div>
               )}
+              {/* Products: commercial status — barcode (generic flag) · affiliate/partner · cost · regions */}
+              {activeTab === 'products' && (() => {
+                const c = productCommercial(record);
+                const generic = isGenericBarcode(record.barcode);
+                return (
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {generic ? (
+                      <span title={`Generic / placeholder barcode: ${record.barcode || '—'} — not a real UPC/EAN`} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                        ⚠ Generic barcode
+                      </span>
+                    ) : (
+                      <span title="Real UPC/EAN barcode" className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                        {record.barcode}
+                      </span>
+                    )}
+                    {c.hasAffiliate ? (
+                      <span title={`Partner affiliate${c.hosts.length ? ' · ' + c.hosts.join(', ') : ''}${c.commissionPct != null ? ' · ' + c.commissionPct + '% commission' : ''}`} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800">
+                        🔗 Affiliate{c.commissionPct != null ? ` ${c.commissionPct}%` : ''}
+                      </span>
+                    ) : c.isStore ? (
+                      <span title="Sold via our store" className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">🏪 Our store</span>
+                    ) : null}
+                    {c.partner && (
+                      <span title="Partner / brand" className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium">{c.partner}</span>
+                    )}
+                    {c.cost != null && (
+                      <span className="text-[10px] text-gray-500" title="Supplier cost (USD)">cost ${c.cost.toFixed(2)}</span>
+                    )}
+                    {c.price != null && (
+                      <span className="text-[10px] text-gray-700 font-semibold" title="Sell price (USD)">${c.price.toFixed(2)}</span>
+                    )}
+                    {c.markets.length > 0 && c.markets.map((m: string) => (
+                      <span key={m} title={`Offered in ${m}`} className="text-[9px] font-semibold px-1 py-0.5 rounded bg-gray-100 text-gray-600">
+                        {m}{REGION_CCY[m] ? ` ${REGION_CCY[m]}` : ''}
+                      </span>
+                    ))}
+                    {c.hasAffiliate && c.hosts.length > 0 && (
+                      <span className="text-[9px] text-gray-400" title="Affiliate destination">{c.hosts.join(', ')}</span>
+                    )}
+                  </div>
+                );
+              })()}
               {!isWaitlist && record.description && (
                 <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
                   {typeof record.description === 'string'
@@ -5814,6 +5927,14 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
               }
             }
 
+            // hideWhen: hide ONLY on an exact value match — an empty/unset value
+            // stays visible, so gating on a type discriminator never hides the
+            // field on legacy records that predate that discriminator.
+            if (field.hideWhen) {
+              const hv = String((editingRecord as any)[field.hideWhen.field] || '').toLowerCase();
+              if (field.hideWhen.is.map(v => v.toLowerCase()).includes(hv)) return null;
+            }
+
             if (field.type === 'media_upload') {
               const handleUpload = async (file: File) => {
                 setUploadingImage(true);
@@ -6159,15 +6280,22 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
               const desc = currentVal && field.optionDescriptions?.[currentVal];
               // Support dynamic options based on another field's value (like multi_tags)
               let tagOptions = field.options || [];
+              // When the parent is unset/unmapped, fall back to the field's own
+              // `options` if it has any (so a category doesn't vanish on legacy
+              // records) — only show "select parent first" when there is no fallback.
+              let tagNoParent = false;
               if (field.dynamicOptionsMap && field.conditionalOn && editingRecord) {
                 const parentVal = editingRecord[field.conditionalOn];
                 if (parentVal && field.dynamicOptionsMap[parentVal]) {
                   tagOptions = field.dynamicOptionsMap[parentVal];
-                } else if (!parentVal) {
+                } else if (field.options && field.options.length) {
+                  tagOptions = field.options;
+                } else {
                   tagOptions = [];
+                  tagNoParent = !parentVal;
                 }
               }
-              const noParent = field.conditionalOn && editingRecord && !editingRecord[field.conditionalOn];
+              const noParent = tagNoParent;
               return (
                 <div key={field.key} className={`space-y-1.5 ${field.colSpan === 2 ? 'col-span-2' : ''}`}>
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{field.label}</Label>
@@ -6209,15 +6337,19 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
               const selected: string[] = Array.isArray(val) ? val : (typeof val === 'string' && val ? val.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
               // Support dynamic options based on another field's value
               let tagOptions = field.options || [];
+              let mtNoParent = false;
               if (field.dynamicOptionsMap && field.conditionalOn && editingRecord) {
                 const parentVal = editingRecord[field.conditionalOn];
                 if (parentVal && field.dynamicOptionsMap[parentVal]) {
                   tagOptions = field.dynamicOptionsMap[parentVal];
+                } else if (field.options && field.options.length) {
+                  tagOptions = field.options;
                 } else {
                   tagOptions = [];
+                  mtNoParent = !parentVal;
                 }
               }
-              const noParent = field.conditionalOn && editingRecord && !editingRecord[field.conditionalOn];
+              const noParent = mtNoParent;
               
               // Special card layout for benefits and risks
               const isBenefits = field.key === 'health_benefits' || field.key === 'functions';
@@ -8111,19 +8243,16 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                 };
 
                 return (
-                  <div key={sectionName} className="pt-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <button type="button" onClick={() => toggleSection(sKey)}
-                        className="flex-1 flex items-center gap-2 group cursor-pointer">
-                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                          <span className="text-[10px] font-mono text-gray-300 mr-1.5">{sectionNumber} •</span>
-                          {SECTION_EMOJI[sectionName] && <span className="mr-1">{SECTION_EMOJI[sectionName]}</span>}
-                          {sectionName}
-                          <span className="ml-1.5 text-[10px] font-light italic text-gray-300 normal-case tracking-normal">{fields.length}</span>
-                        </h4>
-                        <div className="flex-1 h-px bg-gray-100" />
-                        {secOpen ? <ChevronUp className="w-3 h-3 text-gray-300 group-hover:text-gray-500" /> : <ChevronDown className="w-3 h-3 text-gray-300 group-hover:text-gray-500" />}
+                  <div key={sectionName} className="sb-shopify-card mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <button type="button" onClick={() => toggleSection(sKey)} title={`Section ${sectionNumber}`}
+                        className="flex items-center gap-1.5 group cursor-pointer">
+                        {SECTION_EMOJI[sectionName] && <span className="text-sm">{SECTION_EMOJI[sectionName]}</span>}
+                        <h4 className="text-[13px] font-semibold text-foreground">{sectionName}</h4>
+                        <span className="text-[11px] font-normal text-muted-foreground">{fields.length}</span>
+                        {secOpen ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
                       </button>
+                      <div className="flex-1" />
                       {/* Vector search button — shown on all sections */}
                       <button type="button"
                         onClick={(e) => { e.stopPropagation(); setVecSearchSection(isVecOpen ? null : sectionName); setVecSearchQuery(''); }}
@@ -8281,14 +8410,14 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
 
                   {/* Culinary tab: flavour, texture, steps, ingredients, descriptions */}
                   {editModalTab === 'culinary' && (
-                    <div className="space-y-0">
+                    <div className="sb-canvas rounded-xl p-3 sm:p-4 space-y-0">
                       {renderSections(s => CULINARY_SECTIONS.has(s))}
                     </div>
                   )}
 
                   {/* Health tab: nutrition, micros, risks, scoring, references */}
                   {editModalTab === 'health' && (
-                    <div className="space-y-0">
+                    <div className="sb-canvas rounded-xl p-3 sm:p-4 space-y-0">
                       {/* Linked ingredients + Compute Nutrition at top of health tab */}
                       {activeTab === 'recipes' && (() => {
                         const linkedIds: string[] = Array.isArray(editingRecord?.linked_ingredients) ? editingRecord.linked_ingredients : [];
@@ -8349,14 +8478,14 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
 
                   {/* Content tab: scientific papers + social content */}
                   {editModalTab === 'content' && (
-                    <div className="space-y-0">
+                    <div className="sb-canvas rounded-xl p-3 sm:p-4 space-y-0">
                       {renderSections(s => CONTENT_SECTIONS.has(s))}
                     </div>
                   )}
                 </>
               ) : (
                 /* Non-tabbed tabs (waitlist, elements, scans) — flat layout */
-                <div className="space-y-0">
+                <div className="sb-canvas rounded-xl p-3 sm:p-4 space-y-0">
                   {renderSections()}
                 </div>
               )}

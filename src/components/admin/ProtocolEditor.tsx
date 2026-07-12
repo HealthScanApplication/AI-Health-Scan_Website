@@ -168,11 +168,36 @@ interface Opt { value: string; label: string; Icon?: any; color?: string }
 const TYPE_OPTS: Opt[] = [
   { value: 'recipe', label: 'Recipe', Icon: Utensils, color: '#388E3C' },
   { value: 'ingredient', label: 'Ingredient', Icon: Leaf, color: '#43A047' },
-  { value: 'product', label: 'Product', Icon: Package, color: '#6B7280' },
+  { value: 'product', label: 'Product', Icon: Package, color: '#0891B2' },
   { value: 'activity', label: 'Activity', Icon: Dumbbell, color: '#D45B0A' },
   { value: 'supplement', label: 'Supplement', Icon: Pill, color: '#0097A7' },
   { value: 'sleep', label: 'Sleep', Icon: Moon, color: 'var(--sb-text-soft)' },
 ];
+// One colour language for "what kind of thing is this?" — used on the step's
+// item_type badge AND the linked catalog record's kind badge so orange=activity,
+// green=meal/food, cyan/blue=buyable (product/supplement) reads at a glance.
+// Keys cover both DB item_type values and catalog-link kinds.
+const KIND_COLOR: Record<string, string> = {
+  activity: '#D45B0A',   // orange  — a thing you DO
+  recipe: '#388E3C',     // green   — a meal
+  consume: '#2E7D32',    // green   — food/ingredient you eat
+  ingredient: '#43A047', // green   — food/ingredient you eat
+  product: '#0891B2',    // cyan    — buyable product
+  supplement: '#0097A7', // teal    — buyable supplement
+  sleep: '#6366F1',      // indigo  — sleep
+};
+function kindColor(k?: string | null): string {
+  return KIND_COLOR[(k || '').toLowerCase()] || 'var(--sb-text-soft)';
+}
+// Colour-coded chip: tinted fill + border derived from the kind colour.
+function kindChip(k?: string | null): React.CSSProperties {
+  const c = kindColor(k);
+  return {
+    color: c,
+    background: `color-mix(in srgb, ${c} 13%, transparent)`,
+    border: `1px solid color-mix(in srgb, ${c} 34%, transparent)`,
+  };
+}
 // secondary sub-type, keyed by the stored `category` the primary maps to.
 const SUB_OPTS: Record<string, Opt[]> = {
   consume: [
@@ -1050,7 +1075,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
             </button>
             <button type="button" onClick={() => link && openRecord(link, it.id)} title={`Open ${link.kind} record`}
               style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150, textAlign: 'left' }}>{link.name}</button>
-            <span style={{ fontSize: 9.5, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{link.kind}</span>
+            <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 4, padding: '2px 5px', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', ...kindChip(link.kind) }}>{link.kind}</span>
             {link.kind === 'product' && (link.price != null || link.buyUrl) && (
               <span style={{ fontSize: 10.5, fontWeight: 600, color: C.good, whiteSpace: 'nowrap' }}>
                 {link.price != null ? `$${link.price}` : ''}{link.buyUrl ? (link.price != null ? ' · Buy ↗' : 'Buy ↗') : ''}
@@ -1162,7 +1187,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           {!isRule ? (
             <>
               <span title={`Stored type: item_type="${it.item_type || 'null'}", category="${it.category || 'none'}". Change it with the dropdown →`}
-                style={{ fontSize: 9.5, fontFamily: 'ui-monospace, monospace', color: C.faint, border: '1px solid ' + C.hair, borderRadius: 4, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'ui-monospace, monospace', borderRadius: 4, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', ...kindChip(it.item_type) }}>
                 {it.item_type || '—'}
               </span>
               <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={116} />
