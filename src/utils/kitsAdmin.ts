@@ -399,6 +399,17 @@ export function itemCustomerBuyUrl(
   return null;
 }
 
+/** Combined "add all to cart" Shopify permalink for a set of store items — the
+ *  admin equivalent of the mobile app's per-merchant "Add all to cart" on the
+ *  store lane: one cart with every numeric variant. Ignores non-store rows.
+ *  `https://healthscan.myshopify.com/cart/{v1}:1,{v2}:1,…` */
+export function storeCartPermalink(variantIds: (string | null | undefined)[], market?: string | null): string | null {
+  const ids = variantIds.map((v) => String(v || '')).filter((v) => /^\d+$/.test(v));
+  if (!ids.length) return null;
+  const cc = SHOPIFY_COUNTRY[String(market || '')] || '';
+  return `https://${HEALTHSCAN_STORE_DOMAIN}/cart/${ids.map((v) => `${v}:1`).join(',')}?storefront=true${cc ? `&country=${cc}` : ''}`;
+}
+
 /** Link an EXISTING kit item to a catalog product: sets catalog_product_id (so
  *  region-legality + coverage work) and upgrades its purchase path from the
  *  product — a Shopify variant → store lane, else the product's affiliate/

@@ -13,7 +13,7 @@ import { ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Plus, Trash
 import { toast } from 'sonner';
 import {
   REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem, updateKitItem, deleteKitItem,
-  itemCustomerBuyUrl,
+  itemCustomerBuyUrl, storeCartPermalink,
   fmtMoney, itemMarginPct, itemSellUsd, listFxRates,
   type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
@@ -501,7 +501,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
           </thead>
           <tbody>
             {(() => {
-              const renderLeaf = (row: (typeof display)[number]) => {
+              const renderLeaf = (row: (typeof display)[number], num?: number, total?: number) => {
               if (row.t === 'missing') {
                 const m = row.m;
                 const f = kitItemFieldsFromProduct(m.product);
@@ -572,16 +572,21 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                     <input type="checkbox" checked={selected.has(i.id)} onChange={() => toggleSel(i.id)} style={{ cursor: 'pointer' }} title="Select for batch actions" />
                   </td>
                   <td>
-                    {onOpenProduct
-                      ? <button onClick={() => onOpenProduct(i.catalog_product_id, i.title || undefined)} className="sb-cell"
-                          title={i.catalog_product_id
-                            ? `${i.title || ''} — open the linked product record (${i.catalog_product_id})`
-                            : `${i.title || ''} — not linked; opens the Products tab searched by name so you can edit or link it`}
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: 'pointer', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: 'inherit' }}>
-                          {i.image_url && <img src={i.image_url} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />}
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: i.catalog_product_id ? 'underline dotted' : 'underline dashed', textUnderlineOffset: 3, textDecorationColor: i.catalog_product_id ? undefined : 'var(--sb-text-faint)' }}>{i.title || '(untitled)'}</span>
-                        </button>
-                      : <span className="sb-cell">{i.title || '(untitled)'}</span>}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {num != null && (
+                        <span title={total != null ? `Item ${num} of ${total} in this region` : ''} style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontSize: 10.5, fontWeight: 600, color: 'var(--sb-text-faint)', minWidth: 38, textAlign: 'right', paddingLeft: 18 }}>{num}{total != null ? `/${total}` : ''}</span>
+                      )}
+                      {onOpenProduct
+                        ? <button onClick={() => onOpenProduct(i.catalog_product_id, i.title || undefined)} className="sb-cell"
+                            title={i.catalog_product_id
+                              ? `${i.title || ''} — open the linked product record (${i.catalog_product_id})`
+                              : `${i.title || ''} — not linked; opens the Products tab searched by name so you can edit or link it`}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, cursor: 'pointer', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: 'inherit' }}>
+                            {i.image_url && <img src={i.image_url} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: i.catalog_product_id ? 'underline dotted' : 'underline dashed', textUnderlineOffset: 3, textDecorationColor: i.catalog_product_id ? undefined : 'var(--sb-text-faint)' }}>{i.title || '(untitled)'}</span>
+                          </button>
+                        : <span className="sb-cell">{i.title || '(untitled)'}</span>}
+                    </span>
                   </td>
                   <td><span className="sb-cell" style={{ color: i.catalog_product_id ? 'var(--sb-brand-strong)' : '#d97706' }}>{i.catalog_product_id ? 'yes' : 'NO'}</span></td>
                   <td>
@@ -665,6 +670,17 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               );
               }; // end renderLeaf
 
+              // Which "store" a row buys from — mirrors how the mobile app groups
+              // the cart by merchant: all store-lane items are one HealthScan-store
+              // group; each affiliate partner (by supplier, else the link host) is
+              // its own group so the buy destinations are obvious.
+              const merchantOf = (i: KitItem): { key: string; label: string; store: boolean } => {
+                if (kitItemBuyPath(i) === 'store' || i.lane === 'store') return { key: 'store', label: 'Our store · HealthScan (Shopify)', store: true };
+                const host = hostOf(i.affiliate_url || null) || '';
+                const label = i.supplier || host || 'Other partner';
+                return { key: `aff:${label.toLowerCase()}`, label, store: false };
+              };
+
               const nodes: any[] = [];
               tree.forEach((K, ki) => {
                 const kitOpen = expandedKits.has(K.slug);
@@ -709,7 +725,60 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                       </td>
                     </tr>
                   );
-                  if (regionOpen) R.rows.forEach((row) => nodes.push(renderLeaf(row)));
+                  if (regionOpen) {
+                    const itemRows = R.rows.filter((r: any) => r.t === 'item');
+                    const missingRows = R.rows.filter((r: any) => r.t === 'missing');
+                    const total = itemRows.length;
+                    // group items by merchant, preserving first-appearance order,
+                    // then float the store group to the top (like the app's store lane)
+                    const groups: { key: string; label: string; store: boolean; rows: any[] }[] = [];
+                    const gmap = new Map<string, (typeof groups)[number]>();
+                    for (const row of itemRows) {
+                      const mm = merchantOf(row.i);
+                      let g = gmap.get(mm.key);
+                      if (!g) { g = { key: mm.key, label: mm.label, store: mm.store, rows: [] }; gmap.set(mm.key, g); groups.push(g); }
+                      g.rows.push(row);
+                    }
+                    groups.sort((a, b) => (a.store === b.store ? 0 : a.store ? -1 : 1));
+                    let n = 0;
+                    for (const g of groups) {
+                      const storeCart = g.store ? storeCartPermalink(g.rows.map((r: any) => r.i.variant_id), market) : null;
+                      nodes.push(
+                        <tr key={`grp:${rKey}:${g.key}`} style={{ background: 'var(--sb-hover)' }}>
+                          <td colSpan={COLS} style={{ padding: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 10px 3px 58px', color: 'var(--sb-text-soft)' }}>
+                              {g.store ? <ShoppingCart size={12} style={{ flexShrink: 0, color: 'var(--sb-brand-strong)' }} /> : <ExternalLink size={12} style={{ flexShrink: 0 }} />}
+                              <span style={{ fontSize: 11.5, fontWeight: 600 }}>{g.label}</span>
+                              <span style={{ fontSize: 11, color: 'var(--sb-text-faint)' }}>{g.rows.length} item{g.rows.length !== 1 ? 's' : ''}</span>
+                              {storeCart && (
+                                <a href={storeCart} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px]"
+                                  title={`Add all ${g.rows.length} store items to one HealthScan Shopify cart — ${storeCart}`}
+                                  style={{ color: 'var(--sb-brand-strong)', display: 'inline-flex', alignItems: 'center', gap: 3, textDecoration: 'none' }}>
+                                  <ShoppingCart size={11} /> Buy all →
+                                </a>
+                              )}
+                              <span style={{ flex: 1 }} />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                      for (const row of g.rows) { n++; nodes.push(renderLeaf(row, n, total)); }
+                    }
+                    if (missingRows.length) {
+                      nodes.push(
+                        <tr key={`grp:${rKey}:missing`} style={{ background: 'rgba(245, 158, 11, 0.06)' }}>
+                          <td colSpan={COLS} style={{ padding: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 10px 3px 58px', color: '#d97706' }}>
+                              <Plus size={12} style={{ flexShrink: 0 }} />
+                              <span style={{ fontSize: 11.5, fontWeight: 600 }}>Suggested — not in this kit yet</span>
+                              <span style={{ fontSize: 11, color: 'var(--sb-text-faint)' }}>{missingRows.length}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                      missingRows.forEach((row: any) => nodes.push(renderLeaf(row)));
+                    }
+                  }
                 });
               });
               if (!tree.length) nodes.push(<tr key="empty"><td colSpan={COLS} style={{ textAlign: 'center', padding: 20, color: 'var(--sb-text-faint)' }}>No rows match.</td></tr>);
