@@ -56,6 +56,38 @@ const supplierLabel = (i: KitItem): string => {
   return hostOf(i.affiliate_url) || '—';
 };
 
+/* ── the "ready to sell" pipeline, per line ──────────────────────────────────
+ * Rolls the scattered stages (linked → buy path → kit live → region rule) into
+ * one verdict so you can see at a glance whether a customer can actually buy
+ * this line right now, and if not, which gate is failing.
+ *   ✓ Live   — sellable now (has a buy path, kit is live, not region-blocked)
+ *   Staged   — sellable but the kit is hidden (just flip the kit live)
+ *   No path  — not sellable yet (needs a Shopify variant or an affiliate link)
+ *   Blocked  — a region rule blocks it here                                    */
+type SellKey = 'live' | 'staged' | 'no-path' | 'blocked';
+interface SellVerdict { key: SellKey; label: string; short: string; color: string; stages: { label: string; ok: boolean; soft?: boolean }[] }
+function sellStatus(i: KitItem, kit: ProtocolKit | undefined, rule: RegionRule | undefined): SellVerdict {
+  const buyPath = kitItemBuyPath(i);
+  const sellable = !!buyPath || (i.lane === 'store' && !!kit?.partner_cart_url);
+  const live = !!kit?.is_live;
+  const blocked = rule?.action === 'block';
+  const buyLabel = buyPath === 'store' ? 'Has a Shopify variant (buy path)'
+    : buyPath === 'affiliate' ? 'Has an affiliate / partner link (buy path)'
+    : i.lane === 'store' && kit?.partner_cart_url ? 'Has a partner cart (buy path)'
+    : 'Has a buy path (Shopify variant or affiliate link)';
+  const stages = [
+    { label: 'Linked to a catalog product', ok: !!i.catalog_product_id, soft: true },
+    { label: buyLabel, ok: sellable },
+    { label: 'Kit is live', ok: live },
+    { label: 'Not blocked in this region', ok: !blocked },
+  ];
+  if (blocked) return { key: 'blocked', label: 'Blocked (region)', short: 'Blocked', color: '#dc2626', stages };
+  if (!sellable) return { key: 'no-path', label: 'No buy path', short: 'No path', color: '#d97706', stages };
+  if (!live) return { key: 'staged', label: 'Staged — kit hidden', short: 'Staged', color: '#0891b2', stages };
+  return { key: 'live', label: 'Live · ready to sell', short: '✓ Live', color: 'var(--sb-brand-strong)', stages };
+}
+const sellTip = (v: SellVerdict) => `Ready to sell? ${v.label}\n\n` + v.stages.map((s) => `${s.ok ? '✓' : '✗'} ${s.label}${s.soft && !s.ok ? ' (optional)' : ''}`).join('\n');
+
 /** tiny square thumbnail with a theme-safe placeholder */
 function Thumb({ src, size = 20 }: { src: string | null | undefined; size?: number }) {
   return src
@@ -347,13 +379,13 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
 
   const exportCsv = () => {
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const head = ['region', 'kit', 'protocol', 'product', 'lane', 'buy_path', 'published_shopify', 'linked_product_id', 'supplier', 'store_url', 'cost_usd', 'sell_local', 'currency', 'margin_pct_fx', 'commission_pct', 'affiliate_url', 'variant_id', 'kit_live', 'region_rule'];
+    const head = ['region', 'kit', 'protocol', 'product', 'sell_status', 'lane', 'buy_path', 'published_shopify', 'linked_product_id', 'supplier', 'store_url', 'cost_usd', 'sell_local', 'currency', 'margin_pct_fx', 'commission_pct', 'affiliate_url', 'variant_id', 'kit_live', 'region_rule'];
     const lines = rows.map((i) => {
       const kit = kitBySlugMarket.get(`${i.slug}:${i.market}`);
       const rule = ruleFor(i);
       // 'supplier' stays the RAW db field — blank means "supplier unknown, go fill it in",
       // which is the whole point of this export; the channel lives in buy_path/store_url.
-      return [i.market, i.slug, kit ? protoName.get(kit.protocol_id) || '' : '', i.title, i.lane, kitItemBuyPath(i) || 'none',
+      return [i.market, i.slug, kit ? protoName.get(kit.protocol_id) || '' : '', i.title, sellStatus(i, kit, rule).label, i.lane, kitItemBuyPath(i) || 'none',
         kitItemBuyPath(i) === 'store' ? 'yes' : (i.lane === 'store' ? (kit?.partner_cart_url ? 'partner' : 'NO') : ''), i.catalog_product_id || '',
         i.supplier || '', itemStoreUrl(i) || '', i.supplier_cost_usd ?? '', i.price_usd ?? '', i.currency || 'USD', itemMarginPct(i, fx) ?? '', i.commission_pct ?? '',
         i.affiliate_url || '', i.variant_id || '', kit?.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
@@ -362,7 +394,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     const missingLines = missingRows.map((m) => {
       const f = kitItemFieldsFromProduct(m.product);
       const rule = rules.find((r) => r.region === m.market && r.item_id === m.product.id);
-      return [m.market, m.slug, protoName.get(m.kit.protocol_id) || '', m.product.name, '', 'NOT_IN_KIT', '', m.product.id,
+      return [m.market, m.slug, protoName.get(m.kit.protocol_id) || '', m.product.name, 'not_in_kit', '', 'NOT_IN_KIT', '', m.product.id,
         '', '', '', m.product.price_usd ?? '', 'USD', '', '',
         f.affiliate_url || '', f.variant_id || '', m.kit.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
     });
@@ -494,7 +526,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               <SortTh k="margin" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }}>Margin</SortTh>
               <th style={{ width: 54 }}>Comm.</th>
               <th style={{ width: 60 }} title="Partner affiliate link — opens the partner storefront">Affil.</th>
-              <th style={{ width: 50 }}>Live</th>
+              <th style={{ width: 82 }} title="Ready to sell? — rolls up the whole pipeline: linked → buy path → kit live → not region-blocked. ✓ Live = a customer can buy it now · Staged = sellable but the kit is hidden · No path = needs a Shopify variant or affiliate link · Blocked = a region rule blocks it.">Sell status</th>
               <th style={{ width: 58 }}>Rule</th>
               <th style={{ width: 92 }} title="Buy = open the real customer purchase URL (Shopify cart for store, partner link for affiliate). Unlink = clear the product link. Trash = remove this kit item.">Actions</th>
             </tr>
@@ -551,7 +583,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                           </a>
                         : <span className="sb-cell">—</span>}
                     </td>
-                    <td><span className="sb-cell">{m.kit.is_live ? 'live' : 'hidden'}</span></td>
+                    <td><span className="sb-cell" style={{ color: 'var(--sb-text-faint)' }} title="Not in the kit yet — add it (← Add) to make it sellable">not in kit</span></td>
                     <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>
                     <td><span className="sb-cell" style={{ color: 'var(--sb-text-faint)' }} title="Add it to the kit first (← Add) to get buy / unlink / remove actions">—</span></td>
                   </tr>
@@ -638,7 +670,12 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         </a>
                       : <span className="sb-cell">—</span>}
                   </td>
-                  <td><span className="sb-cell">{kit?.is_live ? 'live' : 'hidden'}</span></td>
+                  <td>{(() => { const ss = sellStatus(i, kit, rule); return (
+                    <span className="sb-cell" title={sellTip(ss)}
+                      style={{ fontWeight: 600, color: ss.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 999, background: ss.color, flexShrink: 0 }} />{ss.short}
+                    </span>
+                  ); })()}</td>
                   <td><span className="sb-cell" title={rule?.reason || ''} style={rule ? { color: rule.action === 'block' ? '#dc2626' : '#d97706', fontWeight: 600 } : undefined}>{rule ? rule.action : '—'}</span></td>
                   <td>
                     {(() => {
@@ -717,6 +754,20 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                           <span style={{ fontWeight: 500 }}>{REGION_FLAG[market]} {market}</span>
                           <span style={{ flexShrink: 0, borderRadius: 999, padding: '0 7px', fontSize: 10, fontWeight: 600, color: R.kit?.is_live ? 'var(--sb-brand-strong)' : 'var(--sb-text-faint)', background: R.kit?.is_live ? 'var(--sb-brand-soft)' : 'var(--sb-hover)' }}>{R.kit?.is_live ? 'live' : 'hidden'}</span>
                           <span style={{ color: 'var(--sb-text-faint)', fontSize: 11.5 }}>{R.rows.length} item{R.rows.length !== 1 ? 's' : ''}</span>
+                          {(() => {
+                            const items = R.rows.filter((r: any) => r.t === 'item');
+                            if (!items.length) return null;
+                            const c: Record<SellKey, number> = { live: 0, staged: 0, 'no-path': 0, blocked: 0 };
+                            items.forEach((r: any) => { c[sellStatus(r.i, R.kit, ruleFor(r.i)).key]++; });
+                            return (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, flexShrink: 0 }}>
+                                <span style={{ color: c.live === items.length ? 'var(--sb-brand-strong)' : 'var(--sb-text-soft)', fontWeight: 600 }} title="Lines a customer can buy right now">{c.live}/{items.length} ready to sell</span>
+                                {c.staged > 0 && <span style={{ color: '#0891b2' }} title="Sellable but the kit is hidden">{c.staged} staged</span>}
+                                {c['no-path'] > 0 && <span style={{ color: '#d97706' }} title="No buy path yet (needs a Shopify variant or affiliate link)">{c['no-path']} no-path</span>}
+                                {c.blocked > 0 && <span style={{ color: '#dc2626' }} title="Blocked by a region rule">{c.blocked} blocked</span>}
+                              </span>
+                            );
+                          })()}
                           {(() => { const ids = R.rows.filter((r) => r.t === 'item').map((r: any) => r.i.id); const allSel = ids.length > 0 && ids.every((id) => selected.has(id)); return ids.length > 0 && (
                             <button onClick={(e) => { e.stopPropagation(); selectMany(ids, !allSel); }} className="text-[11px]" style={{ color: 'var(--sb-brand-strong)', background: 'none', border: 'none', cursor: 'pointer' }}>{allSel ? 'deselect' : 'select all'}</button>
                           ); })()}
