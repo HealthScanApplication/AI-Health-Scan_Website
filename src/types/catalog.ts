@@ -385,6 +385,9 @@ export interface CatalogProduct {
   name?: string;
   brand?: string;
   category?: string;
+  product_kind?: string;
+  /** Default action verb when used as a protocol step (Apply/Take/Drink/…). DEV-491. */
+  verb?: string;
   barcode?: string;
   ingredients_text?: string;
   allergen_info?: string;
