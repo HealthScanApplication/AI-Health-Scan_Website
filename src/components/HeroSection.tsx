@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { UniversalWaitlist } from "./UniversalWaitlist";
 import { ReferralInvitationBanner } from "./ReferralInvitationBanner";
+import { FlutedGlassBackground } from "./FlutedGlassBackground";
 import { projectId, publicAnonKey } from "../utils/supabase/info";
 import { APP_STORE_URL } from "../config/appLinks";
 import heroPoster from "../assets/5f38caf68dd6b8af22362056b70854ea4cf4b933.png";
@@ -27,7 +28,7 @@ function AppleMark({ size = 15 }: { size?: number }) {
 // Strava brandmark (in the HealthScan ochre accent) for the integrations strip.
 function StravaMark({ size = 16 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="#9A6A2F" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#B05A36" aria-hidden="true">
       <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.172" />
     </svg>
   );
@@ -37,7 +38,7 @@ function StravaMark({ size = 16 }: { size?: number }) {
 function OuraRing({ size = 15 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <circle cx="12" cy="12" r="8" fill="none" stroke="#9A6A2F" strokeWidth="3.4" />
+      <circle cx="12" cy="12" r="8" fill="none" stroke="#B05A36" strokeWidth="3.4" />
     </svg>
   );
 }
@@ -45,7 +46,7 @@ function OuraRing({ size = 15 }: { size?: number }) {
 // Apple Health heart (in the HealthScan ochre accent) for the integrations strip.
 function AppleHealthMark({ size = 15 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="#9A6A2F" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#B05A36" aria-hidden="true">
       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
     </svg>
   );
@@ -81,6 +82,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
   const [fadingOut, setFadingOut] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
   const [wordVisible, setWordVisible] = useState(true);
+  const [posterLoaded, setPosterLoaded] = useState(false);
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -94,8 +96,8 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
     const slow = conn?.saveData === true || /(^|-)2g$/.test(eff) || (typeof conn?.downlink === "number" && conn.downlink < 1.5);
     let videoTimer: ReturnType<typeof setTimeout> | undefined;
     if (!reduce && !conn?.saveData && !(window.matchMedia("(max-width: 600px)").matches && slow) && !/(^|-)2g$/.test(eff)) {
-      // Let the poster image paint + the page settle before we fetch/stream video.
-      videoTimer = setTimeout(() => setAllowVideo(true), 900);
+      // Fetch the produce clips shortly after paint — they feed the fluted-glass shader.
+      videoTimer = setTimeout(() => setAllowVideo(true), 600);
     }
     return () => {
       narrowMq.removeEventListener?.("change", applyNarrow);
@@ -152,29 +154,35 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
       id="hero-section"
       style={{ position: "relative", minHeight: "100svh", background: ed.paper, overflow: "hidden" }}
     >
-      {/* Cover stock — faded photo under a heavy paper tint so it reads as printed paper */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 0 }} aria-hidden="true">
+      {/* Cover stock — the hero image rendered through a WebGL fluted-glass shader
+          (a port of Function Health's "fluting" hero). The plain <img> sits behind
+          as a fallback for no-WebGL / reduced-motion. */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0, background: ed.paperAlt }} aria-hidden="true">
         <img
           src={heroPoster}
           alt=""
           {...({ fetchpriority: "high" } as any)}
           decoding="async"
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "saturate(0.9) contrast(1.02)" }}
+          ref={(el) => { if (el?.complete) setPosterLoaded(true); }}
+          onLoad={() => setPosterLoaded(true)}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "saturate(0.95) contrast(1.03)", opacity: posterLoaded ? 1 : 0, transition: "opacity 1.1s ease" }}
         />
-        {allowVideo && backgroundVideos.length > 0 && (
-          <video
-            key={backgroundVideos[currentVideoIndex]}
-            src={backgroundVideos[currentVideoIndex]}
-            autoPlay
-            muted
-            loop
-            playsInline
-            aria-hidden="true"
-            tabIndex={-1}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "saturate(0.9)", opacity: fadingOut ? 0 : 1, transition: "opacity 0.8s ease-in-out" }}
-          />
+        {!reduceMotion && (
+          <FlutedGlassBackground videos={backgroundVideos} poster={heroPoster} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }} />
         )}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(244,241,234,0.78) 0%, rgba(244,241,234,0.7) 55%, rgba(244,241,234,0.86) 100%)" }} />
+
+        {/* Warm tint — very subtle soft-light warmth so the fluted video sits in
+            the editorial palette without recoloring the produce. */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(150deg, rgba(197,106,58,0.16) 0%, rgba(224,169,106,0.06) 55%, rgba(176,90,54,0.14) 100%)", mixBlendMode: "soft-light" }} />
+
+        {/* Paper tint — lighter up top so the fluted glass reads; heavier toward
+            the lower-left where the headline sits, so the dark type stays legible */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(158deg, rgba(250,245,236,0.30) 0%, rgba(250,245,236,0.40) 40%, rgba(250,245,236,0.72) 78%, rgba(250,245,236,0.88) 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(250,245,236,0.55) 0%, rgba(250,245,236,0.12) 42%, rgba(250,245,236,0) 70%)" }} />
+        {/* warm vignette for depth — darker toward the edges/corners */}
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(110% 100% at 50% 42%, rgba(40,24,14,0) 46%, rgba(40,24,14,0.14) 78%, rgba(30,17,9,0.34) 100%)" }} />
+        {/* fine grain */}
+        <div style={{ position: "absolute", inset: 0, opacity: 0.05, mixBlendMode: "multiply", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")", backgroundSize: "180px 180px" }} />
       </div>
 
       {/* Cover content on the grid */}

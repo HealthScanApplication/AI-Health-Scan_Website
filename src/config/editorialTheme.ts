@@ -4,13 +4,14 @@
  * a strict 12-col grid. All applied via inline styles (no Tailwind JIT).
  */
 export const ed = {
-  paper: "#F4F1EA",
-  paperAlt: "#ECE7DB",
+  // Warmed toward Function Health's palette — beige paper + terracotta accent.
+  paper: "#FAF5EC",
+  paperAlt: "#F1EBDD",
   ink: "#16140F",
   inkSoft: "rgba(22,20,15,0.62)",
   inkFaint: "rgba(22,20,15,0.30)",
   hair: "rgba(22,20,15,0.14)",
-  accent: "#9A6A2F",
+  accent: "#B05A36",
   // single inverted dark spread
   dark: "#16140F",
   onDark: "#F4F1EA",
