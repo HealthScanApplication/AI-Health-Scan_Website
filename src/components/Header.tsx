@@ -315,8 +315,11 @@ export function Header({
   const navStrong = overHero ? '#FFFBF5' : '#16140F';
   const navHover = overHero ? '#FFFFFF' : oura.forest;
   const capsule = overHero
-    ? { background: 'rgba(24,18,12,0.24)', backdropFilter: 'blur(26px)', WebkitBackdropFilter: 'blur(26px)', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 12px 40px -20px rgba(0,0,0,0.55)' }
+    // pure, neutral frosted blur — no dark tone
+    ? { background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(30px) saturate(1.3)', WebkitBackdropFilter: 'blur(30px) saturate(1.3)', border: '1px solid rgba(255,255,255,0.24)', boxShadow: '0 12px 40px -24px rgba(0,0,0,0.28)' }
     : { background: 'rgba(244,241,234,0.92)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(22,20,15,0.14)', boxShadow: '0 10px 34px -16px rgba(22,20,15,0.28)' };
+  // Try / Subscribe / Refer — solid white pills with dark text
+  const ctaWhite: React.CSSProperties = { background: '#FFFFFF', color: '#16140F', borderColor: '#FFFFFF', textDecorationColor: 'transparent', boxShadow: '0 2px 12px -5px rgba(0,0,0,0.35)' };
 
   return (
     <>
@@ -447,7 +450,7 @@ export function Header({
                       className="flex items-center gap-2 h-auto p-2 hover:bg-gray-100"
                     >
                       <div className="hidden lg:flex flex-col items-end">
-                        <span className="text-sm font-medium text-gray-900 text-right">
+                        <span className="text-sm font-medium text-right" style={{ color: navStrong, transition: 'color 350ms ease' }}>
                           {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
                         </span>
                       </div>
@@ -497,7 +500,7 @@ export function Header({
                   
                   {/* Refer Friends — unified outlined CTA */}
                   <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleReferralModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 16px' }}>
+                    <button onClick={handleReferralModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 16px', ...ctaWhite }}>
                       <Share2 className="w-4 h-4" />
                       Refer
                     </button>
@@ -516,7 +519,7 @@ export function Header({
 
                   {/* Subscribe — unified outlined CTA */}
                   <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px', ...(overHero ? { color: '#FFFBF5', borderColor: 'rgba(255,255,255,0.55)', textDecorationColor: 'rgba(255,255,255,0.55)' } : {}) }}>
+                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px', ...ctaWhite }}>
                       Subscribe
                     </button>
                   </div>
