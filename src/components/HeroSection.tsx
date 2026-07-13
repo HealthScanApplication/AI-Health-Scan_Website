@@ -181,6 +181,8 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(250,245,236,0.55) 0%, rgba(250,245,236,0.12) 42%, rgba(250,245,236,0) 70%)" }} />
         {/* warm vignette for depth — darker toward the edges/corners */}
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(110% 100% at 50% 42%, rgba(40,24,14,0) 46%, rgba(40,24,14,0.14) 78%, rgba(30,17,9,0.34) 100%)" }} />
+        {/* terracotta pool at the bottom-left — grounds the white headline */}
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(70% 70% at 0% 100%, rgba(176,90,54,0.72) 0%, rgba(176,90,54,0.38) 40%, rgba(176,90,54,0) 74%)" }} />
         {/* fine grain */}
         <div style={{ position: "absolute", inset: 0, opacity: 0.05, mixBlendMode: "multiply", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")", backgroundSize: "180px 180px" }} />
       </div>
@@ -204,37 +206,37 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
         {/* Top: issue line + folio */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: `1px solid ${ed.hair}`, paddingTop: 14 }}>
           <p style={overline}>Health · Beauty · Fitness</p>
-          <p style={folioStyle}>Out now on iOS</p>
+          <p style={folioStyle}>Out now on iOS · Android coming soon</p>
         </div>
 
         <div style={{ flex: 1, minHeight: "clamp(40px, 8vh, 120px)" }} />
 
         {/* Cover line + deck, lower-left */}
         <div style={{ width: "100%" }}>
-          <h1 style={coverStyle}>
+          <h1 style={{ ...coverStyle, color: "#FFFFFF", textShadow: "0 4px 24px rgba(0,0,0,0.38)" }}>
             <span style={{ display: "block" }}>Build a routine</span>
             <span style={{ display: "block" }}>
               for{" "}
               <span
                 style={{
                   fontStyle: "italic",
-                  color: ed.accent,
+                  color: ed.ink,
+                  textShadow: "none",
                   transition: reduceMotion ? undefined : "opacity 320ms ease",
                   opacity: wordVisible ? 1 : 0,
                 }}
               >
                 {GOAL_WORDS[wordIndex]}
               </span>
-              .
             </span>
           </h1>
-          <p style={{ ...deckStyle, marginTop: "clamp(20px, 3vw, 36px)", maxWidth: "34ch" }}>
+          <p style={{ ...deckStyle, color: ed.ink, marginTop: "clamp(20px, 3vw, 36px)", maxWidth: "34ch" }}>
             Daily to-dos, activity tracking, and a food scanner — set for whatever you want to achieve.
           </p>
 
           {/* Integrations — syncs with Apple Health, Ōura Ring & Strava */}
           <div style={{ marginTop: "clamp(22px, 3vw, 34px)", display: "flex", alignItems: "center", gap: "10px 16px", flexWrap: "wrap" }}>
-            <span style={{ ...overline, color: ed.inkFaint }}>Syncs</span>
+            <span style={{ ...overline, color: ed.inkSoft }}>Syncs</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
               <AppleHealthMark size={15} />
               <span style={syncName}>Apple Health</span>
@@ -255,7 +257,6 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
         {/* Bottom: waitlist (left) + cover credit (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 28, marginTop: "clamp(44px, 7vh, 88px)" }}>
           <div>
-            <p style={{ ...overline, color: ed.accent, marginBottom: 16 }}>Out now on iOS — Android coming soon</p>
             <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
               <a
                 href={APP_STORE_URL || undefined}
@@ -266,7 +267,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
               >
                 <AppleMark />Try&nbsp;→
               </a>
-              <span style={{ fontFamily: DISPLAY, fontStyle: "italic", fontSize: 17, color: ed.inkSoft }}>or</span>
+              <span style={{ fontFamily: GRO, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", fontSize: 11, color: "rgba(255,255,255,0.75)" }}>or</span>
               <UniversalWaitlist variant="editorial" submitLabel="Subscribe →" placeholder="you@email.com" />
             </div>
           </div>

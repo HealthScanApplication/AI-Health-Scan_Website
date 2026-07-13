@@ -56,9 +56,9 @@ export function UniversalWaitlist({
     fontSize: 11,
     fontWeight: 600,
     letterSpacing: '0.04em',
-    color: '#16140F',
+    color: '#FFFFFF',
     background: 'transparent',
-    border: '1px solid #16140F',
+    border: '1px solid #FFFFFF',
     borderRight: 'none',
     borderRadius: '2px 0 0 2px',
     padding: '0 14px',
@@ -72,8 +72,8 @@ export function UniversalWaitlist({
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
     color: '#16140F',
-    background: 'transparent',
-    border: '1px solid #16140F',
+    background: '#FFFFFF',
+    border: '1px solid #FFFFFF',
     borderRadius: '0 2px 2px 0',
     height: 42,
     boxSizing: 'border-box',
@@ -85,6 +85,7 @@ export function UniversalWaitlist({
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     boxShadow: 'none',
+    textShadow: 'none',
     transition: 'background-color 200ms ease, color 200ms ease',
   };
   const heroInputStyle = {
@@ -470,8 +471,8 @@ export function UniversalWaitlist({
           <Button
             type="submit"
             disabled={isLoading}
-            onMouseEnter={isEditorial ? (e) => { e.currentTarget.style.background = '#16140F'; e.currentTarget.style.color = '#F4F1EA'; } : undefined}
-            onMouseLeave={isEditorial ? (e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#16140F'; } : undefined}
+            onMouseEnter={isEditorial ? (e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.textShadow = '0 1px 4px rgba(0,0,0,0.4)'; } : undefined}
+            onMouseLeave={isEditorial ? (e) => { e.currentTarget.style.background = '#FFFFFF'; e.currentTarget.style.color = '#16140F'; e.currentTarget.style.textShadow = 'none'; } : undefined}
             style={isEditorial ? editorialButtonStyle : isHero ? heroButtonStyle : undefined}
             className={isEditorial
               ? "ed-cta-sub"
