@@ -203,7 +203,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
       >
         {/* Top: issue line + folio */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: `1px solid ${ed.hair}`, paddingTop: 14 }}>
-          <p style={overline}>HealthScan — Health · Beauty · Fitness</p>
+          <p style={overline}>Health · Beauty · Fitness</p>
           <p style={folioStyle}>Out now on iOS</p>
         </div>
 

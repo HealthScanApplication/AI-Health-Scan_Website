@@ -311,9 +311,10 @@ export function Header({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
   const overHero = currentPage === 'home' && atTop;
-  const navText = overHero ? 'rgba(255,251,245,0.90)' : oura.body;
-  const navStrong = overHero ? '#FFFBF5' : '#16140F';
-  const navHover = overHero ? '#FFFFFF' : oura.forest;
+  // Dark, elegant editorial text everywhere (readable on the light frosted blur).
+  const navText = oura.body;
+  const navStrong = '#16140F';
+  const navHover = oura.forest;
   const capsule = overHero
     // pure, neutral frosted blur — no dark tone
     ? { background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(30px) saturate(1.3)', WebkitBackdropFilter: 'blur(30px) saturate(1.3)', border: '1px solid rgba(255,255,255,0.24)', boxShadow: '0 12px 40px -24px rgba(0,0,0,0.28)' }
@@ -363,7 +364,7 @@ export function Header({
                       color: navText,
                       fontWeight: 500,
                       borderRadius: 999,
-                      border: `1px solid ${overHero ? 'rgba(255,255,255,0.35)' : oura.hairline}`,
+                      border: `1px solid ${oura.hairline}`,
                       letterSpacing: '0.08em',
                       transition: 'color 350ms ease, border-color 350ms ease',
                     }}
@@ -379,7 +380,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('routines')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.13em', color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
@@ -388,7 +389,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('features')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.13em', color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
@@ -397,7 +398,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('how-it-works')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.13em', color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
@@ -406,7 +407,7 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('faq')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.13em', color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
@@ -519,7 +520,7 @@ export function Header({
 
                   {/* Subscribe — unified outlined CTA */}
                   <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px', ...ctaWhite }}>
+                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px', background: 'transparent', color: navText, borderColor: 'rgba(22,20,15,0.5)' }}>
                       Subscribe
                     </button>
                   </div>

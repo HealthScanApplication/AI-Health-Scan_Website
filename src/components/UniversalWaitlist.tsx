@@ -72,7 +72,7 @@ export function UniversalWaitlist({
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
     color: '#16140F',
-    background: '#FFFFFF',
+    background: 'transparent',
     border: '1px solid #16140F',
     borderRadius: '0 2px 2px 0',
     height: 42,
@@ -471,7 +471,7 @@ export function UniversalWaitlist({
             type="submit"
             disabled={isLoading}
             onMouseEnter={isEditorial ? (e) => { e.currentTarget.style.background = '#16140F'; e.currentTarget.style.color = '#F4F1EA'; } : undefined}
-            onMouseLeave={isEditorial ? (e) => { e.currentTarget.style.background = '#FFFFFF'; e.currentTarget.style.color = '#16140F'; } : undefined}
+            onMouseLeave={isEditorial ? (e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#16140F'; } : undefined}
             style={isEditorial ? editorialButtonStyle : isHero ? heroButtonStyle : undefined}
             className={isEditorial
               ? "ed-cta-sub"
