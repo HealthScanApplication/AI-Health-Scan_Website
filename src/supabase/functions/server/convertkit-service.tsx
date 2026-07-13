@@ -1,4 +1,4 @@
-// ConvertKit API Service for HealthScan
+// ConvertKit API Service for ROUTINE³
 // Handles email subscription integration with ConvertKit
 
 interface ConvertKitSubscriber {

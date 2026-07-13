@@ -42,7 +42,7 @@ export function clearAllAuthTokens(): void {
     localStorage.removeItem('supabase.auth.token');
     sessionStorage.removeItem('supabase.auth.token');
     
-    // Clear custom HealthScan tokens
+    // Clear custom ROUTINE³ tokens
     localStorage.removeItem('healthscan-supabase-auth-token');
     localStorage.removeItem('healthscan_auth_token');
     localStorage.removeItem('healthscan_refresh_token');

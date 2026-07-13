@@ -28,7 +28,7 @@ export function useUrlParameterHandling({ setCurrentPage }: UseUrlParameterHandl
               <div className="space-y-1">
                 <p className="font-semibold">Email confirmed!</p>
                 {data.position && <p className="text-sm opacity-90">You're <strong>#{data.position}</strong> in the queue</p>}
-                <p className="text-xs opacity-75">Welcome to HealthScan</p>
+                <p className="text-xs opacity-75">Welcome to ROUTINE³</p>
               </div>,
               { id: 'confirm-email', duration: 8000 }
             );
@@ -80,7 +80,7 @@ export function useUrlParameterHandling({ setCurrentPage }: UseUrlParameterHandl
             
             if (!error && data.session) {
               console.log('✅ Email verification successful - user session established');
-              toast.success('🎉 Email verified successfully! Welcome to HealthScan!', {
+              toast.success('🎉 Email verified successfully! Welcome to ROUTINE³!', {
                 duration: 5000
               });
               
@@ -117,7 +117,7 @@ export function useUrlParameterHandling({ setCurrentPage }: UseUrlParameterHandl
         
         if (!verifyError) {
           console.log('✅ Email verification successful via token hash');
-          toast.success('🎉 Email verified successfully! Welcome to HealthScan!', {
+          toast.success('🎉 Email verified successfully! Welcome to ROUTINE³!', {
             duration: 5000
           });
           

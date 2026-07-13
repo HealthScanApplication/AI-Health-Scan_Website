@@ -4,7 +4,7 @@ import { projectId, publicAnonKey } from '../utils/supabase/info';
 // Base API configuration - Use Supabase Edge Functions
 const HEALTHSCAN_API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2`;
 
-// Interface definitions for HealthScan API responses
+// Interface definitions for ROUTINE³ API responses
 export interface HealthScanApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -140,7 +140,7 @@ class HealthScanApiClient {
     const url = `${this.baseUrl}${endpoint}`;
     
     try {
-      console.log(`🔗 HealthScan API Request: ${options.method || 'GET'} ${url}`);
+      console.log(`🔗 ROUTINE³ API Request: ${options.method || 'GET'} ${url}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -158,7 +158,7 @@ class HealthScanApiClient {
 
       // Handle 404 specifically as a graceful failure
       if (response.status === 404) {
-        console.warn(`⚠️ HealthScan API Endpoint Not Found: ${endpoint}`);
+        console.warn(`⚠️ ROUTINE³ API Endpoint Not Found: ${endpoint}`);
         return {
           success: false,
           error: `Endpoint not available: ${endpoint}`,
@@ -176,7 +176,7 @@ class HealthScanApiClient {
       } catch (jsonError) {
         // Handle cases where response is not JSON
         if (response.ok) {
-          console.warn(`⚠️ HealthScan API returned non-JSON response for ${endpoint}`);
+          console.warn(`⚠️ ROUTINE³ API returned non-JSON response for ${endpoint}`);
           return {
             success: true,
             data: [] as T,
@@ -191,11 +191,11 @@ class HealthScanApiClient {
       }
 
       if (!response.ok) {
-        console.error(`❌ HealthScan API Error: ${response.status}`, data);
+        console.error(`❌ ROUTINE³ API Error: ${response.status}`, data);
         throw new Error(data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      console.log(`✅ HealthScan API Success: ${endpoint}`, data);
+      console.log(`✅ ROUTINE³ API Success: ${endpoint}`, data);
       return data || {
         success: true,
         data: [] as T,
@@ -206,10 +206,10 @@ class HealthScanApiClient {
       };
 
     } catch (error: any) {
-      console.error(`❌ HealthScan API Request Failed: ${endpoint}`, error);
+      console.error(`❌ ROUTINE³ API Request Failed: ${endpoint}`, error);
       
       if (error.name === 'AbortError') {
-        throw new Error('Request timed out - HealthScan API may be slow or unavailable');
+        throw new Error('Request timed out - ROUTINE³ API may be slow or unavailable');
       } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
         throw new Error('Network error - please check your internet connection');
       }
@@ -510,7 +510,7 @@ export const healthScanApiUtils = {
   // Show toast notifications for API operations
   showApiSuccess: (message: string) => {
     toast.success(`🌱 ${message}`, {
-      description: 'HealthScan API operation completed successfully'
+      description: 'ROUTINE³ API operation completed successfully'
     });
   },
 
@@ -523,7 +523,7 @@ export const healthScanApiUtils = {
 
   showApiWarning: (message: string) => {
     toast.warning(`⚠️ ${message}`, {
-      description: 'Please check the HealthScan API status'
+      description: 'Please check the ROUTINE³ API status'
     });
   },
 
@@ -564,15 +564,15 @@ export const healthScanApiUtils = {
     try {
       const response = await healthScanApi.healthCheck();
       if (healthScanApiUtils.isApiSuccess(response)) {
-        return { online: true, message: 'HealthScan API is online' };
+        return { online: true, message: 'ROUTINE³ API is online' };
       }
       
       // Handle 404 for health endpoint as "online but limited"
       if (response.error?.includes('Endpoint not available')) {
-        return { online: true, message: 'HealthScan API is online (health endpoint not available)' };
+        return { online: true, message: 'ROUTINE³ API is online (health endpoint not available)' };
       }
       
-      return { online: false, message: 'HealthScan API responded with an error' };
+      return { online: false, message: 'ROUTINE³ API responded with an error' };
     } catch (error) {
       const errorMsg = healthScanApiUtils.formatApiError(error);
       
@@ -580,13 +580,13 @@ export const healthScanApiUtils = {
       if (errorMsg.includes('404') || errorMsg.includes('Endpoint not available')) {
         return { 
           online: true, 
-          message: 'HealthScan API is online (health endpoint not available)' 
+          message: 'ROUTINE³ API is online (health endpoint not available)' 
         };
       }
       
       return { 
         online: false, 
-        message: `HealthScan API is unreachable: ${errorMsg}` 
+        message: `ROUTINE³ API is unreachable: ${errorMsg}`
       };
     }
   }

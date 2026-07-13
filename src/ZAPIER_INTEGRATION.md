@@ -1,11 +1,11 @@
-# HealthScan Zapier Integration
+# ROUTINE³ Zapier Integration
 
-Connect HealthScan with 6,000+ apps through Zapier to automate your workflows.
+Connect ROUTINE³ with 6,000+ apps through Zapier to automate your workflows.
 
 ## 🚀 Quick Start
 
 1. **Access Admin Dashboard**
-   - Log in to HealthScan as an admin user
+   - Log in to ROUTINE³ as an admin user
    - Navigate to Admin Dashboard → Zapier tab
 
 2. **Get Your Zapier Webhook URL**
@@ -14,8 +14,8 @@ Connect HealthScan with 6,000+ apps through Zapier to automate your workflows.
    - Select "Catch Hook" event
    - Copy the provided webhook URL
 
-3. **Configure HealthScan Integration**
-   - Click "Add Integration" in HealthScan
+3. **Configure ROUTINE³ Integration**
+   - Click "Add Integration" in ROUTINE³
    - Paste your webhook URL
    - Select which events to trigger
    - Save and test the connection
@@ -181,7 +181,7 @@ zapierWebhooks.referralMilestone(email, milestoneType, count);
 
 **Webhook not receiving data?**
 - Verify webhook URL starts with `https://hooks.zapier.com`
-- Check that integration is enabled in HealthScan
+- Check that integration is enabled in ROUTINE³
 - Ensure correct triggers are selected
 - Test connection using built-in test button
 
@@ -205,7 +205,7 @@ zapierWebhooks.referralMilestone(email, milestoneType, count);
 
 For help with Zapier integration:
 
-1. Check the Setup Guide in HealthScan admin dashboard
+1. Check the Setup Guide in ROUTINE³ admin dashboard
 2. Review webhook activity logs for errors
 3. Test connections using built-in tools
 4. Contact support for custom webhook requirements

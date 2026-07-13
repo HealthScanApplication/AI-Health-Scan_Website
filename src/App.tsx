@@ -37,7 +37,7 @@ function LoadingScreen() {
       <div className="text-center">
         <div className="w-16 h-16 border-4 border-[var(--healthscan-green)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
         <h2 className="text-xl font-semibold text-gray-800">
-          Loading HealthScan...
+          Loading ROUTINE³...
         </h2>
         <p className="text-gray-600 mt-2">
           Preparing your health dashboard
@@ -113,7 +113,7 @@ function AppContent() {
         // Verbose dev banner is opt-in — set localStorage 'hs-debug'='1' to see it.
         // Keeps the console clean by default (the banner is reference text, not signal).
         if (typeof window !== "undefined" && localStorage.getItem("hs-debug") === "1") {
-          console.group("🔧 HealthScan Development Tools");
+          console.group("🔧 ROUTINE³ Development Tools");
           console.log('🎨 Ctrl+Shift+T toggles the theme manager (admin only)');
           console.log('🔍 "?page=login-diagnostic" opens the login diagnostic tool');
           console.log('📧 "Invalid login credentials" / "User already registered" are expected auth responses, not errors');

@@ -1,15 +1,15 @@
-# HealthScan 🌱 - Complete Marketing Platform & Admin Dashboard
+# ROUTINE³ 🌱 - Complete Marketing Platform & Admin Dashboard
 
 [![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://healthscan.live)
 [![Real API Integration](https://img.shields.io/badge/APIs-16%2B%20Real%20Sources-blue.svg)](#api-integrations)
 [![Supabase Powered](https://img.shields.io/badge/Database-Supabase-orange.svg)](#backend-architecture)
 [![Email & Referral System](https://img.shields.io/badge/Email%20%26%20Referral-ConvertKit%20%2B%20Custom-purple.svg)](#email-signup-to-referral-flow)
 
-> **A high-converting marketing landing page and comprehensive admin dashboard for HealthScan, a mobile app that may reveal potential pollutants in food products through predictive analysis. Features complete email capture, referral system, and production-ready integrations.**
+> **A high-converting marketing landing page and comprehensive admin dashboard for ROUTINE³, a mobile app that may reveal potential pollutants in food products through predictive analysis. Features complete email capture, referral system, and production-ready integrations.**
 
 ## 🚀 Project Overview
 
-HealthScan is a production-ready web application featuring:
+ROUTINE³ is a production-ready web application featuring:
 - **Marketing Landing Page**: High-converting design with email capture, referral leaderboards, countdown timers
 - **Admin Dashboard**: Complete CRUD interface for managing nutrients, pollutants, ingredients, products, scans, meals, and parasites
 - **Real API Integration**: 16+ authentic data sources including USDA, FDA, EPA, EFSA, and OpenFood Facts
@@ -752,7 +752,7 @@ HealthScanAuthDebug.resetPassword('user@example.com')
 
 ## 📄 License
 
-This project is proprietary software for HealthScan. All rights reserved.
+This project is proprietary software for ROUTINE³. All rights reserved.
 
 ## 📞 Support
 

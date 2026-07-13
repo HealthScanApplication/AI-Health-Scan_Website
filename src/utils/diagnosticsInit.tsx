@@ -1,6 +1,6 @@
 export async function initializeDiagnostics() {
   try {
-    console.log('🔍 HealthScan diagnostics system initialized');
+    console.log('🔍 ROUTINE³ diagnostics system initialized');
     console.log('🔍 Manual diagnostics available via window.healthScanDebug');
     console.log('🔍 No automatic connectivity checks will be performed during app startup');
     

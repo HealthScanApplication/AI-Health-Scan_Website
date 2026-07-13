@@ -483,7 +483,7 @@ export function ApiMigrationUtility({ accessToken }: ApiMigrationUtilityProps) {
                   <XCircle className="h-5 w-5 text-red-600" />
                 )}
                 <div>
-                  <p className="font-medium">HealthScan API</p>
+                  <p className="font-medium">ROUTINE³ API</p>
                   <p className="text-sm text-gray-500">
                     {systemStatus.apiConnected ? 'Connected' : 'Needs Setup'}
                   </p>
@@ -631,7 +631,7 @@ export function ApiMigrationUtility({ accessToken }: ApiMigrationUtilityProps) {
                   <div>
                     <h4 className="font-medium">System Health Check</h4>
                     <p className="text-sm text-gray-600">
-                      Verifies connectivity to both Supabase and the HealthScan API to ensure migration can proceed safely.
+                      Verifies connectivity to both Supabase and the ROUTINE³ API to ensure migration can proceed safely.
                     </p>
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 /*
- * Oura-inspired design tokens for the HealthScan site.
+ * Oura-inspired design tokens for the ROUTINE³ site.
  *
  * The project ships a PREBUILT static index.css with NO Tailwind JIT, so custom
  * values must be applied via inline style objects (these tokens), not new utility

@@ -39,7 +39,7 @@ export function DatabaseSetupHelper() {
   const [loading, setLoading] = useState(false);
   const [setupInProgress, setSetupInProgress] = useState(false);
 
-  const sqlScript = `-- HealthScan Database Setup - Run this SQL in Supabase Dashboard → SQL Editor:
+  const sqlScript = `-- ROUTINE³ Database Setup - Run this SQL in Supabase Dashboard → SQL Editor:
 
 -- Step 1: Create the KV store table
 CREATE TABLE IF NOT EXISTS kv_store_ed0fe4c2 (
@@ -172,7 +172,7 @@ CREATE TRIGGER update_kv_store_ed0fe4c2_updated_at
             <div>
               <CardTitle>Database Setup Status</CardTitle>
               <p className="text-sm text-gray-600 mt-1">
-                HealthScan KV Store Configuration
+                ROUTINE³ KV Store Configuration
               </p>
             </div>
           </div>

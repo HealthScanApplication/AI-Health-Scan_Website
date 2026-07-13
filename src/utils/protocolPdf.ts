@@ -259,7 +259,7 @@ export async function buildProtocolPdf(opts: { accessToken: string; protocol: Pd
   for (let p = 1; p <= n; p++) {
     doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120);
     doc.text(`${protocol.name} — page ${p} of ${n}`, M, PH - 6);
-    doc.text('HealthScan', PW - M, PH - 6, { align: 'right' });
+    doc.text('ROUTINE³', PW - M, PH - 6, { align: 'right' });
     doc.setTextColor(0);
   }
 

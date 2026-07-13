@@ -801,7 +801,7 @@ const elementsFields: FieldConfig[] = [
   // --- Age Ranges & DRV (rich structure: EU + USA deficiency/optimal/excess by age × gender) ---
   {
     key: "age_ranges",
-    label: "Age Ranges (EU / USA / HealthScan)",
+    label: "Age Ranges (EU / USA / ROUTINE³)",
     type: "json",
     showInDetail: true,
     showInEdit: true,
@@ -3762,7 +3762,7 @@ const protocolsFields: FieldConfig[] = [
 
 /**
  * ============================================================
- *  HS_TESTS TAB — HealthScan test catalog
+ *  HS_TESTS TAB — ROUTINE³ test catalog
  * ============================================================
  */
 const hsTestsFields: FieldConfig[] = [
@@ -3825,7 +3825,7 @@ const hsTestsFields: FieldConfig[] = [
 
 /**
  * ============================================================
- *  HS_SUPPLEMENTS TAB — HealthScan supplement products
+ *  HS_SUPPLEMENTS TAB — ROUTINE³ supplement products
  * ============================================================
  */
 const hsSupplementsFields: FieldConfig[] = [
@@ -3871,7 +3871,7 @@ const hsSupplementsFields: FieldConfig[] = [
 
 /**
  * ============================================================
- *  HS_PRODUCTS TAB — HealthScan physical products (filters, devices)
+ *  HS_PRODUCTS TAB — ROUTINE³ physical products (filters, devices)
  * ============================================================
  */
 const hsProductsFields: FieldConfig[] = [

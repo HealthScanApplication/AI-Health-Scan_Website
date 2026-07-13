@@ -32,7 +32,7 @@ export function ConfettiCelebration({ isActive = true, onComplete }: ConfettiCel
 
   // Single plant green color palette - as requested
   const plantGreenColors = [
-    '#16a34a', // HealthScan plant green (primary)
+    '#16a34a', // ROUTINE³ plant green (primary)
     '#15803d', // Darker plant green
     '#166534', // Even darker green
     '#14532d', // Deep forest green

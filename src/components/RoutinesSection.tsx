@@ -37,7 +37,7 @@ export function RoutinesSection() {
             </h2>
           </Reveal>
           <Reveal as="p" delay={0.1} style={{ ...deckStyle, marginTop: 22, maxWidth: "48ch" }}>
-            Tell HealthScan what you want to achieve — it builds the routine: daily to-dos, activity tracking and the scanner, working together.
+            Tell ROUTINE³ what you want to achieve — it builds the routine: daily to-dos, activity tracking and the scanner, working together.
           </Reveal>
         </div>
 

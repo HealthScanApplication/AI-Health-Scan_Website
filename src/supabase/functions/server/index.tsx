@@ -244,7 +244,7 @@ app.get('/make-server-ed0fe4c2/health', (c) => {
   return c.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    server: 'HealthScan Production Server',
+    server: 'ROUTINE³ Production Server',
     version: '1.0.0'
   })
 })
@@ -254,7 +254,7 @@ app.get('/make-server-ed0fe4c2/status', (c) => {
     status: 'online', 
     uptime: process.uptime ? Math.floor(process.uptime()) : 0,
     timestamp: new Date().toISOString(),
-    server: 'HealthScan Production Server'
+    server: 'ROUTINE³ Production Server'
   })
 })
 
@@ -269,7 +269,7 @@ app.get('/make-server-ed0fe4c2/ping', (c) => {
 app.get('/make-server-ed0fe4c2/', (c) => {
   return c.json({ 
     success: true,
-    message: 'HealthScan API Server',
+    message: 'ROUTINE³ API Server',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     endpoints: [
@@ -291,7 +291,7 @@ app.get('/make-server-ed0fe4c2/stats', (c) => {
   return c.json({
     success: true,
     data: {
-      server: 'HealthScan Production Server',
+      server: 'ROUTINE³ Production Server',
       version: '1.0.0',
       timestamp: new Date().toISOString(),
       endpoints_available: [

@@ -681,7 +681,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Your Profile</h1>
-          <p className="text-gray-600">Manage your account, preferences, and track your HealthScan journey</p>
+          <p className="text-gray-600">Manage your account, preferences, and track your ROUTINE³ journey</p>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -781,7 +781,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                   )}
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-2">
-                  {preferences.fullName || authUser?.email?.split('@')[0] || 'HealthScan User'}
+                  {preferences.fullName || authUser?.email?.split('@')[0] || 'ROUTINE³ User'}
                 </h2>
                 <div className="flex items-center gap-2 text-gray-600 mb-2">
                   <Mail className="w-4 h-4" />
@@ -1455,7 +1455,7 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Scanning Preferences</h3>
-                    <p className="text-sm text-gray-600">How HealthScan analyzes your food</p>
+                    <p className="text-sm text-gray-600">How ROUTINE³ analyzes your food</p>
                   </div>
                 </div>
                 {expandedSections.scanning ? (

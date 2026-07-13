@@ -275,7 +275,7 @@ export function DeploymentTroubleshooting() {
 
   const copyProjectInfo = () => {
     const info = `
-HealthScan Deployment Info:
+ROUTINE³ Deployment Info:
 - Project ID: ${projectId}
 - API Key: ${publicAnonKey.slice(0, 20)}...
 - Domain: ${window.location.hostname}

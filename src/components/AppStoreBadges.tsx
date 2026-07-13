@@ -63,22 +63,22 @@ export function AppStoreBadges({ className = "", align = "center", caption }: Ap
 
   // App Store: live → link to the listing (or focus waitlist until the URL is set).
   const appleEl = APP_STORE_AVAILABLE && APP_STORE_URL ? (
-    <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Download HealthScan on the App Store">
+    <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Download ROUTINE³ on the App Store">
       <AppleBadge />
     </a>
   ) : (
-    <button onClick={focusWaitlist} aria-label="HealthScan on the App Store" className="cursor-pointer">
+    <button onClick={focusWaitlist} aria-label="ROUTINE³ on the App Store" className="cursor-pointer">
       <AppleBadge />
     </button>
   );
 
   // Google Play: coming soon → muted, routes to the waitlist.
   const playEl = GOOGLE_PLAY_AVAILABLE && GOOGLE_PLAY_URL ? (
-    <a href={GOOGLE_PLAY_URL} target="_blank" rel="noopener noreferrer" aria-label="Get HealthScan on Google Play">
+    <a href={GOOGLE_PLAY_URL} target="_blank" rel="noopener noreferrer" aria-label="Get ROUTINE³ on Google Play">
       <PlayBadge />
     </a>
   ) : (
-    <button onClick={focusWaitlist} aria-label="HealthScan is coming soon to Google Play" className="cursor-pointer">
+    <button onClick={focusWaitlist} aria-label="ROUTINE³ is coming soon to Google Play" className="cursor-pointer">
       <PlayBadge muted />
     </button>
   );

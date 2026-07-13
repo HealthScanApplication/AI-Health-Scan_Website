@@ -155,7 +155,7 @@ export function ZapierSetupGuide() {
           <h1 className="text-3xl font-bold">Zapier Integration Guide</h1>
         </div>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          Connect HealthScan with over 6,000+ apps through Zapier. Automate workflows, 
+          Connect ROUTINE³ with over 6,000+ apps through Zapier. Automate workflows,
           sync data, and streamline your operations with powerful webhook integrations.
         </p>
       </div>
@@ -189,7 +189,7 @@ export function ZapierSetupGuide() {
                 Quick Start Guide
               </CardTitle>
               <CardDescription>
-                Follow these steps to connect HealthScan with Zapier in minutes
+                Follow these steps to connect ROUTINE³ with Zapier in minutes
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -206,7 +206,7 @@ export function ZapierSetupGuide() {
                   </p>
                   <Alert className="bg-blue-50 border-blue-200">
                     <AlertDescription>
-                      Choose "Catch Hook" as the trigger event type to receive data from HealthScan
+                      Choose "Catch Hook" as the trigger event type to receive data from ROUTINE³
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -234,9 +234,9 @@ export function ZapierSetupGuide() {
                   3
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold mb-2">Configure HealthScan Integration</h3>
+                  <h3 className="font-semibold mb-2">Configure ROUTINE³ Integration</h3>
                   <p className="text-gray-600 mb-3">
-                    Go to the HealthScan Admin Dashboard → Zapier tab and create a new integration 
+                    Go to the ROUTINE³ Admin Dashboard → Zapier tab and create a new integration
                     using your webhook URL.
                   </p>
                   <Button variant="outline" className="mr-2">
@@ -254,7 +254,7 @@ export function ZapierSetupGuide() {
                 <div className="flex-1">
                   <h3 className="font-semibold mb-2">Test & Complete Your Zap</h3>
                   <p className="text-gray-600">
-                    Test the connection from HealthScan, then continue building your Zap by 
+                    Test the connection from ROUTINE³, then continue building your Zap by
                     adding actions like sending emails, creating records, or posting to Slack.
                   </p>
                 </div>
@@ -267,7 +267,7 @@ export function ZapierSetupGuide() {
             <CardHeader>
               <CardTitle>Popular Automation Ideas</CardTitle>
               <CardDescription>
-                Get inspired with these common HealthScan + Zapier workflows
+                Get inspired with these common ROUTINE³ + Zapier workflows
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -322,7 +322,7 @@ export function ZapierSetupGuide() {
             <CardHeader>
               <CardTitle>Available Webhook Events</CardTitle>
               <CardDescription>
-                HealthScan can send these types of events to your Zapier webhooks
+                ROUTINE³ can send these types of events to your Zapier webhooks
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -367,7 +367,7 @@ export function ZapierSetupGuide() {
             <CardHeader>
               <CardTitle>Webhook Payload Examples</CardTitle>
               <CardDescription>
-                Sample JSON payloads that HealthScan sends to your Zapier webhooks
+                Sample JSON payloads that ROUTINE³ sends to your Zapier webhooks
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -445,9 +445,9 @@ export function ZapierSetupGuide() {
                   <h4 className="font-semibold text-yellow-800">Webhook not receiving data?</h4>
                   <ul className="mt-2 text-sm text-yellow-700 space-y-1">
                     <li>• Check that your webhook URL is correct and starts with https://hooks.zapier.com</li>
-                    <li>• Verify the integration is enabled in HealthScan admin dashboard</li>
+                    <li>• Verify the integration is enabled in ROUTINE³ admin dashboard</li>
                     <li>• Make sure the correct event triggers are selected</li>
-                    <li>• Test the connection using the test button in HealthScan</li>
+                    <li>• Test the connection using the test button in ROUTINE³</li>
                   </ul>
                 </div>
 
@@ -474,7 +474,7 @@ export function ZapierSetupGuide() {
                 <div className="p-4 border-l-4 border-l-green-500 bg-green-50">
                   <h4 className="font-semibold text-green-800">Need help with advanced setups?</h4>
                   <ul className="mt-2 text-sm text-green-700 space-y-1">
-                    <li>• Check the webhook activity logs in HealthScan admin dashboard</li>
+                    <li>• Check the webhook activity logs in ROUTINE³ admin dashboard</li>
                     <li>• Use Zapier's built-in testing tools to debug issues</li>
                     <li>• Consider using filters to process only specific events</li>
                     <li>• Contact support if you need custom webhook events</li>
@@ -494,7 +494,7 @@ export function ZapierSetupGuide() {
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span>Use descriptive names for your Zapier integrations in HealthScan</span>
+                      <span>Use descriptive names for your Zapier integrations in ROUTINE³</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />

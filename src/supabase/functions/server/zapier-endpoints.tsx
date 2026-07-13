@@ -382,7 +382,7 @@ zapierApp.post('/webhook/test', async (c) => {
       trigger: 'test_connection',
       timestamp: new Date().toISOString(),
       data: {
-        message: 'This is a test webhook from HealthScan',
+        message: 'This is a test webhook from ROUTINE³',
         test_id: `test_${Date.now()}`,
         app_name: 'HealthScan',
         version: '1.0.0'

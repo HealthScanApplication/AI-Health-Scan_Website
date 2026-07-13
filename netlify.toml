@@ -11,6 +11,19 @@
 [context.production.environment]
   SECRETS_SCAN_ENABLED = "false"
 
+# Brand migration — healthscan.live -> routine3.com (canonical domain)
+[[redirects]]
+  from = "https://healthscan.live/*"
+  to = "https://routine3.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.healthscan.live/*"
+  to = "https://routine3.com/:splat"
+  status = 301
+  force = true
+
 # Static files served directly (before SPA catch-all)
 [[redirects]]
   from = "/robots.txt"

@@ -1,4 +1,4 @@
-# HealthScan Launch Readiness Checklist
+# ROUTINE³ Launch Readiness Checklist
 *Last Updated: July 27, 2025*
 
 ## 🚨 CRITICAL ISSUES FIXED
@@ -34,7 +34,7 @@
 
 ### 4. Performance & SEO
 - [ ] **Add meta tags** - Title, description, OG tags
-- [ ] **Add favicon** - HealthScan logo
+- [ ] **Add favicon** - ROUTINE³ logo
 - [ ] **Optimize images** - Compress all assets
 - [ ] **Add Google Analytics** - Track conversions
 - [ ] **Add schema markup** - Structured data for SEO

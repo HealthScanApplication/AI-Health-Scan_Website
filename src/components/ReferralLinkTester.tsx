@@ -372,7 +372,7 @@ export function ReferralLinkTester({ user, accessToken, isAdmin }: ReferralLinkT
             Referral Link Testing Tool
           </CardTitle>
           <CardDescription>
-            Comprehensive testing suite for the HealthScan referral system
+            Comprehensive testing suite for the ROUTINE³ referral system
           </CardDescription>
         </CardHeader>
       </Card>

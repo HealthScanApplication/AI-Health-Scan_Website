@@ -386,7 +386,7 @@ export function AdminDashboard({ user, accessToken }: AdminDashboardProps) {
           </div>
         </TabsContent>
 
-        {/* HealthScan API Tab */}
+        {/* ROUTINE³ API Tab */}
         <TabsContent value="healthscan-api">
           <HealthScanApiDashboard accessToken={accessToken} />
         </TabsContent>

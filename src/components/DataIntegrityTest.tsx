@@ -409,7 +409,7 @@ export function DataIntegrityTest() {
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          🔍 HealthScan Data Integrity Tests
+          🔍 ROUTINE³ Data Integrity Tests
         </h1>
         <p className="text-gray-600">
           Comprehensive testing suite to validate data consistency and system health

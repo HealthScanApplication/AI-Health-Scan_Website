@@ -26,7 +26,7 @@ export function BlogPreviewSection() {
         id: "sample-1",
         title: "Reading food labels: your complete guide to healthier choices",
         excerpt: "Decode complex food labels and spot the additives worth avoiding in everyday products, so you can choose with confidence.",
-        author: "HealthScan Research Team",
+        author: "ROUTINE³ Research Team",
         publishDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
         readTime: "5 min read",
         tags: ["nutrition", "food safety", "ingredients"],
@@ -62,7 +62,7 @@ export function BlogPreviewSection() {
         id: a.id || `server-article-${index}`,
         title: a.title?.length > 90 ? a.title.substring(0, 90) + "…" : a.title || "Untitled",
         excerpt: a.excerpt?.length > 200 ? a.excerpt.substring(0, 200) + "…" : a.excerpt || "",
-        author: a.author || "HealthScan Team",
+        author: a.author || "ROUTINE³ Team",
         publishDate: a.publishDate || new Date().toISOString(),
         readTime: a.readTime || "3 min read",
         imageUrl: a.imageUrl,
@@ -112,7 +112,7 @@ export function BlogPreviewSection() {
             Latest <span style={{ fontStyle: "italic", color: ed.accent }}>reading</span>.
           </h2>
           <p style={{ ...deckStyle, marginTop: 22, maxWidth: "46ch" }}>
-            Research-backed notes on nutrition, food safety and wellness from the HealthScan team.
+            Research-backed notes on nutrition, food safety and wellness from the ROUTINE³ team.
           </p>
         </div>
 

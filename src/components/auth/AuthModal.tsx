@@ -552,7 +552,7 @@ export function AuthModal({ open, onOpenChange, defaultTab = 'login', prefillEma
         setNetworkError(null);
         setUserAlreadyExistsError(null);
         
-        toast.success('Account created successfully! Welcome to HealthScan. 🌱');
+        toast.success('Account created successfully! Welcome to ROUTINE³. 🌱');
         onOpenChange(false);
         setSignupForm({ name: '', email: '', password: '', confirmPassword: '' });
       }
@@ -573,11 +573,11 @@ export function AuthModal({ open, onOpenChange, defaultTab = 'login', prefillEma
               <Heart className="h-4 w-4 text-white" />
             </div>
             <DialogTitle className="text-xl font-semibold text-gray-900">
-              HealthScan
+              ROUTINE³
             </DialogTitle>
           </div>
           <DialogDescription className="text-gray-600">
-            Join HealthScan to access revolutionary AI-powered health scanning technology
+            Join ROUTINE³ to access revolutionary AI-powered health scanning technology
           </DialogDescription>
         </DialogHeader>
 

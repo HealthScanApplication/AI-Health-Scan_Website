@@ -1,5 +1,5 @@
 /**
- * HealthScan Application Integrity Check Guide
+ * ROUTINE³ Application Integrity Check Guide
  * 
  * This guide explains how to use the integrity checking tools to prevent and fix
  * broken links and functionality after making changes to the application.

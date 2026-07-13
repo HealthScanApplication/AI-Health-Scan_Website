@@ -1,5 +1,5 @@
 /**
- * Event Tracking Utility for HealthScan Funnel Analytics
+ * Event Tracking Utility for ROUTINE³ Funnel Analytics
  * Tracks: lp_view, cta_click, signup_start, signup_submit, email_confirm,
  *         share_click, referral_link_open, referral_signup_submit, referral_email_confirm
  * 

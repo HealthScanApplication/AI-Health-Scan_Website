@@ -150,7 +150,7 @@ export function RecordImageDisplay({
       case 'pollutant':
         return 'Pollutants are shown as warning visualizations with safety awareness context';
       case 'scan':
-        return 'Scans show the HealthScan app interface in action scanning items';
+        return 'Scans show the ROUTINE³ app interface in action scanning items';
       default:
         return 'Professional product photography with blurred bokeh background';
     }

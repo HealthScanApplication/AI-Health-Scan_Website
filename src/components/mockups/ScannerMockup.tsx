@@ -3,13 +3,13 @@ import { GRO } from "../../config/editorialTheme";
 import { PhoneFrame } from "./PhoneFrame";
 import { X, Wifi } from "lucide-react";
 
-/* 100% faithful recreation of the real HealthScan capture screen:
-   a live camera view (real fruit & veg footage from the HealthScan catalog),
+/* 100% faithful recreation of the real ROUTINE³ capture screen:
+   a live camera view (real fruit & veg footage from the ROUTINE³ catalog),
    white corner brackets, ✕ close, Meal | Product toggle, shutter, gallery. */
 
 const sans = GRO;
 
-/* Real produce footage from the HealthScan catalog (Supabase `assets` bucket) —
+/* Real produce footage from the ROUTINE³ catalog (Supabase `assets` bucket) —
    centred "crisp food shot" clips, exactly what the scanner sees in the app. */
 const SB = "https://mofhvoudjxinvpplsytd.supabase.co/storage/v1/object/public/assets";
 const PRODUCE_VIDEOS = [

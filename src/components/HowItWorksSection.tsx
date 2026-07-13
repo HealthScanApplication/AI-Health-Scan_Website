@@ -16,7 +16,7 @@ const STEPS = [
   {
     number: "01",
     title: "Pick your goal",
-    description: "Lose weight, clear your skin, build muscle, feed your kids better — choose what matters and HealthScan turns it into a plan.",
+    description: "Lose weight, clear your skin, build muscle, feed your kids better — choose what matters and ROUTINE³ turns it into a plan.",
   },
   {
     number: "02",
@@ -31,7 +31,7 @@ const STEPS = [
   {
     number: "04",
     title: "Hit your goal",
-    description: "Build streaks, watch progress grow, and let HealthScan adapt the routine as you go.",
+    description: "Build streaks, watch progress grow, and let ROUTINE³ adapt the routine as you go.",
   },
 ];
 
@@ -60,7 +60,7 @@ export function HowItWorksSection() {
             </h2>
           </Reveal>
           <Reveal as="p" delay={0.1} style={{ ...deckStyle, marginTop: 22, maxWidth: "46ch" }}>
-            HealthScan turns whatever you want to achieve into a routine you can actually keep — and tracks every step with you.
+            ROUTINE³ turns whatever you want to achieve into a routine you can actually keep — and tracks every step with you.
           </Reveal>
         </div>
 

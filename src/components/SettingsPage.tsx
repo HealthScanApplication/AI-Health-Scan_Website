@@ -431,7 +431,7 @@ export function SettingsPage({ onNavigateBack }: SettingsPageProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Email Updates</p>
-                  <p className="text-sm text-[var(--healthscan-text-muted)]">Receive general updates about HealthScan</p>
+                  <p className="text-sm text-[var(--healthscan-text-muted)]">Receive general updates about ROUTINE³</p>
                 </div>
                 <Switch
                   checked={notifications.emailUpdates}

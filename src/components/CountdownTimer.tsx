@@ -112,7 +112,7 @@ export function CountdownTimer() {
           }}
         >
           <span className="text-white font-bold text-lg relative z-10">
-            🚀 HealthScan is Live!
+            🚀 ROUTINE³ is Live!
           </span>
         </div>
         <div className="flex flex-wrap justify-center gap-3 mt-3">
@@ -190,7 +190,7 @@ export function CountdownTimer() {
           animation: 'gradient-x 5s ease infinite 1.5s'
         }}
       >
-        Until HealthScan Beta Launch • {LAUNCH_LABEL}
+        Until ROUTINE³ Beta Launch • {LAUNCH_LABEL}
       </p>
     </div>
   );

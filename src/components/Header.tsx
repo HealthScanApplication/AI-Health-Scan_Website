@@ -28,7 +28,35 @@ import {
 } from './ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { PageType } from '../types/app';
-import healthScanLogo from '../assets/cf2e65f2699becd01c6c8ddad2c65d7f0e9a7c42.png';
+
+// ROUTINE³ lockup — a square, single-bordered box joining the wordmark to the BETA tag,
+// same joined-seam treatment as the email/Subscribe container.
+function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#16140F' }: { size?: number; textColor?: string; hairline?: string }) {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'stretch',
+        height: size,
+        border: `1px solid ${hairline}`,
+        borderRadius: 2,
+        overflow: 'hidden',
+        flexShrink: 0,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px' }}>
+        <span style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.13em', color: textColor, whiteSpace: 'nowrap', transition: 'color 350ms ease' }}>
+          ROUTINE³
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', borderLeft: `1px solid ${hairline}`, transition: 'border-color 350ms ease' }}>
+        <span style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: textColor, whiteSpace: 'nowrap', transition: 'color 350ms ease' }}>
+          Beta
+        </span>
+      </div>
+    </div>
+  );
+}
 
 interface HeaderProps {
   onNavigateToProfile?: () => void;
@@ -128,7 +156,7 @@ export function Header({
 
   const handleWaitlistSuccess = () => {
     setShowWaitlistModal(false);
-    toast.success('Subscribed — welcome to HealthScan!');
+    toast.success('Subscribed — welcome to ROUTINE³!');
     
     // Update waitlist position after successful signup
     setTimeout(() => {
@@ -344,35 +372,7 @@ export function Header({
           <div className="flex justify-between items-center h-16 md:flex-row">
             {/* Logo & App Name */}
             <div className="flex items-center cursor-pointer flex-shrink-0 md:justify-start justify-center md:flex-none flex-1" onClick={handleHomeNavigation}>
-              <img 
-                src={healthScanLogo} 
-                alt="HealthScan" 
-                className="h-8 w-auto"
-              />
-              <div className="ml-3 flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="leading-tight"
-                    style={{ color: navStrong, fontFamily: '"Fraunces", Georgia, serif', fontWeight: 400, fontSize: 23, letterSpacing: '-0.01em', transition: 'color 350ms ease' }}
-                  >
-                    HealthScan
-                  </span>
-                  <span
-                    className="px-1.5 py-0.5 text-[10px]"
-                    style={{
-                      background: 'transparent',
-                      color: navText,
-                      fontWeight: 500,
-                      borderRadius: 999,
-                      border: `1px solid ${oura.hairline}`,
-                      letterSpacing: '0.08em',
-                      transition: 'color 350ms ease, border-color 350ms ease',
-                    }}
-                  >
-                    BETA
-                  </span>
-                </div>
-              </div>
+              <RoutineMark size={28} textColor={navStrong} />
             </div>
 
             {/* Desktop Navigation - Centered and Optimized */}
@@ -678,9 +678,9 @@ export function Header({
       {/* Waitlist Modal */}
       <Dialog open={showWaitlistModal} onOpenChange={setShowWaitlistModal}>
         <DialogContent className="max-w-2xl">
-          <DialogTitle className="sr-only">Subscribe to HealthScan</DialogTitle>
+          <DialogTitle className="sr-only">Subscribe to ROUTINE³</DialogTitle>
           <DialogDescription className="sr-only">
-            Sign up for early access to HealthScan
+            Sign up for early access to ROUTINE³
           </DialogDescription>
           <UniversalWaitlist 
             onSignupSuccess={handleWaitlistSuccess}

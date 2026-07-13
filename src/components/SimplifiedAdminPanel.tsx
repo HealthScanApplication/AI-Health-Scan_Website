@@ -1770,7 +1770,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     },
     {
       id: 'healthscan',
-      label: 'HealthScan Products',
+      label: 'ROUTINE³ Products',
       icon: <Sparkles className="w-4 h-4 text-teal-600" />,
       tabs: [
         { id: 'hs_overview', label: 'Overview', icon: <Eye className="w-4 h-4 text-teal-600" />, table: '' },
@@ -3523,7 +3523,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     setTimeout(() => setBatchProgress(null), 4000);
   };
 
-  // ─── Import Element Data (EU, USA, HealthScan, All) ──────────────
+  // ─── Import Element Data (EU, USA, ROUTINE³, All) ──────────────
   // Processes one record at a time to avoid edge function timeouts.
   // Tracks per-record results for resume capability.
   const handleImportElementData = async (source: 'eu' | 'usa' | 'healthscan' | 'all', elementIds?: string[], resumeFromIdx = 0) => {
@@ -3596,7 +3596,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
     fetchRecords();
 
     const wasCancelled = importCancelRef.current;
-    const sourceLabel = source === 'all' ? 'EU + USA + HealthScan' : source.toUpperCase();
+    const sourceLabel = source === 'all' ? 'EU + USA + ROUTINE³' : source.toUpperCase();
     if (wasCancelled) {
       toast.info(`Import cancelled at record ${succeeded + failed}/${ids.length}. ${succeeded} succeeded, ${failed} failed. Use "Resume" to continue.`);
     } else {
@@ -4096,7 +4096,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
   };
 
   const getImageUrl = (record: AdminRecord) => {
-    // For HealthScan products, prioritize icon_url (supplier logo) over image_url
+    // For ROUTINE³ products, prioritize icon_url (supplier logo) over image_url
     if (activeTab === 'hs_supplements' || activeTab === 'hs_tests' || activeTab === 'hs_products') {
       const imageUrl = record.icon_url || record.image_url || record.avatar_url;
       const base = imageUrl || PLACEHOLDER_IMAGE;
@@ -4294,7 +4294,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
               )}
               {!isWaitlist && (
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  {/* Published status for HealthScan products */}
+                  {/* Published status for ROUTINE³ products */}
                   {(activeTab === 'hs_supplements' || activeTab === 'hs_tests' || activeTab === 'hs_products') && (
                     <Badge className={`text-[10px] px-1.5 py-0 ${
                       record.published 
@@ -4474,7 +4474,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
               )}
               {/* Action buttons */}
               <div className="flex items-center gap-1">
-                {/* View Public Page button for HealthScan products */}
+                {/* View Public Page button for ROUTINE³ products */}
                 {(activeTab === 'hs_supplements' || activeTab === 'hs_tests' || activeTab === 'hs_products') && record.slug && (
                   <Button
                     size="sm"
@@ -4967,7 +4967,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                   const etaSec = Math.round(avgPerRecord * remaining);
                   const etaMin = Math.floor(etaSec / 60);
                   const pct = Math.round((importProgress.current / importProgress.total) * 100);
-                  const sourceLabel = importProgress.source === 'all' ? '🌍 All Regions' : importProgress.source === 'eu' ? '🇪🇺 EU' : importProgress.source === 'usa' ? '🇺🇸 USA' : '💚 HealthScan';
+                  const sourceLabel = importProgress.source === 'all' ? '🌍 All Regions' : importProgress.source === 'eu' ? '🇪🇺 EU' : importProgress.source === 'usa' ? '🇺🇸 USA' : '💚 ROUTINE³';
                   const isDone = !importingElementData;
 
                   return (
@@ -5287,7 +5287,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                             size="sm"
                             onClick={() => setShowImportMenu(v => !v)}
                             className="gap-1 whitespace-nowrap text-cyan-700 border-cyan-200 hover:bg-cyan-50"
-                            title="Import official DRV data (EU, USA, HealthScan)"
+                            title="Import official DRV data (EU, USA, ROUTINE³)"
                           >
                             <Database className="w-4 h-4" />
                             <span className="hidden sm:inline">Import DRV</span>
@@ -5299,7 +5299,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                               <button className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-50 flex items-center gap-2 text-gray-700"
                                 onClick={() => handleImportElementData('all')}>
                                 <span className="text-cyan-500 flex-shrink-0 text-sm">🌍</span>
-                                <div><div className="font-medium">All Regions</div><div className="text-[10px] text-gray-400">EU + USA + HealthScan data</div></div>
+                                <div><div className="font-medium">All Regions</div><div className="text-[10px] text-gray-400">EU + USA + ROUTINE³ data</div></div>
                               </button>
                               <button className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 text-gray-700"
                                 onClick={() => handleImportElementData('eu')}>
@@ -5314,7 +5314,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                               <button className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700"
                                 onClick={() => handleImportElementData('healthscan')}>
                                 <span className="text-emerald-500 flex-shrink-0 text-sm">💚</span>
-                                <div><div className="font-medium">HealthScan</div><div className="text-[10px] text-gray-400">Curated blend (stricter values)</div></div>
+                                <div><div className="font-medium">ROUTINE³</div><div className="text-[10px] text-gray-400">Curated blend (stricter values)</div></div>
                               </button>
                             </div>
                           )}
@@ -5812,7 +5812,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                       onClick={() => setShowImportMenu(v => !v)}
                       disabled={importingElementData || (!editingRecord?.name && !editingRecord?.name_common)}
                       className="h-8 px-3 bg-gradient-to-r from-cyan-50 to-sky-50 border-cyan-200 text-cyan-700 hover:from-cyan-100 hover:to-sky-100"
-                      title="Import official DRV data for this element (EU, USA, HealthScan)"
+                      title="Import official DRV data for this element (EU, USA, ROUTINE³)"
                     >
                       {importingElementData ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Database className="w-3.5 h-3.5 mr-1" />}
                       <span className="text-xs">{importingElementData ? 'Importing...' : 'Import DRV'}</span>
@@ -5824,7 +5824,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                         <button className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-50 flex items-center gap-2 text-gray-700"
                           onClick={() => { setShowImportMenu(false); handleImportSingleElement('all'); }}>
                           <span className="text-cyan-500 flex-shrink-0 text-sm">🌍</span>
-                          <div><div className="font-medium">All Regions</div><div className="text-[10px] text-gray-400">EU + USA + HealthScan</div></div>
+                          <div><div className="font-medium">All Regions</div><div className="text-[10px] text-gray-400">EU + USA + ROUTINE³</div></div>
                         </button>
                         <button className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 text-gray-700"
                           onClick={() => { setShowImportMenu(false); handleImportSingleElement('eu'); }}>
@@ -5839,7 +5839,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                         <button className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700"
                           onClick={() => { setShowImportMenu(false); handleImportSingleElement('healthscan'); }}>
                           <span className="text-emerald-500 flex-shrink-0 text-sm">💚</span>
-                          <div><div className="font-medium">HealthScan</div><div className="text-[10px] text-gray-400">Curated blend</div></div>
+                          <div><div className="font-medium">ROUTINE³</div><div className="text-[10px] text-gray-400">Curated blend</div></div>
                         </button>
                       </div>
                     )}

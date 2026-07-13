@@ -14,19 +14,19 @@ export interface FAQItem {
 export const faqData: FAQItem[] = [
   // General
   {
-    question: "What is HealthScan?",
+    question: "What is ROUTINE³?",
     answer:
-      "HealthScan is a goal-based health app. Tell it what you want to achieve — lose weight, clearer skin, build muscle, more energy, better sleep, or feed your kids better — and it builds you a personalized routine: daily to-dos, meals, habits, and activity, with an AI food scanner built in to check what you eat along the way.",
+      "ROUTINE³ is a goal-based health app. Tell it what you want to achieve — lose weight, clearer skin, build muscle, more energy, better sleep, or feed your kids better — and it builds you a personalized routine: daily to-dos, meals, habits, and activity, with an AI food scanner built in to check what you eat along the way.",
     category: "general",
   },
   {
     question: "What exactly is a “routine”?",
     answer:
-      "A routine is your day-by-day plan for a goal. It's a simple checklist grouped into supplements, things to consume, things to do, and sleep — each scheduled through the day. You tick items off as you go, build streaks, and watch your progress. HealthScan adapts the routine over time as you stick with it.",
+      "A routine is your day-by-day plan for a goal. It's a simple checklist grouped into supplements, things to consume, things to do, and sleep — each scheduled through the day. You tick items off as you go, build streaks, and watch your progress. ROUTINE³ adapts the routine over time as you stick with it.",
     category: "general",
   },
   {
-    question: "How much does HealthScan cost?",
+    question: "How much does ROUTINE³ cost?",
     answer:
       "There's a free tier and a premium subscription. Free covers the core routine, daily checklist, and food scanning. Premium unlocks deeper analysis, activity integrations, family profiles, and the ability to shop your routine in one tap. You can try the app and start a routine before deciding to upgrade.",
     category: "general",
@@ -36,7 +36,7 @@ export const faqData: FAQItem[] = [
   {
     question: "How do I build a routine?",
     answer:
-      "Pick a goal and HealthScan generates a routine for it in seconds — the daily to-dos, meals, habits, and the exact foods, supplements, and products you'll need. From there you just follow the plan each day, check items off, and let it adjust as you progress.",
+      "Pick a goal and ROUTINE³ generates a routine for it in seconds — the daily to-dos, meals, habits, and the exact foods, supplements, and products you'll need. From there you just follow the plan each day, check items off, and let it adjust as you progress.",
     category: "features",
   },
   {
@@ -48,13 +48,13 @@ export const faqData: FAQItem[] = [
   {
     question: "How does the food scanner work?",
     answer:
-      "Point your camera at any meal or packaged product. HealthScan reads it in seconds and gives you a health score, the nutrients that matter, and the ingredients worth watching — then tells you whether it fits your current goal and logs it to your routine. The scanner is built into every routine, so what you eat feeds directly into your plan.",
+      "Point your camera at any meal or packaged product. ROUTINE³ reads it in seconds and gives you a health score, the nutrients that matter, and the ingredients worth watching — then tells you whether it fits your current goal and logs it to your routine. The scanner is built into every routine, so what you eat feeds directly into your plan.",
     category: "features",
   },
   {
     question: "Does it track my activity, and sync with Strava and Ōura Ring?",
     answer:
-      "Yes. You can log workouts, water, sleep, and habits, and watch your streaks build. HealthScan also syncs with Strava and the Ōura Ring, so your workouts and your sleep and recovery flow in automatically and your routine adapts to how your body is actually doing.",
+      "Yes. You can log workouts, water, sleep, and habits, and watch your streaks build. ROUTINE³ also syncs with Strava and the Ōura Ring, so your workouts and your sleep and recovery flow in automatically and your routine adapts to how your body is actually doing.",
     category: "features",
   },
   {
@@ -64,7 +64,7 @@ export const faqData: FAQItem[] = [
     category: "features",
   },
   {
-    question: "Can I use HealthScan for my family?",
+    question: "Can I use ROUTINE³ for my family?",
     answer:
       "Yes. Premium accounts support multiple profiles with their own goals, preferences, and dietary needs. Parents can manage a child's routine, plan family meals everyone will actually eat, and keep an eye on the household's nutrition together.",
     category: "features",
@@ -98,9 +98,9 @@ export const faqData: FAQItem[] = [
 
   // Technical
   {
-    question: "Which devices is HealthScan on?",
+    question: "Which devices is ROUTINE³ on?",
     answer:
-      "HealthScan is live on iOS — download it from the App Store on iPhone today. An Android version is coming soon. For the best scanning results we recommend a device with a camera from roughly the last five years.",
+      "ROUTINE³ is live on iOS — download it from the App Store on iPhone today. An Android version is coming soon. For the best scanning results we recommend a device with a camera from roughly the last five years.",
     category: "technical",
   },
   {
@@ -124,9 +124,9 @@ export const faqData: FAQItem[] = [
 
   // Availability & Access
   {
-    question: "Is HealthScan available yet?",
+    question: "Is ROUTINE³ available yet?",
     answer:
-      "Yes — HealthScan is out now on the App Store for iPhone. There's no waitlist and no invite needed: download it, pick a goal, and start your first routine today. Android is on the way.",
+      "Yes — ROUTINE³ is out now on the App Store for iPhone. There's no waitlist and no invite needed: download it, pick a goal, and start your first routine today. Android is on the way.",
     category: "launch",
   },
   {
@@ -138,7 +138,7 @@ export const faqData: FAQItem[] = [
   {
     question: "How do I get started?",
     answer:
-      "Download HealthScan from the App Store, choose the goal that matters to you, and you'll get a personalized routine right away. Follow the daily to-dos, scan your food as you go, and connect Strava or your Ōura Ring to make it even more tailored.",
+      "Download ROUTINE³ from the App Store, choose the goal that matters to you, and you'll get a personalized routine right away. Follow the daily to-dos, scan your food as you go, and connect Strava or your Ōura Ring to make it even more tailored.",
     category: "launch",
   },
 ];

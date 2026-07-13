@@ -78,10 +78,10 @@ export const generatePrompt = (
       return `Visual representation of ${itemName} nutrient in fresh healthy foods, ${basePrompt}, health and wellness concept, fresh fruits and vegetables rich in ${itemName}, scientific yet appealing, health-focused photography`;
 
     case 'pollutant':
-      return `Warning visualization about ${itemName} contamination, ${basePrompt}, safety awareness concept, smartphone displaying HealthScan app with warning indicators, food safety illustration, cautionary but not alarming, health app interface`;
+      return `Warning visualization about ${itemName} contamination, ${basePrompt}, safety awareness concept, smartphone displaying ROUTINE³ app with warning indicators, food safety illustration, cautionary but not alarming, health app interface`;
 
     case 'scan':
-      return `HealthScan mobile app interface scanning a ${itemName}, ${basePrompt}, smartphone screen showing the scanning process, modern app design, user interface, technology in action, mobile app photography`;
+      return `ROUTINE³ mobile app interface scanning a ${itemName}, ${basePrompt}, smartphone screen showing the scanning process, modern app design, user interface, technology in action, mobile app photography`;
 
     default:
       return `Beautiful ${itemName}, ${basePrompt}, centered composition, professional photography`;

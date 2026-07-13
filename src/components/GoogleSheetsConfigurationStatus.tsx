@@ -394,7 +394,7 @@ GOOGLE_SERVICE_ACCOUNT_CREDENTIALS={"type":"service_account","project_id":"...",
           <AlertDescription>
             <div className="space-y-1">
               <p className="font-medium">System Status: ✅ Fully Operational Without Google Sheets</p>
-              <p className="text-sm">HealthScan operates completely independently of Google Sheets. All email signups, referrals, and user data are securely stored and managed in the primary KV database. Google Sheets is purely an optional external backup feature.</p>
+              <p className="text-sm">ROUTINE³ operates completely independently of Google Sheets. All email signups, referrals, and user data are securely stored and managed in the primary KV database. Google Sheets is purely an optional external backup feature.</p>
             </div>
           </AlertDescription>
         </Alert>

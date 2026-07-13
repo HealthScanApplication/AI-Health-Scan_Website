@@ -274,7 +274,7 @@ export function EmailConfirmationBanner({ userEmail, onDismiss }: EmailConfirmat
 
   return (
     <>
-      {/* Fixed banner that pushes content down - Enhanced with organic HealthScan styling */}
+      {/* Fixed banner that pushes content down - Enhanced with organic ROUTINE³ styling */}
       <div className="fixed top-0 left-0 right-0 z-[100] animate-banner-slide-down">
         {/* Organic gradient background with subtle animation */}
         <div className="relative bg-gradient-to-r from-[var(--healthscan-bg-light)] via-green-50 to-emerald-50 backdrop-blur-sm animate-banner-organic-glow">
@@ -295,17 +295,17 @@ export function EmailConfirmationBanner({ userEmail, onDismiss }: EmailConfirmat
           {/* Content container with enhanced spacing */}
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between py-4 gap-4">
-              {/* Icon and Message - Enhanced with HealthScan styling */}
+              {/* Icon and Message - Enhanced with ROUTINE³ styling */}
               <button
                 onClick={openEmailApp}
                 className="flex items-center gap-3 flex-1 min-w-0 hover:bg-white/60 rounded-xl p-2.5 -m-2 transition-all duration-300 group cursor-pointer hover:shadow-sm hover:scale-[1.02]"
                 title="Open email"
               >
-                {/* Enhanced icon with HealthScan logo and organic glow */}
+                {/* Enhanced icon with ROUTINE³ logo and organic glow */}
                 <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[var(--healthscan-green)] to-[var(--healthscan-light-green)] rounded-full flex items-center justify-center group-hover:shadow-lg group-hover:scale-110 transition-all duration-300 shadow-sm animate-banner-icon-float overflow-hidden">
                   <img 
                     src={healthScanLogo}
-                    alt="HealthScan" 
+                    alt="ROUTINE³"
                     className="w-6 h-6 rounded-full object-cover border border-white/20"
                     onError={(e) => {
                       // Fallback to Mail icon if logo fails to load
@@ -329,7 +329,7 @@ export function EmailConfirmationBanner({ userEmail, onDismiss }: EmailConfirmat
                 </div>
               </button>
 
-              {/* Action Buttons - Enhanced HealthScan styling */}
+              {/* Action Buttons - Enhanced ROUTINE³ styling */}
               <div className="flex items-center gap-3 flex-shrink-0">
                 <Button
                   onClick={handleResendConfirmation}

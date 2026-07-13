@@ -30,7 +30,7 @@ const FEATURES: Feature[] = [
     label: "Smart scanning",
     titleLead: "Point, shoot, ",
     titleEm: "know",
-    body: "Aim your camera at any meal or packaged product. HealthScan reads it in seconds — a health score, the nutrients that matter, and the ingredients worth watching — then logs it against your goal.",
+    body: "Aim your camera at any meal or packaged product. ROUTINE³ reads it in seconds — a health score, the nutrients that matter, and the ingredients worth watching — then logs it against your goal.",
     bullets: [
       { title: "Visual food recognition", desc: "AI identifies the dish, ingredients and portions straight from a photo." },
       { title: "Health-score rating", desc: "An instant 0–100 score with the why behind it, tuned to your goal." },
@@ -43,14 +43,14 @@ const FEATURES: Feature[] = [
     label: "Nutrition intelligence",
     titleLead: "The nutrients you're ",
     titleEm: "actually getting",
-    body: "HealthScan reads meals and products down to the ingredient, tracks what you take in over time, and surfaces where you run short — so your routine fills the gaps instead of guessing.",
+    body: "ROUTINE³ reads meals and products down to the ingredient, tracks what you take in over time, and surfaces where you run short — so your routine fills the gaps instead of guessing.",
     bullets: [
       { title: "Ingredient-level tracking", desc: "See which ingredients supply which nutrients, and how much." },
       { title: "Intake over time", desc: "Spot patterns and deficiencies across days and weeks." },
       { title: "Smart food pairing", desc: "Suggestions that help your body absorb more of what it needs." },
     ],
     image: needScreenshot,
-    alt: "HealthScan nutrition analysis screen",
+    alt: "ROUTINE³ nutrition analysis screen",
     fig: "Fig. 02 — Nutrient breakdown",
   },
   {
@@ -65,7 +65,7 @@ const FEATURES: Feature[] = [
       { title: "Your personal watch-list", desc: "Informational, built from your preferences and what you scan." },
     ],
     image: riskScreenshot,
-    alt: "HealthScan risk detection screen",
+    alt: "ROUTINE³ risk detection screen",
     fig: "Fig. 03 — Watch-list",
   },
   {
@@ -73,14 +73,14 @@ const FEATURES: Feature[] = [
     label: "Recipe engine",
     titleLead: "Meals the whole ",
     titleEm: "table will eat",
-    body: "Build plans around everyone at once. HealthScan weighs each person's needs, preferences and goals, then suggests recipes that satisfy the table while keeping nutrition high and additives low.",
+    body: "Build plans around everyone at once. ROUTINE³ weighs each person's needs, preferences and goals, then suggests recipes that satisfy the table while keeping nutrition high and additives low.",
     bullets: [
       { title: "Family profiles", desc: "Needs, allergies and preferences tracked per person." },
       { title: "Smart recipe matching", desc: "Dishes that meet everyone's nutrition and taste at once." },
       { title: "Personalised plans", desc: "Weekly planning tuned to your household's goals." },
     ],
     image: mealAnalysisScreenshot,
-    alt: "HealthScan recipe analysis",
+    alt: "ROUTINE³ recipe analysis",
     fig: "Fig. 04 — Recipe match",
   },
 ];
@@ -158,7 +158,7 @@ export function AppFeaturesSection() {
             </h2>
           </Reveal>
           <Reveal as="p" delay={0.1} style={{ ...deckStyle, marginTop: 22, maxWidth: "44ch" }}>
-            Every routine runs on what you actually eat. Aim the camera; HealthScan checks it against your goal and logs it in seconds.
+            Every routine runs on what you actually eat. Aim the camera; ROUTINE³ checks it against your goal and logs it in seconds.
           </Reveal>
         </div>
 
@@ -200,7 +200,7 @@ export function AppFeaturesSection() {
         {/* Disclaimer colophon */}
         <div style={{ maxWidth: 680, marginTop: "clamp(64px, 8vw, 110px)", paddingTop: 24, borderTop: `1px solid ${ed.hair}` }}>
           <p style={{ fontFamily: GRO, fontSize: 12, lineHeight: 1.6, color: ed.inkSoft, margin: 0 }}>
-            HealthScan provides informational estimates based on public food and nutrition data to help you make everyday choices. It is not a medical device and does not diagnose, treat, cure or prevent any disease. Always consult a qualified healthcare professional for medical advice.
+            ROUTINE³ provides informational estimates based on public food and nutrition data to help you make everyday choices. It is not a medical device and does not diagnose, treat, cure or prevent any disease. Always consult a qualified healthcare professional for medical advice.
           </p>
         </div>
       </div>

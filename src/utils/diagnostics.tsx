@@ -394,7 +394,7 @@ class HealthScanDiagnostics {
 
   // Comprehensive diagnostic suite
   async diagnosticSuite(): Promise<DiagnosticResult[]> {
-    console.log('🔍 Running HealthScan diagnostic suite...');
+    console.log('🔍 Running ROUTINE³ diagnostic suite...');
     
     const results: DiagnosticResult[] = [];
     

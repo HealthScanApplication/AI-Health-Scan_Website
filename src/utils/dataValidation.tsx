@@ -31,7 +31,7 @@ interface WaitlistData {
 // Enhanced KV Store documentation and utilities
 export const KVStoreDocumentation = {
   tableName: "kv_store_557a7646",
-  purpose: "Flexible key-value storage for HealthScan waitlist and referral data",
+  purpose: "Flexible key-value storage for ROUTINE³ waitlist and referral data",
   
   // Expected table structure
   schema: {
@@ -230,7 +230,7 @@ export class DataValidator {
       const healthscanKeys = allKeys.filter(key => key.startsWith('healthscan_'));
       
       if (healthscanKeys.length > 10) {
-        warnings.push("Large number of HealthScan localStorage keys detected");
+        warnings.push("Large number of ROUTINE³ localStorage keys detected");
       }
 
     } catch (error) {

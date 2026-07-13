@@ -105,7 +105,7 @@ export function Blog({ onNavigateBack }: BlogProps) {
       setLoading(true);
       setError(null);
 
-      console.log('🔄 Fetching articles from HealthScan blog...');
+      console.log('🔄 Fetching articles from ROUTINE³ blog...');
 
       // Test server connectivity first
       const isServerConnected = await testServerConnectivity();
@@ -171,7 +171,7 @@ export function Blog({ onNavigateBack }: BlogProps) {
                 description: result.notice || 'Real RSS feed will be restored soon'
               });
             } else {
-              toast.success(`🌱 Loaded ${result.data.length} real articles from HealthScan blog`);
+              toast.success(`🌱 Loaded ${result.data.length} real articles from ROUTINE³ blog`);
             }
             return; // Success - exit early
           } else {
@@ -305,7 +305,7 @@ export function Blog({ onNavigateBack }: BlogProps) {
       // Extract author
       const author = item.querySelector('dc\\:creator, author, creator')?.textContent?.trim() || 
                    item.querySelector('author name')?.textContent?.trim() || 
-                   'HealthScan Team';
+                   'ROUTINE³ Team';
       
       // Enhanced image extraction
       let imageUrl: string | undefined;
@@ -505,7 +505,7 @@ export function Blog({ onNavigateBack }: BlogProps) {
                   <BookOpen className="w-5 h-5 text-[var(--healthscan-green)]" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">HealthScan Blog</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">ROUTINE³ Blog</h1>
                   <p className="text-gray-600">Real insights from our Substack publication</p>
                 </div>
               </div>

@@ -107,7 +107,7 @@ export function SocialSharingModal({
         body: JSON.stringify({
           toEmail: trimmedEmail,
           message: finalMessage,
-          senderName: userName || userEmail?.split('@')[0] || 'A HealthScan member',
+          senderName: userName || userEmail?.split('@')[0] || 'A ROUTINE³ member',
           senderEmail: userEmail,
           referralCode: referralCode,
         }),
@@ -127,7 +127,7 @@ export function SocialSharingModal({
     }
   };
 
-  // Default share message with proper HealthScan referral link
+  // Default share message with proper ROUTINE³ referral link
   const getReferralLink = () => {
     // Try prop first, then localStorage fallback
     const code = referralCode || 
@@ -142,27 +142,27 @@ export function SocialSharingModal({
   const messageTemplates = useMemo(() => {
     const currentReferralLink = getReferralLink();
     return {
-      partner: `Hey love! I found something that might help us make better food choices together. HealthScan could potentially reveal what's really in our food - both nutrients and possible pollutants.
+      partner: `Hey love! I found something that might help us make better food choices together. ROUTINE³ could potentially reveal what's really in our food - both nutrients and possible pollutants.
 
 Want to check it out with me? ${currentReferralLink} 🌱💚`,
 
-      friend: `Hey! Have you heard about HealthScan? This might help us understand what potential pollutants & nutrients could be in our food.
+      friend: `Hey! Have you heard about ROUTINE³? This might help us understand what potential pollutants & nutrients could be in our food.
 
 Could be worth checking out: ${currentReferralLink} 🌱💚`,
 
-      parent: `Fellow parent! Found something that might help us make better choices for our kids. HealthScan could potentially reveal what pollutants & nutrients are in their food.
+      parent: `Fellow parent! Found something that might help us make better choices for our kids. ROUTINE³ could potentially reveal what pollutants & nutrients are in their food.
 
 Early access here: ${currentReferralLink} 🌱💚`,
 
-      sibling: `Hey! Your sibling here with something interesting. Found this app called HealthScan that might help us understand what's actually in our food - the good and potentially concerning stuff.
+      sibling: `Hey! Your sibling here with something interesting. Found this app called ROUTINE³ that might help us understand what's actually in our food - the good and potentially concerning stuff.
 
 Thought you'd want to check it out: ${currentReferralLink} 🌱💚`,
 
-      family: `Hi family! Wanted to share something that could help all of us make better food choices. HealthScan might reveal what potential pollutants and nutrients are in the food we eat.
+      family: `Hi family! Wanted to share something that could help all of us make better food choices. ROUTINE³ might reveal what potential pollutants and nutrients are in the food we eat.
 
 Let's explore this together: ${currentReferralLink} 🌱💚`,
 
-      colleague: `Hi! I came across something that might interest you from a health perspective. HealthScan could potentially help us understand what's in our food - both nutritionally and concerning contaminants.
+      colleague: `Hi! I came across something that might interest you from a health perspective. ROUTINE³ could potentially help us understand what's in our food - both nutritionally and concerning contaminants.
 
 Worth exploring: ${currentReferralLink} 🌱💚`
     };
@@ -270,7 +270,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
       currentReferralLink
     );
     
-    // If no HealthScan link was found in user's message, append the referral link
+    // If no ROUTINE³ link was found in user's message, append the referral link
     if (!updatedMessage.includes('healthscan.live')) {
       const finalMessage = `${updatedMessage}\n\nJoin here: ${currentReferralLink}`;
       return finalMessage;
@@ -336,7 +336,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
       if (navigator.share) {
         const finalMessage = ensureCorrectReferralLink(shareMessage);
         navigator.share({
-          title: 'HealthScan - Food Transparency Revolution',
+          title: 'ROUTINE³ - Food Transparency Revolution',
           text: finalMessage,
           url: referralLink,
         }).then(() => {
@@ -372,7 +372,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
   const shareViaLinkedIn = () => {
     const finalMessage = ensureCorrectReferralLink(shareMessage);
     // Add LinkedIn company page reference
-    const linkedinMessage = `${finalMessage}\n\nConnect with HealthScan on LinkedIn! 💚`;
+    const linkedinMessage = `${finalMessage}\n\nConnect with ROUTINE³ on LinkedIn! 💚`;
     const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}&summary=${encodeURIComponent(linkedinMessage)}`;
     window.open(linkedinUrl, '_blank', 'noopener,noreferrer');
     toast.success('💚 LinkedIn opened!');
@@ -409,7 +409,7 @@ Worth exploring: ${currentReferralLink} 🌱💚`
       try {
         const finalMessage = ensureCorrectReferralLink(shareMessage);
         await navigator.share({
-          title: 'HealthScan - Food Transparency Together',
+          title: 'ROUTINE³ - Food Transparency Together',
           text: finalMessage,
           url: referralLink,
         });

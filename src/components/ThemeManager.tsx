@@ -100,7 +100,7 @@ export function ThemeManager({ isAdmin = false }: ThemeManagerProps) {
 
   // Preset themes
   const presetThemes = {
-    default: 'Default HealthScan',
+    default: 'Default ROUTINE³',
     purple: 'Purple Health',
     blue: 'Ocean Blue',
     orange: 'Vibrant Orange',
@@ -332,7 +332,7 @@ export function ThemeManager({ isAdmin = false }: ThemeManagerProps) {
             {/* Brand Colors */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">HealthScan Brand Colors</CardTitle>
+                <CardTitle className="text-lg">ROUTINE³ Brand Colors</CardTitle>
                 <CardDescription>Brand-specific color variables</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

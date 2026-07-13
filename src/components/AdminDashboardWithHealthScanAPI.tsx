@@ -225,7 +225,7 @@ export function AdminDashboardWithHealthScanAPI({ user, accessToken }: AdminDash
   // Tab configuration for mobile navigation
   const tabConfig = [
     { value: 'overview', label: 'Overview', icon: Database },
-    { value: 'healthscan-api', label: 'HealthScan API', icon: ExternalLink },
+    { value: 'healthscan-api', label: 'ROUTINE³ API', icon: ExternalLink },
     { value: 'users', label: 'Users', icon: Users },
     { value: 'nutrients', label: 'Nutrients', icon: Heart },
     { value: 'ingredients', label: 'Ingredients', icon: Leaf },
@@ -373,7 +373,7 @@ export function AdminDashboardWithHealthScanAPI({ user, accessToken }: AdminDash
               <div className="flex items-center gap-2">
                 <ExternalLink className="h-4 w-4 lg:h-5 lg:w-5 text-purple-600 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs lg:text-sm font-medium text-gray-600">HealthScan API</p>
+                  <p className="text-xs lg:text-sm font-medium text-gray-600">ROUTINE³ API</p>
                   <p className="text-lg lg:text-2xl font-bold">Live</p>
                   <p className="text-xs text-gray-500">Connected</p>
                 </div>
@@ -394,15 +394,15 @@ export function AdminDashboardWithHealthScanAPI({ user, accessToken }: AdminDash
             </Card>
           </div>
 
-          {/* Quick Access to HealthScan API */}
+          {/* Quick Access to ROUTINE³ API */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <ExternalLink className="h-5 w-5 text-purple-600" />
-                <CardTitle className="text-lg">HealthScan API Integration</CardTitle>
+                <CardTitle className="text-lg">ROUTINE³ API Integration</CardTitle>
               </div>
               <CardDescription>
-                Access real-time data from the HealthScan production API
+                Access real-time data from the ROUTINE³ production API
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -441,7 +441,7 @@ export function AdminDashboardWithHealthScanAPI({ user, accessToken }: AdminDash
           </Card>
         </TabsContent>
 
-        {/* HealthScan API Tab */}
+        {/* ROUTINE³ API Tab */}
         <TabsContent value="healthscan-api" className="space-y-4 lg:space-y-6">
           <HealthScanApiDashboard accessToken={accessToken} />
         </TabsContent>
@@ -509,7 +509,7 @@ export function AdminDashboardWithHealthScanAPI({ user, accessToken }: AdminDash
                     </p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="font-medium text-gray-700">HealthScan API</p>
+                    <p className="font-medium text-gray-700">ROUTINE³ API</p>
                     <p className="text-sm text-gray-600">✅ https://api.healthscan.live</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg">

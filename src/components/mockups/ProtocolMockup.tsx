@@ -3,7 +3,7 @@ import { PhoneFrame } from "./PhoneFrame";
 import { CATEGORY_TINTS, itemIcon, type CatKey, type ProtocolItem } from "../../config/protocolCategories";
 import { Check, Flame } from "lucide-react";
 
-/* Faithful recreation of the HealthScan "today's routine" completion screen.
+/* Faithful recreation of the ROUTINE³ "today's routine" completion screen.
    App-true: progress fill #10B981 on #F3F4F6 track, "3 / 5" counter,
    category-tinted icon tiles, completed rows strike-through + faded. */
 

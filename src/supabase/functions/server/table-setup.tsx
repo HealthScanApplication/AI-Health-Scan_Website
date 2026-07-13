@@ -1,5 +1,5 @@
 /**
- * Table setup and initialization for HealthScan KV store
+ * Table setup and initialization for ROUTINE³ KV store
  * Automatically creates the required table if it doesn't exist
  */
 

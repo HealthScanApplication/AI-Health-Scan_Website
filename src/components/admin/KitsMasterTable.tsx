@@ -25,12 +25,12 @@ const sel = 'sb-select';
    Shopify; affiliate = we link out to the brand and earn commission (they fulfil). */
 const LANE_LABEL: Record<string, string> = { store: 'Our store', affiliate: 'Partner link' };
 const LANE_HELP: Record<string, string> = {
-  store: 'Our store — we sell & fulfil this on the HealthScan Shopify store (needs a Shopify variant).',
+  store: 'Our store — we sell & fulfil this on the ROUTINE³ Shopify store (needs a Shopify variant).',
   affiliate: 'Partner link — we link out to the brand/partner and earn affiliate commission; they fulfil.',
 };
 const laneLabel = (lane: string) => LANE_LABEL[lane] || lane;
 
-/* HealthScan's Shopify admin (DEV-354/DEV-416) — store-lane rows deep-link here */
+/* ROUTINE³'s Shopify admin (DEV-354/DEV-416) — store-lane rows deep-link here */
 const SHOPIFY_ADMIN = 'https://admin.shopify.com/store/healthscan';
 
 const hostOf = (url: string | null): string | null => {
@@ -52,7 +52,7 @@ const itemStoreUrl = (i: KitItem): string | null => {
  *  so a mislaned row can't show a Shopify label linking to a partner site. */
 const supplierLabel = (i: KitItem): string => {
   if (i.supplier) return i.supplier;
-  if (kitItemBuyPath(i) === 'store') return 'HealthScan store';
+  if (kitItemBuyPath(i) === 'store') return 'ROUTINE³ store';
   return hostOf(i.affiliate_url) || '—';
 };
 
@@ -517,7 +517,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               <th style={{ width: 30 }} title="Select rows for batch actions"></th>
               <SortTh k="product" sortCol={sortCol} onSort={clickSort} style={{ minWidth: 220 }}>Product</SortTh>
               <th style={{ width: 52 }} title="Linked to a catalog product? (a key gap signal)">Linked</th>
-              <th style={{ width: 74 }} title="Has a real Shopify variant — i.e. published on the HealthScan Shopify store (Supliful/HS)">Publ.</th>
+              <th style={{ width: 74 }} title="Has a real Shopify variant — i.e. published on the ROUTINE³ Shopify store (Supliful/HS)">Publ.</th>
               <th style={{ width: 66 }} title="Where the buy button goes: 'shopify' = our Shopify store; 'partner' = the kit's partner cart; NONE = not sellable yet">Buy path</th>
               <th style={{ width: 84 }} title="How this item is sold — 'Our store' = we sell & fulfil on Shopify; 'Partner link' = we link out to the brand for a commission">Sold via</th>
               <SortTh k="supplier" sortCol={sortCol} onSort={clickSort} style={{ maxWidth: 150 }}>Supplier</SortTh>
@@ -567,7 +567,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                     <td>
                       <span className="sb-cell" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {faviconFor(f.affiliate_url || null) && <img src={faviconFor(f.affiliate_url || null)!} alt="" loading="lazy" style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0 }} />}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.lane === 'store' ? 'HealthScan store' : hostOf(f.affiliate_url || null) || '—'}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.lane === 'store' ? 'ROUTINE³ store' : hostOf(f.affiliate_url || null) || '—'}</span>
                       </span>
                     </td>
                     <td><span className="sb-cell">—</span></td>
@@ -624,7 +624,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                   <td>
                     {buyPath === 'store'
                       ? <a className="sb-cell" href={itemStoreUrl(i)!} target="_blank" rel="noopener noreferrer"
-                          title="Published — has a Shopify variant. Opens the product in the HealthScan Shopify admin."
+                          title="Published — has a Shopify variant. Opens the product in the ROUTINE³ Shopify admin."
                           style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--sb-brand-strong)', fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
                           shopify <ExternalLink size={10} style={{ flexShrink: 0 }} />
                         </a>
@@ -634,7 +634,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                             style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--sb-brand-strong)', textDecoration: 'none', cursor: 'pointer' }}>
                             partner <ExternalLink size={10} style={{ flexShrink: 0 }} />
                           </a>
-                        : <span className="sb-cell" title={i.lane === 'store' ? 'Store lane but no Shopify variant — publish it to the HealthScan Shopify (Supliful US / Suplify EU) and set variant_id, or set the kit\'s partner cart URL if it sells via a partner' : 'Affiliate row — sold on the partner store, not ours'}
+                        : <span className="sb-cell" title={i.lane === 'store' ? 'Store lane but no Shopify variant — publish it to the ROUTINE³ Shopify (Supliful US / Suplify EU) and set variant_id, or set the kit\'s partner cart URL if it sells via a partner' : 'Affiliate row — sold on the partner store, not ours'}
                             style={i.lane === 'store' ? { color: '#dc2626', fontWeight: 600 } : undefined}>
                             {i.lane === 'store' ? 'NO' : '—'}
                           </span>}
@@ -684,7 +684,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                       return (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           {buyUrl
-                            ? <a href={buyUrl} target="_blank" rel="noopener noreferrer" title={buyPath === 'store' ? `Add to cart on the HealthScan Shopify store — ${buyUrl}` : `Buy via partner — ${buyUrl}`}
+                            ? <a href={buyUrl} target="_blank" rel="noopener noreferrer" title={buyPath === 'store' ? `Add to cart on the ROUTINE³ Shopify store — ${buyUrl}` : `Buy via partner — ${buyUrl}`}
                                 style={{ display: 'inline-flex', padding: 3, color: 'var(--sb-brand-strong)' }}>
                                 <ShoppingCart size={13} />
                               </a>
@@ -708,11 +708,11 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               }; // end renderLeaf
 
               // Which "store" a row buys from — mirrors how the mobile app groups
-              // the cart by merchant: all store-lane items are one HealthScan-store
+              // the cart by merchant: all store-lane items are one ROUTINE³-store
               // group; each affiliate partner (by supplier, else the link host) is
               // its own group so the buy destinations are obvious.
               const merchantOf = (i: KitItem): { key: string; label: string; store: boolean } => {
-                if (kitItemBuyPath(i) === 'store' || i.lane === 'store') return { key: 'store', label: 'Our store · HealthScan (Shopify)', store: true };
+                if (kitItemBuyPath(i) === 'store' || i.lane === 'store') return { key: 'store', label: 'Our store · ROUTINE³ (Shopify)', store: true };
                 const host = hostOf(i.affiliate_url || null) || '';
                 const label = i.supplier || host || 'Other partner';
                 return { key: `aff:${label.toLowerCase()}`, label, store: false };
@@ -803,7 +803,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                               <span style={{ fontSize: 11, color: 'var(--sb-text-faint)' }}>{g.rows.length} item{g.rows.length !== 1 ? 's' : ''}</span>
                               {storeCart && (
                                 <a href={storeCart} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px]"
-                                  title={`Add all ${g.rows.length} store items to one HealthScan Shopify cart — ${storeCart}`}
+                                  title={`Add all ${g.rows.length} store items to one ROUTINE³ Shopify cart — ${storeCart}`}
                                   style={{ color: 'var(--sb-brand-strong)', display: 'inline-flex', alignItems: 'center', gap: 3, textDecoration: 'none' }}>
                                   <ShoppingCart size={11} /> Buy all →
                                 </a>

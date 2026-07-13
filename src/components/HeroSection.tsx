@@ -25,7 +25,7 @@ function AppleMark({ size = 15 }: { size?: number }) {
   );
 }
 
-// Strava brandmark (in the HealthScan ochre accent) for the integrations strip.
+// Strava brandmark (in the ROUTINE³ terracotta accent) for the integrations strip.
 function StravaMark({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#B05A36" aria-hidden="true">
@@ -43,7 +43,7 @@ function OuraRing({ size = 15 }: { size?: number }) {
   );
 }
 
-// Apple Health heart (in the HealthScan ochre accent) for the integrations strip.
+// Apple Health heart (in the ROUTINE³ terracotta accent) for the integrations strip.
 function AppleHealthMark({ size = 15 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#B05A36" aria-hidden="true">
@@ -203,9 +203,10 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
           paddingBottom: "clamp(32px, 5vh, 56px)",
         }}
       >
-        {/* Top: issue line + folio */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: `1px solid ${ed.hair}`, paddingTop: 14 }}>
-          <p style={overline}>Health · Beauty · Fitness</p>
+        {/* Top: issue line + folio — inset to line up under the header logo/nav/buttons */}
+        <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: `1px solid ${ed.hair}`, paddingTop: 14, paddingLeft: "clamp(16px, 2vw, 28px)", paddingRight: "clamp(16px, 2vw, 28px)" }}>
+          <p style={overline}>Set · Track · Adapt</p>
+          <p style={{ ...overline, position: "absolute", left: "50%", top: 14, transform: "translateX(-50%)", opacity: 0.5 }}>Health · Beauty · Fitness</p>
           <p style={folioStyle}>Out now on iOS · Android coming soon</p>
         </div>
 

@@ -17,17 +17,17 @@ export function useDocumentSetup() {
     // Add Open Graph meta tags for better Facebook/social sharing
     const updateMetaTags = () => {
       const metaTags = [
-        { property: 'og:title', content: 'HealthScan - Know What You Eat Before You Eat It' },
+        { property: 'og:title', content: 'ROUTINE³ - Know What You Eat Before You Eat It' },
         { property: 'og:description', content: 'Revolutionary food transparency platform exposing toxin levels, nutrient density, and chemical clearance times. Join the movement for food transparency!' },
         { property: 'og:url', content: window.location.origin },
         { property: 'og:type', content: 'website' },
-        { property: 'og:site_name', content: 'HealthScan' },
+        { property: 'og:site_name', content: 'ROUTINE³' },
         { property: 'og:image', content: `${window.location.origin}/healthscan-og-image.png` },
         { property: 'og:image:width', content: '1200' },
         { property: 'og:image:height', content: '630' },
-        { property: 'og:image:alt', content: 'HealthScan - Food Transparency Revolution' },
+        { property: 'og:image:alt', content: 'ROUTINE³ - Food Transparency Revolution' },
         { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:title', content: 'HealthScan - Know What You Eat Before You Eat It' },
+        { name: 'twitter:title', content: 'ROUTINE³ - Know What You Eat Before You Eat It' },
         { name: 'twitter:description', content: 'Revolutionary food transparency platform exposing toxin levels, nutrient density, and chemical clearance times.' },
         { name: 'twitter:image', content: `${window.location.origin}/healthscan-og-image.png` },
         { name: 'description', content: 'Revolutionary food transparency platform exposing toxin levels, nutrient density, and chemical clearance times. Join the movement for food transparency!' }
@@ -49,7 +49,7 @@ export function useDocumentSetup() {
       });
 
       // Ensure proper title
-      document.title = 'HealthScan - Know What You Eat Before You Eat It';
+      document.title = 'ROUTINE³ - Know What You Eat Before You Eat It';
     };
 
     updateViewportMeta();

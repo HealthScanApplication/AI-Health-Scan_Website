@@ -140,7 +140,7 @@ export function ComparisonTool() {
             Smart Product Comparison
           </h2>
           <p className="text-xl text-[var(--healthscan-text-muted)] max-w-3xl mx-auto mb-8">
-            Don't just compare prices—compare health. HealthScan makes it easy to see which 
+            Don't just compare prices—compare health. ROUTINE³ makes it easy to see which
             products are truly better for you with side-by-side nutritional analysis.
           </p>
           <div className="flex justify-center items-center gap-6 text-sm text-gray-600">

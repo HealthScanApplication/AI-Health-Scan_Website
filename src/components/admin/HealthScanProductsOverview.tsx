@@ -80,7 +80,7 @@ export function HealthScanProductsOverview({ accessToken }: HealthScanProductsOv
         fetch(`https://${projectId}.supabase.co/rest/v1/hs_tests?select=*&order=name`, { headers }),
         fetch(`https://${projectId}.supabase.co/rest/v1/hs_supplements?select=*&order=name`, { headers }),
         // hs_products was merged into catalog_products (20260710) and dropped — read the
-        // HealthScan store SKUs (product_hs_*) from the single catalog_products table instead.
+        // ROUTINE³ store SKUs (product_hs_*) from the single catalog_products table instead.
         fetch(`https://${projectId}.supabase.co/rest/v1/catalog_products?id=like.product_hs_*&select=*&order=name`, { headers }),
         // the buyable "Shop the kit" bundles per protocol × region + their line items
         fetch(`https://${projectId}.supabase.co/rest/v1/protocol_kits?select=slug,market,protocol_id,is_live`, { headers }),
@@ -181,8 +181,8 @@ export function HealthScanProductsOverview({ accessToken }: HealthScanProductsOv
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">HealthScan Products Overview</h2>
-          <p className="text-sm text-gray-500 mt-1">Live status, links, and sales readiness for all HealthScan products</p>
+          <h2 className="text-2xl font-bold text-gray-900">ROUTINE³ Products Overview</h2>
+          <p className="text-sm text-gray-500 mt-1">Live status, links, and sales readiness for all ROUTINE³ products</p>
         </div>
         <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
           {testStats.total + suppStats.total + prodStats.total} Total Products

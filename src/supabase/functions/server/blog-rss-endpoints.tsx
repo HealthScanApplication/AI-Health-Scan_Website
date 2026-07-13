@@ -181,7 +181,7 @@ async function fetchRSSFeed(): Promise<BlogArticle[]> {
     // Extract RSS metadata using regex
     const channelTitleMatch = rssContent.match(/<channel>[\s\S]*?<title[^>]*>([\s\S]*?)<\/title>/i);
     const channelDescMatch = rssContent.match(/<channel>[\s\S]*?<description[^>]*>([\s\S]*?)<\/description>/i);
-    const channelTitle = channelTitleMatch ? channelTitleMatch[1].trim().replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1') : 'HealthScan Blog';
+    const channelTitle = channelTitleMatch ? channelTitleMatch[1].trim().replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1') : 'ROUTINE³ Blog';
     const channelDescription = channelDescMatch ? channelDescMatch[1].trim().replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1') : 'Health insights and research';
     
     console.log('📰 Server: RSS Feed Info:', { title: channelTitle, description: channelDescription });
@@ -225,7 +225,7 @@ async function fetchRSSFeed(): Promise<BlogArticle[]> {
         const creatorMatch = itemXml.match(/<creator[^>]*>([\s\S]*?)<\/creator>/i);
         const author = (dcCreatorMatch ? dcCreatorMatch[1] : 
                        authorMatch ? authorMatch[1] : 
-                       creatorMatch ? creatorMatch[1] : 'HealthScan Team').trim().replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1');
+                       creatorMatch ? creatorMatch[1] : 'ROUTINE³ Team').trim().replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1');
         
         // Extract image from multiple sources
         let imageUrl: string | undefined;
@@ -335,7 +335,7 @@ app.get('/blog/articles', async (c) => {
         title: 'Understanding Food Labels: What to Look For',
         excerpt: 'Learn how to decode food labels and identify potential health concerns in your everyday products. This guide covers essential ingredients to avoid and healthier alternatives.',
         content: 'Food labels can be confusing, but understanding them is crucial for making healthy choices...',
-        author: 'HealthScan Team',
+        author: 'ROUTINE³ Team',
         publishDate: new Date().toISOString(),
         readTime: '5 min read',
         imageUrl: 'https://images.unsplash.com/photo-1556909502-f6b3d4d65b31?w=600&h=400&fit=crop',
@@ -348,7 +348,7 @@ app.get('/blog/articles', async (c) => {
         title: 'The Hidden Toxins in Your Kitchen',
         excerpt: 'Discover common household items that may contain harmful chemicals and learn about safer alternatives for your family.',
         content: 'Many everyday kitchen items contain hidden toxins that can affect your health...',
-        author: 'HealthScan Research Team',
+        author: 'ROUTINE³ Research Team',
         publishDate: new Date(Date.now() - 86400000).toISOString(), // Yesterday
         readTime: '7 min read',
         imageUrl: 'https://images.unsplash.com/photo-1556909919-f6b3e4d65b31?w=600&h=400&fit=crop',

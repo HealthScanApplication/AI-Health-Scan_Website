@@ -41,13 +41,13 @@ export function ReferralModal({
   };
 
   const shareOnTwitter = () => {
-    const text = `Join me on HealthScan! 🌱 Get early access to revolutionary AI-powered health scanning. Use my referral code: ${referralCode}`;
+    const text = `Join me on ROUTINE³! 🌱 Get early access to revolutionary AI-powered health scanning. Use my referral code: ${referralCode}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(referralLink)}`;
     window.open(url, '_blank');
   };
 
   const shareOnLinkedIn = () => {
-    const text = `I'm on the HealthScan waitlist! 🌱 Join me and get early access to revolutionary AI-powered health scanning. Use my referral code: ${referralCode}`;
+    const text = `I'm on the ROUTINE³ waitlist! 🌱 Join me and get early access to revolutionary AI-powered health scanning. Use my referral code: ${referralCode}`;
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`;
     window.open(url, '_blank');
   };
@@ -61,7 +61,7 @@ export function ReferralModal({
             Share & Move Up
           </DialogTitle>
           <DialogDescription>
-            Invite friends to HealthScan and move up in the queue
+            Invite friends to ROUTINE³ and move up in the queue
           </DialogDescription>
         </DialogHeader>
 
@@ -142,7 +142,7 @@ export function ReferralModal({
               <Users className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-sm text-gray-900">Earn Free Weeks</p>
-                <p className="text-xs text-gray-600">Get free access when HealthScan launches</p>
+                <p className="text-xs text-gray-600">Get free access when ROUTINE³ launches</p>
               </div>
             </div>
           </div>

@@ -823,8 +823,8 @@ export async function handleWaitlistSignup(c: any): Promise<Response> {
     return c.json({
       success: true,
       message: needsConfirmation
-        ? 'Welcome to the HealthScan waitlist! Please check your email to confirm your spot.'
-        : 'Welcome to the HealthScan waitlist!',
+        ? 'Welcome to the ROUTINE³ waitlist! Please check your email to confirm your spot.'
+        : 'Welcome to the ROUTINE³ waitlist!',
       position: calculatedPosition,
       referralCode: userReferralCode,
       totalWaitlist: currentCount + 1,

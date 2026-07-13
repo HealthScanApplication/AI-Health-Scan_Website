@@ -182,7 +182,7 @@ export function PasswordUpgradeModal({
         console.log('🔑 Using regular account creation flow');
         
         // Regular account creation
-        const { error } = await signUp(userEmail, password, 'HealthScan User');
+        const { error } = await signUp(userEmail, password, 'ROUTINE³ User');
         
         if (error) {
           if (error.signupSuccess) {
@@ -229,7 +229,7 @@ export function PasswordUpgradeModal({
   const handleSocialModalClose = () => {
     console.log('✅ User finished sharing flow');
     setShowSocialModal(false);
-    toast.success('🎉 Welcome to HealthScan! Start sharing to earn rewards and climb the queue.');
+    toast.success('🎉 Welcome to ROUTINE³! Start sharing to earn rewards and climb the queue.');
     onOpenChange(false);
   };
 

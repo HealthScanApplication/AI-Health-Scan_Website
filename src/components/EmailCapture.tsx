@@ -205,7 +205,7 @@ export function EmailCapture({ onSignupSuccess, placeholder = "Add your email", 
       if (data.isUpdate) {
         toast.success(`👋 Welcome back! You're on the waitlist.`);
       } else {
-        toast.success(`🎉 You're on the list! Welcome to HealthScan!`);
+        toast.success(`🎉 You're on the list! Welcome to ROUTINE³!`);
       }
       
       // Show referral success message if they were referred

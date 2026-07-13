@@ -23,7 +23,7 @@ export function LaunchVideoSection() {
             See it in a <span style={{ fontStyle: "italic", color: ed.accent }}>minute</span>.
           </h2>
           <p style={{ ...deckStyle, marginTop: 22, maxWidth: "44ch" }}>
-            How HealthScan changes the way people make food choices — start to finish.
+            How ROUTINE³ changes the way people make food choices — start to finish.
           </p>
         </div>
 
@@ -33,7 +33,7 @@ export function LaunchVideoSection() {
             <div style={{ position: "relative", paddingTop: "56.25%", overflow: "hidden", background: "#000" }}>
               <iframe
                 src="https://www.youtube.com/embed/BWSJ3OJGB5A"
-                title="HealthScan — Know What You Eat"
+                title="ROUTINE³ — Know What You Eat"
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
@@ -42,7 +42,7 @@ export function LaunchVideoSection() {
             </div>
           </div>
           <figcaption style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginTop: 16 }}>
-            <span style={{ fontFamily: GRO, fontSize: 11, fontStyle: "italic", color: ed.inkSoft, letterSpacing: "0.02em" }}>Fig. 05 — The HealthScan film</span>
+            <span style={{ fontFamily: GRO, fontSize: 11, fontStyle: "italic", color: ed.inkSoft, letterSpacing: "0.02em" }}>Fig. 05 — The ROUTINE³ film</span>
             <a href="https://healthscan.gumroad.com/coffee" target="_blank" rel="noopener noreferrer" className="ed-cta">Back the project →</a>
           </figcaption>
         </figure>

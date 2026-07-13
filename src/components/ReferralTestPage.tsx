@@ -92,7 +92,7 @@ export function ReferralTestPage() {
             Referral System Test Page
           </h1>
           <p className="text-lg text-gray-600">
-            Test and debug the HealthScan referral system functionality
+            Test and debug the ROUTINE³ referral system functionality
           </p>
         </div>
 

@@ -82,7 +82,7 @@ export function NetworkDiagnostic({ onClose }: NetworkDiagnosticProps) {
       description: 'Supabase database platform availability'
     },
     {
-      name: 'HealthScan Server Health',
+      name: 'ROUTINE³ Server Health',
       url: `https://${projectId}.supabase.co/functions/v1/make-server-557a7646/health`,
       method: 'GET',
       headers: {
@@ -90,7 +90,7 @@ export function NetworkDiagnostic({ onClose }: NetworkDiagnosticProps) {
         'Accept': 'application/json'
       },
       timeout: 10000,
-      description: 'HealthScan production server health check'
+      description: 'ROUTINE³ production server health check'
     },
     {
       name: 'Database Statistics API',
@@ -331,7 +331,7 @@ export function NetworkDiagnostic({ onClose }: NetworkDiagnosticProps) {
               Network Diagnostic
             </h1>
             <p className="text-gray-600 mt-1">
-              Test network connectivity and HealthScan server availability
+              Test network connectivity and ROUTINE³ server availability
             </p>
           </div>
           
@@ -451,7 +451,7 @@ export function NetworkDiagnostic({ onClose }: NetworkDiagnosticProps) {
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Activity className="w-5 h-5" />
-            HealthScan Server Tests
+            ROUTINE³ Server Tests
             {results.length > 0 && (
               <Badge variant="outline" className="ml-2">
                 {results.filter(r => r && r.success === true).length}/{results.length} passed
@@ -463,7 +463,7 @@ export function NetworkDiagnostic({ onClose }: NetworkDiagnosticProps) {
             <Alert className="bg-blue-50 border-blue-200">
               <Globe className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800">
-                Click "Run Tests" to diagnose network connectivity and HealthScan server availability.
+                Click "Run Tests" to diagnose network connectivity and ROUTINE³ server availability.
                 This will test all production endpoints including admin dashboard, referral system, and API integrations.
               </AlertDescription>
             </Alert>

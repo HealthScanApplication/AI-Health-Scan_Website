@@ -2121,7 +2121,7 @@ export const GOALS: Goal[] = [
         "name": "Functional Training Circuit",
         "chip": "Functional",
         "description": "A full-body functional circuit built on the five fundamental movement patterns — squat, hinge, push, pull, and carry. Trains strength that transfers to everyday movement; scalable from bodyweight to loaded.",
-        "creator": "HealthScan",
+        "creator": "ROUTINE³",
         "evidence": "moderate",
         "days": 1,
         "items": [

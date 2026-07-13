@@ -131,7 +131,7 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
         onClick={() => setExpanded(v => !v)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-teal-800">HealthScan Coverage</span>
+          <span className="text-sm font-semibold text-teal-800">ROUTINE³ Coverage</span>
           {loading ? (
             <span className="text-xs text-teal-500">Loading…</span>
           ) : (
@@ -159,7 +159,7 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
               <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Tests</span>
             </div>
             {!hasTests ? (
-              <p className="text-xs text-gray-400 italic">No HealthScan test linked to this element</p>
+              <p className="text-xs text-gray-400 italic">No ROUTINE³ test linked to this element</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {tests.map(test => (
@@ -232,7 +232,7 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
               <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Supplements</span>
             </div>
             {!hasSupplements ? (
-              <p className="text-xs text-gray-400 italic">No HealthScan supplement linked to this element</p>
+              <p className="text-xs text-gray-400 italic">No ROUTINE³ supplement linked to this element</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {supplements.map(supp => (
@@ -336,7 +336,7 @@ export function HealthScanCoverageSection({ elementKey, elementKeys, accessToken
           {!hasCoverage && (
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-dashed border-gray-300">
               <XCircle className="w-4 h-4 text-gray-400" />
-              <span className="text-xs text-gray-500">This element is not yet covered by HealthScan tests, supplements or products. Add via the HS tabs.</span>
+              <span className="text-xs text-gray-500">This element is not yet covered by ROUTINE³ tests, supplements or products. Add via the HS tabs.</span>
             </div>
           )}
         </div>
@@ -369,7 +369,7 @@ export function IngredientCoverageSection({ record, accessToken, onOpenTest, onO
   if (!keys.length) {
     return (
       <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 text-center">
-        <p className="text-xs text-gray-400">No element links found — add element keys to elements_content to see HealthScan coverage.</p>
+        <p className="text-xs text-gray-400">No element links found — add element keys to elements_content to see ROUTINE³ coverage.</p>
       </div>
     );
   }

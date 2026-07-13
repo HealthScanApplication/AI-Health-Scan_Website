@@ -120,7 +120,7 @@ const defaultNutrient: NutrientData = {
   food_sources: [],
   
   // System fields
-  source: "HealthScan Nutrient Database",
+  source: "ROUTINE³ Nutrient Database",
   api_source: "Manual Entry",
   imported_at: new Date().toISOString(),
   external_id: "",

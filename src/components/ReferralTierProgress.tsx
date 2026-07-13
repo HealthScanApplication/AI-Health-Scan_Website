@@ -150,7 +150,7 @@ export function ReferralTierProgress({ referralCount = 0, className = '' }: Refe
         {/* Header */}
         <div className="text-center">
           <h4 className="text-lg font-bold text-gray-900 mb-2">Referral Rewards System</h4>
-          <p className="text-sm text-gray-600">Unlock amazing rewards by sharing HealthScan with friends</p>
+          <p className="text-sm text-gray-600">Unlock amazing rewards by sharing ROUTINE³ with friends</p>
         </div>
 
         {/* Current Tier Display */}

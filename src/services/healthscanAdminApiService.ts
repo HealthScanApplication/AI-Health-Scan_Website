@@ -1,5 +1,5 @@
 /**
- * HealthScan Admin API Service
+ * ROUTINE³ Admin API Service
  * 
  * Centralized API service for admin operations using Supabase Edge Functions
  * Replaces direct Supabase calls with standardized API endpoints

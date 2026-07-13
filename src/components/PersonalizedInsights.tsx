@@ -227,8 +227,8 @@ export function PersonalizedInsights() {
             Personalized Health Insights
           </h2>
           <p className="text-xl text-[var(--healthscan-text-muted)] max-w-3xl mx-auto mb-8">
-            Get recommendations tailored to your unique health goals and dietary needs. 
-            HealthScan learns what matters most to you and highlights what to look for.
+            Get recommendations tailored to your unique health goals and dietary needs.
+            ROUTINE³ learns what matters most to you and highlights what to look for.
           </p>
           <div className="flex justify-center items-center gap-6 text-sm text-gray-600">
             <div className="flex items-center gap-2">
@@ -285,7 +285,7 @@ export function PersonalizedInsights() {
               <div className="mt-6 p-4 bg-[var(--healthscan-bg-light)] rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Pro Tip</h4>
                 <p className="text-xs text-gray-600">
-                  You can set multiple goals in the app. HealthScan will balance recommendations 
+                  You can set multiple goals in the app. ROUTINE³ will balance recommendations
                   to help you achieve all your health objectives.
                 </p>
               </div>
@@ -299,7 +299,7 @@ export function PersonalizedInsights() {
                 Recommendations for {healthGoals.find(g => g.id === selectedGoal)?.name}
               </h3>
               <p className="text-sm text-gray-600">
-                Based on your goal, here's what HealthScan will highlight when scanning products:
+                Based on your goal, here's what ROUTINE³ will highlight when scanning products:
               </p>
             </div>
 

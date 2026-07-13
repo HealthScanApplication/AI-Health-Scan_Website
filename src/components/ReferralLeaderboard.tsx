@@ -255,7 +255,7 @@ export function ReferralLeaderboard() {
             Share to Unlock Rewards
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Help friends discover HealthScan and earn exclusive rewards. The more you share, the more you save!
+            Help friends discover ROUTINE³ and earn exclusive rewards. The more you share, the more you save!
           </p>
         </div>
 

@@ -1,5 +1,5 @@
 // SocialProofSection — editorial trust block.
-// HealthScan is newly live on iOS; rather than invent testimonials or stats,
+// ROUTINE³ is newly live on iOS; rather than invent testimonials or stats,
 // this presents an honest set of commitments as a magazine "statement of values".
 import { ed, GRO, DISPLAY, kickerStyle, folioStyle, h2Style, deckStyle, pullStyle } from "../config/editorialTheme";
 import { Reveal } from "./motion/Reveal";

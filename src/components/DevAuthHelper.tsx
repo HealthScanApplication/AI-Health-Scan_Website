@@ -15,7 +15,7 @@ interface DevAuthHelperProps {
 export function DevAuthHelper({ isVisible = false }: DevAuthHelperProps) {
   const [showHelper, setShowHelper] = useState(isVisible);
   const [testEmail, setTestEmail] = useState('johnferreira@gmail.com');
-  const [testPassword, setTestPassword] = useState('HealthScan2024!');
+  const [testPassword, setTestPassword] = useState('ROUTINE³2024!');
   const [testName, setTestName] = useState('John Ferreira');
   const [showPassword, setShowPassword] = useState(false);
   const [isCreating, setIsCreating] = useState(false);

@@ -193,7 +193,7 @@ export function SocialShareComponent({
         <div className="text-center">
           <h4 className="text-lg font-semibold text-gray-900 mb-2">Share with friends</h4>
           <p className="text-sm text-[var(--healthscan-text-muted)]">
-            Help spread the word about HealthScan!
+            Help spread the word about ROUTINE³!
           </p>
         </div>
       )}

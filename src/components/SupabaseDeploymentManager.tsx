@@ -216,9 +216,9 @@ jobs:
       {
         name: 'deploy.sh',
         content: `#!/bin/bash
-# HealthScan Edge Function Deployment Script
+# ROUTINE³ Edge Function Deployment Script
 
-echo "🚀 Deploying HealthScan Edge Function..."
+echo "🚀 Deploying ROUTINE³ Edge Function..."
 
 # Check if Supabase CLI is installed
 if ! command -v supabase &> /dev/null; then
@@ -270,7 +270,7 @@ echo "✅ Deployment completed!"
     {
       label: 'Link Project',
       command: `supabase link --project-ref ${projectId}`,
-      description: 'Link to your HealthScan project'
+      description: 'Link to your ROUTINE³ project'
     },
     {
       label: 'Deploy Edge Function',

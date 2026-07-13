@@ -67,7 +67,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
   const loadApiStats = async (showToast = true) => {
     setLoading(true);
     try {
-      console.log('📊 Loading HealthScan API statistics...');
+      console.log('📊 Loading ROUTINE³ API statistics...');
 
       // Check API health first
       const health = await healthScanApiUtils.checkApiHealth();
@@ -75,7 +75,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
 
       if (!health.online) {
         if (showToast) {
-          healthScanApiUtils.showApiWarning('HealthScan API appears to be offline');
+          healthScanApiUtils.showApiWarning('ROUTINE³ API appears to be offline');
         }
         // Provide fallback stats when API is offline
         setApiStats({
@@ -103,12 +103,12 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
       if (stats) {
         setApiStats(stats);
         if (showToast) {
-          healthScanApiUtils.showApiSuccess('HealthScan API data loaded successfully');
+          healthScanApiUtils.showApiSuccess('ROUTINE³ API data loaded successfully');
         }
       } else if (statsResponse && !statsResponse.success && statsResponse.error?.includes('Endpoint not available')) {
         // Handle case where stats endpoint is not available
         if (showToast) {
-          healthScanApiUtils.showApiWarning('Statistics endpoint is not yet available in the HealthScan API');
+          healthScanApiUtils.showApiWarning('Statistics endpoint is not yet available in the ROUTINE³ API');
         }
         setApiStats({
           nutrients: { total: 0, categories: {} },
@@ -122,27 +122,27 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
             api_version: 'v1',
             uptime: 0,
             last_updated: new Date().toISOString(),
-            data_sources: ['HealthScan API']
+            data_sources: ['ROUTINE³ API']
           }
         });
-        setApiHealth({ online: true, message: 'HealthScan API is online (limited endpoints available)' });
+        setApiHealth({ online: true, message: 'ROUTINE³ API is online (limited endpoints available)' });
       } else {
         throw new Error('Failed to load API statistics');
       }
 
     } catch (error) {
-      console.error('❌ Failed to load HealthScan API data:', error);
+      console.error('❌ Failed to load ROUTINE³ API data:', error);
       
       // Don't show error toast for 404/endpoint not available errors
       if (!error.message?.includes('Endpoint not available') && showToast) {
-        healthScanApiUtils.showApiError(error, 'Loading HealthScan API data');
+        healthScanApiUtils.showApiError(error, 'Loading ROUTINE³ API data');
       }
       
       const errorMsg = healthScanApiUtils.formatApiError(error);
       
       // Set health status based on error type
       if (errorMsg.includes('Endpoint not available') || errorMsg.includes('404')) {
-        setApiHealth({ online: true, message: 'HealthScan API is online (limited endpoints available)' });
+        setApiHealth({ online: true, message: 'ROUTINE³ API is online (limited endpoints available)' });
         // Provide basic stats structure even when endpoints are unavailable
         setApiStats({
           nutrients: { total: 0, categories: {} },
@@ -156,7 +156,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
             api_version: 'v1',
             uptime: 0,
             last_updated: new Date().toISOString(),
-            data_sources: ['HealthScan API (limited)']
+            data_sources: ['ROUTINE³ API (limited)']
           }
         });
       } else {
@@ -218,7 +218,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
 
       // Handle endpoint not available case
       if (response && !response.success && response.error?.includes('Endpoint not available')) {
-        healthScanApiUtils.showApiWarning(`${type} endpoint is not yet available in the HealthScan API`);
+        healthScanApiUtils.showApiWarning(`${type} endpoint is not yet available in the ROUTINE³ API`);
       }
 
     } catch (error) {
@@ -275,7 +275,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
       <CardHeader>
         <div className="flex items-center gap-2">
           <Globe className="h-5 w-5 text-blue-600" />
-          <CardTitle className="text-lg">HealthScan API Status</CardTitle>
+          <CardTitle className="text-lg">ROUTINE³ API Status</CardTitle>
           <Button 
             onClick={() => loadApiStats()} 
             variant="outline" 
@@ -320,7 +320,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
           
           {apiHealth?.message?.includes('limited') && (
             <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-xs">
-              <p><strong>Note:</strong> Some API endpoints may not be available yet. The HealthScan API is actively being developed.</p>
+              <p><strong>Note:</strong> Some API endpoints may not be available yet. The ROUTINE³ API is actively being developed.</p>
             </div>
           )}
         </div>
@@ -451,7 +451,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
           <Database className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No {type} data available</p>
           <p className="text-xs mt-2 opacity-75">
-            This endpoint may not be implemented yet in the HealthScan API
+            This endpoint may not be implemented yet in the ROUTINE³ API
           </p>
         </div>
       );
@@ -624,8 +624,8 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">HealthScan API Dashboard</h2>
-          <p className="text-gray-600">Real-time data from HealthScan's production API</p>
+          <h2 className="text-2xl font-bold text-gray-900">ROUTINE³ API Dashboard</h2>
+          <p className="text-gray-600">Real-time data from ROUTINE³'s production API</p>
         </div>
         <Button onClick={() => loadApiStats()} disabled={loading} variant="outline">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -663,7 +663,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
                 Nutrients Data
               </CardTitle>
               <CardDescription>
-                Nutritional compounds from the HealthScan API
+                Nutritional compounds from the ROUTINE³ API
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -681,7 +681,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
                 Ingredients Data
               </CardTitle>
               <CardDescription>
-                Food ingredients and components from the HealthScan API
+                Food ingredients and components from the ROUTINE³ API
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -699,7 +699,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
                 Products Data
               </CardTitle>
               <CardDescription>
-                Commercial food products from the HealthScan API
+                Commercial food products from the ROUTINE³ API
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -717,7 +717,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
                 Pollutants Data
               </CardTitle>
               <CardDescription>
-                Environmental toxins and contaminants from the HealthScan API
+                Environmental toxins and contaminants from the ROUTINE³ API
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -735,7 +735,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
                 Scans Data
               </CardTitle>
               <CardDescription>
-                User scans and analysis results from the HealthScan API
+                User scans and analysis results from the ROUTINE³ API
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -753,7 +753,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
                 Meals Data
               </CardTitle>
               <CardDescription>
-                Meal plans and nutritional combinations from the HealthScan API
+                Meal plans and nutritional combinations from the ROUTINE³ API
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -771,7 +771,7 @@ export function HealthScanApiDashboard({ accessToken }: HealthScanApiDashboardPr
                 Parasites Data
               </CardTitle>
               <CardDescription>
-                Parasites and harmful organisms from the HealthScan API
+                Parasites and harmful organisms from the ROUTINE³ API
               </CardDescription>
             </CardHeader>
             <CardContent>

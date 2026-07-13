@@ -45,7 +45,7 @@ export function ReferralInvitationSection({
     {
       icon: <Gift className="w-6 h-6" />,
       title: "Free Premium Weeks",
-      description: "Earn multiple free weeks of HealthScan Premium through referrals",
+      description: "Earn multiple free weeks of ROUTINE³ Premium through referrals",
       color: "text-[var(--healthscan-green)]"
     },
     {
@@ -140,12 +140,12 @@ export function ReferralInvitationSection({
             <p className="text-xl text-gray-600 mb-4">
               {referrerName ? (
                 <>
-                  <span className="font-semibold text-[var(--healthscan-green)]">{referrerName}</span> invited you to join HealthScan,
+                  <span className="font-semibold text-[var(--healthscan-green)]">{referrerName}</span> invited you to join ROUTINE³,
                   the revolutionary app that reveals what's really in your food.
                 </>
               ) : (
                 <>
-                  A friend invited you to join HealthScan, the revolutionary app that reveals what's really in your food.
+                  A friend invited you to join ROUTINE³, the revolutionary app that reveals what's really in your food.
                 </>
               )}
             </p>
@@ -226,13 +226,13 @@ export function ReferralInvitationSection({
                 ))}
               </div>
               <blockquote className="text-xl md:text-2xl mb-8 italic leading-relaxed">
-                "HealthScan completely changed how I shop for food. I finally understand what I'm putting in my body, and I've never felt healthier!"
+                "ROUTINE³ completely changed how I shop for food. I finally understand what I'm putting in my body, and I've never felt healthier!"
               </blockquote>
               <div className="flex items-center justify-center gap-4">
                 <Avatar className="w-16 h-16 border-2 border-white/30 shadow-lg">
                   <AvatarImage 
                     src="https://ui-avatars.com/api/?name=Sarah+Johnson&size=128&background=3b82f6&color=ffffff&rounded=true&bold=true&format=png" 
-                    alt="Sarah Johnson - HealthScan user"
+                    alt="Sarah Johnson - ROUTINE³ user"
                     className="object-cover"
                   />
                   <AvatarFallback className="bg-white/20 text-white font-semibold">SJ</AvatarFallback>

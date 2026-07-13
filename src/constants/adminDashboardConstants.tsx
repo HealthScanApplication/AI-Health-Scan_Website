@@ -61,7 +61,7 @@ export const dataTypeCards = [
 
 export const tabConfig = [
   { value: 'overview', label: 'Overview', icon: Database },
-  { value: 'healthscan-api', label: 'HealthScan API', icon: ExternalLink },
+  { value: 'healthscan-api', label: 'ROUTINE³ API', icon: ExternalLink },
   { value: 'users', label: 'Users', icon: Users },
   { value: 'api-migration', label: 'API Migration', icon: Cloud },
   { value: 'email-service', label: 'Email Service', icon: Mail },

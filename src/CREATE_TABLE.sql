@@ -1,4 +1,4 @@
--- HealthScan Database Setup
+-- ROUTINE³ Database Setup
 -- Copy and paste this ENTIRE script into Supabase Dashboard → SQL Editor and click "RUN"
 
 -- Step 1: Create the main table
@@ -42,4 +42,4 @@ VALUES ('setup_test', '{"setup": true, "timestamp": "' || now() || '"}')
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
 -- Success message
-SELECT 'HealthScan database setup completed successfully!' as status;
+SELECT 'ROUTINE³ database setup completed successfully!' as status;

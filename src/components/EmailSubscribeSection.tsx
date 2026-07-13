@@ -67,7 +67,7 @@ export function EmailSubscribeSection() {
                 rel="noopener noreferrer"
                 className="ed-cta"
               >
-                <AppleMark />Try HealthScan&nbsp;→
+                <AppleMark />Try ROUTINE³&nbsp;→
               </a>
             </div>
           </div>

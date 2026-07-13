@@ -10,7 +10,7 @@
  *
  * Economics per item (expand a row): supplier cost → generated margin_pct
  * (read-only — DB computes it), supplier name (e.g. 'Tre Lune'), affiliate
- * commission % for non-HealthScan items. Footer totals per region: sell /
+ * commission % for non-ROUTINE³ items. Footer totals per region: sell /
  * cost / margin / est. affiliate commission.
  *
  * "Copy region → region" clones missing items compliance-aware (skips blocked,
@@ -526,7 +526,7 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
                 <input defaultValue={it.price_usd ?? ''} placeholder="0.00" title="Sale price (region currency)"
                   className="w-16 rounded border border-gray-200 bg-white px-1 py-0.5 text-xs"
                   onBlur={(e) => { const v = num(e.target.value); if (v !== it.price_usd) commit(it, { price_usd: v }); }} />
-                <span title={it.lane === 'store' ? 'HealthScan store (Shopify variant)' : 'Affiliate / external link'}
+                <span title={it.lane === 'store' ? 'ROUTINE³ store (Shopify variant)' : 'Affiliate / external link'}
                   className={`rounded px-1 text-[10px] font-bold ${it.lane === 'store' ? 'bg-gray-900 text-white' : 'bg-purple-50 text-purple-600 border border-purple-300'}`}>
                   {it.lane === 'store' ? 'S' : 'A'}
                 </span>

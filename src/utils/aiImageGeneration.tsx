@@ -21,13 +21,13 @@ export const createImageGenerationPrompt = (recordType: string, itemName: string
       return `${baseContext}, showing premium ${itemName} package being held above a shopping basket in grocery shopping context, product photography style`;
     
     case 'pollutant':
-      return `${baseContext}, showing a smartphone displaying HealthScan app interface scanning a product for ${itemName} contamination warning, modern mobile app UI`;
+      return `${baseContext}, showing a smartphone displaying ROUTINE³ app interface scanning a product for ${itemName} contamination warning, modern mobile app UI`;
     
     case 'product':
       return `${baseContext}, showing ${itemName} product package being held above a shopping basket, realistic product photography`;
     
     case 'scan':
-      return `${baseContext}, showing HealthScan mobile app interface scanning ${itemName}, clean modern app design with green accents`;
+      return `${baseContext}, showing ROUTINE³ mobile app interface scanning ${itemName}, clean modern app design with green accents`;
     
     case 'parasite':
       return `${baseContext}, scientific illustration of ${itemName} parasite with educational diagram elements, medical textbook style`;

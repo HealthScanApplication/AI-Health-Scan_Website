@@ -36,7 +36,7 @@ ${preheader ? `<span style="display:none;font-size:1px;color:#fff;max-height:0;o
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
   <!-- Header -->
   <tr><td style="background-color:#111827;padding:32px 40px;text-align:center;">
-    <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:22px;font-weight:600;color:#ffffff;letter-spacing:-0.3px;">HealthScan</p>
+    <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:22px;font-weight:600;color:#ffffff;letter-spacing:-0.3px;">ROUTINE³</p>
   </td></tr>
   <!-- Body -->
   <tr><td style="padding:40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -44,7 +44,7 @@ ${preheader ? `<span style="display:none;font-size:1px;color:#fff;max-height:0;o
   </td></tr>
   <!-- Footer -->
   <tr><td style="padding:24px 40px;border-top:1px solid #e5e7eb;text-align:center;">
-    <p style="margin:0 0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#9ca3af;">HealthScan — AI-Powered Health Scanning</p>
+    <p style="margin:0 0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#9ca3af;">ROUTINE³ — AI-Powered Health Scanning</p>
     <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#9ca3af;">You received this because you signed up at healthscan.live</p>
   </td></tr>
 </table>
@@ -77,11 +77,11 @@ export const EMAIL_TEMPLATES = {
 
   // ── Email 1: Confirmation (sent immediately on signup) ──────────────────
   waitlistConfirmation: (email: string, position: number, confirmationLink: string, referralCode?: string, referralLink?: string): EmailTemplate => ({
-    subject: `Confirm your spot — you're #${position} on the HealthScan waitlist`,
+    subject: `Confirm your spot — you're #${position} on the ROUTINE³ waitlist`,
     html: emailLayout(`
       <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Confirm your email</h1>
       <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
-        Thanks for signing up for HealthScan. Please confirm your email address to secure your spot on the waitlist.
+        Thanks for signing up for ROUTINE³. Please confirm your email address to secure your spot on the waitlist.
       </p>
 
       ${emailButton('Confirm Email Address', confirmationLink, '#10b981')}
@@ -108,10 +108,10 @@ export const EMAIL_TEMPLATES = {
       ` : ''}
 
       <p style="margin:28px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;">
-        If you didn't sign up for HealthScan, you can ignore this email. You can unsubscribe at any time.
+        If you didn't sign up for ROUTINE³, you can ignore this email. You can unsubscribe at any time.
       </p>
-    `, `You're #${position} on the HealthScan waitlist. Confirm your email to secure your spot.`),
-    text: `Confirm your spot on the HealthScan waitlist
+    `, `You're #${position} on the ROUTINE³ waitlist. Confirm your email to secure your spot.`),
+    text: `Confirm your spot on the ROUTINE³ waitlist
 
 You're #${position} in the queue.
 
@@ -124,7 +124,7 @@ ${referralLink ? `Share your referral link: ${referralLink}` : ''}
 
 If you didn't sign up, you can ignore this email.
 
-HealthScan — AI-Powered Health Scanning`
+ROUTINE³ — AI-Powered Health Scanning`
   }),
 
   // ── Email 1 (Bitly-style alias — same as above for backward compat) ─────
@@ -134,9 +134,9 @@ HealthScan — AI-Powered Health Scanning`
 
   // ── Email 2: Welcome (sent after email confirmation or 3 days later) ────
   welcomeEmail: (email: string, position: number, referralCode: string, referralLink: string): EmailTemplate => ({
-    subject: `Welcome to HealthScan — here's what happens next`,
+    subject: `Welcome to ROUTINE³ — here's what happens next`,
     html: emailLayout(`
-      <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Welcome to HealthScan</h1>
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Welcome to ROUTINE³</h1>
       <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
         Your email is confirmed and your spot is secured. Here's what to expect before launch.
       </p>
@@ -176,13 +176,13 @@ HealthScan — AI-Powered Health Scanning`
         </td></tr>
       </table>
 
-      ${emailButton('Visit HealthScan', 'https://healthscan.live')}
+      ${emailButton('Visit ROUTINE³', 'https://healthscan.live')}
 
       <p style="margin:0;font-size:13px;color:#9ca3af;">
         Questions? Just reply to this email.
       </p>
-    `, `Your spot is confirmed. Here's what happens before HealthScan launches.`),
-    text: `Welcome to HealthScan
+    `, `Your spot is confirmed. Here's what happens before ROUTINE³ launches.`),
+    text: `Welcome to ROUTINE³
 
 Your email is confirmed and your spot is secured.
 
@@ -200,23 +200,23 @@ Your referral link: ${referralLink}
 
 Questions? Reply to this email.
 
-HealthScan — AI-Powered Health Scanning`
+ROUTINE³ — AI-Powered Health Scanning`
   }),
 
   // ── Email 3: How to Use / Getting Started (sent 3 days after signup) ────
   howToUseEmail: (email: string, name: string): EmailTemplate => ({
-    subject: 'Getting ready for HealthScan — what you can do now',
+    subject: 'Getting ready for ROUTINE³ — what you can do now',
     html: emailLayout(`
       <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Get ready for launch day</h1>
       <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
-        Hi${name ? ` ${name}` : ''}, HealthScan launches on February 27, 2026. Here's how to get the most out of it from day one.
+        Hi${name ? ` ${name}` : ''}, ROUTINE³ launches on February 27, 2026. Here's how to get the most out of it from day one.
       </p>
 
-      <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#111827;">How HealthScan works</p>
+      <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#111827;">How ROUTINE³ works</p>
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px;">
         <tr><td style="padding:12px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
           <strong style="color:#111827;">Scan any food product</strong><br>
-          Point your camera at a food label, barcode, or ingredient list. HealthScan's AI reads and analyses it instantly.
+          Point your camera at a food label, barcode, or ingredient list. ROUTINE³'s AI reads and analyses it instantly.
         </td></tr>
         <tr><td style="padding:12px 0;font-size:14px;color:#4b5563;line-height:1.6;border-bottom:1px solid #f4f4f5;">
           <strong style="color:#111827;">Get a health score</strong><br>
@@ -245,17 +245,17 @@ HealthScan — AI-Powered Health Scanning`
         </td></tr>
       </table>
 
-      ${emailButton('Visit HealthScan', 'https://healthscan.live')}
+      ${emailButton('Visit ROUTINE³', 'https://healthscan.live')}
 
       <p style="margin:0;font-size:13px;color:#9ca3af;">
         Questions about how it works? Just reply to this email.
       </p>
-    `, `Here's how to get the most out of HealthScan from day one.`),
-    text: `Getting ready for HealthScan
+    `, `Here's how to get the most out of ROUTINE³ from day one.`),
+    text: `Getting ready for ROUTINE³
 
-Hi${name ? ` ${name}` : ''}, HealthScan launches on February 27, 2026. Here's how to get the most out of it.
+Hi${name ? ` ${name}` : ''}, ROUTINE³ launches on February 27, 2026. Here's how to get the most out of it.
 
-How HealthScan works:
+How ROUTINE³ works:
 - Scan any food product: Point your camera at a food label or barcode.
 - Get a health score: Every product receives a clear health score.
 - Understand what's inside: Plain-language breakdown of every ingredient.
@@ -270,12 +270,12 @@ Visit: https://healthscan.live
 
 Questions? Reply to this email.
 
-HealthScan — AI-Powered Health Scanning`
+ROUTINE³ — AI-Powered Health Scanning`
   }),
 
   // ── Email Confirmed (sent when user clicks confirm link) ────────────────
   emailConfirmed: (email: string, position: number, referralLink: string): EmailTemplate => ({
-    subject: `You're confirmed — #${position} on the HealthScan waitlist`,
+    subject: `You're confirmed — #${position} on the ROUTINE³ waitlist`,
     html: emailLayout(`
       <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Email confirmed</h1>
       <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
@@ -300,15 +300,15 @@ HealthScan — AI-Powered Health Scanning`
         <a href="${referralLink}" style="font-size:13px;color:#10b981;text-decoration:underline;word-break:break-all;">${referralLink}</a>
       </p>
 
-      ${emailButton('Visit HealthScan', 'https://healthscan.live')}
+      ${emailButton('Visit ROUTINE³', 'https://healthscan.live')}
 
       <p style="margin:0;font-size:13px;color:#9ca3af;">
         Questions? Just reply to this email.
       </p>
-    `, `Your email is confirmed. You're #${position} on the HealthScan waitlist.`),
+    `, `Your email is confirmed. You're #${position} on the ROUTINE³ waitlist.`),
     text: `Email confirmed
 
-Your spot on the HealthScan waitlist is locked in.
+Your spot on the ROUTINE³ waitlist is locked in.
 
 Position: #${position}
 Launch: February 27, 2026
@@ -318,7 +318,7 @@ Share your referral link to move up: ${referralLink}
 
 Visit: https://healthscan.live
 
-HealthScan — AI-Powered Health Scanning`
+ROUTINE³ — AI-Powered Health Scanning`
   })
 }
 
@@ -569,11 +569,11 @@ export class EmailService {
   // Send email verification/confirmation for auth users
   async sendEmailConfirmation(email: string, confirmationLink: string): Promise<{ success: boolean; error?: string }> {
     const emailTemplate = {
-      subject: 'Verify your HealthScan email address',
+      subject: 'Verify your ROUTINE³ email address',
       html: emailLayout(`
         <h1 style="margin:0 0 8px;font-size:22px;font-weight:600;color:#111827;">Verify your email</h1>
         <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
-          Please verify your email address to continue using HealthScan and access all features.
+          Please verify your email address to continue using ROUTINE³ and access all features.
         </p>
 
         ${emailButton('Verify Email Address', confirmationLink, '#10b981')}
@@ -586,16 +586,16 @@ export class EmailService {
         <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">
           If you didn't request this verification, you can safely ignore this email.
         </p>
-      `, 'Verify your email to access HealthScan.'),
-      text: `Verify your HealthScan email address
+      `, 'Verify your email to access ROUTINE³.'),
+      text: `Verify your ROUTINE³ email address
 
-Please verify your email address to continue using HealthScan.
+Please verify your email address to continue using ROUTINE³.
 
 Click this link to verify: ${confirmationLink}
 
 If you didn't request this, you can ignore this email.
 
-HealthScan — AI-Powered Health Scanning`
+ROUTINE³ — AI-Powered Health Scanning`
     }
     
     return await this.sendEmail({

@@ -313,9 +313,9 @@ export function ReferralDashboard({ userEmail, referralCode, currentReferrals }:
 
   const shareViaEmail = async () => {
     try {
-      const subject = encodeURIComponent('Join me on HealthScan - Know What You Eat!');
+      const subject = encodeURIComponent('Join me on ROUTINE³ - Know What You Eat!');
       const body = encodeURIComponent(
-        `Hey! I wanted to share HealthScan with you - it's an amazing app that helps you scan food and uncover the truth about what you're eating.\n\nJoin the waitlist using my referral link and we'll both get rewards:\n${referralLink}\n\nLet's build a healthier future together! 🌱`
+        `Hey! I wanted to share ROUTINE³ with you - it's an amazing app that helps you scan food and uncover the truth about what you're eating.\n\nJoin the waitlist using my referral link and we'll both get rewards:\n${referralLink}\n\nLet's build a healthier future together! 🌱`
       );
       const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
       
@@ -333,7 +333,7 @@ export function ReferralDashboard({ userEmail, referralCode, currentReferrals }:
   const shareViaWhatsApp = async () => {
     try {
       const message = encodeURIComponent(
-        `Hey! Check out HealthScan - scan any food and uncover the truth! Join using my link for rewards: ${referralLink}`
+        `Hey! Check out ROUTINE³ - scan any food and uncover the truth! Join using my link for rewards: ${referralLink}`
       );
       const whatsappLink = `https://wa.me/?text=${message}`;
       
@@ -400,8 +400,8 @@ export function ReferralDashboard({ userEmail, referralCode, currentReferrals }:
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'HealthScan - Know What You Eat',
-          text: 'Join me on the HealthScan waitlist! Get early access to the app that reveals what\'s really in your food.',
+          title: 'ROUTINE³ - Know What You Eat',
+          text: 'Join me on the ROUTINE³ waitlist! Get early access to the app that reveals what\'s really in your food.',
           url: referralLink,
         });
         toast.success('📤 Shared successfully!');

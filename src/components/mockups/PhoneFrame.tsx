@@ -3,7 +3,7 @@ import { ed } from "../../config/editorialTheme";
 
 /**
  * Editorial device frame — a clean ink phone used to present faithful
- * recreations of the HealthScan app screens. The frame is the only place a
+ * recreations of the ROUTINE³ app screens. The frame is the only place a
  * soft shadow + large radius is allowed (it's a depicted object, not UI chrome).
  */
 export function PhoneFrame({

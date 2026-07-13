@@ -1,5 +1,5 @@
 /**
- * Timeout Management Utility for HealthScan
+ * Timeout Management Utility for ROUTINE³
  * Provides robust timeout handling with cancellation and retry logic
  */
 

@@ -20,8 +20,8 @@ interface SocialPlatform {
 }
 
 export function SocialShareModal({ isOpen, onClose, referralLink }: SocialShareModalProps) {
-  const shareTitle = 'HealthScan - Know What You Eat';
-  const shareText = `Mind-blowing! 🤯 HealthScan exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
+  const shareTitle = 'ROUTINE³ - Know What You Eat';
+  const shareText = `Mind-blowing! 🤯 ROUTINE³ exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
 
 Reserve your spot: ${referralLink}
 
@@ -33,7 +33,7 @@ Be part of the movement they fear most! 🍎`;
       icon: '𝕏',
       color: 'bg-black hover:bg-gray-800',
       shareUrl: (url, text) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-      customText: `Mind-blowing! 🤯 HealthScan exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
+      customText: `Mind-blowing! 🤯 ROUTINE³ exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
 
 Reserve your spot: ${referralLink}
 
@@ -44,7 +44,7 @@ Be part of the movement they fear most! 🍎`
       icon: 'in',
       color: 'bg-blue-600 hover:bg-blue-700',
       shareUrl: (url, text) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&summary=${encodeURIComponent(text)}`,
-      customText: `Mind-blowing! 🤯 HealthScan exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
+      customText: `Mind-blowing! 🤯 ROUTINE³ exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
 
 Reserve your spot: ${referralLink}
 
@@ -55,7 +55,7 @@ Be part of the movement they fear most! 🍎`
       icon: 'f',
       color: 'bg-blue-500 hover:bg-blue-600',
       shareUrl: (url, text) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`,
-      customText: `Mind-blowing! 🤯 HealthScan exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
+      customText: `Mind-blowing! 🤯 ROUTINE³ exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
 
 Reserve your spot: ${referralLink}
 
@@ -66,7 +66,7 @@ Be part of the movement they fear most! 🍎`
       icon: '💬',
       color: 'bg-green-500 hover:bg-green-600',
       shareUrl: (url, text) => `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
-      customText: `Mind-blowing! 🤯 HealthScan exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
+      customText: `Mind-blowing! 🤯 ROUTINE³ exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
 
 Reserve your spot: ${referralLink}
 
@@ -77,7 +77,7 @@ Be part of the movement they fear most! 🍎`
       icon: '✈️',
       color: 'bg-blue-400 hover:bg-blue-500',
       shareUrl: (url, text) => `https://telegram.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
-      customText: `Mind-blowing! 🤯 HealthScan exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
+      customText: `Mind-blowing! 🤯 ROUTINE³ exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
 
 Reserve your spot: ${referralLink}
 
@@ -88,7 +88,7 @@ Be part of the movement they fear most! 🍎`
       icon: '🤖',
       color: 'bg-orange-500 hover:bg-orange-600',
       shareUrl: (url, text) => `https://reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}`,
-      customText: `Mind-blowing! 🤯 HealthScan exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
+      customText: `Mind-blowing! 🤯 ROUTINE³ exposes what food companies have been hiding - toxin levels, nutrient density, chemical clearance times. Big Food is NOT going to like this level of transparency! Join NOW to lock in your early adopter spot!
 
 Reserve your spot: ${referralLink}
 
@@ -137,7 +137,7 @@ Be part of the movement they fear most! 🍎`
               Share Your Referral Link
             </DialogTitle>
             <DialogDescription className="sr-only">
-              Share your HealthScan referral link on social media or copy it to share manually. Earn rewards for every person who joins using your link.
+              Share your ROUTINE³ referral link on social media or copy it to share manually. Earn rewards for every person who joins using your link.
             </DialogDescription>
             <Button
               variant="ghost"

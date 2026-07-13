@@ -1,5 +1,5 @@
 /*
- * ProtocolHomeScreen — a pixel-faithful web replica of the HealthScan iOS app's
+ * ProtocolHomeScreen — a pixel-faithful web replica of the ROUTINE³ iOS app's
  * protocol HOME screen (the "YOUR ROUTINE" day view). Reverse-engineered from
  * the mobile repo (ActiveProtocolCard / ProtocolGroupBody / WeekCalendarStrip /
  * categoryTints) so the marketing phone mock and the admin preview are identical

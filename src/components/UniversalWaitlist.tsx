@@ -57,7 +57,7 @@ export function UniversalWaitlist({
     fontWeight: 600,
     letterSpacing: '0.04em',
     color: '#FFFFFF',
-    background: 'transparent',
+    background: 'rgba(255,255,255,0.16)',
     border: '1px solid #FFFFFF',
     borderRight: 'none',
     borderRadius: '2px 0 0 2px',
@@ -425,7 +425,7 @@ export function UniversalWaitlist({
     console.log('🔐 UniversalWaitlist: Password upgrade completed, success:', success);
     
     if (success) {
-      toast.success("Account created successfully! Welcome to HealthScan! 🌱✅");
+      toast.success("Account created successfully! Welcome to ROUTINE³! 🌱✅");
     }
     
     // Always close the modal and reset flow state

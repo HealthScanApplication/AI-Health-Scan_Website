@@ -1,5 +1,5 @@
 /*
- * "The Routine Issue" — magazine-editorial design tokens for HealthScan.
+ * "The Routine Issue" — magazine-editorial design tokens for ROUTINE³.
  * Warm newsprint + ink, Fraunces display + Archivo grotesque, one ochre accent,
  * a strict 12-col grid. All applied via inline styles (no Tailwind JIT).
  */

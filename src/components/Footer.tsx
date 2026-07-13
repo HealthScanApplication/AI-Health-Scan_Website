@@ -132,7 +132,7 @@ export function Footer({}: FooterProps = {}) {
     }
     setIsSubmitting(true);
     try {
-      const subject = encodeURIComponent("Contact from HealthScan");
+      const subject = encodeURIComponent("Contact from ROUTINE³");
       const body = encodeURIComponent(`From: ${contactForm.email}\n\nMessage:\n${contactForm.message}`);
       window.open(`mailto:hello@healthscan.live?subject=${subject}&body=${body}`);
       toast.success("Opening your email client…");
@@ -220,7 +220,7 @@ export function Footer({}: FooterProps = {}) {
               rel="noopener noreferrer"
               className="ed-cta-dark"
             >
-              <AppleMark />Try HealthScan&nbsp;→
+              <AppleMark />Try ROUTINE³&nbsp;→
             </a>
             <a
               href="https://healthscan.gumroad.com/coffee"
@@ -247,7 +247,7 @@ export function Footer({}: FooterProps = {}) {
           <div style={{ flex: "2.2 1 320px", minWidth: 280 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
               <span style={{ fontFamily: DISPLAY, fontSize: "1.85rem", fontWeight: 400, letterSpacing: "-0.02em", color: ed.onDark }}>
-                HealthScan
+                ROUTINE³
               </span>
               <span
                 style={{
@@ -374,7 +374,7 @@ export function Footer({}: FooterProps = {}) {
           </div>
 
           <p style={{ fontFamily: GRO, fontSize: 12, color: "rgba(244,241,234,0.4)", margin: 0, letterSpacing: "0.02em" }}>
-            {`© ${year} HealthScan — Set in Fraunces & Archivo. Made for a healthier world.`}
+            {`© ${year} ROUTINE³ — Set in Fraunces & Archivo. Made for a healthier world.`}
           </p>
         </div>
       </div>

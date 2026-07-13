@@ -29,7 +29,7 @@ export class GoogleSheetsService {
     this.isConfigured = !!(this.spreadsheetId && (this.apiKey || this.serviceAccountCredentials));
     
     if (!this.isConfigured) {
-      console.log('✅ HealthScan waitlist system operational (Google Sheets integration disabled)');
+      console.log('✅ ROUTINE³ waitlist system operational (Google Sheets integration disabled)');
       console.log('💡 Google Sheets integration is completely optional and not required for operation');
       console.log('📋 All data is securely stored in the primary KV database');
       console.log('🔧 To enable optional Google Sheets backup:');

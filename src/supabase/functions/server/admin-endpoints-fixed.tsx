@@ -173,7 +173,7 @@ app.get('/make-server-ed0fe4c2/admin/health', async (c) => {
     return c.json({ 
       status: 'healthy', 
       timestamp: new Date().toISOString(),
-      service: 'HealthScan Admin API',
+      service: 'ROUTINE³ Admin API',
       version: '1.0.0'
     })
   } catch (error) {

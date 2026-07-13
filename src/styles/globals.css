@@ -43,7 +43,7 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
   
-  /* HealthScan brand colors */
+  /* ROUTINE³ brand colors */
   --healthscan-green: #16a34a;
   --healthscan-light-green: #22c55e;
   --healthscan-red-accent: #dc2626;
@@ -132,7 +132,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   
-  /* HealthScan brand utilities */
+  /* ROUTINE³ brand utilities */
   --color-healthscan-green: var(--healthscan-green);
   --color-healthscan-light-green: var(--healthscan-light-green);
   --color-healthscan-red-accent: var(--healthscan-red-accent);

@@ -270,7 +270,7 @@ export function ZapierIntegration() {
             Zapier Integration
           </h1>
           <p className="text-gray-600">
-            Connect HealthScan with Zapier to automate workflows and integrate with thousands of apps
+            Connect ROUTINE³ with Zapier to automate workflows and integrate with thousands of apps
           </p>
         </div>
         <div className="flex gap-2">
@@ -292,7 +292,7 @@ export function ZapierIntegration() {
             <DialogHeader>
               <DialogTitle>Create New Zapier Integration</DialogTitle>
               <DialogDescription>
-                Configure a new webhook connection to send HealthScan events to Zapier
+                Configure a new webhook connection to send ROUTINE³ events to Zapier
               </DialogDescription>
             </DialogHeader>
             
@@ -380,7 +380,7 @@ export function ZapierIntegration() {
               Zapier Integration Setup Guide
             </DialogTitle>
             <DialogDescription>
-              Complete guide to connecting HealthScan with Zapier
+              Complete guide to connecting ROUTINE³ with Zapier
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-y-auto max-h-[80vh]">
@@ -403,7 +403,7 @@ export function ZapierIntegration() {
                 <Zap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Zapier integrations yet</h3>
                 <p className="text-gray-500 mb-4">
-                  Create your first integration to start automating workflows with HealthScan events
+                  Create your first integration to start automating workflows with ROUTINE³ events
                 </p>
                 <div className="flex gap-2 justify-center">
                   <Button 
@@ -540,7 +540,7 @@ export function ZapierIntegration() {
             <CardHeader>
               <CardTitle>How to Set Up Zapier Integration</CardTitle>
               <CardDescription>
-                Follow these steps to connect HealthScan with your Zapier workflows
+                Follow these steps to connect ROUTINE³ with your Zapier workflows
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -583,7 +583,7 @@ export function ZapierIntegration() {
                     3
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-2">Configure HealthScan Integration</h4>
+                    <h4 className="font-semibold mb-2">Configure ROUTINE³ Integration</h4>
                     <p className="text-gray-600">
                       Use the "Add Integration" button above to create a new configuration with your webhook URL.
                     </p>

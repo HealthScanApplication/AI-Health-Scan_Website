@@ -43,7 +43,7 @@ export const SETUP_STEPS = [
         link: "https://sheets.google.com/"
       },
       "Create a new blank spreadsheet",
-      'Name it "HealthScan Email Signups" (or any name you prefer)',
+      'Name it "ROUTINE³ Email Signups" (or any name you prefer)',
       "Copy the Spreadsheet ID from the URL",
       "Make sure the sheet is accessible (not private)"
     ]

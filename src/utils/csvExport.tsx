@@ -268,7 +268,7 @@ export const exportAllData = async (): Promise<void> => {
   let loadingToast: string | number | undefined;
   
   try {
-    loadingToast = toast.loading('Exporting all HealthScan data...', {
+    loadingToast = toast.loading('Exporting all ROUTINE³ data...', {
       description: 'Starting bulk export process...'
     });
     

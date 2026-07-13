@@ -314,7 +314,7 @@ export function LoginDiagnostic() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Login Diagnostic Tool</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Comprehensive authentication troubleshooting and testing tool for HealthScan login issues
+            Comprehensive authentication troubleshooting and testing tool for ROUTINE³ login issues
           </p>
         </div>
 
