@@ -300,6 +300,24 @@ export function Header({
     }
   };
 
+  // Frosted, light-text header while over the hero (top of the home page); reverts
+  // to the cream capsule + dark text once scrolled onto the light sections below,
+  // so the nav stays readable everywhere.
+  const [atTop, setAtTop] = useState(true);
+  useEffect(() => {
+    const onScroll = () => setAtTop(window.scrollY < 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  const overHero = currentPage === 'home' && atTop;
+  const navText = overHero ? 'rgba(255,251,245,0.90)' : oura.body;
+  const navStrong = overHero ? '#FFFBF5' : '#16140F';
+  const navHover = overHero ? '#FFFFFF' : oura.forest;
+  const capsule = overHero
+    ? { background: 'rgba(24,18,12,0.24)', backdropFilter: 'blur(26px)', WebkitBackdropFilter: 'blur(26px)', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 12px 40px -20px rgba(0,0,0,0.55)' }
+    : { background: 'rgba(244,241,234,0.92)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(22,20,15,0.14)', boxShadow: '0 10px 34px -16px rgba(22,20,15,0.28)' };
+
   return (
     <>
       <header
@@ -312,14 +330,11 @@ export function Header({
         <div style={{ maxWidth: 1440, margin: '0 auto', paddingLeft: 'clamp(20px, 5vw, 72px)', paddingRight: 'clamp(20px, 5vw, 72px)' }}>
           <div
             style={{
-              background: 'rgba(244,241,234,0.92)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              border: '1px solid rgba(22,20,15,0.14)',
+              ...capsule,
               borderRadius: 16,
-              boxShadow: '0 10px 34px -16px rgba(22,20,15,0.28)',
               paddingLeft: 'clamp(16px, 2vw, 28px)',
               paddingRight: 'clamp(16px, 2vw, 28px)',
+              transition: 'background 350ms ease, backdrop-filter 350ms ease, border-color 350ms ease, box-shadow 350ms ease',
             }}
           >
           <div className="flex justify-between items-center h-16 md:flex-row">
@@ -334,7 +349,7 @@ export function Header({
                 <div className="flex items-center gap-2">
                   <span
                     className="leading-tight"
-                    style={{ color: '#16140F', fontFamily: '"Fraunces", Georgia, serif', fontWeight: 400, fontSize: 23, letterSpacing: '-0.01em' }}
+                    style={{ color: navStrong, fontFamily: '"Fraunces", Georgia, serif', fontWeight: 400, fontSize: 23, letterSpacing: '-0.01em', transition: 'color 350ms ease' }}
                   >
                     HealthScan
                   </span>
@@ -342,11 +357,12 @@ export function Header({
                     className="px-1.5 py-0.5 text-[10px]"
                     style={{
                       background: 'transparent',
-                      color: oura.muted,
+                      color: navText,
                       fontWeight: 500,
                       borderRadius: 999,
-                      border: `1px solid ${oura.hairline}`,
+                      border: `1px solid ${overHero ? 'rgba(255,255,255,0.35)' : oura.hairline}`,
                       letterSpacing: '0.08em',
+                      transition: 'color 350ms ease, border-color 350ms ease',
                     }}
                   >
                     BETA
@@ -360,36 +376,36 @@ export function Header({
               <button
                 onClick={() => handleSectionScroll('routines')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
                 <span style={{ fontSize: 14 }}>Routines</span>
               </button>
               <button
                 onClick={() => handleSectionScroll('features')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
                 <span style={{ fontSize: 14 }}>Features</span>
               </button>
               <button
                 onClick={() => handleSectionScroll('how-it-works')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
                 <span style={{ fontSize: 14 }}>How It Works</span>
               </button>
               <button
                 onClick={() => handleSectionScroll('faq')}
                 className="px-4 py-2"
-                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: oura.body, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = oura.forest; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = oura.body; }}
+                style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: navText, background: 'transparent', border: 'none', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = navText; }}
               >
                 <span style={{ fontSize: 14 }}>FAQ</span>
               </button>
@@ -493,14 +509,14 @@ export function Header({
                     variant="ghost"
                     onClick={handleSignIn}
                     className="font-medium"
-                    style={{ color: oura.ink }}
+                    style={{ color: navText, transition: 'color 350ms ease' }}
                   >
                     Sign In
                   </Button>
 
                   {/* Subscribe — unified outlined CTA */}
                   <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px' }}>
+                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px', ...(overHero ? { color: '#FFFBF5', borderColor: 'rgba(255,255,255,0.55)', textDecorationColor: 'rgba(255,255,255,0.55)' } : {}) }}>
                       Subscribe
                     </button>
                   </div>
