@@ -11,8 +11,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
-  Pencil, GitMerge, Download, Upload, Repeat, CalendarDays, FileText, ChevronUp,
+  Pencil, GitMerge, Download, Upload, Repeat, CalendarDays, FileText, ChevronUp, ImageOff, Image as ImageIcon,
 } from 'lucide-react';
+import { aiGenerateImage } from '../../utils/aiImage';
+import { buildProtocolCoverPrompt } from '../../utils/imagePromptBuilder';
+import { composeAppIconCoverFile } from '../../utils/appIconCover';
 import { generateProtocolPdf } from '../../utils/protocolPdf';
 import { toast } from 'sonner';
 import {
@@ -324,6 +327,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [fGender, setFGender] = useState('');
   const [fCategory, setFCategory] = useState('');
   const [fType, setFType] = useState('');
+  const [fNoCover, setFNoCover] = useState(false); // show only protocols missing a cover image
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // deep-open wins over the "first row" default; list-load keeps it (see setSelectedId((cur) => …))
   useEffect(() => { if (initialProtocolId) setSelectedId(initialProtocolId); }, [initialProtocolId]);
@@ -333,6 +337,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
 
   const [form, setForm] = useState<Partial<AdminProtocol>>({});
   const [savingProtocol, setSavingProtocol] = useState(false);
+  // AI cover generation: aiBusy while generating; coverPrompt is the (optionally
+  // edited) prompt — null means "use the global template built from this protocol".
+  const [aiBusy, setAiBusy] = useState(false);
+  const [coverPrompt, setCoverPrompt] = useState<string | null>(null);
+  useEffect(() => { setCoverPrompt(null); }, [selectedId]);
   const [importing, setImporting] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -451,7 +460,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   };
   const categoryOpts = useMemo(() => distinctOf('category'), [protocols]);
   const typeOpts = useMemo(() => distinctOf('type'), [protocols]);
-  const filtersActive = !!(fGender || fCategory || fType || query.trim());
+  const filtersActive = !!(fGender || fCategory || fType || query.trim() || fNoCover);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -466,12 +475,72 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
       }
       if (fCategory && (p.category || '').toLowerCase() !== fCategory.toLowerCase()) return false;
       if (fType && (p.type || '').toLowerCase() !== fType.toLowerCase()) return false;
+      if (fNoCover && (p.image_url || '').trim()) return false;
       return true;
     });
-  }, [protocols, query, fGender, fCategory, fType]);
+  }, [protocols, query, fGender, fCategory, fType, fNoCover]);
+
+  // how many protocols still have no cover image (drives the "Needs cover" chip)
+  const missingCovers = useMemo(
+    () => protocols.filter((p) => !(p.image_url || '').trim()).length,
+    [protocols],
+  );
 
   function setField<K extends keyof AdminProtocol>(key: K, value: AdminProtocol[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // AI cover — the global template, filled from this protocol; editable per-cover.
+  const defaultCoverPrompt = useMemo(
+    () => buildProtocolCoverPrompt(form),
+    [form.name, form.category, form.type],
+  );
+  const effectiveCoverPrompt = coverPrompt ?? defaultCoverPrompt;
+
+  // Frame any image into the app-icon template (square-in-square + blurred bg)
+  // and upload the result. Falls back to the raw URL if canvas framing fails.
+  async function frameAndUpload(rawUrl: string): Promise<string> {
+    try {
+      const file = await composeAppIconCoverFile(rawUrl, `cover-${Date.now()}.png`);
+      return await uploadProtocolImage(accessToken, file);
+    } catch (e: any) {
+      console.warn('App-icon framing failed, using raw image:', e);
+      toast.warning('Saved unframed (could not apply app-icon frame to this image)');
+      return rawUrl;
+    }
+  }
+
+  async function generateCover() {
+    const prompt = effectiveCoverPrompt.trim();
+    if (!prompt) { toast.error('Prompt is empty'); return; }
+    setAiBusy(true);
+    try {
+      toast.info('Generating cover… (~20–40s)');
+      const raw = await aiGenerateImage(accessToken, prompt);
+      toast.info('Framing as app icon…');
+      setField('image_url', await frameAndUpload(raw));
+      toast.success('Cover generated — remember to Save');
+    } catch (e: any) {
+      toast.error(`Generate failed: ${(e?.message || '').slice(0, 120)}`);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  // Re-frame the current image (e.g. an uploaded one) into the app-icon template.
+  async function frameCurrentCover() {
+    const src = (form.image_url || '').trim();
+    if (!src) { toast.error('No image to frame yet'); return; }
+    setAiBusy(true);
+    try {
+      toast.info('Framing as app icon…');
+      setField('image_url', await frameAndUpload(src));
+      toast.success('Framed as app icon — remember to Save');
+    } catch (e: any) {
+      toast.error(`Framing failed: ${(e?.message || '').slice(0, 120)}`);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   async function saveProtocol() {
@@ -1030,7 +1099,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     const mini: React.CSSProperties = { width: 56, padding: '5px 6px', fontSize: 12, border: '1px solid ' + C.hair, borderRadius: 7, color: C.ink, background: C.paper, outline: 'none' };
     return (
       <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px dashed ' + C.hair, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}><Repeat size={12} /> Repeat</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}><Repeat size={12} /> Repeat</span>
         <IconSelect value={rt} options={REPEAT_OPTS} onChange={(t) => setRecurType(it, t)} width={148} />
         {rt === 'weekly' && (
           <div style={{ display: 'flex', gap: 4 }}>
@@ -1075,9 +1144,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
             </button>
             <button type="button" onClick={() => link && openRecord(link, it.id)} title={`Open ${link.kind} record`}
               style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150, textAlign: 'left' }}>{link.name}</button>
-            <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 4, padding: '2px 5px', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', ...kindChip(link.kind) }}>{link.kind}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 4, padding: '2px 5px', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', ...kindChip(link.kind) }}>{link.kind}</span>
             {link.kind === 'product' && (link.price != null || link.buyUrl) && (
-              <span style={{ fontSize: 10.5, fontWeight: 600, color: C.good, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: C.good, whiteSpace: 'nowrap' }}>
                 {link.price != null ? `$${link.price}` : ''}{link.buyUrl ? (link.price != null ? ' · Buy ↗' : 'Buy ↗') : ''}
               </span>
             )}
@@ -1098,7 +1167,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
             </div>
             {suggesting && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: C.good, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: C.good, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5 }}>
                 <Sparkles size={12} /> Suggested for {slot}
               </div>
             )}
@@ -1114,7 +1183,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     {thumb(h.image)}
                     <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
                     {h.healthScore != null && (
-                      <span title="Health score" style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: C.good, background: C.goodBg, border: '1px solid ' + C.goodBorder, borderRadius: 999, padding: '1px 6px' }}>{h.healthScore}</span>
+                      <span title="Health score" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.good, background: C.goodBg, border: '1px solid ' + C.goodBorder, borderRadius: 999, padding: '1px 6px' }}>{h.healthScore}</span>
                     )}
                   </button>
                 ))}
@@ -1187,7 +1256,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           {!isRule ? (
             <>
               <span title={`Stored type: item_type="${it.item_type || 'null'}", category="${it.category || 'none'}". Change it with the dropdown →`}
-                style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'ui-monospace, monospace', borderRadius: 4, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', ...kindChip(it.item_type) }}>
+                style={{ fontSize: 11.5, fontWeight: 700, fontFamily: 'ui-monospace, monospace', borderRadius: 4, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', ...kindChip(it.item_type) }}>
                 {it.item_type || '—'}
               </span>
               <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={116} />
@@ -1265,7 +1334,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
         </button>
       );
     }
-    const hdr: React.CSSProperties = { fontSize: 9.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '7px 8px 3px' };
+    const hdr: React.CSSProperties = { fontSize: 11.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '7px 8px 3px' };
     const item: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 8px', fontSize: 12.5, color: C.ink, background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer', textAlign: 'left' };
     const pick = (preset?: AddPreset) => { setOpen(false); addItem('action', undefined, preset); };
     return (
@@ -1281,7 +1350,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               {MEAL_PRESETS.map((m) => (
                 <button key={m.label} onClick={() => pick(m.preset)} style={item}>
                   <m.Icon size={14} color={m.color} style={{ flexShrink: 0 }} /> {m.label}
-                  <span style={{ marginLeft: 'auto', fontSize: 10, color: C.faint }}>{toTimeInput(m.preset.scheduled_time || null)}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: C.faint }}>{toTimeInput(m.preset.scheduled_time || null)}</span>
                 </button>
               ))}
               <div style={hdr}>Add by type</div>
@@ -1312,7 +1381,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               : <div style={{ height: 160, background: C.panel, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.faint, fontSize: 13 }}>{linkBusy ? <Loader2 size={20} className="animate-spin" /> : 'No image on this record yet'}</div>}
             <div style={{ padding: 16, maxHeight: 'calc(90vh - 200px)', overflowY: 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   {viewRec.kind}{viewRec.price != null ? ` · $${viewRec.price}` : ''}
                   {recRefs != null && <span style={{ marginLeft: 8, color: C.faint, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>· used by {recRefs} item{recRefs === 1 ? '' : 's'}</span>}
                 </div>
@@ -1409,11 +1478,28 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               {typeOpts.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
+          {/* review-the-rest: jump to protocols still missing a cover image */}
+          <div style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={() => setFNoCover((v) => !v)}
+              title="Show only protocols with no cover image"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
+                padding: '5px 10px', borderRadius: 999, cursor: 'pointer',
+                border: '1px solid ' + (fNoCover ? C.accent : C.hair),
+                background: fNoCover ? 'var(--sb-brand-soft)' : 'var(--sb-panel)',
+                color: fNoCover ? C.accent : (missingCovers ? C.ink : C.faint),
+              }}
+            >
+              <ImageOff size={13} /> Needs cover ({missingCovers})
+            </button>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
             <span style={{ fontSize: 11, color: C.faint }}>
               {filtered.length} of {protocols.length}
               {filtersActive && (
-                <button onClick={() => { setQuery(''); setFGender(''); setFCategory(''); setFType(''); }}
+                <button onClick={() => { setQuery(''); setFGender(''); setFCategory(''); setFType(''); setFNoCover(false); }}
                   style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.accent, fontSize: 11, marginLeft: 8, padding: 0 }}>Clear</button>
               )}
             </span>
@@ -1453,7 +1539,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 <span style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, overflow: 'hidden', background: C.panel, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                   {p.image_url
                     ? <img src={p.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <span style={{ fontSize: 14, fontWeight: 700, color: C.faint }}>{(p.name || '?').charAt(0)}</span>}
+                    : <span style={{ fontSize: 13, fontWeight: 700, color: C.faint }}>{(p.name || '?').charAt(0)}</span>}
                 </span>
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name || 'Untitled'}</div>
@@ -1537,6 +1623,45 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                       onChange={(url) => setField('image_url', url)}
                       onUpload={(file) => uploadProtocolImage(accessToken, file)}
                     />
+                    {/* AI cover — one global template: generate a clean emblem, then
+                        frame it square-in-square on a blurred copy of itself (app-icon
+                        look) via composeAppIconCover. Prompt is prefilled but editable. */}
+                    <div style={{ marginTop: 8, border: '1px solid ' + C.goodBorder, background: C.goodBg, borderRadius: 10, padding: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: C.good, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          <Sparkles size={12} /> AI cover · global template
+                        </span>
+                        {coverPrompt !== null && (
+                          <button type="button" onClick={() => setCoverPrompt(null)}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, fontSize: 11, padding: 0 }}>
+                            reset to template
+                          </button>
+                        )}
+                      </div>
+                      <textarea
+                        value={effectiveCoverPrompt}
+                        disabled={aiBusy}
+                        rows={3}
+                        onChange={(e) => setCoverPrompt(e.target.value)}
+                        placeholder="Describe the cover to generate…"
+                        style={{ width: '100%', fontSize: 12, lineHeight: 1.45, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, padding: '7px 9px', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        <button type="button" onClick={generateCover} disabled={aiBusy || !effectiveCoverPrompt.trim()}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 8, cursor: aiBusy || !effectiveCoverPrompt.trim() ? 'default' : 'pointer', border: '1px solid ' + C.good, background: C.good, color: '#fff', opacity: aiBusy || !effectiveCoverPrompt.trim() ? 0.6 : 1 }}>
+                          {aiBusy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                          {aiBusy ? 'Working…' : (form.image_url ? 'Regenerate cover' : 'Generate cover')}
+                        </button>
+                        {form.image_url && (
+                          <button type="button" onClick={frameCurrentCover} disabled={aiBusy}
+                            title="Re-frame the current image into the app-icon template (square-in-square + blurred background)"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: aiBusy ? 'default' : 'pointer', border: '1px solid ' + C.goodBorder, background: 'var(--sb-panel)', color: C.good, opacity: aiBusy ? 0.6 : 1 }}>
+                            <ImageIcon size={14} /> Frame as app icon
+                          </button>
+                        )}
+                        <span style={{ fontSize: 11, color: C.faint }}>Square-in-square, blurred background · applied to every cover</span>
+                      </div>
+                    </div>
                   </div>
                   <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 2 }}>
                     {([['is_suggested', 'Suggested'], ['is_active', 'Active'], ['is_public', 'Public']] as const).map(([key, lbl]) => (
@@ -1579,7 +1704,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                       return (
                         <button key={d} onClick={() => setViewDay(d)} title={`${n} steps on day ${d}`}
                           style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, fontSize: 12.5, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.ink : C.hair), background: on ? C.ink : 'var(--sb-panel)', color: on ? '#fff' : C.sub }}>
-                          {d}<span style={{ fontSize: 9.5, fontWeight: 600, opacity: 0.65 }}>{n}</span>
+                          {d}<span style={{ fontSize: 11.5, fontWeight: 600, opacity: 0.65 }}>{n}</span>
                         </button>
                       );
                     })}
@@ -1602,13 +1727,13 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                       Wake
                       <input type="time" value={toTimeInput(wakeItem?.scheduled_time || null)} onChange={(e) => setAnchor('wake', e.target.value)}
                         style={{ ...inputStyle, width: 110, padding: '6px 8px' }} />
-                      <span style={{ fontSize: 10.5, color: C.faint }}>End&nbsp;Sleep</span>
+                      <span style={{ fontSize: 11.5, color: C.faint }}>End&nbsp;Sleep</span>
                     </label>
                     <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.sub }}>
                       Bedtime
                       <input type="time" value={toTimeInput(bedItem?.scheduled_time || null)} onChange={(e) => setAnchor('bed', e.target.value)}
                         style={{ ...inputStyle, width: 110, padding: '6px 8px' }} />
-                      <span style={{ fontSize: 10.5, color: C.faint }}>Start&nbsp;Sleep</span>
+                      <span style={{ fontSize: 11.5, color: C.faint }}>Start&nbsp;Sleep</span>
                     </label>
                     {sleepWin.durationLabel && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--sb-text-soft)', padding: '4px 9px', borderRadius: 999, background: 'var(--sb-panel-soft)' }}>
@@ -1628,7 +1753,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                         <Link2 size={12} /> Link wake to first step ({derivedWake})
                       </button>
                     ) : (
-                      <span style={{ fontSize: 10.5, color: C.faint, maxWidth: 240 }}>
+                      <span style={{ fontSize: 11.5, color: C.faint, maxWidth: 240 }}>
                         {wakeItem || bedItem ? 'Pins the day’s start/end.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}
                       </span>
                     )}

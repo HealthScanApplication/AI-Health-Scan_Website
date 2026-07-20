@@ -58,6 +58,39 @@ export function buildImagePrompt(tabType: string, record: Rec, variant?: string 
   return clean(`A clean conceptual illustration representing "${n}"${c ? `, ${c}` : ''}, ${STYLE.abstract}`);
 }
 
+/* ── PROTOCOL COVERS ───────────────────────────────────────────────────────
+ * The ONE global template every routine/protocol cover follows, so the
+ * suggested-routine shelf reads as a single branded set instead of a jumble.
+ *
+ * Two halves make the "app icon on a blurred background" look:
+ *   1. This prompt generates a CLEAN, centred emblem on a flat background — no
+ *      built-in blur (the frame is added next, and blur-on-blur looks muddy).
+ *   2. composeAppIconCover() (src/utils/appIconCover.ts) then frames it into the
+ *      square-in-square look — sharp rounded icon over a blurred, zoomed copy of
+ *      itself — matching the reference Self-Heal-by-Design cover.
+ *
+ * Editing PROTOCOL_COVER_STYLE restyles EVERY future generated cover at once —
+ * this constant is the global template. The per-protocol subject (name /
+ * category) is the only thing that varies.
+ */
+export const PROTOCOL_COVER_STYLE =
+  'a clean, centered minimalist wellness emblem or symbol filling most of the frame, ' +
+  'flat solid warm cream background, generous even margin, sharp and in focus, ' +
+  'ROUTINE³ editorial palette — sage and olive green, soft gold and terracotta accents on warm cream, ' +
+  'calm, botanical, premium wellness brand, simple, high detail, ' +
+  'square 1:1 composition, centered, no text, no lettering, no words, no numbers, no logotype';
+
+/** Build the global-template cover prompt for a protocol. Only the subject
+ *  (name / category) changes; the house style is shared via PROTOCOL_COVER_STYLE. */
+export function buildProtocolCoverPrompt(p: {
+  name?: string | null; category?: string | null; type?: string | null;
+} = {}): string {
+  const n = (p?.name || '').trim() || 'a daily wellness routine';
+  const theme = (p?.category || p?.type || '').trim();
+  const subject = `A symbolic emblem representing "${n}"${theme ? `, a ${theme.toLowerCase()} routine` : ''}`;
+  return clean(`${subject}. ${PROTOCOL_COVER_STYLE}`);
+}
+
 /** The image columns a record type can carry variants for (single is image_url). */
 export function imageVariantFields(tabType: string): { field: string; variant: string | null; label: string }[] {
   const t = (tabType || '').toLowerCase();
