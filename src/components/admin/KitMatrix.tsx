@@ -24,7 +24,7 @@ import {
   copyKitRegion, cloneKitItem, searchProductsLite, kitItemFieldsFromProduct, listProtocolBuyableProducts,
   linkKitItemToProduct, kitItemBuyPath, listFxRates, itemMarginPct, itemSellUsd, fmtMoney, convertKitRegionPrices,
   REGION_CURRENCY, CURRENCY_SYMBOL, fetchKitAiSuggestions, playbookSuggestionCards, type KitSuggestionCard,
-  REGIONS, REGION_FLAG, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
+  REGIONS, REGION_FLAG, REGION_DROPSHIP_SUPPLIER, type ProtocolKit, type KitItem, type RegionRule, type KitRegion, type ProductHit,
   type ProtocolLite, type ProtocolSuggestion,
 } from '../../utils/kitsAdmin';
 import { Link2 } from 'lucide-react';
@@ -569,9 +569,21 @@ function FragmentRow({ rk, cells, first, markets, isOpen, onToggle, ruleFor, bus
                       onBlur={(e) => { const v = num(e.target.value); if (v !== it.supplier_cost_usd) commit(it, { supplier_cost_usd: v }); }} />
                   </Field>
                   <Field label="Supplier">
-                    <input defaultValue={it.supplier ?? ''} placeholder="Supliful, Tre Lune…" className={miniInput}
+                    <input defaultValue={it.supplier ?? ''} placeholder={REGION_DROPSHIP_SUPPLIER[m] || 'Supliful, Tre Lune…'} className={miniInput}
                       onBlur={(e) => commit(it, { supplier: e.target.value || null })} />
                   </Field>
+                  {it.lane === 'store' && (
+                    <>
+                      <Field label="Supplier catalog link">
+                        <input defaultValue={it.supplier_url ?? ''} placeholder={`e.g. the ${REGION_DROPSHIP_SUPPLIER[m] || 'supplier'} catalog page for this SKU`} className={miniInput}
+                          onBlur={(e) => commit(it, { supplier_url: e.target.value || null } as Partial<KitItem>)} />
+                      </Field>
+                      <Field label="Label design link">
+                        <input defaultValue={it.label_url ?? ''} placeholder="Canva share link / hosted PDF" className={miniInput}
+                          onBlur={(e) => commit(it, { label_url: e.target.value || null } as Partial<KitItem>)} />
+                      </Field>
+                    </>
+                  )}
                   {it.lane === 'affiliate' && (
                     <Field label="Affiliate commission %">
                       <input defaultValue={it.commission_pct ?? ''} placeholder="e.g. 15" className={miniInput}

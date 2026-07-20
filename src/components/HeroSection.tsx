@@ -78,8 +78,6 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
   const [isNarrow, setIsNarrow] = useState(false);
   const [allowVideo, setAllowVideo] = useState(false);
   const [backgroundVideos, setBackgroundVideos] = useState<string[]>([]);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [fadingOut, setFadingOut] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
   const [wordVisible, setWordVisible] = useState(true);
   const [posterLoaded, setPosterLoaded] = useState(false);
@@ -125,18 +123,6 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
     };
     fetchVideos();
   }, [allowVideo]);
-
-  useEffect(() => {
-    if (backgroundVideos.length < 2) return;
-    const t = setInterval(() => {
-      setFadingOut(true);
-      setTimeout(() => {
-        setCurrentVideoIndex((p) => (p + 1) % backgroundVideos.length);
-        setFadingOut(false);
-      }, 800);
-    }, 7000);
-    return () => clearInterval(t);
-  }, [backgroundVideos]);
 
   useEffect(() => {
     const t = setInterval(() => {
