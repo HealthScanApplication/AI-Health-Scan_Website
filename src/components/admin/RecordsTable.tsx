@@ -231,7 +231,7 @@ export function RecordsTable({ table, accessToken, initialSearch }: { table: str
                       <td key={c.key} style={{ textAlign: 'center' }}>
                         {r[c.key]
                           ? <img src={r[c.key]} alt="" style={{ width: 26, height: 26, borderRadius: 5, objectFit: 'cover', display: 'inline-block', verticalAlign: 'middle' }} />
-                          : <span style={{ color: 'var(--sb-text-faint)', fontSize: 10 }}>—</span>}
+                          : <span style={{ color: 'var(--sb-text-faint)', fontSize: 11 }}>—</span>}
                       </td>
                     );
                   }

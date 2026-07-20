@@ -102,7 +102,7 @@ export function MarkdownField({ value, onChange, minHeight = 120, placeholder }:
       ) : (
         <textarea ref={ref} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, minHeight }} />
       )}
-      <div style={{ fontSize: 10.5, color: C.faint, marginTop: 4 }}>Markdown — **bold**, *italic*, ## heading, - bullet. Select text, then click a button.</div>
+      <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>Markdown — **bold**, *italic*, ## heading, - bullet. Select text, then click a button.</div>
     </div>
   );
 }

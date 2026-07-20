@@ -31,6 +31,14 @@
   --sb-brand-soft: rgba(62, 207, 142, 0.12);
   --sb-radius: 6px;
   --sb-radius-lg: 8px;
+  /* Type scale — ONE ladder for all admin text. 11px is the floor: nothing
+     smaller. Reach for these instead of ad-hoc sizes so nothing drifts.
+       badge 11 · sm 12 · body 13 (default control) · title 15 · display 20 */
+  --sb-fs-badge: 11px;
+  --sb-fs-sm: 12px;
+  --sb-fs-body: 13px;
+  --sb-fs-title: 15px;
+  --sb-fs-display: 20px;
   color-scheme: light;
 
   font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
@@ -91,6 +99,17 @@
 .sb-admin *::-webkit-scrollbar-thumb { background: var(--sb-border-strong); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
 .sb-admin *::-webkit-scrollbar-thumb:hover { background: var(--sb-text-faint); background-clip: content-box; }
 .sb-admin *::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Type-scale floor — fold the historical jumble of tiny Tailwind sizes
+     (text-[6px]…text-[10px], scattered hundreds of times across the panel) up
+     to the 11px floor so admin text reads at one consistent bottom size. Scoped
+     to .sb-admin and higher-specificity than the utilities, so it wins without
+     touching every call site. Snapping only the floor keeps dense tables intact. */
+.sb-admin .text-\[6px\],
+.sb-admin .text-\[7px\],
+.sb-admin .text-\[8px\],
+.sb-admin .text-\[9px\],
+.sb-admin .text-\[10px\] { font-size: var(--sb-fs-badge) !important; }
 
 /* ── Standard controls — ONE height/font for every input, select and button,
      Supabase-style. Apply `sb-input` / `sb-select` / `sb-btn`

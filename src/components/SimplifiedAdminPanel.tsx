@@ -4561,7 +4561,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                 >
                   {group.icon}
                   <span>{group.label}</span>
-                  <span style={{ fontSize: 10, opacity: 0.6, border: '1px solid var(--sb-border)', borderRadius: 4, padding: '0 4px', lineHeight: '15px' }}>
+                  <span style={{ fontSize: 11, opacity: 0.6, border: '1px solid var(--sb-border)', borderRadius: 4, padding: '0 4px', lineHeight: '15px' }}>
                     {group.tabs.length}
                   </span>
                 </button>
@@ -5455,7 +5455,7 @@ export function SimplifiedAdminPanel({ accessToken, user, initialSearch }: Simpl
                         <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 460, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.5)', padding: 20 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                             <GitMerge className="w-4 h-4 text-purple-600" />
-                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111827' }}>Merge {recs.length} records</h3>
+                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111827' }}>Merge {recs.length} records</h3>
                           </div>
                           <p style={{ fontSize: 12.5, color: '#6B7280', margin: '0 0 14px', lineHeight: 1.5 }}>
                             Pick the record to <strong>keep</strong>. The other {recs.length - 1}{recs.length - 1 === 1 ? '’s values fill' : ' records’ values fill'} its empty fields, every recipe↔ingredient junction + protocol link that pointed at them is re-pointed here, then they are permanently deleted. This cannot be undone.
