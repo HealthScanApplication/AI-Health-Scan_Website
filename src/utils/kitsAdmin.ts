@@ -21,6 +21,13 @@ export type KitRegion = (typeof REGIONS)[number];
 export { REGIONS };
 export const REGION_FLAG: Record<KitRegion, string> = { US: '🇺🇸', EU: '🇪🇺', UK: '🇬🇧', AU: '🇦🇺' };
 
+/* ── the ONE white-label dropship supplier per region (docs/kit-fulfilment-
+   strategy.md §2-3): Supliful is US-only (missing DE/ES/IE/AT/GR — do not use
+   for EU); Suplify is the EU equivalent (ships from inside the EU, no
+   customs); UK/AU have no Shopify-app dropshipper yet (manual/partner-cart).
+   Drives the region-aware "set supplier" quick-pick in the admin pipeline UI. ── */
+export const REGION_DROPSHIP_SUPPLIER: Partial<Record<KitRegion, string>> = { US: 'Supliful', EU: 'Suplify' };
+
 /* ── currency (20260710_kit_region_currency): each region row carries its own
    currency + local price; fx_rates converts to USD for margin math ── */
 export const REGION_CURRENCY: Record<KitRegion, string> = { US: 'USD', EU: 'EUR', UK: 'GBP', AU: 'AUD' };
@@ -62,6 +69,11 @@ export interface KitItem {
   supplier_cost_usd: number | null; supplier: string | null; commission_pct: number | null;
   margin_pct: number | null;
   currency: string | null; // region-local currency of price_usd (USD/EUR/GBP/AUD)
+  // dropship pipeline (20260713_kit_item_supplier_pipeline) — store-lane items
+  // fulfilled by a white-label supplier (Supliful US / Suplify EU) need both
+  // before they can actually go live with that supplier:
+  label_url: string | null;    // print-ready label design (Canva share link / hosted PDF)
+  supplier_url: string | null; // the supplier's own catalog/product page for this SKU
 }
 export interface ProtocolLite { id: string; name: string; is_public: boolean | null; source: string | null; image_url: string | null }
 export interface RegionRule {
@@ -70,7 +82,7 @@ export interface RegionRule {
 }
 
 const KIT_COLS = 'id,protocol_id,slug,market,kind,title,subtitle,cart_url,partner_label,partner_cart_url,price_usd,is_live,items_slug,created_at,image_url,currency';
-const ITEM_COLS = 'id,slug,market,lane,variant_id,title,price_usd,image_url,affiliate_url,catalog_product_id,sort,sku,supplier_cost_usd,supplier,commission_pct,margin_pct,currency';
+const ITEM_COLS = 'id,slug,market,lane,variant_id,title,price_usd,image_url,affiliate_url,catalog_product_id,sort,sku,supplier_cost_usd,supplier,commission_pct,margin_pct,currency,label_url,supplier_url';
 
 /* ── FX rates (fx_rates table, usd_per_unit; admin-editable) ── */
 export async function listFxRates(accessToken: string): Promise<Record<string, number>> {

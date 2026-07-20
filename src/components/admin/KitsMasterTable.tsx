@@ -9,10 +9,10 @@
  * NOTHING to sell (no kit items and no product-linked steps) vs. fallback-only.
  */
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Plus, Trash2, Unlink, ShoppingCart } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Plus, Tag, Trash2, Unlink, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  REGIONS, REGION_FLAG, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem, updateKitItem, deleteKitItem,
+  REGIONS, REGION_FLAG, REGION_DROPSHIP_SUPPLIER, kitItemBuyPath, kitItemFieldsFromProduct, createKitItem, updateKitItem, deleteKitItem,
   itemCustomerBuyUrl, storeCartPermalink,
   fmtMoney, itemMarginPct, itemSellUsd, listFxRates,
   type KitItem, type ProtocolKit, type ProtocolLite, type KitRegion, type RegionRule, type ProtocolSuggestion,
@@ -75,11 +75,18 @@ function sellStatus(i: KitItem, kit: ProtocolKit | undefined, rule: RegionRule |
     : buyPath === 'affiliate' ? 'Has an affiliate / partner link (buy path)'
     : i.lane === 'store' && kit?.partner_cart_url ? 'Has a partner cart (buy path)'
     : 'Has a buy path (Shopify variant or affiliate link)';
+  // dropship supplier pipeline (soft — doesn't block "Live", just flags the
+  // white-label fulfilment side isn't fully wired for this store-lane row)
+  const needsSupplierPipeline = i.lane === 'store' && buyPath === 'store';
   const stages = [
     { label: 'Linked to a catalog product', ok: !!i.catalog_product_id, soft: true },
     { label: buyLabel, ok: sellable },
     { label: 'Kit is live', ok: live },
     { label: 'Not blocked in this region', ok: !blocked },
+    ...(needsSupplierPipeline ? [
+      { label: 'Supplier catalog link set', ok: !!i.supplier_url, soft: true },
+      { label: 'Label design link set', ok: !!i.label_url, soft: true },
+    ] : []),
   ];
   if (blocked) return { key: 'blocked', label: 'Blocked (region)', short: 'Blocked', color: '#dc2626', stages };
   if (!sellable) return { key: 'no-path', label: 'No buy path', short: 'No path', color: '#d97706', stages };
@@ -276,10 +283,30 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     if (!/^https?:\/\//i.test(url.trim())) { toast.error('Enter a full http(s):// URL'); return; }
     bulkUpdate({ affiliate_url: url.trim(), lane: 'affiliate' }, 'Set affiliate link');
   };
+  // region-aware default: if every selected row is the same region and that
+  // region has ONE correct dropship supplier (docs/kit-fulfilment-strategy.md),
+  // pre-fill it so the pipeline can't accidentally cross US↔EU suppliers.
+  const selectedRegionSupplier = useMemo(() => {
+    const regions = new Set([...selected].map((id) => items.find((i) => i.id === id)?.market).filter(Boolean));
+    if (regions.size !== 1) return '';
+    return REGION_DROPSHIP_SUPPLIER[[...regions][0] as KitRegion] || '';
+  }, [selected, items]);
   const batchSetSupplier = () => {
-    const s = window.prompt('Supplier / dropship provider name for the selected items (e.g. Supliful, Suplify EU, Specialist UK):');
+    const s = window.prompt('Supplier / dropship provider name for the selected items (e.g. Supliful for US, Suplify for EU):', selectedRegionSupplier);
     if (s == null) return;
     bulkUpdate({ supplier: s.trim() || null }, 'Set supplier');
+  };
+  const batchSetLabel = () => {
+    const url = window.prompt('Label design link for the selected items (Canva share link or hosted PDF — required by the dropship supplier before the SKU can go live):');
+    if (url == null) return;
+    if (url.trim() && !/^https?:\/\//i.test(url.trim())) { toast.error('Enter a full http(s):// URL'); return; }
+    bulkUpdate({ label_url: url.trim() || null } as Partial<KitItem>, 'Set label link');
+  };
+  const batchSetSupplierUrl = () => {
+    const url = window.prompt("Supplier catalog link for the selected items (e.g. the Suplify/Supliful catalog page for this SKU — not the customer's buy link):");
+    if (url == null) return;
+    if (url.trim() && !/^https?:\/\//i.test(url.trim())) { toast.error('Enter a full http(s):// URL'); return; }
+    bulkUpdate({ supplier_url: url.trim() || null } as Partial<KitItem>, 'Set supplier link');
   };
   const batchSetLane = (lane: 'store' | 'affiliate') => bulkUpdate({ lane }, `Set lane → ${lane}`);
 
@@ -300,6 +327,37 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     setRowBusy(i.id);
     try { await deleteKitItem(accessToken, i.id); toast.success('Item removed'); onItemsChanged?.(); }
     catch (e: any) { toast.error(`Remove failed: ${e?.message || e}`); }
+    finally { setRowBusy(null); }
+  };
+  // per-row: add/edit the label design link or the supplier catalog link —
+  // the two things a store-lane row needs before its dropship supplier can
+  // actually fulfil it (see REGION_DROPSHIP_SUPPLIER: Supliful US / Suplify EU).
+  const setItemLabel = async (i: KitItem) => {
+    if (!accessToken) return;
+    const url = window.prompt(`Label design link for "${i.title || i.id}"\n(Canva share link or hosted PDF — required by the supplier before this SKU can go live):`, i.label_url || '');
+    if (url == null) return;
+    const v = url.trim();
+    if (v && !/^https?:\/\//i.test(v)) { toast.error('Enter a full http(s):// URL'); return; }
+    setRowBusy(i.id);
+    try { await updateKitItem(accessToken, i.id, { label_url: v || null } as Partial<KitItem>); toast.success('Label link saved'); onItemsChanged?.(); }
+    catch (e: any) { toast.error(`Save failed: ${e?.message || e}`); }
+    finally { setRowBusy(null); }
+  };
+  const setItemSupplierUrl = async (i: KitItem) => {
+    if (!accessToken) return;
+    const suggestion = !i.supplier_url && !i.supplier ? REGION_DROPSHIP_SUPPLIER[i.market] : undefined;
+    const url = window.prompt(`Supplier catalog link for "${i.title || i.id}"${suggestion ? ` (region supplier: ${suggestion})` : ''}:`, i.supplier_url || '');
+    if (url == null) return;
+    const v = url.trim();
+    if (v && !/^https?:\/\//i.test(v)) { toast.error('Enter a full http(s):// URL'); return; }
+    setRowBusy(i.id);
+    try {
+      const patch: Partial<KitItem> = { supplier_url: v || null };
+      if (v && suggestion && !i.supplier) patch.supplier = suggestion; // quietly fill the supplier name too, first time only
+      await updateKitItem(accessToken, i.id, patch);
+      toast.success('Supplier link saved'); onItemsChanged?.();
+    }
+    catch (e: any) { toast.error(`Save failed: ${e?.message || e}`); }
     finally { setRowBusy(null); }
   };
   const batchDelink = () => bulkUpdate({ catalog_product_id: null } as Partial<KitItem>, 'De-linked');
@@ -345,7 +403,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
     }
     return order.map((s) => map.get(s)!);
   }, [display, kits, protoName, protoImage, kitBySlugMarket]);
-  const COLS = 15; // leaf columns incl. the select checkbox + trailing actions (Region/Kit/Protocol are the parent rows)
+  const COLS = 17; // leaf columns incl. the select checkbox + trailing actions (Region/Kit/Protocol are the parent rows)
   const addMissing = async (m: MissingRow) => {
     if (!accessToken) return;
     setAddingKey(m.key);
@@ -379,7 +437,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
 
   const exportCsv = () => {
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const head = ['region', 'kit', 'protocol', 'product', 'sell_status', 'lane', 'buy_path', 'published_shopify', 'linked_product_id', 'supplier', 'store_url', 'cost_usd', 'sell_local', 'currency', 'margin_pct_fx', 'commission_pct', 'affiliate_url', 'variant_id', 'kit_live', 'region_rule'];
+    const head = ['region', 'kit', 'protocol', 'product', 'sell_status', 'lane', 'buy_path', 'published_shopify', 'linked_product_id', 'supplier', 'store_url', 'cost_usd', 'sell_local', 'currency', 'margin_pct_fx', 'commission_pct', 'affiliate_url', 'supplier_url', 'label_url', 'variant_id', 'kit_live', 'region_rule'];
     const lines = rows.map((i) => {
       const kit = kitBySlugMarket.get(`${i.slug}:${i.market}`);
       const rule = ruleFor(i);
@@ -388,7 +446,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
       return [i.market, i.slug, kit ? protoName.get(kit.protocol_id) || '' : '', i.title, sellStatus(i, kit, rule).label, i.lane, kitItemBuyPath(i) || 'none',
         kitItemBuyPath(i) === 'store' ? 'yes' : (i.lane === 'store' ? (kit?.partner_cart_url ? 'partner' : 'NO') : ''), i.catalog_product_id || '',
         i.supplier || '', itemStoreUrl(i) || '', i.supplier_cost_usd ?? '', i.price_usd ?? '', i.currency || 'USD', itemMarginPct(i, fx) ?? '', i.commission_pct ?? '',
-        i.affiliate_url || '', i.variant_id || '', kit?.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
+        i.affiliate_url || '', i.supplier_url || '', i.label_url || '', i.variant_id || '', kit?.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
     });
     // protocol-mentioned products missing from the kit — the sourcing to-do list
     const missingLines = missingRows.map((m) => {
@@ -396,7 +454,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
       const rule = rules.find((r) => r.region === m.market && r.item_id === m.product.id);
       return [m.market, m.slug, protoName.get(m.kit.protocol_id) || '', m.product.name, 'not_in_kit', '', 'NOT_IN_KIT', '', m.product.id,
         '', '', '', m.product.price_usd ?? '', 'USD', '', '',
-        f.affiliate_url || '', f.variant_id || '', m.kit.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
+        f.affiliate_url || '', '', '', f.variant_id || '', m.kit.is_live ? 'live' : 'hidden', rule ? `${rule.action}: ${rule.reason || ''}` : ''].map(esc).join(',');
     });
     const blob = new Blob([[head.join(','), ...lines, ...missingLines].join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -500,7 +558,9 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
           <span className="flex-1" />
           {batchBusy && <Loader2 size={13} className="animate-spin" />}
           <button className="sb-btn sb-btn-sm" onClick={batchSetAffiliate} disabled={batchBusy}>Affiliate link…</button>
-          <button className="sb-btn sb-btn-sm" onClick={batchSetSupplier} disabled={batchBusy}>Supplier / dropship…</button>
+          <button className="sb-btn sb-btn-sm" onClick={batchSetSupplier} disabled={batchBusy} title={selectedRegionSupplier ? `Suggests "${selectedRegionSupplier}" — the correct dropship supplier for this region` : undefined}>Supplier / dropship…</button>
+          <button className="sb-btn sb-btn-sm" onClick={batchSetLabel} disabled={batchBusy} title="Print-ready label design link (Canva / hosted PDF) — required before the supplier can fulfil these SKUs">Label link…</button>
+          <button className="sb-btn sb-btn-sm" onClick={batchSetSupplierUrl} disabled={batchBusy} title="The supplier's own catalog/product page for these SKUs">Supplier link…</button>
           <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('store')} disabled={batchBusy} title="Sell & fulfil on our Shopify store">Sold via → Our store</button>
           <button className="sb-btn sb-btn-sm" onClick={() => batchSetLane('affiliate')} disabled={batchBusy} title="Link out to the brand for commission">Sold via → Partner</button>
           <button className="sb-btn sb-btn-sm" onClick={batchDelink} disabled={batchBusy} title="Clear the catalog-product link on the selected items (keeps the rows)">De-link</button>
@@ -521,6 +581,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
               <th style={{ width: 66 }} title="Where the buy button goes: 'shopify' = our Shopify store; 'partner' = the kit's partner cart; NONE = not sellable yet">Buy path</th>
               <th style={{ width: 84 }} title="How this item is sold — 'Our store' = we sell & fulfil on Shopify; 'Partner link' = we link out to the brand for a commission">Sold via</th>
               <SortTh k="supplier" sortCol={sortCol} onSort={clickSort} style={{ maxWidth: 150 }}>Supplier</SortTh>
+              <th style={{ width: 58 }} title="Print-ready label design for the dropship supplier (Canva share link / hosted PDF) — required before this SKU can go live with that supplier">Label</th>
+              <th style={{ width: 58 }} title="The supplier's own catalog/product page for this SKU (distinct from the customer-facing affiliate link)">Supp. link</th>
               <SortTh k="cost" sortCol={sortCol} onSort={clickSort} style={{ width: 56 }}>Cost</SortTh>
               <SortTh k="sell" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }} title="Sorts on the fx-converted USD value, so regions compare fairly">Sell</SortTh>
               <SortTh k="margin" sortCol={sortCol} onSort={clickSort} style={{ width: 60 }}>Margin</SortTh>
@@ -547,7 +609,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', cursor: onOpenProduct ? 'pointer' : 'text', background: 'none', border: 'none', textAlign: 'left', font: 'inherit', color: onOpenProduct ? 'var(--sb-brand-strong)' : 'inherit' }}>
                         <Thumb src={m.product.image} size={18} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.product.name}</span>
-                        <span style={{ flexShrink: 0, borderRadius: 4, padding: '1px 5px', fontSize: 9.5, fontWeight: 700, letterSpacing: 0.3, color: '#d97706', border: '1px solid rgba(217, 119, 6, 0.4)', background: 'rgba(245, 158, 11, 0.1)' }}>
+                        <span style={{ flexShrink: 0, borderRadius: 4, padding: '1px 5px', fontSize: 11.5, fontWeight: 700, letterSpacing: 0.3, color: '#d97706', border: '1px solid rgba(217, 119, 6, 0.4)', background: 'rgba(245, 158, 11, 0.1)' }}>
                           NOT IN KIT{m.product.mentions > 1 ? ` ×${m.product.mentions}` : ''}
                         </span>
                       </button>
@@ -570,6 +632,8 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.lane === 'store' ? 'ROUTINE³ store' : hostOf(f.affiliate_url || null) || '—'}</span>
                       </span>
                     </td>
+                    <td><span className="sb-cell" style={{ color: 'var(--sb-text-faint)' }} title="Add it to the kit first (← Add) to set a label link">—</span></td>
+                    <td><span className="sb-cell" style={{ color: 'var(--sb-text-faint)' }} title="Add it to the kit first (← Add) to set a supplier link">—</span></td>
                     <td><span className="sb-cell">—</span></td>
                     <td><span className="sb-cell">{m.product.price_usd != null ? `$${m.product.price_usd}` : '—'}</span></td>
                     <td><span className="sb-cell">—</span></td>
@@ -606,7 +670,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                   <td>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {num != null && (
-                        <span title={total != null ? `Item ${num} of ${total} in this region` : ''} style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontSize: 10.5, fontWeight: 600, color: 'var(--sb-text-faint)', minWidth: 38, textAlign: 'right', paddingLeft: 18 }}>{num}{total != null ? `/${total}` : ''}</span>
+                        <span title={total != null ? `Item ${num} of ${total} in this region` : ''} style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontSize: 11.5, fontWeight: 600, color: 'var(--sb-text-faint)', minWidth: 38, textAlign: 'right', paddingLeft: 18 }}>{num}{total != null ? `/${total}` : ''}</span>
                       )}
                       {onOpenProduct
                         ? <button onClick={() => onOpenProduct(i.catalog_product_id, i.title || undefined)} className="sb-cell"
@@ -650,6 +714,34 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                             {supplierLabel(i)}
                           </a>
                         : <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{supplierLabel(i)}</span>}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="sb-cell" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {i.label_url ? (
+                        <>
+                          <a href={i.label_url} target="_blank" rel="noopener noreferrer" title={`Open label design — ${i.label_url}`} style={{ color: 'var(--sb-brand-strong)', display: 'inline-flex' }}><Tag size={12} /></a>
+                          <button onClick={() => setItemLabel(i)} title="Edit label link" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: 'var(--sb-text-faint)', fontSize: 11 }}>edit</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setItemLabel(i)} className="sb-btn" style={{ height: 20, padding: '0 6px', fontSize: 11.5 }} title="Add the print-ready label design link (Canva share link / hosted PDF) — required before the dropship supplier can fulfil this SKU">
+                          <Plus size={10} /> add
+                        </button>
+                      )}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="sb-cell" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {i.supplier_url ? (
+                        <>
+                          <a href={i.supplier_url} target="_blank" rel="noopener noreferrer" title={`Open supplier catalog page — ${i.supplier_url}`} style={{ color: 'var(--sb-brand-strong)', display: 'inline-flex' }}><ExternalLink size={12} /></a>
+                          <button onClick={() => setItemSupplierUrl(i)} title="Edit supplier link" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: 'var(--sb-text-faint)', fontSize: 11 }}>edit</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setItemSupplierUrl(i)} className="sb-btn" style={{ height: 20, padding: '0 6px', fontSize: 11.5 }} title={`Add this SKU's page on the region's dropship supplier catalog${REGION_DROPSHIP_SUPPLIER[i.market] ? ` (${REGION_DROPSHIP_SUPPLIER[i.market]} for ${i.market})` : ''}`}>
+                          <Plus size={10} /> add
+                        </button>
+                      )}
                     </span>
                   </td>
                   <td><span className="sb-cell">{i.supplier_cost_usd != null ? fmtMoney(i.supplier_cost_usd, 'USD') : '—'}</span></td>
@@ -752,7 +844,7 @@ export function KitsMasterTable({ items, kits, protocols, rules, itemCounts, pro
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px 5px 40px' }}>
                           {regionOpen ? <ChevronDown size={13} className="shrink-0 text-gray-400" /> : <ChevronRight size={13} className="shrink-0 text-gray-400" />}
                           <span style={{ fontWeight: 500 }}>{REGION_FLAG[market]} {market}</span>
-                          <span style={{ flexShrink: 0, borderRadius: 999, padding: '0 7px', fontSize: 10, fontWeight: 600, color: R.kit?.is_live ? 'var(--sb-brand-strong)' : 'var(--sb-text-faint)', background: R.kit?.is_live ? 'var(--sb-brand-soft)' : 'var(--sb-hover)' }}>{R.kit?.is_live ? 'live' : 'hidden'}</span>
+                          <span style={{ flexShrink: 0, borderRadius: 999, padding: '0 7px', fontSize: 11, fontWeight: 600, color: R.kit?.is_live ? 'var(--sb-brand-strong)' : 'var(--sb-text-faint)', background: R.kit?.is_live ? 'var(--sb-brand-soft)' : 'var(--sb-hover)' }}>{R.kit?.is_live ? 'live' : 'hidden'}</span>
                           <span style={{ color: 'var(--sb-text-faint)', fontSize: 11.5 }}>{R.rows.length} item{R.rows.length !== 1 ? 's' : ''}</span>
                           {(() => {
                             const items = R.rows.filter((r: any) => r.t === 'item');
