@@ -8,6 +8,17 @@ interface UseUrlParameterHandlingProps {
 }
 
 export function useUrlParameterHandling({ setCurrentPage }: UseUrlParameterHandlingProps) {
+  // Deep-link the admin panel: routing here is state-based (no path router), so
+  // visiting /admin would otherwise stay on 'home'. Map the path → the 'admin'
+  // page on load; the admin auth gate in PageRenderer still applies (a non-admin
+  // is bounced back to home once auth resolves). The session persists in
+  // localStorage, so once you're signed in as admin, reloading /admin lands here.
+  useEffect(() => {
+    if (window.location.pathname.replace(/\/+$/, '') === '/admin') {
+      setCurrentPage('admin');
+    }
+  }, [setCurrentPage]);
+
   // Handle custom /confirm-email?token=... links from waitlist confirmation emails
   useEffect(() => {
     const path = window.location.pathname;
