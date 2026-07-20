@@ -341,7 +341,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   // edited) prompt — null means "use the global template built from this protocol".
   const [aiBusy, setAiBusy] = useState(false);
   const [coverPrompt, setCoverPrompt] = useState<string | null>(null);
-  useEffect(() => { setCoverPrompt(null); }, [selectedId]);
+  // Optional inspiration image (data: URL from an upload, or a pasted URL) that
+  // guides generation via gpt-image-1 edits. Empty = pure text-to-image.
+  const [inspoUrl, setInspoUrl] = useState('');
+  const inspoInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { setCoverPrompt(null); setInspoUrl(''); }, [selectedId]);
   const [importing, setImporting] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -510,13 +514,24 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     }
   }
 
+  // Read a chosen inspiration file into a data: URL (kept client-side; sent to
+  // the generator only when generating, never uploaded to storage on its own).
+  function onPickInspiration(file: File) {
+    if (!file.type.startsWith('image/')) { toast.error('Pick an image file'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setInspoUrl(String(reader.result || ''));
+    reader.onerror = () => toast.error('Could not read that image');
+    reader.readAsDataURL(file);
+  }
+
   async function generateCover() {
     const prompt = effectiveCoverPrompt.trim();
     if (!prompt) { toast.error('Prompt is empty'); return; }
+    const reference = inspoUrl.trim();
     setAiBusy(true);
     try {
-      toast.info('Generating cover… (~20–40s)');
-      const raw = await aiGenerateImage(accessToken, prompt);
+      toast.info(reference ? 'Generating from your inspiration… (~20–40s)' : 'Generating cover… (~20–40s)');
+      const raw = await aiGenerateImage(accessToken, prompt, reference ? { referenceImageUrl: reference } : {});
       toast.info('Framing as app icon…');
       setField('image_url', await frameAndUpload(raw));
       toast.success('Cover generated — remember to Save');
@@ -1646,6 +1661,30 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                         placeholder="Describe the cover to generate…"
                         style={{ width: '100%', fontSize: 12, lineHeight: 1.45, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, padding: '7px 9px', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }}
                       />
+                      {/* optional inspiration image — guides generation (gpt-image-1 edits) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        <input ref={inspoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                          onChange={(e) => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) onPickInspiration(f); }} />
+                        {inspoUrl ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            <img src={inspoUrl} alt="inspiration" style={{ width: 30, height: 30, borderRadius: 6, objectFit: 'cover', border: '1px solid ' + C.hair }} />
+                            <span style={{ fontSize: 11, color: C.sub }}>Inspiration set</span>
+                            <button type="button" onClick={() => setInspoUrl('')} disabled={aiBusy}
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, fontSize: 11, padding: 0 }}>remove</button>
+                          </span>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => inspoInputRef.current?.click()} disabled={aiBusy}
+                              title="Optional: give the generator a reference image to match a look"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '5px 10px', borderRadius: 8, cursor: aiBusy ? 'default' : 'pointer', border: '1px solid ' + C.hair, background: 'var(--sb-panel)', color: C.sub }}>
+                              <ImageIcon size={13} /> Add inspiration image
+                            </button>
+                            <input value={inspoUrl} disabled={aiBusy} onChange={(e) => setInspoUrl(e.target.value)}
+                              placeholder="…or paste a reference image URL"
+                              style={{ flex: '1 1 180px', minWidth: 140, fontSize: 11, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, padding: '6px 8px', outline: 'none', boxSizing: 'border-box' }} />
+                          </>
+                        )}
+                      </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                         <button type="button" onClick={generateCover} disabled={aiBusy || !effectiveCoverPrompt.trim()}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 8, cursor: aiBusy || !effectiveCoverPrompt.trim() ? 'default' : 'pointer', border: '1px solid ' + C.good, background: C.good, color: '#fff', opacity: aiBusy || !effectiveCoverPrompt.trim() ? 0.6 : 1 }}>
@@ -1659,7 +1698,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                             <ImageIcon size={14} /> Frame as app icon
                           </button>
                         )}
-                        <span style={{ fontSize: 11, color: C.faint }}>Square-in-square, blurred background · applied to every cover</span>
+                        <span style={{ fontSize: 11, color: C.faint }}>Describe it above or add an inspiration image · every cover is framed square-in-square</span>
                       </div>
                     </div>
                   </div>

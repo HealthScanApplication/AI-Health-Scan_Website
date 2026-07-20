@@ -8,13 +8,19 @@ import { projectId } from './supabase/info';
 export async function aiGenerateImage(
   accessToken: string,
   prompt: string,
-  opts: { provider?: string; size?: string } = {},
+  opts: { provider?: string; size?: string; referenceImageUrl?: string } = {},
 ): Promise<string> {
   const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/ai-generate-image`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, provider: opts.provider || 'openai', size: opts.size || '1024x1024' }),
+    body: JSON.stringify({
+      prompt,
+      provider: opts.provider || 'openai',
+      size: opts.size || '1024x1024',
+      // Optional inspiration image (data: or http URL) → gpt-image-1 edits path.
+      ...(opts.referenceImageUrl ? { referenceImageUrl: opts.referenceImageUrl } : {}),
+    }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.success === false) {

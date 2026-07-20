@@ -1446,11 +1446,57 @@ app.post('/make-server-ed0fe4c2/admin/storage/upload', async (c: any) => {
 // Replicate-Flux later, add a branch that returns raw PNG bytes — the upload +
 // endpoint stay the same. Midjourney has no official API (needs an async relay +
 // job queue), so it's a future provider, not a drop-in.
-async function generateImageBytes(provider: string, prompt: string, opts: { size?: string } = {}): Promise<Uint8Array> {
+// Reference image → raw bytes. Accepts a data: URL (inline upload) or an
+// http(s) URL (already-hosted image). Admin-gated caller, so fetching a
+// user-supplied URL here is acceptable.
+async function fetchImageBytes(ref: string): Promise<Uint8Array> {
+  if (ref.startsWith('data:')) {
+    const b64 = ref.slice(ref.indexOf(',') + 1)
+    return Uint8Array.from(atob(b64), (ch: string) => ch.charCodeAt(0))
+  }
+  const r = await fetch(ref)
+  if (!r.ok) throw new Error(`Could not fetch reference image (${r.status})`)
+  return new Uint8Array(await r.arrayBuffer())
+}
+
+async function generateImageBytes(
+  provider: string,
+  prompt: string,
+  opts: { size?: string; referenceImageUrl?: string } = {},
+): Promise<Uint8Array> {
   const p = (provider || 'openai').toLowerCase()
   if (p === 'openai') {
     const key = Deno.env.get('OPENAI_API_KEY')
     if (!key) throw new Error('OPENAI_API_KEY not configured')
+
+    // Inspiration image supplied → gpt-image-1 edits (image + text → image).
+    // No dall-e fallback here: dall-e-3 has no edits endpoint and dall-e-2
+    // requires a mask, so image-guided generation needs gpt-image-1.
+    if (opts.referenceImageUrl) {
+      const refBytes = await fetchImageBytes(opts.referenceImageUrl)
+      const form = new FormData()
+      form.append('model', 'gpt-image-1')
+      form.append('image', new Blob([refBytes], { type: 'image/png' }), 'reference.png')
+      form.append('prompt', prompt)
+      form.append('size', opts.size || '1024x1024')
+      form.append('n', '1')
+      const res = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}` }, // fetch sets multipart boundary
+        body: form,
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (/gpt-image|verif|does not have access|must be verified/i.test(JSON.stringify(j?.error || '')))
+          throw new Error('Inspiration-image generation needs gpt-image-1 access on this OpenAI org (verify the org, then retry).')
+        throw new Error(j?.error?.message || `OpenAI edits error (${res.status})`)
+      }
+      const d = j?.data?.[0]
+      if (d?.b64_json) return Uint8Array.from(atob(d.b64_json), (ch: string) => ch.charCodeAt(0))
+      if (d?.url) { const ir = await fetch(d.url); return new Uint8Array(await ir.arrayBuffer()) }
+      throw new Error('OpenAI returned no image data')
+    }
+
     const call = (model: string, extra: Record<string, any> = {}) => fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -1480,10 +1526,10 @@ app.post('/make-server-ed0fe4c2/admin/ai-generate-image', async (c: any) => {
     const adminValidation = await validateAdminAccess(accessToken)
     if (adminValidation.error) return c.json({ success: false, error: adminValidation.error }, adminValidation.status)
 
-    const { prompt, provider = 'openai', size = '1024x1024', bucket = 'catalog-media' } = await c.req.json()
+    const { prompt, provider = 'openai', size = '1024x1024', bucket = 'catalog-media', referenceImageUrl } = await c.req.json()
     if (!prompt || typeof prompt !== 'string') return c.json({ success: false, error: 'prompt is required' }, 400)
 
-    const bytes = await generateImageBytes(provider, prompt, { size })
+    const bytes = await generateImageBytes(provider, prompt, { size, referenceImageUrl })
 
     const { data: existing } = await supabase.storage.getBucket(bucket)
     if (!existing) await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: 52428800 })
@@ -1491,7 +1537,7 @@ app.post('/make-server-ed0fe4c2/admin/ai-generate-image', async (c: any) => {
     const { error: uploadErr } = await supabase.storage.from(bucket).upload(path, bytes, { contentType: 'image/png', upsert: true })
     if (uploadErr) return c.json({ success: false, error: uploadErr.message }, 500)
     const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
-    console.log(`[Admin] AI image (${provider}) → ${path} by ${adminValidation.user?.email}`)
+    console.log(`[Admin] AI image (${provider}${referenceImageUrl ? ', ref' : ''}) → ${path} by ${adminValidation.user?.email}`)
     return c.json({ success: true, publicUrl: urlData.publicUrl, prompt, provider })
   } catch (error: any) {
     console.error('[Admin] ai-generate-image error:', error)
