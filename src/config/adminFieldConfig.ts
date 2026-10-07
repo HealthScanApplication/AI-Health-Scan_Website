@@ -2997,17 +2997,20 @@ const activitiesFields: FieldConfig[] = [
     colSpan: 2,
     placeholder: "e.g. Running shoes, Heart rate monitor",
   },
+  // The one body/muscle list (2026-10-07): muscle_groups, muscles_targeted and
+  // target_muscles were merged into body_parts and dropped. Values are lower
+  // snake_case slugs — the vocabulary is src/utils/bodyParts.ts in the app repo.
   {
-    key: "muscle_groups",
-    label: "Muscle Groups",
+    key: "body_parts",
+    label: "Body Parts",
     type: "array",
     showInDetail: true,
     showInEdit: true,
     colSpan: 2,
-    placeholder: "e.g. Quadriceps, Hamstrings, Core",
+    placeholder: "e.g. quadriceps, hamstrings, core",
     aiSuggest: true,
     aiPrompt:
-      "List the primary muscle groups targeted by '{name}'. Return as a simple array of muscle group names. Format: [\"Quadriceps\",\"Hamstrings\",\"Core\"]",
+      "List the body parts '{name}' works, as lower snake_case anatomical names (e.g. quadriceps, latissimus_dorsi, hip_flexors). Return a JSON array such as [\"quadriceps\",\"hamstrings\",\"core\"], or [] if it works no body part.",
   },
   {
     key: "contraindications",

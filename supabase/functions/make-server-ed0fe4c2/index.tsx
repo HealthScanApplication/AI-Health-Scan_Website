@@ -1229,7 +1229,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/update', async (c: any) => {
         'name','description','category','icon_name','icon_svg_path','icon_url','image_url','video_url',
         'sweat_level','default_duration_min','calories_per_minute','intensity_levels',
         'mineral_impact','toxin_loss','benefits','strava_types',
-        'equipment_needed','muscle_groups','contraindications',
+        'equipment_needed','body_parts','contraindications',
         'is_active','sort_order','updated_at',
       ]),
       catalog_symptoms: new Set([
@@ -2478,7 +2478,7 @@ app.post('/make-server-ed0fe4c2/admin/catalog/insert', async (c: any) => {
         'id','name','description','category','icon_name','icon_svg_path','icon_url','image_url','video_url',
         'sweat_level','default_duration_min','calories_per_minute','intensity_levels',
         'mineral_impact','toxin_loss','benefits','strava_types',
-        'equipment_needed','muscle_groups','contraindications',
+        'equipment_needed','body_parts','contraindications',
         'is_active','sort_order','created_at','updated_at',
       ]),
       catalog_products: new Set([
