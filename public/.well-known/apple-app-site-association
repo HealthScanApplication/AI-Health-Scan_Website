@@ -1,0 +1,22 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "PMVKKWSBVW.design.johnferreira.healthscan",
+          "PMVKKWSBVW.design.johnferreira.healthscan.dev"
+        ],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "A guardian invite to share a family member's day. The token is the capability; the app redeems it after sign-in."
+          },
+          {
+            "/": "/protocol/????????-????-????-????-????????????",
+            "comment": "A printed routine's QR. Shared catalog routines only."
+          }
+        ]
+      }
+    ]
+  }
+}
