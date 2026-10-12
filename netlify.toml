@@ -40,6 +40,32 @@
   to = "/og-image.png"
   status = 200
 
+# Universal links (DEV-1640). Must sit above the forced SPA catch-all, or the
+# association file is served as index.html and iOS silently ignores routine3.com.
+[[redirects]]
+  from = "/.well-known/apple-app-site-association"
+  to = "/.well-known/apple-app-site-association"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/apple-app-site-association"
+  to = "/.well-known/apple-app-site-association"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/join/*"
+  to = "/join/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/protocol/*"
+  to = "/protocol/index.html"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/assets/*"
   to = "/assets/:splat"
@@ -84,3 +110,18 @@
   [headers.values]
     Cache-Control = "public, max-age=86400"
     Content-Type = "application/xml"
+
+# iOS requires application/json for the association file (no extension, so
+# Netlify would otherwise guess application/octet-stream).
+[[headers]]
+  for = "/.well-known/apple-app-site-association"
+  [headers.values]
+    Content-Type = "application/json"
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/join/*"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
