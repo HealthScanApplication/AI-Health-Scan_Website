@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Join on Routine³</title>
+<meta name="description" content="You were invited to share someone's day on Routine³. Open the invite in the R³ app.">
+<meta name="apple-itunes-app" content="app-id=6740406583">
+<meta name="robots" content="noindex, nofollow">
+<!-- The invite token is in this page's URL. Nothing on this page may carry it
+     anywhere: no third-party requests, no referrer, no analytics. -->
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<style>
+  :root { --bg:#FAF8F4; --surface:#FFFFFF; --ink:#1A1A1A; --muted:#5C5C5C; --faint:#8A8A8A; --line:#E8E5DD; --button:#1A1A1A; --button-ink:#FFFFFF; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111111; --surface:#1C1C1C; --ink:#F4F2EE; --muted:#B5B2AC; --faint:#85827D; --line:#2E2E2E; --button:#F4F2EE; --button-ink:#111111; }
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:var(--bg); color:var(--ink); font-family:system-ui, -apple-system, 'Segoe UI', sans-serif; line-height:1.5; }
+  main { max-width:480px; margin:0 auto; padding:max(40px, env(safe-area-inset-top)) 16px 48px; }
+  .mark { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:12px; background:var(--button); color:var(--button-ink); font-weight:700; font-size:18px; }
+  .mark sup { font-size:10px; margin-left:1px; }
+  .eyebrow { margin-top:32px; font-size:13px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); }
+  h1 { margin-top:6px; font-size:clamp(28px, 8vw, 36px); font-weight:700; line-height:1.15; letter-spacing:-.02em; }
+  .about { margin-top:16px; font-size:16px; color:var(--muted); }
+  .actions { margin-top:32px; display:grid; gap:12px; }
+  .button { display:block; text-align:center; padding:16px 20px; min-height:52px; border-radius:14px; font-weight:600; font-size:16px; text-decoration:none; }
+  .primary { background:var(--button); color:var(--button-ink); }
+  .secondary { background:var(--surface); color:var(--ink); border:1px solid var(--line); }
+  .note { margin-top:16px; font-size:13px; color:var(--faint); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <span class="mark" aria-label="Routine³">R<sup>3</sup></span>
+  <p class="eyebrow">An invite for you</p>
+  <h1 id="title">Get Routine³</h1>
+  <p class="about" id="about">You were invited to help with someone's day on Routine³. Get the app, then open this link again to accept.</p>
+  <div class="actions">
+    <a class="button primary" id="open" href="routine3://" hidden>Open in Routine³</a>
+    <a class="button primary" id="testflight" href="https://testflight.apple.com/join/sucxsQpE">Get Routine³ (TestFlight)</a>
+    <a class="button secondary" href="https://apps.apple.com/app/id6740406583">Get Routine³ on the App Store</a>
+  </div>
+  <p class="note">Routine³ is on iPhone. This page never asks you for anything.</p>
+</main>
+<script>
+/*
+ * Fallback for https://routine3.com/join/<token>. With R³ installed iOS opens the
+ * app directly (universal link) and this page never loads. Otherwise: offer to
+ * open the app through its scheme (in-app browsers, or Safari after the Smart
+ * App Banner), and to get it. The token is only ever handed to the app; this page
+ * makes no network request with it.
+ */
+(function () {
+  var m = location.pathname.match(/^\/join\/([A-Za-z0-9_-]{16,128})\/?$/);
+  if (!m) {
+    document.getElementById('title').textContent = 'This invite link is incomplete';
+    document.getElementById('about').textContent = 'Ask whoever shared it to send the link again.';
+    return;
+  }
+  var open = document.getElementById('open');
+  open.href = 'routine3://join/' + m[1];
+  open.hidden = false;
+  document.getElementById('title').textContent = 'Open your invite';
+  document.getElementById('testflight').className = 'button secondary';
+})();
+</script>
+</body>
+</html>
