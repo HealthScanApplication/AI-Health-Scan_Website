@@ -29,7 +29,7 @@ export const CATEGORY_TINTS: Record<CatKey, { fg: string; bg: string; label: str
   supplements: { fg: "#0097A7", bg: "#E8F5F7", label: "Supplements", Icon: Pill },
   consume: { fg: "#388E3C", bg: "#EBF5EB", label: "Consume", Icon: Utensils },
   do: { fg: "#D45B0A", bg: "#FEF3EB", label: "Do", Icon: Dumbbell },
-  sleep: { fg: "#5C6B7A", bg: "#F2F2F4", label: "Sleep", Icon: Moon },
+  sleep: { fg: "#245FAE", bg: "#EAF2FC", label: "Sleep", Icon: Moon },
 };
 
 // Fixed display order, exactly like ProtocolGroupBody.buildGroups.
