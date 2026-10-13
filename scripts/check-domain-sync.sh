@@ -6,16 +6,19 @@ set -euo pipefail
 
 WEB="$(cd "$(dirname "$0")/.." && pwd)/src/protocolDomain"
 MOB="${MOBILE_REPO:-$HOME/Developer/AI-Health-Scan_Mobile}/src/protocolDomain"
+WEB_TYPES="$(cd "$(dirname "$0")/.." && pwd)/src/constants/itemTypes.ts"
+MOB_TYPES="${MOBILE_REPO:-$HOME/Developer/AI-Health-Scan_Mobile}/src/constants/itemTypes.ts"
 
 if [ ! -d "$MOB" ]; then
   echo "skip: mobile repo not found at $MOB (set MOBILE_REPO to override)"
   exit 0
 fi
 
-if diff -r --exclude=__tests__ "$WEB" "$MOB" >/tmp/domain-sync.diff 2>&1; then
-  echo "✓ protocolDomain is in sync (web === mobile)"
+if diff -r --exclude=__tests__ "$WEB" "$MOB" >/tmp/domain-sync.diff 2>&1 \
+  && diff "$WEB_TYPES" "$MOB_TYPES" >>/tmp/domain-sync.diff 2>&1; then
+  echo "✓ protocolDomain and item types are in sync (web === mobile)"
 else
-  echo "✗ protocolDomain has DIVERGED between web and mobile:"
+  echo "✗ shared protocol logic has DIVERGED between web and mobile:"
   cat /tmp/domain-sync.diff
   exit 1
 fi

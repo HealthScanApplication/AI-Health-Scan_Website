@@ -1,4 +1,5 @@
-/**
+
+import { PROTOCOL_ITEM_KINDS } from '../constants/itemTypes';/**
  * hygieneWindows — the single definition of "when is hygiene a morning/evening
  * bookend" (DEV-418, extracted from ProtocolWidget + ActiveProtocolCard where
  * the windows were defined twice and had started to drift).
@@ -45,16 +46,36 @@ export function hygieneSlotName(
   item: HygieneBandable,
   wakeHour: number = 0,
 ): string | null {
-  if (item.kind && item.kind !== 'action') return null;
+  if (item.kind && item.kind !== PROTOCOL_ITEM_KINDS.ACTION) return null;
   const g = String(item.group_name || '').trim().toLowerCase();
   if (g === 'morning hygiene') return HYGIENE_SLOT_MORNING;
   if (g === 'evening hygiene') return HYGIENE_SLOT_EVENING;
   if (String(item.subtype || '') !== 'hygiene') return null;
   const h = hourOf(item.scheduled_time);
   if (h < 0) return null;
-  if (h >= wakeHour && h < Math.min(12, wakeHour + 3)) return HYGIENE_SLOT_MORNING;
+  if (h >= wakeHour && h < morningWindowEndHour(wakeHour)) return HYGIENE_SLOT_MORNING;
   if (h >= 17) return HYGIENE_SLOT_EVENING;
   return null;
+}
+
+/**
+ * Where the morning-hygiene window closes, given the day's wake hour.
+ *
+ * It used to be a flat `min(12, wakeHour + 3)`, which breaks the moment the wake
+ * anchor lands in the small hours. John, 2026-07-30: an Oura session ending at
+ * 1:18am made `wakeHour = 1`, so the window became hours [1, 4) — and his 7am
+ * Brush Teeth / Use Toilet fell straight out of MORNING HYGIENE into a plain Do
+ * group. A wake time that early is a mid-night or short session, not the hour the
+ * user's morning routine happens.
+ *
+ * The +3h reach is kept (it is what stops a 3pm shower banding as morning) but
+ * the window may never close before 10:00, so an ordinary morning is always
+ * covered whatever the anchor says. Normal wakes are unaffected: a 7am wake
+ * closed at min(12, 10) = 10 before and closes at 10 now.
+ */
+const MORNING_HYGIENE_MIN_END_HOUR = 10;
+export function morningWindowEndHour(wakeHour: number): number {
+  return Math.min(12, Math.max(wakeHour + 3, MORNING_HYGIENE_MIN_END_HOUR));
 }
 
 /** Suppression window around the actual wake: wake−30min … wake+2h30. */

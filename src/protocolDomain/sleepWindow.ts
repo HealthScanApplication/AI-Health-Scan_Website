@@ -47,7 +47,16 @@ export function dateToHHMM(d?: Date | null): string | null {
   return `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 }
 
-export interface SleepItemLike { display_name?: string | null; scheduled_time?: string | null; category?: string | null }
+export interface SleepItemLike {
+  display_name?: string | null;
+  scheduled_time?: string | null;
+  category?: string | null;
+  /** Which bookend this row IS, when the source knows. Wearable-derived rows set
+   *  it (features/protocol/timeline/sleepAnchors); protocol items leave it unset
+   *  and fall back to the name. Same field `sleepConsolidate.sleepActionBucket`
+   *  already treats as authoritative — one claim, read the same way in both. */
+  sleep_anchor?: 'wake' | 'bed' | null;
+}
 
 export interface SleepWindow<T> {
   wakeItem?: T; bedItem?: T;
@@ -65,11 +74,41 @@ export function computeSleepWindow<T extends SleepItemLike>(
   items: T[],
   opts: { actualWake?: string | null } = {},
 ): SleepWindow<T> {
+  /**
+   * ROLE FIRST, then the name, and only then the clock.
+   *
+   * John, 2026-08-11: his Aug 9 read "Sleep 2:01am · woke 2:01am". 2:01am is when
+   * he went TO sleep; the wake was 8:55am, and that row rendered bare.
+   *
+   * The cause was the clock branch below. A sleep-category row before noon was
+   * counted as a WAKE, so the 02:01 sleep-START joined `wakes`, sorted first
+   * (earliest wins) and became `wakeItem` — taking the wake subtitle, and worse,
+   * supplying `plannedWakeMins`, which is what re-anchors the whole morning. The
+   * day was being re-timed from a bedtime.
+   *
+   * This is the same inference #1060 removed from `hasStartSleep`, surviving in
+   * the twin. `sleepSessions.ts` states the rule the model runs on: "Nothing
+   * infers start-vs-end from the hour." A row's ROLE is data — wearable rows
+   * carry `sleep_anchor`, exactly as `sleepActionBucket` reads it — so an
+   * explicit claim is honoured before anything is guessed.
+   *
+   * The clock stays as the LAST resort for a planned protocol item with no claim
+   * and no recognisable name, but it may no longer overrule a bed NAME: that is
+   * what let "Sleep" at 02:01 read as a wake.
+   */
+  const claims = (i: T, bucket: 'wake' | 'bed') => i.sleep_anchor === bucket;
+  const unclaimed = (i: T) => i.sleep_anchor !== 'wake' && i.sleep_anchor !== 'bed';
   const wakes = items
-    .filter((i) => isWakeName(i.display_name) || (isSleepCategory(i.category) && (minutesOfTime(i.scheduled_time) ?? 1e9) < 720))
+    .filter((i) => claims(i, 'wake') || (unclaimed(i) && (
+      isWakeName(i.display_name)
+      || (isSleepCategory(i.category) && !isBedName(i.display_name)
+        && (minutesOfTime(i.scheduled_time) ?? 1e9) < 720))))
     .sort((a, b) => (minutesOfTime(a.scheduled_time) ?? 1e9) - (minutesOfTime(b.scheduled_time) ?? 1e9));
   const beds = items
-    .filter((i) => isBedName(i.display_name) || (isSleepCategory(i.category) && (minutesOfTime(i.scheduled_time) ?? -1) >= 720))
+    .filter((i) => claims(i, 'bed') || (unclaimed(i) && (
+      isBedName(i.display_name)
+      || (isSleepCategory(i.category) && !isWakeName(i.display_name)
+        && (minutesOfTime(i.scheduled_time) ?? -1) >= 720))))
     .sort((a, b) => (minutesOfTime(a.scheduled_time) ?? -1) - (minutesOfTime(b.scheduled_time) ?? -1));
 
   const wakeItem = wakes[0];

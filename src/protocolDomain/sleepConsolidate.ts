@@ -23,7 +23,9 @@
  * SHARED, portable (no DOM/RN imports) — mirror to the web repo with the other
  * protocolDomain modules.
  */
-import { isWakeName, isBedName, isSleepCategory, minutesOfTime } from './sleepWindow';
+import { isSleepCategory, minutesOfTime } from './sleepWindow';
+import { claimsBedAnchor, claimsWakeAnchor } from './sleepAnchorClaim';
+import { PROTOCOL_ITEM_KINDS } from '../constants/itemTypes';
 
 export interface SleepActionLike {
   id?: string | null;
@@ -34,11 +36,21 @@ export interface SleepActionLike {
   parent_protocol_item_id?: string | null;
   source?: string | null;
   notes?: string | null;
+  /** Explicit bookend claim, set by wearable-derived rows (see
+   *  features/protocol/timeline/sleepAnchors). A night's session spans two
+   *  local days — it is day D's BEDTIME and day D+1's WAKE — so the recorded
+   *  rows say which bookend they are instead of being guessed from the clock.
+   *  `null` explicitly says this measured endpoint is NOT a day bookend (a nap
+   *  or an internal night segment); absent protocol items keep the heuristic
+   *  below. */
+  sleep_anchor?: 'wake' | 'bed' | null;
 }
 
-const isAction = (i: SleepActionLike) => i.kind === undefined || i.kind === null || i.kind === 'action';
-const isRecorded = (i: SleepActionLike) =>
+const isAction = (i: SleepActionLike) => i.kind === undefined || i.kind === null || i.kind === PROTOCOL_ITEM_KINDS.ACTION;
+/** A wearable-recorded sleep session (Oura) — a measurement, not a plan. */
+export const isRecordedSleep = (i: SleepActionLike) =>
   (i.source || '').toLowerCase() === 'oura' || (i.id || '').startsWith('oura_sleep');
+const isRecorded = isRecordedSleep;
 const isVirtual = (i: SleepActionLike) => (i.id || '').startsWith('__virtual_');
 
 type Bucket = 'wake' | 'bed' | null;
@@ -46,10 +58,36 @@ type Bucket = 'wake' | 'bed' | null;
 /** Which sleep-anchor bucket an ACTION row belongs to, or null for non-sleep. */
 export function sleepActionBucket(i: SleepActionLike): Bucket {
   if (!isAction(i) || i.parent_protocol_item_id) return null;
+  // A derived sleep-session endpoint with an explicit null is deliberately
+  // outside the day's one wake/bed pair. Do not fall through to clock/name
+  // inference: that is what collapsed separate naps into the bookend buckets.
+  if (i.sleep_anchor === null) return null;
+  // An explicit claim always wins: a recorded BEDTIME is legitimately timed
+  // after noon and must still take the bed bucket (the nap rule below would
+  // otherwise drop it, which is why a real bedtime never reached the timeline).
+  if (i.sleep_anchor === 'wake' || i.sleep_anchor === 'bed') return i.sleep_anchor;
   const mins = minutesOfTime(i.scheduled_time);
   const beforeNoon = mins != null && mins < 12 * 60;
-  if (isWakeName(i.display_name)) return 'wake';
-  if (isBedName(i.display_name)) return 'bed';
+  // A RECORDED session ending after noon is a nap — finished history. It can
+  // never stand in for tonight's bed anchor (it would render an already-done
+  // "Slept 6:43pm → 7:14pm" where Start Sleep belongs — John, 2026-07-16).
+  // It stays a standalone chronological row. Recorded sessions ending before
+  // noon are the night's sleep and rightly claim the wake bucket.
+  if (isRecorded(i) && !beforeNoon) return null;
+  // A NAME is not evidence on its own (DEV-1101). These two ran before any
+  // category gate, and `isBedName` matches bed/bedtime/sleep/lights-out
+  // ANYWHERE in a display name — so an ordinary consume row called "Bedtime
+  // Snack" claimed the bed bucket, outranked the virtual anchor by tier, and
+  // the day's BEDTIME was dropped, silently, because losing a bucket removes
+  // the row.
+  //
+  // The rule lives in `sleepAnchorClaim`, not here: six call sites consumed
+  // these string predicates as though they answered a question about the ROW,
+  // and a rule stated once per site is the thing that produced the bug. An
+  // explicit `sleep_anchor` claim has already returned above, so nothing that
+  // legitimately declares itself is affected.
+  if (claimsWakeAnchor(i)) return 'wake';
+  if (claimsBedAnchor(i)) return 'bed';
   if (isSleepCategory(i.category)) return mins == null ? 'bed' : beforeNoon ? 'wake' : 'bed';
   return null;
 }

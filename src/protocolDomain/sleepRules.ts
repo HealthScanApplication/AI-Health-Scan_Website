@@ -1,4 +1,5 @@
-/*
+
+import { PROTOCOL_ITEM_KINDS } from '../constants/itemTypes';/*
  * protocolDomain/sleepRules — classify protocol RULES (kind rule_do/rule_dont)
  * that are really sleep guidance, so the widget can nest them under the day's
  * sleep anchors (Start Sleep / End Sleep) instead of the generic bottom
@@ -43,7 +44,7 @@ export interface SleepRuleLike {
  * reads as a wake habit).
  */
 export function sleepRuleAnchor(rule: SleepRuleLike): SleepAnchor | null {
-  if (rule.kind !== 'rule_do' && rule.kind !== 'rule_dont') return null;
+  if (rule.kind !== PROTOCOL_ITEM_KINDS.RULE_DO && rule.kind !== PROTOCOL_ITEM_KINDS.RULE_DONT) return null;
   if (rule.parent_protocol_item_id) return null;
   const text = `${rule.display_name ?? ''} ${rule.notes ?? ''}`;
   if (WAKE_RE.test(text)) return 'wake';

@@ -24,9 +24,8 @@
  * Pinned (never shifted) by default:
  *   • sleep bookends (End Sleep / Start Sleep / category:'sleep') — owned by
  *     computeSleepWindow, which already re-times the wake anchor to actual wake.
- *   • already-COMPLETED items — they happened at their real time; re-timing a
- *     done item would be misleading. (Un-completed items that are now "past"
- *     because you slept in are exactly what should move after wake, so they do.)
+ * Completion never changes placement: pending and completed rows use the same
+ * derived time so checking a box cannot reorder or remove a timeline item.
  *
  * Explicit per-item override (`protocol_items.wake_relative`, DEV-409 column):
  *   true  → always shift (ignores the pins above)
@@ -48,7 +47,13 @@ export interface WakeShiftItemLike {
   display_name?: string | null;
   /** Explicit override (DEV-409 column). true = always shift, false = always pin. */
   wake_relative?: boolean | null;
-  /** When true, the item is already done and is left at its real time. */
+  /**
+   * Set when the row is a ONE-OFF pinned to a specific calendar day, rather than
+   * a recurring template item. Its presence is what tells us the time was chosen
+   * against the real clock — see the eligibility rule below.
+   */
+  scheduled_date?: string | null;
+  /** Completion is carried by callers but intentionally does not affect time. */
   completed?: boolean | null;
 }
 
@@ -130,9 +135,30 @@ export function applyWakeShift<T extends WakeShiftItemLike>(
       eligible = true; // explicit: always shift
     } else if (it.wake_relative === false) {
       eligible = false; // explicit: always pin
+    } else if (it.scheduled_date) {
+      /**
+       * A ONE-OFF is absolute. It was placed on a specific day at a specific
+       * clock time — into a free-time gap, from the catalog, from a capture —
+       * so it is already positioned against the real day. Re-anchoring it to
+       * wake double-counts the offset.
+       *
+       * John, 2026-08-07: an Achilles Stretch added into the 00:08 gap stored
+       * `00:08:00` and DREW at 4:08am. The shift was clamped to
+       * DEFAULT_MAX_SHIFT_MIN (4h), which is why both his examples landed
+       * exactly four hours late. It then read as an EVENING item, because
+       * 4am is pre-wake — a symptom of this, not a second bug.
+       *
+       * Recurring TEMPLATE items keep shifting: "30 min after waking" is
+       * genuinely wake-relative and is the whole point of this function. The
+       * presence of `scheduled_date` is what separates the two.
+       */
+      eligible = false;
     } else {
-      // Default: shift EVERYTHING except sleep bookends and completed items.
-      eligible = !isSleepBookend(it) && it.completed !== true;
+      // Completion is a visual/log state, never a scheduling state. If a row
+      // shifted with the user's wake while pending, checking it must not move
+      // it back to the stored clock time (which can jump it into Evening and
+      // look like it disappeared). Only sleep bookends stay pinned by default.
+      eligible = !isSleepBookend(it);
     }
     if (!eligible) return it;
 

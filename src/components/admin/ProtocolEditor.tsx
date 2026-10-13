@@ -146,6 +146,12 @@ function toHomeItems(items: AdminProtocolItem[], linkImages?: Map<string, string
       time: it.scheduled_time,
       duration_minutes: it.duration_minutes,
       group_name: it.group_name,
+      category: it.category,
+      subtype: it.subtype,
+      recurrence_type: it.recurrence_type,
+      scheduled_date: it.scheduled_date,
+      repeat: !!(it.frequency_override || (it.recurrence_type && it.recurrence_type !== 'one_off')),
+      description: it.notes,
       image_url: linkImages?.get(it.id) || null,
       children: childrenByParent.get(it.id),
     }));
@@ -582,8 +588,13 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const IMPORT_ITEM_FIELDS: (keyof AdminProtocolItem)[] = [
     'display_name', 'item_type', 'kind', 'scope', 'scheduled_time', 'duration_minutes',
     'group_name', 'day_number', 'sort_order', 'category', 'subtype', 'hidden',
+    'enabled', 'notes', 'amount', 'amount_unit', 'frequency_override',
     'catalog_recipe_id', 'catalog_product_id', 'catalog_activity_id', 'catalog_ingredient_id', 'supplement_id',
-    'recurrence_type', 'recurrence_days_of_week', 'recurrence_interval_days', 'recurrence_start_date', 'recurrence_end_date', 'scheduled_date',
+    'recurrence_type', 'recurrence_days_of_week', 'recurrence_interval_days', 'recurrence_interval_unit', 'recurrence_start_date', 'recurrence_end_date', 'scheduled_date',
+    'notifications_enabled', 'notification_lead_minutes',
+    'sets', 'reps', 'reps_display', 'weight_value', 'weight_unit', 'weight_display',
+    'rest_seconds', 'work_seconds', 'rounds', 'intensity', 'distance_value', 'distance_unit',
+    'load_type', 'intensity_variants', 'selected_intensity', 'filter',
   ];
 
   async function downloadPdf() {

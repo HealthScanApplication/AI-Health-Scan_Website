@@ -24,6 +24,7 @@ import { computeSleepWindow } from "../../utils/sleepWindow";
 import { getItemTod, parseHM, type SimpleTod } from "../../protocolDomain/timeOfDay";
 import { mealSlotName } from "../../protocolDomain/mealSlot";
 import { isSleepItemByName } from "../../protocolDomain/category";
+import { claimsBedAnchor, claimsWakeAnchor } from "../../protocolDomain/sleepAnchorClaim";
 
 const POPPINS = 'Poppins, "Archivo", system-ui, -apple-system, sans-serif';
 
@@ -35,6 +36,12 @@ export interface HomeItem {
   time?: string | null;          // 'HH:MM' or 'HH:MM:SS'
   duration_minutes?: number | null;
   group_name?: string | null;
+  category?: string | null;
+  subtype?: string | null;
+  recurrence_type?: string | null;
+  scheduled_date?: string | null;
+  /** Explicit role supplied by wearable-derived rows; null means not a bookend. */
+  sleep_anchor?: "wake" | "bed" | null;
   image_url?: string | null;
   repeat?: boolean;
   description?: string | null;
@@ -51,6 +58,11 @@ function fmtTime(t?: string | null): string {
   return `${h12}:${String(hm.m).padStart(2, "0")}${ampm}`;
 }
 function categorizeFull(it: HomeItem): CatKey {
+  const stored = (it.category || "").toLowerCase();
+  if (stored === "sleep") return "sleep";
+  if (stored === "supplement" || stored === "supplements") return "supplements";
+  if (stored === "consume") return "consume";
+  if (stored === "do") return "do";
   if (isSleepItemByName(it.display_name)) return "sleep";
   if (it.item_type === "supplement") return "supplements";
   if (it.item_type === "consume" || it.item_type === "recipe") return "consume";
@@ -72,15 +84,15 @@ function iconFor(it: HomeItem) {
 const mealSlot = (group?: string | null): string | null => mealSlotName(group);
 // Day-anchor detection, mirroring the app (ProtocolWidget):
 // "End Sleep"/Wake book-ends the morning; the terminal sleep/bed action ends the day.
-const WAKE_RE = /^(end[\s-]?sleep|wake([\s-]?up)?|morning[\s-]?wake)$/i;
 function isWake(it: HomeItem): boolean {
-  return WAKE_RE.test((it.display_name || "").trim());
+  if (it.sleep_anchor === "wake") return true;
+  if (it.sleep_anchor === null) return false;
+  return claimsWakeAnchor(it);
 }
 function isBed(it: HomeItem): boolean {
-  const n = (it.display_name || "").trim();
-  if (/^(start[\s-]?sleep|bed(time)?|lights[\s-]?out)$/i.test(n)) return true;
-  if (/(prep|prepare|wind[\s-]?down|reflection)/i.test(n)) return false; // prep steps don't count
-  return /\b(sleep|bed)\b/i.test(n);
+  if (it.sleep_anchor === "bed") return true;
+  if (it.sleep_anchor === null) return false;
+  return claimsBedAnchor(it);
 }
 // Virtual sleep anchors float to the very top (-1) / bottom (1e9) of the day.
 function orderKey(it: HomeItem): number {
@@ -99,15 +111,15 @@ function withSleepAnchors(items: HomeItem[]): HomeItem[] {
   const toHM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   const wakeTime = mins.length ? toHM(mins[0]) : "06:00";
   return [
-    ...(hasEnd ? [] : [{ display_name: "End Sleep", item_type: "activity", time: wakeTime } as HomeItem]),
+    ...(hasEnd ? [] : [{ display_name: "End Sleep", item_type: "activity", category: "sleep", sleep_anchor: "wake", time: wakeTime } as HomeItem]),
     ...items,
-    ...(hasStart ? [] : [{ display_name: "Start Sleep", item_type: "activity", time: "22:00" } as HomeItem]),
+    ...(hasStart ? [] : [{ display_name: "Start Sleep", item_type: "activity", category: "sleep", sleep_anchor: "bed", time: "22:00" } as HomeItem]),
   ];
 }
 
 type Tod = SimpleTod;
 const todForItem = (it: HomeItem, wakeHour: number): Tod =>
-  getItemTod({ group_name: it.group_name, scheduled_time: it.time }, wakeHour);
+  getItemTod({ group_name: it.group_name, scheduled_time: it.time, display_name: it.display_name, category: it.category }, wakeHour);
 
 interface Band { cat: CatKey; slot: string | null; firstMin: number | null; order: number; time?: string | null; label: string; items: HomeItem[] }
 function buildBands(list: HomeItem[]): Band[] {
@@ -174,7 +186,12 @@ export function ProtocolHomeScreen({
   // book-end the day with grey Sleep anchors (End Sleep / Start Sleep), like the app
   const allItems = anchors ? withSleepAnchors(items) : items;
   // sleep window (hours slept = bedtime → wake) — shown on the anchor cards
-  const sleepWin = computeSleepWindow(allItems.map((i) => ({ display_name: i.display_name, scheduled_time: i.time ?? null, category: null })));
+  const sleepWin = computeSleepWindow(allItems.map((i) => ({
+    display_name: i.display_name,
+    scheduled_time: i.time ?? null,
+    category: i.category ?? null,
+    sleep_anchor: i.sleep_anchor,
+  })));
 
   // wake hour = End Sleep / Wake item's hour, clamped 0..11, else 5
   let wakeHour = 5;

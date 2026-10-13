@@ -56,6 +56,30 @@ export interface AdminProtocolItem {
   category: string | null;   // consume | do | sleep | supplement
   subtype: string | null;    // consume: meal|drink|snack|beverage · do: hygiene|wellness|exercise
   hidden: boolean | null;    // kept in the protocol but hidden from the day view
+  enabled: boolean | null;
+  notes: string | null;
+  amount: number | string | null;
+  amount_unit: string | null;
+  frequency_override: string | null;
+  recurrence_interval_unit: string | null;
+  notifications_enabled: boolean | null;
+  notification_lead_minutes: number | null;
+  sets: number | null;
+  reps: number | null;
+  reps_display: string | null;
+  weight_value: number | null;
+  weight_unit: string | null;
+  weight_display: string | null;
+  rest_seconds: number | null;
+  work_seconds: number | null;
+  rounds: number | null;
+  intensity: string | null;
+  distance_value: number | null;
+  distance_unit: string | null;
+  load_type: string | null;
+  intensity_variants: unknown[] | Record<string, unknown> | null;
+  selected_intensity: string | null;
+  filter: Record<string, unknown> | null;
   catalog_recipe_id: string | null;
   catalog_product_id: string | null;
   catalog_activity_id: string | null;
@@ -73,7 +97,7 @@ export interface AdminProtocolItem {
 const PROTOCOL_COLS =
   'id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
 const ITEM_COLS =
-  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id,recurrence_type,recurrence_days_of_week,recurrence_interval_days,recurrence_start_date,recurrence_end_date,scheduled_date';
+  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,enabled,notes,amount,amount_unit,frequency_override,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id,recurrence_type,recurrence_days_of_week,recurrence_interval_days,recurrence_interval_unit,recurrence_start_date,recurrence_end_date,scheduled_date,notifications_enabled,notification_lead_minutes,sets,reps,reps_display,weight_value,weight_unit,weight_display,rest_seconds,work_seconds,rounds,intensity,distance_value,distance_unit,load_type,intensity_variants,selected_intensity,filter';
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return {
