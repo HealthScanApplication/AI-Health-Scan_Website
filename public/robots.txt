@@ -1,4 +1,4 @@
-# HealthScan - https://healthscan.live
+# ROUTINE3 - https://routine3.com
 User-agent: *
 Allow: /
 Disallow: /admin
@@ -10,4 +10,4 @@ Disallow: /convertkit-test
 Disallow: /referral-test
 
 # Sitemap
-Sitemap: https://healthscan.live/sitemap.xml
+Sitemap: https://routine3.com/sitemap.xml

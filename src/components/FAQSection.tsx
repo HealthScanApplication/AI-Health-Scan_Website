@@ -153,7 +153,7 @@ export function FAQSection() {
         {/* Still asking */}
         <div style={{ marginTop: "clamp(48px, 6vw, 80px)", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "14px 16px" }}>
           <p style={{ fontFamily: DISPLAY, fontStyle: "italic", fontSize: "clamp(1.2rem, 2vw, 1.6rem)", color: ed.ink, margin: "0 8px 0 0" }}>Still wondering?</p>
-          <a href="mailto:hello@healthscan.live" className="ed-cta">Write to us →</a>
+          <a href="mailto:hello@routine3.com" className="ed-cta">Write to us →</a>
           <a href="https://discord.gg/4QJpFyTD44" target="_blank" rel="noopener noreferrer" className="ed-cta">Ask the community →</a>
         </div>
       </div>

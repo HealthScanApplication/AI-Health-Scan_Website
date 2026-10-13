@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Unsubscribe from Routine³ emails</title>
+<meta name="description" content="Stop receiving Routine³ marketing emails.">
+<meta name="robots" content="noindex, nofollow">
+<!-- The unsubscribe token is in this page's URL. Nothing on this page may carry
+     it anywhere except the one request that redeems it. -->
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<style>
+  :root { --bg:#FAF8F4; --surface:#FFFFFF; --ink:#1A1A1A; --muted:#5C5C5C; --faint:#8A8A8A; --line:#E8E5DD; --button:#1A1A1A; --button-ink:#FFFFFF; --ok:#1F6B3A; --bad:#9B2C2C; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111111; --surface:#1C1C1C; --ink:#F4F2EE; --muted:#B5B2AC; --faint:#85827D; --line:#2E2E2E; --button:#F4F2EE; --button-ink:#111111; --ok:#7FD39A; --bad:#F29A9A; }
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:var(--bg); color:var(--ink); font-family:system-ui, -apple-system, 'Segoe UI', sans-serif; line-height:1.5; }
+  main { max-width:480px; margin:0 auto; padding:max(40px, env(safe-area-inset-top)) 16px 48px; }
+  .mark { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:12px; background:var(--button); color:var(--button-ink); font-weight:700; font-size:18px; }
+  .mark sup { font-size:10px; margin-left:1px; }
+  .eyebrow { margin-top:32px; font-size:13px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); }
+  h1 { margin-top:6px; font-size:clamp(28px, 8vw, 36px); font-weight:700; line-height:1.15; letter-spacing:-.02em; }
+  .about { margin-top:16px; font-size:16px; color:var(--muted); }
+  .actions { margin-top:32px; display:grid; gap:12px; }
+  .button { display:block; width:100%; text-align:center; padding:16px 20px; min-height:52px; border:0; border-radius:14px; font:inherit; font-weight:600; font-size:16px; cursor:pointer; background:var(--button); color:var(--button-ink); }
+  .button:disabled { opacity:.6; cursor:default; }
+  .status { margin-top:16px; font-size:15px; font-weight:600; }
+  .status.ok { color:var(--ok); }
+  .status.bad { color:var(--bad); }
+  .note { margin-top:16px; font-size:13px; color:var(--faint); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <span class="mark" aria-label="Routine³">R<sup>3</sup></span>
+  <p class="eyebrow">Email preferences</p>
+  <h1 id="title">Unsubscribe</h1>
+  <p class="about" id="about">Confirm below and we will stop sending you Routine³ marketing emails.</p>
+  <div class="actions">
+    <button class="button" id="go" type="button" hidden>Unsubscribe me</button>
+  </div>
+  <p class="status" id="status" role="status" aria-live="polite" hidden></p>
+  <p class="note" id="note">This page never asks you for anything. It does not need your email address.</p>
+</main>
+<script>
+/*
+ * Fallback for the link at the foot of every Routine³ marketing email:
+ *   https://routine3.com/unsubscribe?t=<token>
+ *
+ * The token is the capability. Redeeming it is one call to the unsubscribe_email
+ * function in the production database (anon may execute it; it flips the matching
+ * subscriber to 'unsubscribed' and answers only ok / invalid_token, never an
+ * address). The key below is the project's public anon key, the same one the site
+ * already ships; it grants nothing beyond what row security and function grants
+ * allow the anon role.
+ *
+ * It waits for a click rather than unsubscribing on load: mail scanners and link
+ * previewers open links, and one of them must not unsubscribe a reader.
+ */
+(function () {
+  var API = 'https://ermbkttsyvpenjjxaxcf.supabase.co/rest/v1/rpc/unsubscribe_email';
+  var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVybWJrdHRzeXZwZW5qanhheGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTc5NTcsImV4cCI6MjA3OTczMzk1N30.PuA1AXHx7TrCMYUaP00O1eYZRAjYY_UzRQztfCnkUA0';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var title = $('title'), about = $('about'), go = $('go'), status = $('status'), note = $('note');
+
+  function show(kind, text) {
+    status.hidden = false;
+    status.className = 'status ' + kind;
+    status.textContent = text;
+  }
+
+  var m = location.search.match(/[?&]t=([A-Za-z0-9_-]{8,128})(?:&|$)/);
+  var token = m ? m[1] : null;
+
+  if (!token) {
+    title.textContent = 'This link is incomplete';
+    about.textContent = 'Use the unsubscribe link at the bottom of the email, or reply to the email and ask to be removed.';
+    return;
+  }
+
+  go.hidden = false;
+  go.addEventListener('click', function () {
+    go.disabled = true;
+    status.hidden = true;
+    fetch(API, {
+      method: 'POST',
+      headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_token: token }),
+      referrerPolicy: 'no-referrer',
+      credentials: 'omit'
+    }).then(function (res) {
+      return res.json().then(function (body) { return { status: res.status, body: body }; });
+    }).then(function (r) {
+      if (r.status === 200 && r.body && r.body.ok === true) {
+        title.textContent = 'You are unsubscribed';
+        about.textContent = 'You will not receive any more marketing emails from Routine³. An email already on its way may still arrive.';
+        go.hidden = true;
+        note.hidden = true;
+        show('ok', 'Done.');
+      } else if (r.status === 200 && r.body && r.body.error === 'invalid_token') {
+        title.textContent = 'This link is not valid';
+        about.textContent = 'It may be old or copied incompletely. Use the unsubscribe link in the most recent email, or reply to that email and ask to be removed.';
+        go.hidden = true;
+        show('bad', 'Nothing was changed.');
+      } else {
+        throw new Error('unexpected response');
+      }
+    }).catch(function () {
+      go.disabled = false;
+      show('bad', 'Could not reach the server. Check your connection and try again.');
+    });
+  });
+})();
+</script>
+</body>
+</html>
