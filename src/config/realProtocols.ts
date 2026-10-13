@@ -2269,97 +2269,102 @@ export const GOALS: Goal[] = [
         "key": "wim-hof-breathing-cold-method",
         "name": "Wim Hof Breathing & Cold Method",
         "chip": "Wim Hof",
-        "description": "The Iceman's clinically-proven protocol: 3 rounds of 30-40 power breaths (hyperventilation) followed by breath retention after exhale, then recovery breath hold. Followed by cold shower or ice bath. Proven in peer-reviewed studies to consciously influence immune response, reduce inflammation, and flood the body with energy. Start with 30 sec cold, build to 5+ minutes.",
+        "description": "A four-round breathing practice followed by optional, gradual cold exposure. Each round combines 10 minutes of deep rhythmic breathing, a comfortable exhale retention, and one full recovery inhale held for about 15 seconds. Always practise seated or lying down. Never practise breath retention in water, near water, while driving, or while standing. Stop immediately if you feel unwell. General-wellness content, not medical advice.",
         "creator": "Wim Hof",
         "evidence": "high",
         "score": 89,
         "items": [
           {
-            "name": "30 Power Breaths",
+            "name": "Round 1 — Deep breathing",
             "item_type": "activity",
             "meta": "06:00",
             "group_name": "Breathing Foundation",
-            "description": "Find a quiet space; consistency matters more than duration"
+            "description": "10 minutes of deep rhythmic breathing, then a comfortable exhale retention and a full recovery inhale held for about 15 seconds.",
+            "children": [
+              "Deep rhythmic breathing — 10 min",
+              "Comfortable exhale retention — no time target",
+              "Full recovery inhale — hold about 15 sec"
+            ]
           },
           {
-            "name": "Recovery Breath",
+            "name": "Round 2 — Deep breathing",
             "item_type": "activity",
-            "meta": "06:05",
+            "meta": "06:12",
             "group_name": "Breathing Foundation",
             "image_url": "https://mofhvoudjxinvpplsytd.supabase.co/storage/v1/object/public/catalog-media/activities/activity_protocol_round_2_recovery_breath.png",
-            "description": "15-sec hold on inhale"
+            "description": "Repeat the controlled breathing cycle while seated or lying down. Stop if you feel unwell.",
+            "children": [
+              "Deep rhythmic breathing — 10 min",
+              "Comfortable exhale retention — no time target",
+              "Full recovery inhale — hold about 15 sec"
+            ]
           },
           {
-            "name": "30 Power Breaths",
+            "name": "Round 3 — Deep breathing",
             "item_type": "activity",
-            "meta": "06:07",
+            "meta": "06:24",
             "group_name": "Breathing Foundation",
             "image_url": "https://mofhvoudjxinvpplsytd.supabase.co/storage/v1/object/public/catalog-media/activities/activity_protocol_round_2_30_power_breaths_extended_retention_hold.png",
-            "description": "Find a quiet space; consistency matters more than duration"
+            "description": "Continue only while the breath remains controlled and comfortable.",
+            "children": [
+              "Deep rhythmic breathing — 10 min",
+              "Comfortable exhale retention — no time target",
+              "Full recovery inhale — hold about 15 sec"
+            ]
           },
           {
-            "name": "Recovery Breath",
+            "name": "Round 4 — Deep breathing",
             "item_type": "activity",
-            "meta": "06:13",
+            "meta": "06:36",
             "group_name": "Breathing Foundation",
             "image_url": "https://mofhvoudjxinvpplsytd.supabase.co/storage/v1/object/public/catalog-media/activities/activity_protocol_round_2_recovery_breath.png",
-            "description": "Find a quiet space; consistency matters more than duration"
-          },
-          {
-            "name": "30 Power Breaths",
-            "item_type": "activity",
-            "meta": "06:15",
-            "group_name": "Breathing Foundation",
-            "description": "Find a quiet space; consistency matters more than duration"
-          },
-          {
-            "name": "Recovery Breath & Rest",
-            "item_type": "activity",
-            "meta": "06:22",
-            "group_name": "Breathing Foundation",
-            "image_url": "https://mofhvoudjxinvpplsytd.supabase.co/storage/v1/object/public/catalog-media/activities/activity_protocol_round_3_recovery_breath_rest.png",
-            "description": "Find a quiet space; consistency matters more than duration"
+            "description": "Complete the final cycle, then return to natural breathing before standing.",
+            "children": [
+              "Deep rhythmic breathing — 10 min",
+              "Comfortable exhale retention — no time target",
+              "Full recovery inhale — hold about 15 sec"
+            ]
           },
           {
             "name": "Cold Shower",
             "item_type": "activity",
-            "meta": "06:30",
+            "meta": "06:50",
             "group_name": "Cold Exposure",
             "description": "Gradual 2-min Cold Exposure"
           },
           {
             "name": "Ice Bath Full Immersion",
             "item_type": "activity",
-            "meta": "06:40",
+            "meta": "07:00",
             "group_name": "Cold Exposure",
             "description": "37–60 seconds to start"
           },
           {
             "name": "Wim Hof Controlled Breathing During Cold",
             "item_type": "activity",
-            "meta": "06:42",
+            "meta": "07:02",
             "group_name": "Cold Exposure",
             "image_url": "https://mofhvoudjxinvpplsytd.supabase.co/storage/v1/object/public/catalog-media/activities/activity_protocol_wim_hof_controlled_breathing_during_cold.png",
-            "description": "Find a quiet space; consistency matters more than duration"
+            "description": "Breathe normally and calmly. Never perform power breathing or breath retention in or near water."
           },
           {
             "name": "Post-Cold Warm-Up & Body Scan",
             "item_type": "activity",
-            "meta": "06:45",
+            "meta": "07:05",
             "group_name": "Cold Exposure",
             "description": "Start with 30 seconds and build tolerance gradually over several weeks"
           },
           {
             "name": "Meditation",
             "item_type": "activity",
-            "meta": "07:00",
+            "meta": "07:15",
             "group_name": "Mental Conditioning",
             "description": "Find a quiet space; consistency matters more than duration"
           },
           {
             "name": "Commitment Affirmation & Mental Visualization",
             "item_type": "activity",
-            "meta": "07:10",
+            "meta": "07:25",
             "group_name": "Mental Conditioning",
             "description": "Write 3 specific things; specificity makes gratitude practice more effective"
           },
@@ -2382,7 +2387,7 @@ export const GOALS: Goal[] = [
             "item_type": "activity",
             "meta": "21:30",
             "group_name": "Mental Conditioning",
-            "description": "3 rounds",
+            "description": "Keep a consistent sleep window to support recovery.",
             "children": [
               "Cool bedroom 17-19C",
               "Total darkness",

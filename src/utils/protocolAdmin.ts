@@ -21,6 +21,7 @@ const rest = () => `https://${projectId}.supabase.co/rest/v1`;
 
 export interface AdminProtocol {
   id: string;
+  user_id?: string | null;
   name: string;
   description: string | null;
   category: string | null;
@@ -58,6 +59,8 @@ export interface AdminProtocolItem {
   hidden: boolean | null;    // kept in the protocol but hidden from the day view
   enabled: boolean | null;
   notes: string | null;
+  media_image_url: string | null;
+  media_audio_url: string | null;
   amount: number | string | null;
   amount_unit: string | null;
   frequency_override: string | null;
@@ -94,10 +97,24 @@ export interface AdminProtocolItem {
   scheduled_date: string | null;             // ISO date — one_off items
 }
 
+export interface AIProtocolDraft {
+  summary: string;
+  steps: { title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null }[];
+}
+
+export async function buildProtocolWithAI(accessToken: string, protocolId: string, message: string): Promise<AIProtocolDraft> {
+  const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/guides/build-protocol`, {
+    method: 'POST',
+    headers: headers(accessToken),
+    body: JSON.stringify({ protocolId, message }),
+  });
+  return handle(res, 'Build protocol with AI');
+}
+
 const PROTOCOL_COLS =
-  'id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
+  'id,user_id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
 const ITEM_COLS =
-  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,enabled,notes,amount,amount_unit,frequency_override,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id,recurrence_type,recurrence_days_of_week,recurrence_interval_days,recurrence_interval_unit,recurrence_start_date,recurrence_end_date,scheduled_date,notifications_enabled,notification_lead_minutes,sets,reps,reps_display,weight_value,weight_unit,weight_display,rest_seconds,work_seconds,rounds,intensity,distance_value,distance_unit,load_type,intensity_variants,selected_intensity,filter';
+  'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,enabled,notes,media_image_url,media_audio_url,amount,amount_unit,frequency_override,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id,recurrence_type,recurrence_days_of_week,recurrence_interval_days,recurrence_interval_unit,recurrence_start_date,recurrence_end_date,scheduled_date,notifications_enabled,notification_lead_minutes,sets,reps,reps_display,weight_value,weight_unit,weight_display,rest_seconds,work_seconds,rounds,intensity,distance_value,distance_unit,load_type,intensity_variants,selected_intensity,filter';
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return {
@@ -128,12 +145,29 @@ function first<T>(rows: T | T[]): T {
 }
 
 /** All protocols, suggested ones first, then by sort order / name. */
-export async function listProtocols(accessToken: string): Promise<AdminProtocol[]> {
+export async function listProtocols(accessToken: string, ownerId?: string | null): Promise<AdminProtocol[]> {
   const url =
     `${rest()}/protocols?select=${PROTOCOL_COLS}` +
+    (ownerId ? `&user_id=eq.${encodeURIComponent(ownerId)}` : '') +
     `&order=is_suggested.desc.nullslast,sort_order.asc.nullslast,name.asc`;
   const res = await fetch(url, { headers: headers(accessToken) });
   return (await handle(res, 'List protocols')) || [];
+}
+
+export async function createProtocol(
+  accessToken: string,
+  protocol: Partial<AdminProtocol> & { name: string; user_id: string },
+): Promise<AdminProtocol> {
+  const res = await fetch(`${rest()}/protocols`, {
+    method: 'POST',
+    headers: headers(accessToken, { Prefer: 'return=representation' }),
+    body: JSON.stringify({
+      description: '', category: 'Health', type: 'daily', target_gender: 'all',
+      total_days: 30, is_suggested: false, is_public: false, is_active: true,
+      ...protocol,
+    }),
+  });
+  return first(await handle(res, 'Create protocol'));
 }
 
 /** Steps for one protocol, ordered chronologically like the app's day view. */
@@ -426,7 +460,7 @@ export async function countProtocolRefs(accessToken: string, kind: CatalogKind, 
   return Array.isArray(rows) ? rows.length : 0;
 }
 
-/** Upload an image to storage via the admin edge function; returns the public URL. */
+/** Upload protocol media through the admin edge function; returns the public URL. */
 export async function uploadProtocolImage(accessToken: string, file: File, bucket = 'catalog-media'): Promise<string> {
   const url = `https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/admin/storage/upload`;
   const form = new FormData();

@@ -14,8 +14,11 @@ export function useUrlParameterHandling({ setCurrentPage }: UseUrlParameterHandl
   // is bounced back to home once auth resolves). The session persists in
   // localStorage, so once you're signed in as admin, reloading /admin lands here.
   useEffect(() => {
-    if (window.location.pathname.replace(/\/+$/, '') === '/admin') {
+    const path = window.location.pathname.replace(/\/+$/, '');
+    if (path === '/admin') {
       setCurrentPage('admin');
+    } else if (path === '/guides' || path === '/guide' || path.startsWith('/guides/')) {
+      setCurrentPage('guides');
     }
   }, [setCurrentPage]);
 

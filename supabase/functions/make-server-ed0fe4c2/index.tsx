@@ -268,6 +268,264 @@ app.get('/make-server-ed0fe4c2/ping', (c) => {
   })
 })
 
+const PROFILE_IMPORT_MAX_BYTES = 1_000_000
+const PROFILE_IMPORT_MAX_URLS = 3
+
+function decodeProfileText(value = ''): string {
+  return value
+    .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/\s+/g, ' ').trim()
+}
+
+function safeProfileUrl(raw: string): URL {
+  const candidate = /^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`
+  const url = new URL(candidate)
+  if (url.protocol !== 'https:') throw new Error('Only HTTPS profile links are supported')
+  const host = url.hostname.toLowerCase().replace(/\.$/, '')
+  const blockedName = host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')
+  const blockedIp = /^(?:127|10|0|169\.254)\./.test(host)
+    || /^192\.168\./.test(host)
+    || /^172\.(?:1[6-9]|2\d|3[01])\./.test(host)
+    || host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')
+  if (blockedName || blockedIp) throw new Error('That profile address is not public')
+  url.username = ''; url.password = ''; url.hash = ''
+  return url
+}
+
+async function assertPublicProfileHost(url: URL) {
+  const checks = await Promise.allSettled([
+    Deno.resolveDns(url.hostname, 'A'),
+    Deno.resolveDns(url.hostname, 'AAAA'),
+  ])
+  const addresses = checks.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
+  const privateAddress = addresses.some((address) =>
+    /^(?:127|10|0|169\.254)\./.test(address)
+    || /^192\.168\./.test(address)
+    || /^172\.(?:1[6-9]|2\d|3[01])\./.test(address)
+    || address === '::1' || address.startsWith('fc') || address.startsWith('fd') || address.startsWith('fe80:')
+  )
+  if (privateAddress) throw new Error('That profile address does not resolve to a public website')
+}
+
+function htmlAttribute(tag: string, name: string): string {
+  const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, 'i'))
+  return decodeProfileText(match?.[1] || '')
+}
+
+function profileMeta(html: string, key: string): string {
+  for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+    const name = htmlAttribute(tag, 'property') || htmlAttribute(tag, 'name')
+    if (name.toLowerCase() === key.toLowerCase()) return htmlAttribute(tag, 'content')
+  }
+  return ''
+}
+
+function profileJsonLd(html: string): Record<string, any> | null {
+  for (const match of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const parsed = JSON.parse(match[1])
+      const queue = Array.isArray(parsed) ? [...parsed] : [parsed]
+      while (queue.length) {
+        const node = queue.shift()
+        if (!node || typeof node !== 'object') continue
+        if (Array.isArray(node['@graph'])) queue.push(...node['@graph'])
+        const types = Array.isArray(node['@type']) ? node['@type'] : [node['@type']]
+        if (types.some((type) => String(type).toLowerCase() === 'person')) return node
+      }
+    } catch { /* Ignore malformed third-party JSON-LD. */ }
+  }
+  return null
+}
+
+function uniqueProfileLinks(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(0, 12)
+}
+
+function publicProfileLinks(html: string, pageUrl: URL, description: string, person: Record<string, any> | null): string[] {
+  const links: string[] = []
+  if (/instagram\.com$/i.test(pageUrl.hostname.replace(/^www\./, ''))) {
+    for (const match of description.matchAll(/(?:^|\s)@([a-z0-9._]{2,30})\b/gi)) {
+      if (!pageUrl.pathname.toLowerCase().includes(`/${match[1].toLowerCase()}`)) {
+        links.push(`https://www.instagram.com/${match[1]}/`)
+      }
+    }
+  }
+  const sameAs = Array.isArray(person?.sameAs) ? person.sameAs : person?.sameAs ? [person.sameAs] : []
+  links.push(...sameAs.filter((value: unknown): value is string => typeof value === 'string'))
+  for (const tag of html.match(/<a\b[^>]*>/gi) || []) {
+    const href = htmlAttribute(tag, 'href')
+    if (!href) continue
+    try {
+      const candidate = new URL(href, pageUrl)
+      if (candidate.protocol === 'https:' && candidate.hostname !== pageUrl.hostname) links.push(candidate.toString())
+    } catch { /* Ignore malformed third-party links. */ }
+  }
+  return uniqueProfileLinks(links)
+}
+
+function profileTopics(text: string): string[] {
+  const taxonomy: Array<[string, RegExp]> = [
+    ['Human Design', /\bhuman\s+design\b/i],
+    ['Breathwork', /\bbreath(?:work|ing)\b/i],
+    ['Nutrition', /\b(?:nutrition|diet|food)\b/i],
+    ['Fitness', /\b(?:fitness|training|exercise)\b/i],
+    ['Sleep', /\bsleep\b/i],
+    ['Skin', /\b(?:skin|skincare|beauty)\b/i],
+    ['Meditation', /\bmeditat(?:e|ion)\b/i],
+    ['Mindfulness', /\bmindful(?:ness)?\b/i],
+    ['Energy work', /\b(?:energy work|reiki)\b/i],
+    ['Astrology', /\bastrolog(?:y|er)\b/i],
+    ['Art', /\b(?:art|artist|colour|color)\b/i],
+  ]
+  return taxonomy.filter(([, pattern]) => pattern.test(text)).map(([label]) => label)
+}
+
+async function fetchPublicProfile(raw: string) {
+  let url = safeProfileUrl(raw)
+  let response: Response | null = null
+  for (let redirect = 0; redirect < 3; redirect++) {
+    await assertPublicProfileHost(url)
+    response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 (compatible; RoutineGuideProfileImporter/1.0; +https://healthscan.live)'
+      }
+    })
+    if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
+      url = safeProfileUrl(new URL(response.headers.get('location')!, url).toString())
+      continue
+    }
+    break
+  }
+  if (!response?.ok) throw new Error(`Could not read ${url.hostname}`)
+  if (!(response.headers.get('content-type') || '').toLowerCase().includes('text/html')) throw new Error(`${url.hostname} did not return a public profile page`)
+  const declaredSize = Number(response.headers.get('content-length') || 0)
+  if (declaredSize > PROFILE_IMPORT_MAX_BYTES) throw new Error(`${url.hostname} returned too much data`)
+  const html = (await response.text()).slice(0, PROFILE_IMPORT_MAX_BYTES)
+  const person = profileJsonLd(html)
+  const title = profileMeta(html, 'og:title') || decodeProfileText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '')
+  const rawImages = [profileMeta(html, 'og:image'), profileMeta(html, 'twitter:image'), typeof person?.image === 'string' ? person.image : person?.image?.url || '']
+  const images = uniqueProfileLinks(rawImages).map((image) => {
+    try { return new URL(image, url).toString() } catch { return '' }
+  }).filter(Boolean)
+  const standardDescription = profileMeta(html, 'description')
+  const socialDescription = profileMeta(html, 'og:description') || profileMeta(html, 'twitter:description')
+  // Instagram's OG description is usually follower counts. Its standard
+  // description contains the actual public biography, so prefer useful text.
+  let description = [standardDescription, String(person?.description || ''), socialDescription]
+    .map(decodeProfileText).sort((a, b) => b.length - a.length)[0] || ''
+  let name = person?.name || title.split(/[|·—–-]/)[0].trim()
+  const isInstagram = /instagram\.com$/i.test(url.hostname.replace(/^www\./, ''))
+  if (isInstagram) {
+    name = String(name).replace(/\s*\(@[^)]+\).*$/i, '').trim()
+    description = description
+      .replace(/^\d[\s\S]*?\son Instagram:\s*["“]?/i, '')
+      .replace(/["”]\s*$/, '')
+      .trim()
+  }
+  const topics = profileTopics(`${title} ${description}`)
+  const relatedProfiles = publicProfileLinks(html, url, description, person).flatMap((profileUrl) => {
+    try {
+      const parsed = new URL(profileUrl)
+      if (parsed.protocol !== 'https:') return []
+      const handle = parsed.pathname.split('/').filter(Boolean)[0] || parsed.hostname.replace(/^www\./, '')
+      return [{ url: profileUrl, label: handle.startsWith('@') ? handle : `@${handle}`, platform: parsed.hostname.replace(/^www\./, '').split('.')[0] }]
+    } catch { return [] }
+  })
+  return {
+    sourceUrl: url.toString(),
+    site: url.hostname.replace(/^www\./, ''),
+    name: decodeProfileText(String(name || '')).slice(0, 120),
+    headline: decodeProfileText(String(person?.jobTitle || (isInstagram && topics.length ? topics.join(' · ') : title) || '')).slice(0, 180),
+    bio: decodeProfileText(String(description || '')).slice(0, 700),
+    avatarUrl: images[0] || null,
+    images: images.map((imageUrl) => ({ url: imageUrl, sourceUrl: url.toString(), kind: 'avatar' })),
+    relatedProfiles,
+    topics,
+  }
+}
+
+app.post('/make-server-ed0fe4c2/guides/import-profile', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    if (!accessToken) return c.json({ error: 'Sign in before importing a profile' }, 401)
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken)
+    if (error || !user) return c.json({ error: 'Invalid session' }, 401)
+    const body = await c.req.json()
+    const urls = Array.isArray(body.urls) ? body.urls.filter((value: unknown) => typeof value === 'string' && value.trim()).slice(0, PROFILE_IMPORT_MAX_URLS) : []
+    if (!urls.length) return c.json({ error: 'Add at least one public website or social profile' }, 400)
+    const settled = await Promise.allSettled(urls.map(fetchPublicProfile))
+    const profiles = settled.filter((result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchPublicProfile>>> => result.status === 'fulfilled').map((result) => result.value)
+    if (!profiles.length) return c.json({ error: 'No public profile information could be read. You can continue manually.' }, 422)
+    const first = profiles[0]
+    return c.json({
+      profile: {
+        name: first.name,
+        headline: profiles.map((p) => p.headline).find(Boolean) || '',
+        bio: profiles.map((p) => p.bio).find(Boolean) || '',
+        avatarUrl: profiles.map((p) => p.avatarUrl).find(Boolean) || null,
+        sources: profiles.map((p) => ({ url: p.sourceUrl, site: p.site })),
+        images: profiles.flatMap((p) => p.images).filter((image, index, all) => all.findIndex((candidate) => candidate.url === image.url) === index),
+        relatedProfiles: profiles.flatMap((p) => p.relatedProfiles).filter((link, index, all) => all.findIndex((candidate) => candidate.url === link.url) === index),
+        topics: Array.from(new Set(profiles.flatMap((p) => p.topics))),
+      },
+      failed: settled.filter((result) => result.status === 'rejected').length,
+    })
+  } catch (error: any) {
+    return c.json({ error: error?.message || 'Profile import failed' }, 400)
+  }
+})
+
+app.post('/make-server-ed0fe4c2/guides/build-protocol', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    if (!accessToken) return c.json({ error: 'Sign in before building a protocol' }, 401)
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+    if (authError || !user) return c.json({ error: 'Invalid session' }, 401)
+    const { protocolId, message } = await c.req.json()
+    if (!protocolId || typeof message !== 'string' || !message.trim()) return c.json({ error: 'Protocol and message are required' }, 400)
+    const { data: protocol, error: protocolError } = await supabase.from('protocols').select('id,user_id,name,description,target_gender,total_days').eq('id', protocolId).eq('user_id', user.id).maybeSingle()
+    if (protocolError || !protocol) return c.json({ error: 'Protocol not found' }, 404)
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) return c.json({ error: 'AI protocol builder is not configured' }, 501)
+    const prompt = `You help a qualified wellness Guardian draft a conservative, practical lifestyle protocol for later human review.
+Selected client profile and offer: ${protocol.description || 'Not provided'}
+Protocol name: ${protocol.name}
+Target gender: ${protocol.target_gender || 'not specified'}
+Duration: ${protocol.total_days || 3} days
+Guardian request: ${message.trim().slice(0, 2000)}
+
+Return JSON only with this exact shape:
+{"summary":"short draft rationale and safety note","steps":[{"title":"clear action","time":"HH:MM or null","category":"consume|do|sleep|supplement","notes":"brief instructions, cautions, and adaptation notes","day_number":1,"duration_minutes":10}]}
+
+Create 5-12 achievable steps. Personalise to the selected life stage (for example premenopause, perimenopause, pregnancy) when supplied. Do not diagnose, promise treatment, prescribe medication, or provide high-risk supplement dosing. Prefer food, sleep, movement, stress regulation and tracking. Flag symptoms or circumstances that require a licensed clinician. Keep every step editable and suitable for professional review.`
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', response_format: { type: 'json_object' }, temperature: 0.3, messages: [{ role: 'user', content: prompt }] }),
+    })
+    const aiPayload = await aiResponse.json()
+    if (!aiResponse.ok) return c.json({ error: aiPayload?.error?.message || 'AI protocol generation failed' }, 502)
+    const content = aiPayload?.choices?.[0]?.message?.content
+    if (!content) return c.json({ error: 'AI returned no protocol' }, 502)
+    const draft = JSON.parse(content)
+    const steps = Array.isArray(draft.steps) ? draft.steps.slice(0, 12).map((step: any, index: number) => ({
+      title: String(step.title || `Step ${index + 1}`).slice(0, 160),
+      time: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(step.time || '')) ? String(step.time) : null,
+      category: ['consume', 'do', 'sleep', 'supplement'].includes(step.category) ? step.category : 'do',
+      notes: String(step.notes || '').slice(0, 1200),
+      day_number: Math.max(1, Math.min(Number(protocol.total_days || 3), Number(step.day_number || 1))),
+      duration_minutes: step.duration_minutes == null ? null : Math.max(1, Math.min(240, Number(step.duration_minutes))),
+    })) : []
+    if (!steps.length) return c.json({ error: 'AI returned no usable protocol steps' }, 502)
+    return c.json({ summary: String(draft.summary || 'AI-generated draft for Guardian review.').slice(0, 1200), steps })
+  } catch (error: any) {
+    return c.json({ error: error?.message || 'Could not build protocol' }, 400)
+  }
+})
+
 app.get('/make-server-ed0fe4c2/', (c) => {
   return c.json({ 
     success: true,

@@ -346,6 +346,7 @@ function AppContent() {
   const referral = useReferral();
 
   const currentPage = navigation?.currentPage || "home";
+  const isGuidePortal = currentPage === "guides";
   const setCurrentPage =
     navigation?.setCurrentPage || (() => {});
   const navigateToPage =
@@ -467,7 +468,7 @@ function AppContent() {
   const getMainContentClasses = useCallback(
     (page: string, hasEmailBanner: boolean) => {
       const baseClasses = "min-h-screen";
-      const headerOffset = page === "home" ? "" : " header-offset";
+      const headerOffset = page === "home" || page === "guides" ? "" : " header-offset";
       const bannerOffset = hasEmailBanner ? " banner-offset" : "";
       
       return `${baseClasses}${headerOffset}${bannerOffset}`;
@@ -534,7 +535,7 @@ function AppContent() {
       )}
 
       {/* Header - Positioned after banner when present */}
-      <Header
+      {!isGuidePortal && <Header
         currentPage={currentPage}
         onNavigateToHome={navigateToHome}
         onNavigateToProfile={handleNavigateToProfile}
@@ -546,7 +547,7 @@ function AppContent() {
         isAdmin={isAdmin}
         authLoading={loading}
         hasEmailBanner={shouldShowEmailBanner}
-      />
+      />}
 
       {/* Main Content - Properly spaced with banner and header */}
       <main
@@ -573,14 +574,14 @@ function AppContent() {
       </main>
 
       {/* Footer */}
-      <Footer />
+      {!isGuidePortal && <Footer />}
 
       {/* Referral Invitation Banner */}
-      <ReferralInvitationBanner
+      {!isGuidePortal && <ReferralInvitationBanner
         hasReferral={hasReferral}
         isActive={isActive}
         referralCode={referralCode}
-      />
+      />}
 
       {/* Theme Manager Quick Access (Admin Only) */}
       {isAdmin && !showThemeManager && (

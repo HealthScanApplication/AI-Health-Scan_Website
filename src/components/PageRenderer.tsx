@@ -26,6 +26,7 @@ const ReferralTestPage = React.lazy(() => import('./ReferralTestPage').then(m =>
 const ConvertKitTestPage = React.lazy(() => import('./ConvertKitTestPage').then(m => ({ default: m.ConvertKitTestPage })))
 const EmailCaptureDebugger = React.lazy(() => import('./EmailCaptureDebugger').then(m => ({ default: m.EmailCaptureDebugger })))
 const EmailCaptureTestPage = React.lazy(() => import('./EmailCaptureTestPage').then(m => ({ default: m.EmailCaptureTestPage })))
+const GuidePortal = React.lazy(() => import('./guides/GuidePortal').then(m => ({ default: m.GuidePortal })))
 
 // Loading fallback for lazy-loaded pages
 function PageLoadingFallback() {
@@ -145,6 +146,9 @@ export function PageRenderer({
   }
 
   switch (currentPage) {
+    case 'guides':
+      return <Suspense fallback={<PageLoadingFallback />}><GuidePortal /></Suspense>
+
     case 'profile':
       return (
         <Suspense fallback={<PageLoadingFallback />}>

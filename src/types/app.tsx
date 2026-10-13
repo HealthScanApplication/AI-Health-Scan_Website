@@ -1,4 +1,4 @@
-export type PageType = 'home' | 'profile' | 'settings' | 'admin' | 'diagnostic' | 'network-test' | 'blog' | 'referral-test';
+export type PageType = 'home' | 'profile' | 'settings' | 'admin' | 'guides' | 'diagnostic' | 'network-test' | 'blog' | 'referral-test';
 
 export interface NavigationProps {
   onNavigateToProfile?: () => void;

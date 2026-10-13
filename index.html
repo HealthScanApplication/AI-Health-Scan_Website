@@ -44,7 +44,7 @@
     <!-- Fonts: Fraunces (editorial display) + Archivo (grotesque UI) — magazine direction. Inter/Instrument Serif kept for not-yet-migrated sections. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..500;1,9..40,300..400&family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json">
@@ -165,6 +165,35 @@
 
     <!-- Unified editorial CTA — outlined "line" buttons, no underline, light + dark variants -->
     <style>
+      @font-face {
+        font-family: "CanelaText";
+        src: url("/fonts/CanelaText-Regular.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "CanelaText";
+        src: url("/fonts/CanelaText-Light.woff2") format("woff2");
+        font-weight: 300;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "CanelaText";
+        src: url("/fonts/CanelaText-LightItalic.woff2") format("woff2");
+        font-weight: 300;
+        font-style: italic;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "EuclidCircularA";
+        src: url("/fonts/EuclidCircularA-Medium.woff2") format("woff2");
+        font-weight: 500;
+        font-style: normal;
+        font-display: swap;
+      }
+
       .ed-cta, .ed-cta-dark {
         font-family: "Archivo", "Inter", sans-serif;
         font-size: 12px;

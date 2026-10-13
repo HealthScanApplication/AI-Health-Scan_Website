@@ -15,7 +15,7 @@
 import { useState } from "react";
 import {
   User, ChartNoAxesCombined, ShoppingBasket, ListChecks, Plus, Repeat, Check,
-  Timer, Apple, Ellipsis, SlidersHorizontal, RefreshCw, Sun, Pin, Info,
+  Timer, Apple, Ellipsis, SlidersHorizontal, RefreshCw, Sun,
 } from "lucide-react";
 import {
   CATEGORY_TINTS, itemIcon, type CatKey, type ProtocolItem as CatItem,
@@ -27,7 +27,8 @@ import { isSleepItemByName } from "../../protocolDomain/category";
 import { claimsBedAnchor, claimsWakeAnchor } from "../../protocolDomain/sleepAnchorClaim";
 import { MOBILE_CATEGORY_TINTS, MOBILE_TIMELINE as MT } from "./mobileTimelineContract";
 
-const POPPINS = 'Poppins, "Archivo", system-ui, -apple-system, sans-serif';
+const POPPINS = '"Poppins", system-ui, -apple-system, sans-serif';
+const JOHN_AVATAR = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&h=160&q=85";
 
 export interface HomeItem {
   display_name: string;
@@ -148,6 +149,7 @@ function buildBands(list: HomeItem[]): Band[] {
 
 /* ───────── date helpers for header + week strip ───────── */
 const WD = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const WD_FULL = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 function isoWeek(d: Date): number {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -166,7 +168,7 @@ export function ProtocolHomeScreen({
   done = 0,
   scale = 0.85,
   anchors = true,
-  imageUrl = null,
+  imageUrl = JOHN_AVATAR,
   showDetails: showDetailsProp = true,
   theme = "light",
   profileName = "John Ferreira",
@@ -221,8 +223,7 @@ export function ProtocolHomeScreen({
   const today = new Date();
 
   const weekLine = `WEEK ${isoWeek(date)}`;
-  const headerDate = `${WD[date.getDay()]} ${MON[date.getMonth()]} ${date.getDate()}`;
-  const sectionDate = `${WD[date.getDay()]}, ${MON[date.getMonth()]} ${date.getDate()}`;
+  const headerDate = `${WD_FULL[date.getDay()]} · ${date.getDate()} ${MON[date.getMonth()]}`;
   const dark = theme === "dark";
   const ui = dark ? {
     outside: "#000000", surface: "#1C1C1E", panel: "#29292C", card: "#000000",
@@ -245,9 +246,16 @@ export function ProtocolHomeScreen({
       </div>
 
       {/* scrollable app canvas */}
-      <div className="phone-scroll" style={{ flex: 1, overflowY: "auto", margin: `0 ${MT.screenCardInset}px`, borderRadius: "22px 22px 0 0", background: ui.surface, padding: "13px 0 108px", display: "flex", flexDirection: "column" }}>
+      <div className="phone-scroll" style={{ flex: 1, overflowY: "auto", margin: `0 ${MT.screenCardInset}px`, borderRadius: "22px 22px 0 0", background: ui.surface, padding: "13px 0 108px", display: "flex", flexDirection: "column", position: "relative" }}>
+        {/* One day spine, matching mobile. Per-row colour segments paint over
+            this base rail, but section and group gaps can no longer break it. */}
+        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.railWidth / 2, top: 78, bottom: 0, width: MT.railWidth, background: dark ? "#5D5D63" : "#9CA3AF", opacity: 0.62, zIndex: 0 }} />
+        {/* Selected day -> End Sleep bridge. Mobile paints this as a full sleep
+            column, not a hairline: both side edges continue from the bottom of
+            the selected date ring into the square top of the wake capsule. */}
+        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.nodeWidth / 2, top: 105, height: 160, width: MT.nodeWidth, background: `linear-gradient(180deg, ${purple} 0%, #965BD2 54%, #A96EAE 100%)`, borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", opacity: 0.96, zIndex: 0 }} />
         {/* HEADER */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: `0 ${MT.headerPadX}px`, marginBottom: 6, gap: 8, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: `0 ${MT.headerPadX}px`, marginBottom: 6, gap: 8, flexShrink: 0, position: "relative", zIndex: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: MT.headerLeadPad, flexShrink: 1, minWidth: 0 }}>
             <span style={{ width: MT.avatarSize, height: MT.avatarSize, borderRadius: MT.avatarSize / 2, background: "#E5E7EB", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
               {imageUrl
@@ -269,16 +277,16 @@ export function ProtocolHomeScreen({
         </div>
 
         {/* WEEK STRIP */}
-        <div style={{ display: "flex", justifyContent: "flex-start", padding: "2px 0 10px", overflow: "hidden", flexShrink: 0, minHeight: 53 }}>
+        <div style={{ display: "flex", justifyContent: "flex-start", padding: "2px 0 10px 14px", overflow: "hidden", flexShrink: 0, minHeight: 53, position: "relative", zIndex: 3 }}>
           {week.map((d, i) => {
             const isToday = sameDay(d, today);
             const isSelected = sameDay(d, date);
             const circleBg = isToday || isSelected ? (dark ? "#F7F7F8" : "#101827") : ui.panel;
             const filled = isToday || isSelected;
             return (
-              <div key={i} style={{ width: 44, flex: "0 0 44px", display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 0" }}>
+              <div key={i} style={{ width: 44, flex: "0 0 44px", display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 0", position: "relative", zIndex: isSelected ? 2 : 1 }}>
                 <span style={{ fontSize: 9.5, fontWeight: filled ? 700 : 600, letterSpacing: 0.6, textTransform: "uppercase", color: filled ? ui.text : ui.muted, marginBottom: 4 }}>{WD[d.getDay()]}</span>
-                <span style={{ width: 32, height: 32, borderRadius: 16, background: circleBg, border: isSelected ? `3px solid ${purple}` : `2px solid ${ui.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ width: 32, height: 32, borderRadius: 16, background: circleBg, border: isSelected ? `3px solid ${purple}` : `2px solid ${ui.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: filled ? (dark ? "#111827" : "#FFFFFF") : ui.text, fontVariantNumeric: "tabular-nums" }}>{d.getDate()}</span>
                 </span>
               </div>
@@ -286,17 +294,16 @@ export function ProtocolHomeScreen({
           })}
         </div>
 
-        <div style={{ margin: `0 15px 10px ${MT.rowContentX}px`, borderRadius: 18, background: ui.dayPill, color: ui.dayPillText, padding: "10px 14px", fontSize: 10.5, fontWeight: 700, letterSpacing: 1.2, textAlign: "center", flexShrink: 0 }}>{headerDate} · TODAY</div>
+        <div style={{ margin: `0 15px 10px ${MT.rowContentX}px`, borderRadius: 18, background: ui.dayPill, color: ui.dayPillText, padding: "10px 14px", fontSize: 10.5, fontWeight: 700, letterSpacing: 1.2, textAlign: "center", flexShrink: 0, position: "relative", zIndex: 1 }}>{headerDate} · TODAY</div>
 
         {/* SECTIONS */}
         {sections.length === 0 && (
           <div style={{ textAlign: "center", color: "#9CA3AF", fontSize: 12, padding: "48px 0" }}>No steps scheduled</div>
         )}
         {sections.map(({ tod, bands }) => (
-          <div key={tod} style={{ position: "relative" }}>
+          <div key={tod} style={{ position: "relative", zIndex: 1 }}>
             <div style={{ padding: `8px 16px 7px ${MT.itemOriginX}px`, minHeight: 24, display: "flex", alignItems: "baseline" }}>
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: "#374151", textTransform: "uppercase" }}>{tod}</span>
-              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0.8, color: "#9CA3AF" }}>{"   ·   " + sectionDate}</span>
             </div>
 
             {bands.map((band, bi) => {
@@ -304,18 +311,27 @@ export function ProtocolHomeScreen({
               const GroupIcon = tint.Icon;
               const complete = band.items.length > 0 && band.items.every((item) => item.done);
               const showHeader = band.items.length > 1 || band.cat === "sleep" || !!band.slot;
-              const surface = complete ? (dark ? "#3B2A50" : tint.bg) : ui.panel;
-              const foreground = complete ? (dark ? "#FFFFFF" : tint.fg) : ui.muted;
+              const bandTint = MOBILE_CATEGORY_TINTS[dark ? "dark" : "light"][band.cat];
+              const darkPurple = "#9A5BE1";
+              const darkPurpleSurface = "#352446";
+              const completedSleepSurface = dark ? "#352446" : "#F0E8FA";
+              const completedFg = band.cat === "sleep" ? purple : bandTint.fg;
+              const completedBg = band.cat === "sleep" ? completedSleepSurface : bandTint.bg;
+              const surface = complete
+                ? completedBg
+                : ui.panel;
+              const foreground = complete
+                ? completedFg
+                : ui.muted;
               return (
                 <div key={bi} style={{ position: "relative", padding: `0 16px 10px ${MT.rowContentX}px` }}>
-                  <div style={{ borderRadius: MT.groupRadius, paddingBottom: MT.groupPadBottom, background: surface, position: "relative" }}>
+                  <div style={{ borderRadius: dark ? 12 : MT.groupRadius, paddingBottom: MT.groupPadBottom, background: surface, position: "relative" }}>
                     {/* band header */}
                     {showHeader && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: `${MT.groupHeaderPadY}px 14px` }}>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                         <GroupIcon size={12} strokeWidth={2} color={foreground} />
                         <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.75, color: foreground, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{band.label}</span>
                       </span>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 9, color: ui.muted }}><Pin size={12} strokeWidth={2} /><Info size={12} strokeWidth={2} /></span>
                     </div>}
                     {/* items */}
                     <div style={{ padding: showHeader ? "0 8px 2px" : `${MT.singletonPadTop}px 8px 2px`, display: "flex", flexDirection: "column", gap: MT.groupItemGap }}>
@@ -323,41 +339,49 @@ export function ProtocolHomeScreen({
                         const ic = iconFor(it);
                         const ItemIcon = ic.Icon;
                         const isDone = !!it.done;
-                        const mobileTint = MOBILE_CATEGORY_TINTS[dark ? "dark" : "light"][band.cat];
+                        const mobileTint = bandTint;
                         const sleepExtra = sleepWin.durationLabel && isWake(it) ? `${sleepWin.durationLabel} sleep`
                           : sleepWin.durationLabel && isBed(it) ? `${sleepWin.durationLabel} until wake` : null;
-                        const sub = [fmtTime(it.time), it.group_name, sleepExtra, it.duration_minutes ? `${it.duration_minutes} min` : null].filter(Boolean).join(" · ");
+                        const sub = [fmtTime(it.time), sleepExtra, it.duration_minutes ? `${it.duration_minutes} min` : null].filter(Boolean).join(" · ");
+                        const nodeH = isWake(it) || isBed(it) ? 66 : Math.max(34, Math.min(48, 34 + ((it.duration_minutes || 0) / 15) * 3));
+                        const hasDetail = showDetails && (!!it.description || !!it.children?.length);
                         return (
-                          <div key={ii} style={{ position: "relative" }}>
-                            {/* Current mobile timeline: time gutter + media capsule sit on the lane, outside the card. */}
-                            <span style={{ position: "absolute", left: -63, top: 17, width: 27, transform: "translateY(-50%)", textAlign: "right", fontSize: 8.5, lineHeight: 1, fontWeight: 600, color: "#9CA3AF", fontVariantNumeric: "tabular-nums" }}>{fmtTime(it.time)}</span>
-                            <span style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.railWidth / 2, top: 0, bottom: ii === band.items.length - 1 ? -12 : -6, width: MT.railWidth, background: isDone ? mobileTint.fg : ui.muted, opacity: 0.75 }} />
-                            <span style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: 2, width: MT.nodeWidth, height: isWake(it) || isBed(it) ? 66 : Math.max(34, Math.min(48, 34 + ((it.duration_minutes || 0) / 15) * 3)), borderRadius: MT.nodeWidth / 2, overflow: "hidden", background: isWake(it) || isBed(it) ? purple : (isDone ? mobileTint.fg : ui.card), border: `1.5px solid ${isWake(it) || isBed(it) ? purple : (isDone ? mobileTint.fg : ui.muted)}`, display: "inline-flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
-                              {it.image_url ? <img src={it.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: isDone ? "none" : "grayscale(1)", opacity: isDone ? 1 : 0.72 }} /> : isWake(it) ? <Sun size={16} strokeWidth={1.8} color="#FFFFFF" /> : <ItemIcon size={15} strokeWidth={1.8} color={isDone ? "#FFFFFF" : "#9CA3AF"} />}
+                          <div key={ii} style={{ position: "relative", minHeight: Math.max(48, nodeH) }}>
+                            {/* Media capsule shares the lane axis; time stays in the card metadata. */}
+                            <span style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.railWidth / 2, top: 0, bottom: ii === band.items.length - 1 ? -12 : -6, width: MT.railWidth, background: isDone ? completedFg : ui.muted, opacity: 0.75 }} />
+                            <span style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: 2, width: MT.nodeWidth, height: nodeH, borderRadius: isWake(it) ? `0 0 ${MT.nodeWidth / 2}px ${MT.nodeWidth / 2}px` : isBed(it) ? `${MT.nodeWidth / 2}px ${MT.nodeWidth / 2}px 0 0` : MT.nodeWidth / 2, overflow: "hidden", background: isWake(it) || isBed(it) ? purple : (isDone ? completedFg : ui.card), border: `1.5px solid ${isWake(it) || isBed(it) ? purple : (isDone ? completedFg : ui.muted)}`, borderTopWidth: isWake(it) ? 0 : 1.5, display: "inline-flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
+                              {it.image_url && !/recipe_water-|openfoodfacts/i.test(it.image_url)
+                                ? <img src={it.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: isDone ? "none" : "grayscale(1)", opacity: isDone ? 1 : 0.72 }} />
+                                : isWake(it) ? <Sun size={16} strokeWidth={1.8} color="#FFFFFF" />
+                                  : <ItemIcon size={15} strokeWidth={1.8} color={isDone ? "#FFFFFF" : "#9CA3AF"} />}
                             </span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: MT.itemRadius, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: dark ? 10 : MT.itemRadius, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
                                 <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
                                 {it.repeat && <Repeat size={10} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />}
                               </div>
                               {sub && <div style={{ fontSize: 10, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
-                              {showDetails && it.description && <div style={{ fontSize: 10.5, lineHeight: 1.4, color: "#6B7280", marginTop: 4 }}>{it.description}</div>}
-                              {showDetails && it.children && it.children.length > 0 && (
-                                <div style={{ marginTop: 5, display: "flex", flexDirection: "column", gap: 4 }}>
-                                  {it.children.map((c, ci) => (
-                                    <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
-                                      <span style={{ width: 4, height: 4, borderRadius: 2, background: "#C4C4C0", flexShrink: 0, marginTop: 5 }} />
-                                      <span style={{ fontSize: 10.5, color: "#9CA3AF", lineHeight: 1.35 }}>{c}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
                             </div>
                             <span style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", background: isDone ? purple : ui.card, border: isDone ? `1px solid ${purple}` : `1.5px solid ${ui.border}` }}>
                               {isDone && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
                             </span>
                             </div>
+                            {hasDetail && (
+                              <div style={{ marginTop: 4, borderRadius: dark ? 10 : 12, padding: "7px 12px", background: isDone ? completedBg : (dark ? "#242427" : "rgba(229,231,235,0.58)"), border: `1px solid ${isDone ? completedFg + "24" : (dark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.10)")}` }}>
+                                {it.description && <div style={{ fontSize: 10, lineHeight: 1.45, fontWeight: 400, color: isDone ? completedFg : ui.muted }}>{it.description}</div>}
+                                {it.children && it.children.length > 0 && (
+                                  <div style={{ marginTop: it.description ? 5 : 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                                    {it.children.map((c, ci) => (
+                                      <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 }}>
+                                        <span style={{ width: 4, height: 4, borderRadius: 2, background: isDone ? completedFg : ui.faint, flexShrink: 0, marginTop: 5, opacity: 0.75 }} />
+                                        <span style={{ fontSize: 10, color: isDone ? completedFg : ui.muted, lineHeight: 1.4 }}>{c}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -372,7 +396,7 @@ export function ProtocolHomeScreen({
       </div>
 
       {/* floating TAB BAR */}
-      <div style={{ position: "absolute", left: 14, right: 14, bottom: 8, display: "flex", alignItems: "center", borderRadius: 40, background: ui.dock, border: `1px solid ${ui.border}`, boxShadow: dark ? "none" : "0 -4px 20px rgba(15,23,42,0.10)", padding: "8px 5px", backdropFilter: "blur(12px)" }}>
+      <div style={{ position: "absolute", left: 14, right: 14, bottom: 8, zIndex: 50, isolation: "isolate", display: "flex", alignItems: "center", borderRadius: 40, background: dark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${ui.border}`, boxShadow: dark ? "0 -6px 24px rgba(0,0,0,0.34)" : "0 -6px 24px rgba(15,23,42,0.14)", padding: "8px 5px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "space-around" }}>
           {[
             { I: SlidersHorizontal, label: "Home", active: true },

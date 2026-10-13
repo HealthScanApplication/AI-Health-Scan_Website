@@ -12,6 +12,7 @@ import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
   Pencil, GitMerge, Download, Upload, Repeat, CalendarDays, FileText, ChevronUp, ImageOff, Image as ImageIcon,
+  AudioLines,
 } from 'lucide-react';
 import { aiGenerateImage } from '../../utils/aiImage';
 import { buildProtocolCoverPrompt } from '../../utils/imagePromptBuilder';
@@ -152,7 +153,7 @@ function toHomeItems(items: AdminProtocolItem[], linkImages?: Map<string, string
       scheduled_date: it.scheduled_date,
       repeat: !!(it.frequency_override || (it.recurrence_type && it.recurrence_type !== 'one_off')),
       description: it.notes,
-      image_url: linkImages?.get(it.id) || null,
+      image_url: it.media_image_url || linkImages?.get(it.id) || null,
       children: childrenByParent.get(it.id),
     }));
 }
@@ -161,7 +162,7 @@ function toHomeItems(items: AdminProtocolItem[], linkImages?: Map<string, string
 function PhonePreview({ name, items, imageUrl, linkImages }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null; linkImages?: Map<string, string> }) {
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">
-      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} imageUrl={imageUrl} />
+      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} />
     </PhoneFrame>
   );
 }
@@ -320,11 +321,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ── main editor ── */
-export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtocolId }: {
+export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtocolId, ownerId }: {
   accessToken: string;
   onOpenCatalogRecord?: (kind: CatalogKind, id: string) => void;
   /** deep-open a protocol (e.g. clicking a Protocol cell in the Kits master table) */
   initialProtocolId?: string | null;
+  /** Restricts a guide workspace to protocols owned by that authenticated user. */
+  ownerId?: string | null;
 }) {
   const [protocols, setProtocols] = useState<AdminProtocol[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -386,7 +389,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   async function loadList(keepSelection = false) {
     setLoadingList(true); setListError(null);
     try {
-      const rows = await listProtocols(accessToken);
+      const rows = await listProtocols(accessToken, ownerId);
       setProtocols(rows);
       if (rows.length && (!keepSelection || !rows.some((r) => r.id === selectedId))) {
         setSelectedId((cur) => (cur && rows.some((r) => r.id === cur) ? cur : rows[0].id));
@@ -397,7 +400,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
       setLoadingList(false);
     }
   }
-  useEffect(() => { loadList(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { loadList(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [ownerId]);
 
   // resolve linked catalog records (name + image) for display + preview thumbnails
   async function resolveLinks(rows: AdminProtocolItem[]) {
@@ -709,6 +712,34 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     } finally {
       setBusyItem(null);
     }
+  }
+
+  async function uploadStepMedia(it: AdminProtocolItem, file: File | undefined, field: 'media_image_url' | 'media_audio_url') {
+    if (!file) return;
+    const isImage = field === 'media_image_url';
+    if (isImage && !file.type.startsWith('image/')) { toast.error('Choose an image file.'); return; }
+    if (!isImage && !file.type.startsWith('audio/')) { toast.error('Choose an audio file.'); return; }
+    if (file.size > 25 * 1024 * 1024) { toast.error('Media must be smaller than 25 MB.'); return; }
+    setBusyItem(it.id);
+    try {
+      const url = await uploadProtocolImage(accessToken, file, 'protocol-media');
+      const updated = await updateProtocolItem(accessToken, it.id, { [field]: url });
+      editItemLocal(it.id, { [field]: url });
+      baseline.current.set(it.id, { ...it, ...updated, [field]: url });
+      toast.success(isImage ? 'Step image added' : 'Step audio added');
+    } catch (e: any) {
+      toast.error(`Upload failed: ${e?.message || e}`);
+    } finally { setBusyItem(null); }
+  }
+
+  async function removeStepMedia(it: AdminProtocolItem, field: 'media_image_url' | 'media_audio_url') {
+    setBusyItem(it.id);
+    try {
+      const updated = await updateProtocolItem(accessToken, it.id, { [field]: null });
+      editItemLocal(it.id, { [field]: null });
+      baseline.current.set(it.id, { ...it, ...updated, [field]: null });
+    } catch (e: any) { toast.error(`Could not remove media: ${e?.message || e}`); }
+    finally { setBusyItem(null); }
   }
 
   async function addItem(kind: Kind, parentId?: string, preset?: AddPreset) {
@@ -1338,6 +1369,14 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
         </div>
         {it.kind === 'action' && it.category !== 'sleep' && <RepeatRow it={it} />}
         {it.kind === 'action' && it.category !== 'sleep' && <CatalogLinker it={it} />}
+        {it.kind === 'action' && <div style={{ marginTop: 7, padding: 8, border: '1px dashed ' + C.hair, borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {it.media_image_url && <img src={it.media_image_url} alt="Step media" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 7, border: '1px solid ' + C.hair }} />}
+          {it.media_audio_url && <audio controls preload="metadata" src={it.media_audio_url} style={{ height: 34, maxWidth: 250 }} />}
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid ' + C.hair, borderRadius: 7, padding: '6px 9px', color: C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}><ImageIcon size={13} />{it.media_image_url ? 'Replace image' : 'Add image'}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => uploadStepMedia(it, e.target.files?.[0], 'media_image_url')} style={{ display: 'none' }} /></label>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid ' + C.hair, borderRadius: 7, padding: '6px 9px', color: C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}><AudioLines size={13} />{it.media_audio_url ? 'Replace audio' : 'Add audio'}<input type="file" accept="audio/mpeg,audio/mp4,audio/wav,audio/webm,audio/ogg" onChange={(e) => uploadStepMedia(it, e.target.files?.[0], 'media_audio_url')} style={{ display: 'none' }} /></label>
+          {it.media_image_url && <button type="button" onClick={() => removeStepMedia(it, 'media_image_url')} style={{ ...iconBtn, color: C.danger }} title="Remove image"><X size={13} /></button>}
+          {it.media_audio_url && <button type="button" onClick={() => removeStepMedia(it, 'media_audio_url')} style={{ ...iconBtn, color: C.danger }} title="Remove audio"><X size={13} /></button>}
+        </div>}
         {kids.length > 0 && (
           <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {kids.map((k) => <ChildRow key={k.id} k={k} />)}
