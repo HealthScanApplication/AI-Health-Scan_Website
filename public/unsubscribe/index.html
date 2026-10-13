@@ -44,6 +44,7 @@
   </div>
   <p class="status" id="status" role="status" aria-live="polite" hidden></p>
   <p class="note" id="note">This page never asks you for anything. It does not need your email address.</p>
+  <noscript><p class="status bad">Unsubscribing here needs JavaScript. Turn it on and reload this page, or reply to the email and ask to be removed.</p></noscript>
 </main>
 <script>
 /*
@@ -51,14 +52,27 @@
  *   https://routine3.com/unsubscribe?t=<token>
  *
  * The token is the capability. Redeeming it is one call to the unsubscribe_email
- * function in the production database (anon may execute it; it flips the matching
- * subscriber to 'unsubscribed' and answers only ok / invalid_token, never an
- * address). The key below is the project's public anon key, the same one the site
- * already ships; it grants nothing beyond what row security and function grants
- * allow the anon role.
+ * function in the PRODUCTION database (anon may execute it). It flips the matching
+ * subscriber to 'unsubscribed' and answers {ok:true,id:<subscriber uuid>} or
+ * {ok:false,error:'invalid_token'}. It never returns an email address; the uuid
+ * is an opaque row id and this page ignores it. The key below is the project's
+ * public anon key, the same one the site already ships; it grants nothing beyond
+ * what row security and function grants allow the anon role.
+ *
+ * Why production: the newsletter send path is production-only. The daily-newsletter
+ * workflow writes the campaign to production and POSTs to the production function
+ * URL; the cron migration (20260513_email_automation) hardcodes the production
+ * host; and a function reads subscribers from the project it runs in. Tokens in
+ * the emails therefore belong to production's email_subscribers. Staging's two rows
+ * are source=manual_test. If sending ever moves to another project, this page, the
+ * CSP connect-src in netlify.toml and scripts/check-routes.mjs must move with it.
  *
  * It waits for a click rather than unsubscribing on load: mail scanners and link
  * previewers open links, and one of them must not unsubscribe a reader.
+ *
+ * EDITING THIS SCRIPT (even a comment) changes its SHA-256, and netlify.toml pins
+ * that hash in the page's CSP. The build fails until the hash is updated;
+ * scripts/check-routes.mjs prints the new value.
  */
 (function () {
   var API = 'https://ermbkttsyvpenjjxaxcf.supabase.co/rest/v1/rpc/unsubscribe_email';

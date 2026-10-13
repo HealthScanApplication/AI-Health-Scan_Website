@@ -150,7 +150,12 @@ if (existsSync(abs('public/unsubscribe/index.html'))) {
   check(!/<script[^>]*\ssrc=/i.test(page), '/unsubscribe: no external script');
   const csp = uh['Content-Security-Policy'] || '';
   const hash = scripts.length ? createHash('sha256').update(scripts[0][1]).digest('base64') : '';
-  check(csp.includes(`'sha256-${hash}'`), "/unsubscribe: CSP script-src hash does not match the inline script. Update netlify.toml (a stale hash blocks the script silently)");
+  check(csp.includes(`'sha256-${hash}'`), `/unsubscribe: CSP script-src hash does not match the inline script (any edit to the script, comments included, changes it). Set netlify.toml to 'sha256-${hash}' (a stale hash blocks the script silently)`);
+  // regression guards for the review fixes
+  check(!/never an address/i.test(page), '/unsubscribe: do not claim the RPC "never returns an address"; its ok branch returns the subscriber uuid');
+  check(/<noscript>[\s\S]*?JavaScript[\s\S]*?<\/noscript>/.test(page), '/unsubscribe: needs a <noscript> message (without JS the button stays hidden)');
+  check(!/mailto:|[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/i.test(page), '/unsubscribe: must not hardcode a mailbox (the reply address is whatever the email was sent with; the routine3.com mailbox is unconfirmed)');
+  check(/production/i.test(page.slice(0, page.indexOf('<script>') + 1500)), '/unsubscribe: the page must say which project it targets and why');
   check(/default-src 'none'/.test(csp) && /form-action 'none'/.test(csp) && /frame-ancestors 'none'/.test(csp), '/unsubscribe: CSP must keep default-src/form-action/frame-ancestors locked');
 
   // Only the production API host, and the key must be the production anon key already in the repo.
@@ -187,8 +192,26 @@ if (existsSync(abs('public/og.jpg'))) {
   check(false, 'public/og.jpg is missing');
 }
 
+// og.jpg: declared size must be the real size (a wrong size makes some scrapers crop or reject)
+function jpegSize(buf) {
+  let i = 2;
+  while (i < buf.length) {
+    if (buf[i] !== 0xff) { i++; continue; }
+    const m = buf[i + 1];
+    if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+    i += 2 + buf.readUInt16BE(i + 2);
+  }
+  return null;
+}
+
 // ── 6. home page text ──
 const home = read('index.html');
+if (existsSync(abs('public/og.jpg'))) {
+  const dim = jpegSize(readFileSync(abs('public/og.jpg')));
+  const w = home.match(/og:image:width" content="(\d+)"/), h = home.match(/og:image:height" content="(\d+)"/);
+  check(dim && w && h && Number(w[1]) === dim.w && Number(h[1]) === dim.h, `index.html: og:image:width/height (${w && w[1]}x${h && h[1]}) must match public/og.jpg (${dim ? dim.w + 'x' + dim.h : 'unreadable'})`);
+}
+check(/check-unsubscribe-page\.mjs/.test(JSON.parse(read('package.json')).scripts.prebuild || ''), 'package.json: prebuild must run scripts/check-unsubscribe-page.mjs (the page behaviour is otherwise unguarded)');
 check(home.includes('<link rel="canonical" href="https://routine3.com/" />'), 'index.html: canonical must be https://routine3.com/');
 check(home.includes('<meta property="og:image" content="https://routine3.com/og.jpg" />'), 'index.html: og:image must be https://routine3.com/og.jpg');
 check(home.includes('<meta name="twitter:image" content="https://routine3.com/og.jpg" />'), 'index.html: twitter:image must be https://routine3.com/og.jpg');
