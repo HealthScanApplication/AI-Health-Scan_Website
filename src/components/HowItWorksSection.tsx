@@ -100,7 +100,7 @@ export function HowItWorksSection() {
           {/* Phone — the routine, tracked (same app UI as the section above, checked off) */}
           <div style={{ flex: "1 1 300px", minWidth: 280, display: "flex", flexDirection: "column", alignItems: "center" }}>
             <PhoneFrame width={300} screenBg="#FFFFFF">
-              <ProtocolHomeScreen protocolName="Weight-loss routine" items={CHECKED_DAY} anchors={false} />
+              <ProtocolHomeScreen protocolName="Weight-loss routine" items={CHECKED_DAY} anchors={false} theme="dark" />
             </PhoneFrame>
             <p style={{ fontFamily: GRO, fontSize: 11, fontStyle: "italic", color: ed.inkSoft, marginTop: 18, letterSpacing: "0.02em", textAlign: "center" }}>
               Fig. 02 — Your day, checked off

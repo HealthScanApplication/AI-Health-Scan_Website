@@ -14,9 +14,8 @@
  */
 import { useState } from "react";
 import {
-  User, BarChart, TrendingUp, ShoppingBasket,
-  ListChecks, BookOpen, Plus, Repeat, Check,
-  LocateFixed, Microscope, Pencil, Ellipsis,
+  User, ChartNoAxesCombined, ShoppingBasket, ListChecks, Plus, Repeat, Check,
+  Timer, Apple, Ellipsis, SlidersHorizontal, RefreshCw, Sun, Pin, Info,
 } from "lucide-react";
 import {
   CATEGORY_TINTS, itemIcon, type CatKey, type ProtocolItem as CatItem,
@@ -168,6 +167,7 @@ export function ProtocolHomeScreen({
   anchors = true,
   imageUrl = null,
   showDetails: showDetailsProp = true,
+  theme = "light",
 }: {
   protocolName: string;
   items: HomeItem[];
@@ -181,6 +181,8 @@ export function ProtocolHomeScreen({
   anchors?: boolean;
   /** Initial state of the in-frame "Details" toggle (each step's description + child checklist). */
   showDetails?: boolean;
+  /** Mirrors the app's system appearance. */
+  theme?: "light" | "dark";
 }) {
   // In-frame toggle for per-step descriptions + child do/don't lines (mirrors the app's showDetails).
   const [showDetails, setShowDetails] = useState(showDetailsProp);
@@ -219,25 +221,29 @@ export function ProtocolHomeScreen({
   const weekLine = `WEEK ${isoWeek(date)}`;
   const headerDate = `${WD[date.getDay()]} ${MON[date.getMonth()]} ${date.getDate()}`;
   const sectionDate = `${WD[date.getDay()]}, ${MON[date.getMonth()]} ${date.getDate()}`;
-  const total = allItems.length;
-  const doneCount = allItems.filter((i) => i.done).length || done;
+  const dark = theme === "dark";
+  const ui = dark ? {
+    outside: "#000000", surface: "#1C1C1E", panel: "#29292C", card: "#000000",
+    text: "#F7F7F8", muted: "#98989F", faint: "#5D5D63", border: "#343438",
+    dayPill: "#FFFFFF", dayPillText: "#111827", dock: "#1C1C1E", plus: "#FFFFFF", plusInk: "#111827",
+  } : {
+    outside: "#EEEEEF", surface: "#FFFFFF", panel: "#F4F6F8", card: "#FFFFFF",
+    text: "#101827", muted: "#6B7280", faint: "#A5ADBA", border: "#E2E6EB",
+    dayPill: "#101827", dayPillText: "#FFFFFF", dock: "rgba(255,255,255,0.96)", plus: "#101827", plusInk: "#FFFFFF",
+  };
+  const purple = "#8C55D6";
 
   return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#FFFFFF" }}>
-    <div style={{ position: "absolute", top: 0, left: 0, width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "top left", display: "flex", flexDirection: "column", fontFamily: POPPINS, color: "#111827", overflow: "hidden" }}>
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: ui.outside }}>
+    <div style={{ position: "absolute", top: 0, left: 0, width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "top left", display: "flex", flexDirection: "column", fontFamily: POPPINS, color: ui.text, overflow: "hidden", background: ui.outside }}>
       {/* status bar */}
-      <div style={{ padding: "13px 22px 2px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#111827", fontVariantNumeric: "tabular-nums", letterSpacing: 0.2 }}>9:41</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 9, fontWeight: 700, color: "#111827" }}>
-          <span style={{ letterSpacing: 0.5 }}>LTE</span>
-          <span style={{ display: "inline-block", width: 22, height: 11, borderRadius: 3, border: "1px solid #111827", position: "relative", padding: 1.5 }}>
-            <span style={{ display: "block", width: "78%", height: "100%", background: "#34C759", borderRadius: 1 }} />
-          </span>
-        </span>
+      <div style={{ padding: "18px 22px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, color: ui.muted }}>
+        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.1 }}>{WD[date.getDay()]} {date.getDate()} {MON[date.getMonth()]}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>7:20 pm</span>
       </div>
 
       {/* scrollable app canvas */}
-      <div className="phone-scroll" style={{ flex: 1, overflowY: "auto", padding: "6px 0 96px", display: "flex", flexDirection: "column" }}>
+      <div className="phone-scroll" style={{ flex: 1, overflowY: "auto", margin: "0 14px", borderRadius: "22px 22px 0 0", background: ui.surface, padding: "13px 0 108px", display: "flex", flexDirection: "column" }}>
         {/* HEADER */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 40, padding: "0 16px", marginBottom: 6, gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 1, minWidth: 0 }}>
@@ -247,17 +253,16 @@ export function ProtocolHomeScreen({
                 : <User size={13} color="#4B5563" strokeWidth={1.5} />}
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-start", minWidth: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.1, color: "#6B7280", whiteSpace: "nowrap" }}>{weekLine}</span>
-              <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: 0.9, color: "#9CA3AF", whiteSpace: "nowrap" }}>{headerDate}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: ui.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 126 }}>{protocolName || "Your routine"}</span>
+              <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 1.1, color: ui.muted, whiteSpace: "nowrap" }}>{weekLine}</span>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
             {[
-              { Icon: LocateFixed, label: "Jump to now" },
-              { Icon: Microscope, label: "Nutrition coverage" },
-              { Icon: Pencil, label: "Edit routine" },
-            ].map(({ Icon, label }) => <button key={label} type="button" title={label} style={{ width: 27, height: 27, borderRadius: 8, border: "1px solid #E5E7EB", background: "#F3F4F6", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#6B7280" }}><Icon size={13} strokeWidth={2} /></button>)}
-            <button type="button" title="Protocol menu" onClick={() => setShowDetails((v) => !v)} style={{ width: 27, height: 27, borderRadius: 8, border: "1px solid #E5E7EB", background: "#F3F4F6", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#9CA3AF" }}><Ellipsis size={15} strokeWidth={2} /></button>
+              { Icon: Timer, label: "Timer" },
+              { Icon: Apple, label: "Nutrition" },
+            ].map(({ Icon, label }) => <button key={label} type="button" title={label} style={{ width: 27, height: 27, borderRadius: 8, border: `1px solid ${ui.border}`, background: ui.panel, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: ui.muted }}><Icon size={13} strokeWidth={2} /></button>)}
+            <button type="button" title="Protocol menu" onClick={() => setShowDetails((v) => !v)} style={{ width: 27, height: 27, borderRadius: 8, border: `1px solid ${ui.border}`, background: ui.panel, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: ui.muted }}><Ellipsis size={15} strokeWidth={2} /></button>
           </div>
         </div>
 
@@ -266,18 +271,20 @@ export function ProtocolHomeScreen({
           {week.map((d, i) => {
             const isToday = sameDay(d, today);
             const isSelected = sameDay(d, date);
-            const circleBg = isToday ? "#1F2937" : isSelected ? "#3D3D3D" : "transparent";
+            const circleBg = isToday || isSelected ? (dark ? "#F7F7F8" : "#101827") : ui.panel;
             const filled = isToday || isSelected;
             return (
               <div key={i} style={{ width: 44, display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 0" }}>
-                <span style={{ fontSize: 10, fontWeight: filled ? 600 : 500, letterSpacing: 0.6, textTransform: "uppercase", color: filled ? "#3D3D3D" : "#6B7280", marginBottom: 4 }}>{WD[d.getDay()]}</span>
-                <span style={{ width: 32, height: 32, borderRadius: 16, background: circleBg, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: 14, fontWeight: filled ? 600 : 500, color: filled ? "#FFFFFF" : "#374151", fontVariantNumeric: "tabular-nums" }}>{d.getDate()}</span>
+                <span style={{ fontSize: 9.5, fontWeight: filled ? 700 : 600, letterSpacing: 0.6, textTransform: "uppercase", color: filled ? ui.text : ui.muted, marginBottom: 4 }}>{WD[d.getDay()]}</span>
+                <span style={{ width: 32, height: 32, borderRadius: 16, background: circleBg, border: isSelected ? `3px solid ${purple}` : `2px solid ${ui.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: filled ? (dark ? "#111827" : "#FFFFFF") : ui.text, fontVariantNumeric: "tabular-nums" }}>{d.getDate()}</span>
                 </span>
               </div>
             );
           })}
         </div>
+
+        <div style={{ margin: "0 15px 10px 66px", borderRadius: 18, background: ui.dayPill, color: ui.dayPillText, padding: "10px 14px", fontSize: 10.5, fontWeight: 700, letterSpacing: 1.2, textAlign: "center" }}>{headerDate} · TODAY</div>
 
         {/* SECTIONS */}
         {sections.length === 0 && (
@@ -295,8 +302,8 @@ export function ProtocolHomeScreen({
               const GroupIcon = tint.Icon;
               const complete = band.items.length > 0 && band.items.every((item) => item.done);
               const showHeader = band.items.length > 1 || band.cat === "sleep" || !!band.slot;
-              const surface = complete ? tint.bg : "#F3F4F6";
-              const foreground = complete ? tint.fg : "#9CA3AF";
+              const surface = complete ? (dark ? "#3B2A50" : tint.bg) : ui.panel;
+              const foreground = complete ? (dark ? "#FFFFFF" : tint.fg) : ui.muted;
               return (
                 <div key={bi} style={{ position: "relative", padding: "0 16px 10px 66px" }}>
                   <div style={{ borderRadius: 14, paddingBottom: 6, background: surface, position: "relative" }}>
@@ -306,6 +313,7 @@ export function ProtocolHomeScreen({
                         <GroupIcon size={12} strokeWidth={2} color={foreground} />
                         <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.75, color: foreground, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{band.label}</span>
                       </span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 9, color: ui.muted }}><Pin size={12} strokeWidth={2} /><Info size={12} strokeWidth={2} /></span>
                     </div>}
                     {/* items */}
                     <div style={{ padding: showHeader ? "0 7px 2px" : "7px 7px 2px", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -320,14 +328,14 @@ export function ProtocolHomeScreen({
                           <div key={ii} style={{ position: "relative" }}>
                             {/* Current mobile timeline: time gutter + media capsule sit on the lane, outside the card. */}
                             <span style={{ position: "absolute", left: -63, top: 17, width: 27, transform: "translateY(-50%)", textAlign: "right", fontSize: 8.5, lineHeight: 1, fontWeight: 600, color: "#9CA3AF", fontVariantNumeric: "tabular-nums" }}>{fmtTime(it.time)}</span>
-                            <span style={{ position: "absolute", left: -31, top: 0, bottom: ii === band.items.length - 1 ? -12 : -6, width: 2, background: isDone ? tint.fg : "#D1D5DB", opacity: 0.7 }} />
-                            <span style={{ position: "absolute", left: -45, top: 2, width: 30, height: Math.max(30, Math.min(48, 30 + ((it.duration_minutes || 0) / 15) * 3)), borderRadius: 15, overflow: "hidden", background: isDone ? tint.fg : "#FFFFFF", border: `1.5px solid ${isDone ? tint.fg : "#D1D5DB"}`, display: "inline-flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
-                              {it.image_url ? <img src={it.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: isDone ? "none" : "grayscale(1)", opacity: isDone ? 1 : 0.72 }} /> : <ItemIcon size={15} strokeWidth={1.8} color={isDone ? "#FFFFFF" : "#9CA3AF"} />}
+                            <span style={{ position: "absolute", left: -31, top: 0, bottom: ii === band.items.length - 1 ? -12 : -6, width: 2, background: isDone ? tint.fg : ui.muted, opacity: 0.75 }} />
+                            <span style={{ position: "absolute", left: -46, top: 2, width: 32, height: isWake(it) || isBed(it) ? 66 : Math.max(34, Math.min(48, 34 + ((it.duration_minutes || 0) / 15) * 3)), borderRadius: 16, overflow: "hidden", background: isWake(it) || isBed(it) ? purple : (isDone ? tint.fg : ui.card), border: `1.5px solid ${isWake(it) || isBed(it) ? purple : (isDone ? tint.fg : ui.muted)}`, display: "inline-flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                              {it.image_url ? <img src={it.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: isDone ? "none" : "grayscale(1)", opacity: isDone ? 1 : 0.72 }} /> : isWake(it) ? <Sun size={16} strokeWidth={1.8} color="#FFFFFF" /> : <ItemIcon size={15} strokeWidth={1.8} color={isDone ? "#FFFFFF" : "#9CA3AF"} />}
                             </span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44, background: "#FFFFFF", borderRadius: 12, padding: "7px 9px 7px 11px", boxShadow: "0 1px 2px rgba(17,24,39,0.05)" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: 12, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                                <span style={{ fontSize: 13, fontWeight: 500, color: isDone ? "#9CA3AF" : "#374151", textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
                                 {it.repeat && <Repeat size={10} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />}
                               </div>
                               {sub && <div style={{ fontSize: 10, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
@@ -343,7 +351,7 @@ export function ProtocolHomeScreen({
                                 </div>
                               )}
                             </div>
-                            <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", background: isDone ? "#22C55E" : "#FFFFFF", border: isDone ? "1px solid #22C55E" : "1.5px solid #D1D5DB" }}>
+                            <span style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", background: isDone ? purple : ui.card, border: isDone ? `1px solid ${purple}` : `1.5px solid ${ui.border}` }}>
                               {isDone && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
                             </span>
                             </div>
@@ -358,51 +366,28 @@ export function ProtocolHomeScreen({
           </div>
         ))}
 
-        {/* FOOTER goals card */}
-        <div style={{ margin: "10px 16px 0", background: "#FFFFFF", borderRadius: 12, padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-          <div style={{ height: 4, borderRadius: 2, background: "#E5E7EB", marginBottom: 10 }}>
-            <div style={{ height: "100%", borderRadius: 2, background: "#059669", width: `${total ? Math.min(100, Math.max(0, (doneCount / total) * 100)) : 0}%` }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", color: "#6B7280" }}>DAILY GOALS ▾</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontSize: 42, fontWeight: 600, letterSpacing: -1.5, lineHeight: "46px" }}>
-              <span style={{ color: "#000000" }}>{doneCount}</span>
-              <span style={{ color: "#C7CBD1" }}>/{total}</span>
-            </span>
-          </div>
-          <div style={{ marginTop: -2 }}>
-            <span style={{ fontFamily: '"DM Sans", ' + POPPINS, fontSize: 11, fontWeight: 500, color: "#6B7280" }}>Protocol Progress</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 8, marginBottom: 2 }}>
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <span key={i} style={{ width: 6, height: 6, borderRadius: 3, background: "transparent", border: i === 0 ? "1.5px solid #111827" : "1px solid #9CA3AF" }} />
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* floating TAB BAR */}
-      <div style={{ position: "absolute", left: 12, right: 12, bottom: 12, display: "flex", alignItems: "center", borderRadius: 56, background: "rgba(255,255,255,0.94)", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 -4px 20px rgba(0,0,0,0.08)", padding: "8px 4px", backdropFilter: "blur(8px)" }}>
+      <div style={{ position: "absolute", left: 14, right: 14, bottom: 8, display: "flex", alignItems: "center", borderRadius: 40, background: ui.dock, border: `1px solid ${ui.border}`, boxShadow: dark ? "none" : "0 -4px 20px rgba(15,23,42,0.10)", padding: "8px 5px", backdropFilter: "blur(12px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "space-around" }}>
           {[
-            { I: BarChart, label: "Home", active: true },
-            { I: TrendingUp, label: "Stats", active: false },
+            { I: SlidersHorizontal, label: "Home", active: true },
+            { I: ListChecks, label: "Tasks", active: false },
+            { I: RefreshCw, label: "Routines", active: false },
+            { I: ChartNoAxesCombined, label: "Stats", active: false },
             { I: ShoppingBasket, label: "Supplies", active: false },
-            { I: ListChecks, label: "Protocol", active: false },
-            { I: BookOpen, label: "Recipe", active: false },
           ].map(({ I, label, active }) => (
             <div key={label} style={{ width: 48, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ width: 38, height: 30, borderRadius: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", background: active ? "rgba(0,0,0,0.06)" : "transparent" }}>
-                <I size={20} strokeWidth={active ? 2 : 1} color={active ? "#000000" : "#4B5563"} />
+              <span style={{ width: 38, height: 30, borderRadius: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", background: active ? ui.panel : "transparent" }}>
+                <I size={19} strokeWidth={active ? 2 : 1.4} color={active ? ui.text : ui.muted} />
               </span>
-              <span style={{ fontSize: 9, fontWeight: 400, marginTop: 2, color: active ? "#000000" : "#4B5563" }}>{label}</span>
+              <span style={{ fontSize: 8.5, fontWeight: 400, marginTop: 2, color: active ? ui.text : ui.muted }}>{label}</span>
             </div>
           ))}
         </div>
-        <span style={{ width: 48, height: 48, borderRadius: 24, background: "#000000", display: "inline-flex", alignItems: "center", justifyContent: "center", marginLeft: 4, flexShrink: 0, boxShadow: "0 4px 6px rgba(0,0,0,0.25)" }}>
-          <Plus size={24} strokeWidth={1.6} color="#FFFFFF" />
+        <span style={{ width: 48, height: 48, borderRadius: 24, background: ui.plus, display: "inline-flex", alignItems: "center", justifyContent: "center", marginLeft: 4, flexShrink: 0, boxShadow: "0 4px 12px rgba(0,0,0,0.18)" }}>
+          <Plus size={24} strokeWidth={1.6} color={ui.plusInk} />
         </span>
       </div>
     </div>
