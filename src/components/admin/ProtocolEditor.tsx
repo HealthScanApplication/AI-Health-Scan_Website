@@ -341,7 +341,7 @@ function IconSelect({ value, options, onChange, width = 132, placeholder }: { va
   const [open, setOpen] = useState(false);
   const cur = options.find((o) => o.value === value);
   return (
-    <div style={{ position: 'relative', width, minWidth: width, flex: '0 1 auto' }}>
+    <div style={{ position: 'relative', width: Math.max(width, 120), minWidth: Math.max(width, 120), flex: '0 1 auto' }}>
       <button type="button" onClick={() => setOpen((o) => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 8px', fontSize: 13, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, cursor: 'pointer', boxSizing: 'border-box' }}>
         {cur?.Icon && <cur.Icon size={14} color={cur.color || C.sub} style={{ flexShrink: 0 }} />}
@@ -1427,13 +1427,13 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
               onBlur={() => commitItem(it.id, ['scheduled_time'])}
               style={{ ...inputStyle, width: 118, flexShrink: 0, padding: '7px 6px' }} /></label>
-              <button type="button" onClick={() => commitField(it, { notifications_enabled: !it.notifications_enabled })} title={it.notifications_enabled ? 'Alarm enabled' : 'Enable alarm'} style={{ height: 32, border: '1px solid ' + (it.notifications_enabled ? C.accent : C.hair), borderRadius: 7, background: it.notifications_enabled ? 'var(--sb-brand-soft)' : C.paper, color: it.notifications_enabled ? C.accent : C.faint, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}><Bell size={12} />{it.notifications_enabled ? 'Alarm on' : 'Alarm off'}</button>
+              <button type="button" onClick={() => commitField(it, { notifications_enabled: !it.notifications_enabled })} title={it.notifications_enabled ? 'Alarm enabled' : 'Enable alarm'} style={{ height: 34, minWidth: 96, boxSizing: 'border-box', justifyContent: 'center', border: '1px solid ' + (it.notifications_enabled ? C.accent : C.hair), borderRadius: 8, background: it.notifications_enabled ? 'var(--sb-brand-soft, #EEF1E6)' : C.paper, color: it.notifications_enabled ? C.accent : C.faint, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}><Bell size={12} />{it.notifications_enabled ? 'Alarm on' : 'Alarm off'}</button>
               {it.notifications_enabled && <select aria-label="Alarm lead time" value={it.notification_lead_minutes ?? 0} onChange={(e) => commitField(it, { notification_lead_minutes: Number(e.target.value) })} style={{ ...inputStyle, width: 104, flexShrink: 0, padding: '7px 5px' }}><option value={0}>At time</option><option value={5}>5 min before</option><option value={10}>10 min before</option><option value={15}>15 min before</option><option value={30}>30 min before</option><option value={60}>1 hour before</option></select>}</>
           )}
           {!isRule ? (
             <>
               <span title={`Stored type: item_type="${it.item_type || 'null'}", category="${it.category || 'none'}". Change it with the dropdown →`}
-                style={{ fontSize: 11.5, fontWeight: 700, fontFamily: 'ui-monospace, monospace', borderRadius: 4, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', ...kindChip(it.item_type) }}>
+                style={{ fontSize: 11, fontWeight: 700, fontFamily: 'ui-monospace, monospace', borderRadius: 8, height: 34, boxSizing: 'border-box', minWidth: 96, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', ...kindChip(it.item_type) }}>
                 {it.item_type || '—'}
               </span>
               <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={116} />
@@ -1562,7 +1562,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   return (
     <div className="r3-compact" style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minHeight: 560 }}>
       {/* One control size across the editor (globals force 16px on inputs; .r3-compact is exempt). */}
-      <style>{`.r3-compact select,.r3-compact input[type=time],.r3-compact input[type=text],.r3-compact input[type=number],.r3-compact input:not([type]){height:34px;font-size:13px;box-sizing:border-box;border-radius:8px}.r3-compact textarea{font-size:13px}`}</style>
+      <style>{`.r3-compact select,.r3-compact input[type=time],.r3-compact input[type=text],.r3-compact input[type=number],.r3-compact input:not([type]){height:34px;font-size:13px;box-sizing:border-box;border-radius:8px}.r3-compact textarea{font-size:13px}.r3-compact select{min-width:110px}.r3-compact .pe-row-controls > *{flex-shrink:0}`}</style>
       {/* linked-record lightbox (view / re-link) */}
       {viewRec && (
         <div onClick={() => setViewRec(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
