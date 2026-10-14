@@ -216,6 +216,22 @@ export async function createGuideLead(guideId: string, lead: Pick<GuideLead, 'na
   return data as GuideLead;
 }
 
+/** Public opt-in from a Guardian mini-site. Insert-only: visitors cannot read leads back. */
+export async function submitGuardianOptIn(guideId: string, lead: { name: string; email: string; goal: string | null; marketingConsent: boolean; consentText: string; sourceOfferId?: string | null; valueRampId?: string | null }): Promise<void> {
+  const { error } = await db().from('guide_leads').insert({
+    guide_id: guideId,
+    name: lead.name.trim(),
+    email: lead.email.trim().toLowerCase(),
+    goal: lead.goal,
+    marketing_consent: lead.marketingConsent,
+    consent_text: lead.marketingConsent ? lead.consentText : null,
+    consent_at: lead.marketingConsent ? new Date().toISOString() : null,
+    source_offer_id: lead.sourceOfferId || null,
+    value_ramp_id: lead.valueRampId || null,
+  });
+  if (error) throw error;
+}
+
 export async function listGuideOffers(userId: string): Promise<GuideOffer[]> {
   const { data, error } = await db().from('guide_offers').select('*').eq('guide_id', userId).order('created_at', { ascending: false });
   if (error) throw error;

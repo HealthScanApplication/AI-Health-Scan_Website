@@ -12,7 +12,7 @@ import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, createProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
-  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listPublicGuideProfiles, saveGuideProfile, submitGuardianSuggestion,
+  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listPublicGuideProfiles, saveGuideProfile, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
   listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
@@ -676,6 +676,91 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
   );
 }
 
+const SUPPORT_KINDS: GuideOffer['kind'][] = ['one_to_one_call', 'group_call', 'in_person', 'journey', 'festival', 'team_program'];
+
+/** Default funnel order: the ramp's own order when published, else free → paid by price → personal support. */
+function orderFunnelOffers(offers: GuideOffer[], ramp: GuideValueRamp | null): GuideOffer[] {
+  if (ramp?.offer_ids?.length) {
+    const byId = new Map(offers.map((offer) => [offer.id, offer]));
+    const ordered = ramp.offer_ids.map((id) => byId.get(id)).filter(Boolean) as GuideOffer[];
+    if (ordered.length) return ordered;
+  }
+  const rank = (offer: GuideOffer) => (offer.access_model === 'free' ? 0 : SUPPORT_KINDS.includes(offer.kind) ? 2 : 1);
+  return [...offers].sort((a, b) => rank(a) - rank(b) || (a.price_cents || 0) - (b.price_cents || 0));
+}
+
+const CONSENT_TEXT = 'Send me occasional emails with new guidance and offers. Unsubscribe any time.';
+
+function GuardianFunnel({ profile, offers, ramp, accent, headingFont }: { profile: GuideProfile; offers: GuideOffer[]; ramp: GuideValueRamp | null; accent: string; headingFont: string }) {
+  const ordered = orderFunnelOffers(offers, ramp);
+  const entry = ordered.find((offer) => offer.access_model === 'free') || null;
+  const nextPaid = ordered.find((offer) => offer.access_model === 'paid' && !SUPPORT_KINDS.includes(offer.kind)) || null;
+  const support = ordered.find((offer) => SUPPORT_KINDS.includes(offer.kind)) || null;
+  const [form, setForm] = useState({ name: '', email: '', goal: '', consent: false });
+  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+  const price = (offer: GuideOffer) => offer.access_model === 'free' ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Enquire';
+  const offerHref = (offer: GuideOffer) => offer.booking_url || offer.affiliate_url || '#start';
+  async function optIn(e: React.FormEvent) {
+    e.preventDefault();
+    setState('sending');
+    try {
+      await submitGuardianOptIn(profile.user_id, { name: form.name, email: form.email, goal: form.goal || null, marketingConsent: form.consent, consentText: CONSENT_TEXT, sourceOfferId: entry?.id, valueRampId: ramp?.id });
+      setState('done');
+    } catch {
+      setState('error');
+    }
+  }
+  const eyebrow: React.CSSProperties = { color: accent, fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' };
+  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 46, border: '1px solid #11120F', borderRadius: 2, padding: '0 14px', fontFamily: 'inherit', fontSize: 14, background: '#FFF', color: '#11120F', outline: 'none' };
+  const solid: React.CSSProperties = { minHeight: 46, border: '1px solid #11120F', borderRadius: 2, background: '#11120F', color: '#FFF', padding: '0 20px', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10, textDecoration: 'none', cursor: 'pointer' };
+  const steps = [entry, nextPaid, support].filter(Boolean) as GuideOffer[];
+  return <>
+    {steps.length > 0 && <section id="offers" style={{ padding: 'clamp(60px,9vw,120px) clamp(24px,8vw,110px)', borderTop: '1px solid rgba(17,18,15,.2)' }}>
+      <span style={eyebrow}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
+      <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(44px,7vw,82px)', lineHeight: .95, margin: '18px 0 36px' }}>Your path, step by step.</h2>
+      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', borderTop: '1px solid #11120F' }}>
+        {steps.map((offer, index) => <li key={offer.id} style={{ padding: '24px 22px 26px 0', borderRight: index < steps.length - 1 ? '1px solid rgba(17,18,15,.16)' : 'none', paddingLeft: index ? 22 : 0, display: 'flex', flexDirection: 'column' }}>
+          <span style={eyebrow}>{String(index + 1).padStart(2, '0')} · {index === 0 && offer.access_model === 'free' ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Personal support' : 'Go deeper'} · {price(offer)}</span>
+          <strong style={{ fontFamily: headingFont, fontSize: 32, lineHeight: 1.05, fontWeight: 300, margin: '18px 0 10px' }}>{offer.title}</strong>
+          <span style={{ color: '#66645F', fontSize: 13, lineHeight: 1.6, marginBottom: 22 }}>{offer.description || 'The next step in your journey.'}</span>
+          <a href={index === 0 && offer.access_model === 'free' ? '#start' : offerHref(offer)} style={{ ...solid, marginTop: 'auto', width: 'fit-content', ...(index ? { background: 'transparent', color: '#11120F' } : {}) }}>{index === 0 && offer.access_model === 'free' ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Apply / book a call' : 'See what is included'} <ArrowRight size={13} /></a>
+        </li>)}
+      </ol>
+    </section>}
+    {entry && <section id="start" style={{ padding: 'clamp(60px,9vw,120px) clamp(24px,8vw,110px)', background: '#11120F', color: '#F5F2EA' }}>
+      <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(32px,6vw,90px)', alignItems: 'center' }}>
+        <div>
+          <span style={{ ...eyebrow, color: '#C7D08E' }}>Free · {entry.title}</span>
+          <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(40px,6vw,72px)', lineHeight: .95, margin: '18px 0' }}>{state === 'done' ? 'You are in.' : 'Start today, free.'}</h2>
+          <p style={{ color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7, maxWidth: 520 }}>{state === 'done' ? `Open ${entry.title} now. It runs as a daily routine in the ROUTINE³ app, with reminders, so you keep going.` : entry.description || 'Get the guide and the interactive routine that goes with it.'}</p>
+        </div>
+        {state === 'done' ? <div style={{ display: 'grid', gap: 12 }}>
+          <a href={entry.booking_url || APP_STORE_URL} style={{ ...solid, background: '#F5F2EA', color: '#11120F', borderColor: '#F5F2EA' }}>Open your free routine <ArrowRight size={13} /></a>
+          {nextPaid && <div style={{ border: '1px solid rgba(245,242,234,.3)', padding: 22 }}>
+            <span style={{ ...eyebrow, color: '#C7D08E' }}>Ready to go further? · {price(nextPaid)}</span>
+            <strong style={{ display: 'block', fontFamily: headingFont, fontWeight: 300, fontSize: 28, lineHeight: 1.05, margin: '12px 0 8px' }}>{nextPaid.title}</strong>
+            <p style={{ color: 'rgba(245,242,234,.72)', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px' }}>{nextPaid.description || 'The complete programme, step by step.'}</p>
+            <a href={offerHref(nextPaid)} style={{ ...solid, background: 'transparent', color: '#F5F2EA', borderColor: '#F5F2EA' }}>See what is included <ArrowRight size={13} /></a>
+          </div>}
+        </div> : <form onSubmit={optIn} style={{ display: 'grid', gap: 12 }}>
+          <input required placeholder="First name" aria-label="First name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={field} />
+          <input required type="email" placeholder="Email" aria-label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={field} />
+          <div role="radiogroup" aria-label="Main goal (optional)" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['Health', 'Beauty', 'Fitness'].map((goal) => <button type="button" key={goal} role="radio" aria-checked={form.goal === goal} onClick={() => setForm({ ...form, goal: form.goal === goal ? '' : goal })} style={{ minHeight: 36, padding: '0 14px', border: '1px solid rgba(245,242,234,.5)', borderRadius: 2, background: form.goal === goal ? '#F5F2EA' : 'transparent', color: form.goal === goal ? '#11120F' : '#F5F2EA', fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{goal}</button>)}
+          </div>
+          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12, lineHeight: 1.5, color: 'rgba(245,242,234,.78)', cursor: 'pointer' }}><input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} style={{ marginTop: 3 }} />{CONSENT_TEXT}</label>
+          {state === 'error' && <p style={{ color: '#F0A7A7', fontSize: 12, margin: 0 }}>We could not sign you up just now. Please try again.</p>}
+          <button disabled={state === 'sending'} style={{ ...solid, background: '#F5F2EA', color: '#11120F', borderColor: '#F5F2EA', opacity: state === 'sending' ? .6 : 1 }}>{state === 'sending' ? 'Sending' : 'Get free access'} <ArrowRight size={13} /></button>
+          <p style={{ fontSize: 11, color: 'rgba(245,242,234,.5)', margin: 0 }}>We use your email to send your access. Marketing emails only if you tick the box.</p>
+        </form>}
+      </div>
+    </section>}
+    <footer style={{ padding: '28px clamp(24px,8vw,110px)', borderTop: '1px solid rgba(17,18,15,.2)', color: '#66645F', fontSize: 11, lineHeight: 1.6 }}>
+      {profile.display_name} shares general wellbeing guidance, not medical advice. Speak to your GP or doctor before changing medication, diet or exercise, and about any health concern. Individual results vary.
+    </footer>
+  </>;
+}
+
 function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boolean }) {
   const [profile, setProfile] = useState<GuideProfile | null>(null);
   const [offers, setOffers] = useState<GuideOffer[]>([]);
@@ -686,13 +771,12 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
     getGuideProfileBySlug(slug).then(async (found) => {
       setProfile(found);
       setOffers(found ? await listGuideOffers(found.user_id) : []);
+      setValueRamps(found ? await listGuideValueRamps(found.user_id).catch(() => []) : []);
     }).catch(() => { setProfile(null); setOffers([]); }).finally(() => setLoading(false));
   }, [slug]);
   if (loading) return <div style={{ minHeight: '100vh', background: black, color: ink, display: 'grid', placeItems: 'center', fontFamily: sans }}>Building Guardian page…</div>;
   if (!profile) return <div style={{ minHeight: '100vh', background: black, color: ink, display: 'grid', placeItems: 'center', padding: 24, fontFamily: sans, textAlign: 'center' }}><div><Brand /><h1 style={{ fontFamily: serif, fontSize: 48, fontWeight: 300, margin: '48px 0 12px' }}>This page is not published yet.</h1><a href="/guardians" style={{ color: acid }}>Return to Guardians</a></div></div>;
   const freeOffers = offers.filter((offer) => offer.access_model === 'free');
-  const paidOffers = offers.filter((offer) => offer.access_model === 'paid');
-  const firstVisibleOffer = freeOffers[0] || paidOffers[0];
   const socials = profile.social_links || {};
   const publicHeadingFont = serif;
   const publicBodyFont = sans;
@@ -725,24 +809,13 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
           <h1 style={{ position: 'relative', zIndex: 2, fontFamily: publicHeadingFont, fontWeight: 300, fontSize: 'clamp(58px,9vw,118px)', lineHeight: .86, letterSpacing: '-.035em', margin: '24px 0' }}>{profile.headline || profile.display_name}</h1>
           <ExpertiseTags tags={publicExpertiseTags} color={publicAccent} />
           <p style={{ position: 'relative', zIndex: 2, color: '#66645F', fontSize: 15, lineHeight: 1.75, maxWidth: 560 }}>{profile.bio}</p>
-          {freeOffers[0] && <a href={freeOffers[0].booking_url || '#offers'} style={{ position: 'relative', zIndex: 2, marginTop: 24, width: 'fit-content', minHeight: 40, borderRadius: 4, background: publicAccent, color: readableText(publicAccent), padding: '0 16px', textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 22px rgba(17,18,15,.14)' }}>Get guide <ArrowRight size={14} /></a>}
+          {freeOffers[0] && <a href="#start" style={{ position: 'relative', zIndex: 2, marginTop: 24, width: 'fit-content', minHeight: 40, borderRadius: 4, background: publicAccent, color: readableText(publicAccent), padding: '0 16px', textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 22px rgba(17,18,15,.14)' }}>Start free <ArrowRight size={14} /></a>}
         </div>
         <div style={{ minHeight: 520, background: '#11120F', display: 'grid', placeItems: 'center', padding: 40 }}>
           {profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name} style={{ width: 'min(74%,520px)', maxHeight: 620, objectFit: 'contain', filter: publicGreyscale ? 'grayscale(1) contrast(1.05)' : 'none' }} /> : <img src="/images/guides/guide-plate.png" alt="" style={{ width: 'min(74%,420px)', objectFit: 'contain', filter: publicGreyscale ? 'grayscale(1)' : 'none' }} />}
         </div>
       </section>
-      <section id="offers" style={{ padding: 'clamp(60px,9vw,120px) clamp(24px,8vw,110px)', borderTop: '1px solid rgba(17,18,15,.2)' }}>
-        <span style={{ color: '#667245', fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' }}>Work with {profile.display_name}</span>
-        <h2 style={{ fontFamily: publicHeadingFont, fontWeight: 300, fontSize: 'clamp(44px,7vw,82px)', lineHeight: .95, margin: '18px 0 36px' }}>Begin here.</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: 12 }}>
-          {firstVisibleOffer && [firstVisibleOffer].map((offer, index) => <a key={offer.id} href={offer.booking_url || offer.affiliate_url || '#'} style={{ color: '#11120F', textDecoration: 'none', minHeight: 220, border: '1px solid rgba(17,18,15,.2)', borderRadius: 6, background: 'rgba(255,255,255,.48)', padding: 26, display: 'flex', flexDirection: 'column', boxShadow: '0 14px 36px rgba(17,18,15,.07)' }}>
-            <span style={{ color: publicAccent, fontSize: 9, fontWeight: 700, letterSpacing: '.14em' }}>{String(index + 1).padStart(2, '0')} · {offer.access_model === 'free' ? 'FREE' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'ENQUIRE'}</span>
-            <strong style={{ fontFamily: publicHeadingFont, fontSize: 34, lineHeight: 1.05, fontWeight: 300, margin: '28px 0 10px' }}>{offer.title}</strong>
-            <span style={{ color: '#66645F', fontSize: 12, lineHeight: 1.55 }}>{offer.description || 'Discover the next step in your journey.'}</span>
-            <span style={{ width: 'fit-content', marginTop: 'auto', paddingTop: 24, color: '#11120F', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 8 }}>Open offer <ArrowRight size={13} /></span>
-          </a>)}
-        </div>
-      </section>
+      <GuardianFunnel profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
     </main>
   </div>;
 }
