@@ -101,6 +101,7 @@ function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | '
 }
 
 const SMART_LIST_ORDER = ['Hygiene', 'Fitness', 'Wellness', 'Beauty', 'Work', 'Home', 'Other'];
+const MOON_GLYPHS: Record<string, string> = { 'New moon': '🌑', 'Waxing crescent': '🌒', 'First quarter': '🌓', 'Waxing gibbous': '🌔', 'Full moon': '🌕', 'Waning gibbous': '🌖', 'Last quarter': '🌗', 'Waning crescent': '🌘' };
 function moonPhaseName(date: Date): string {
   const lunarCycle = 29.53058867;
   const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14);
@@ -397,6 +398,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [routineCovers, setRoutineCovers] = useState<Map<string, string>>(new Map());
   // multi-day protocols (day_number cycles): which cycle day the editor shows
   const [viewDay, setViewDay] = useState(1);
+  // Calendar emulation: which real date day 1 lands on, so each cycle day shows its date and moon phase.
+  const [previewStart, setPreviewStart] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
   useEffect(() => { setViewDay(1); setEditorFocus('timeline'); }, [selectedId]);
   // catalog linking
   const [linkInfo, setLinkInfo] = useState<Map<string, CatalogHit & { kind: CatalogKind }>>(new Map());
@@ -1907,22 +1910,26 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 </div>}
                 {/* Day strip — one cycle day at a time (like the app's day_number cycling) */}
                 {kindTab === 'action' && cycleLen > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.sub }}>
-                      <CalendarDays size={13} /> Day
-                    </span>
-                    {Array.from({ length: cycleLen }, (_, i) => i + 1).map((d) => {
-                      const on = viewDay === d;
-                      const n = allDayItems.filter((i) => showsOnDay(i, d)).length;
-                      const date = new Date(); date.setDate(date.getDate() + d - 1);
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                    {(() => {
+                      const date = new Date(`${previewStart}T12:00:00`); date.setDate(date.getDate() + viewDay - 1);
                       const phase = moonPhaseName(date);
-                      return (
-                        <button key={d} onClick={() => setViewDay(d)} title={`${phase} · ${n} steps on day ${d}`}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 700, padding: '5px 9px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.ink : C.hair), background: on ? C.ink : 'var(--sb-panel)', color: on ? '#fff' : C.sub }}>
-                          <Moon size={11} aria-label={phase} />{d}<span style={{ fontSize: 11.5, fontWeight: 600, opacity: 0.65 }}>{n}</span>
-                        </button>
-                      );
-                    })}
+                      const n = allDayItems.filter((i) => showsOnDay(i, viewDay)).length;
+                      const stepBtn: React.CSSProperties = { width: 34, height: 34, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, color: C.ink, cursor: 'pointer', display: 'grid', placeItems: 'center' };
+                      return <>
+                        <button type="button" aria-label="Previous day" disabled={viewDay <= 1} onClick={() => setViewDay((d) => Math.max(1, d - 1))} style={{ ...stepBtn, opacity: viewDay <= 1 ? 0.4 : 1 }}><ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} /></button>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', border: '1px solid ' + C.ink, borderRadius: 8, background: C.ink, color: '#FFFFFF', fontSize: 13, fontWeight: 700 }}>
+                          <span title={phase} aria-label={phase} style={{ fontSize: 15, lineHeight: 1 }}>{MOON_GLYPHS[phase]}</span>
+                          Day {viewDay} of {cycleLen}
+                          <span style={{ fontWeight: 500, opacity: 0.75 }}>{date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} · {n} steps</span>
+                        </span>
+                        <button type="button" aria-label="Next day" disabled={viewDay >= cycleLen} onClick={() => setViewDay((d) => Math.min(cycleLen, d + 1))} style={{ ...stepBtn, opacity: viewDay >= cycleLen ? 0.4 : 1 }}><ChevronDown size={14} style={{ transform: 'rotate(-90deg)' }} /></button>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.sub, marginLeft: 6 }}>
+                          <CalendarDays size={13} /> Starts
+                          <input type="date" value={previewStart} onChange={(e) => e.target.value && setPreviewStart(e.target.value)} style={{ ...inputStyle, width: 150 }} />
+                        </label>
+                      </>;
+                    })()}
                     {totalDaysMissing && (
                       <button onClick={fixTotalDays}
                         title="Items carry day numbers but the protocol has no total_days — without it the app can't cycle and shows every day at once."
