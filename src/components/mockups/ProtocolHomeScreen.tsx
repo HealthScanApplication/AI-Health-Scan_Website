@@ -257,7 +257,8 @@ export function ProtocolHomeScreen({
   for (const it of allItems) byTod[todForItem(it, wakeHour)].push(it);
   const sections = todOrder
     .map((tod) => ({ tod, bands: grouping === "smart" ? buildSmartBands(byTod[tod], tod) : buildBands(byTod[tod]) }))
-    .filter((s) => s.bands.length);
+    // All three day parts always show; an empty one gets an "Add" slot (as in the app).
+    ;
 
   // The current mobile strip begins on the selected day, keeping the selected
   // circle on the shared avatar/timeline axis (Tue→Mon in the reference).
@@ -350,6 +351,13 @@ export function ProtocolHomeScreen({
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: "#374151", textTransform: "uppercase" }}>{tod}</span>
             </div>
 
+            {bands.every((band) => band.cat === "sleep") && (
+              <div style={{ position: "relative", padding: `0 16px 10px ${MT.rowContentX}px` }}>
+                <div style={{ minHeight: 48, border: `1.5px dashed ${ui.faint}`, borderRadius: dark ? 12 : MT.groupRadius, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: ui.muted, fontSize: 12, fontWeight: 600 }}>
+                  <Plus size={13} strokeWidth={2} /> Add to {tod.toLowerCase()}
+                </div>
+              </div>
+            )}
             {bands.map((band, bi) => {
               const tint = CATEGORY_TINTS[band.cat];
               const GroupIcon = tint.Icon;
@@ -400,6 +408,8 @@ export function ProtocolHomeScreen({
                             {/* Day → wake bridge: continues the selected-day column from the fixed header down
                                 into the wake capsule. Extends upward and is clipped by the scrolling timeline,
                                 so it meets the header column exactly and scrolls with the day like mobile. */}
+                            {/* Bedtime mirrors wake: the night column continues below the capsule. */}
+                            {isBed(it) && <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: 2 + nodeH - 1, height: 100, width: MT.nodeWidth, background: `linear-gradient(180deg, ${purple} 0%, #965BD2 100%)`, WebkitMaskImage: "linear-gradient(180deg, #000 35%, transparent)", maskImage: "linear-gradient(180deg, #000 35%, transparent)", borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", zIndex: 1 }} />}
                             {isWake(it) && <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: -2000, height: 2002, width: MT.nodeWidth, background: `linear-gradient(180deg, #A96EAE 0%, #A96EAE calc(100% - 110px), #965BD2 calc(100% - 50px), ${purple} 100%)`, borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", zIndex: 1 }} />}
                             <span style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: 2, width: MT.nodeWidth, height: nodeH, borderRadius: isWake(it) ? `0 0 ${MT.nodeWidth / 2}px ${MT.nodeWidth / 2}px` : isBed(it) ? `${MT.nodeWidth / 2}px ${MT.nodeWidth / 2}px 0 0` : MT.nodeWidth / 2, overflow: "hidden", background: isWake(it) || isBed(it) ? purple : (isDone ? completedFg : ui.card), border: `1.5px solid ${isWake(it) || isBed(it) ? purple : (isDone ? completedFg : ui.muted)}`, borderTopWidth: isWake(it) ? 0 : 1.5, display: "inline-flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
                               {it.image_url && !/recipe_water-|openfoodfacts/i.test(it.image_url)
