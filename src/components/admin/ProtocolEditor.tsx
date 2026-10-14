@@ -41,8 +41,10 @@ import {
 // the kit protocol modal — follow light/dark automatically instead of being
 // hardcoded light. `accent`/`good` become the Supabase green.
 const C = {
-  ink: 'var(--sb-text)', sub: 'var(--sb-text-soft)', faint: 'var(--sb-text-faint)', hair: 'var(--sb-border)',
-  panel: 'var(--sb-panel-soft)', paper: 'var(--sb-panel)', accent: 'var(--sb-brand-strong)', danger: '#ef4444',
+  // Fallbacks keep the editor legible outside the admin shell (e.g. the Guardian
+  // workspace), where the --sb-* theme variables are not defined.
+  ink: 'var(--sb-text, #11120F)', sub: 'var(--sb-text-soft, #4A4943)', faint: 'var(--sb-text-faint, #8A8880)', hair: 'var(--sb-border, rgba(17,18,15,.22))',
+  panel: 'var(--sb-panel-soft, #F2EFE7)', paper: 'var(--sb-panel, #FFFFFF)', accent: 'var(--sb-brand-strong, #4F5B2E)', danger: '#ef4444',
   good: 'var(--sb-brand-strong)', goodBg: 'var(--sb-brand-soft)', goodBorder: 'var(--sb-brand)',
 };
 
@@ -1368,7 +1370,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     const curVerb = DO_VERBS.find((v) => new RegExp('^' + v + '\\b', 'i').test((it.display_name || '').trim())) || '';
     const iconBtn: React.CSSProperties = { border: 'none', background: 'none', cursor: 'pointer', padding: 4, flexShrink: 0, display: 'inline-flex' };
     return (
-      <div style={{ opacity: it.hidden ? 0.55 : 1, padding: 8, borderRadius: 10, border: '1px solid ' + C.hair, background: busyItem === it.id ? C.panel : C.paper }}>
+      <div style={{ opacity: it.hidden ? 0.55 : 1, padding: '12px 10px', borderBottom: '1px solid ' + C.ink, background: busyItem === it.id ? C.panel : C.paper }}>
         {/* horizontal controls — wraps within the column so nothing overhangs */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? 'rgba(239,68,68,0.14)' : 'var(--sb-brand-soft)', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
@@ -1387,13 +1389,13 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
             value={it.display_name || ''}
             onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
             onBlur={() => commitItem(it.id, ['display_name'])}
-            style={{ ...inputStyle, flex: '1 1 240px', minWidth: 180, width: 'auto', minHeight: 48, lineHeight: 1.35, resize: 'vertical', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', textDecoration: it.hidden ? 'line-through' : 'none' }}
+            style={{ ...inputStyle, flex: '1 1 240px', minWidth: 180, width: 'auto', minHeight: 48, lineHeight: 1.35, resize: 'vertical', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', fieldSizing: 'content', textDecoration: it.hidden ? 'line-through' : 'none' }}
           />
           {!isRule && (
             <><label title="Alarm time" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: C.sub, fontSize: 10 }}><Bell size={12} /><input type="time" value={toTimeInput(it.scheduled_time)}
               onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
               onBlur={() => commitItem(it.id, ['scheduled_time'])}
-              style={{ ...inputStyle, width: 96, flexShrink: 0, padding: '7px 6px' }} /></label>
+              style={{ ...inputStyle, width: 118, flexShrink: 0, padding: '7px 6px' }} /></label>
               <button type="button" onClick={() => commitField(it, { notifications_enabled: !it.notifications_enabled })} title={it.notifications_enabled ? 'Alarm enabled' : 'Enable alarm'} style={{ height: 32, border: '1px solid ' + (it.notifications_enabled ? C.accent : C.hair), borderRadius: 7, background: it.notifications_enabled ? 'var(--sb-brand-soft)' : C.paper, color: it.notifications_enabled ? C.accent : C.faint, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}><Bell size={12} />{it.notifications_enabled ? 'Alarm on' : 'Alarm off'}</button>
               {it.notifications_enabled && <select aria-label="Alarm lead time" value={it.notification_lead_minutes ?? 0} onChange={(e) => commitField(it, { notification_lead_minutes: Number(e.target.value) })} style={{ ...inputStyle, width: 104, flexShrink: 0, padding: '7px 5px' }}><option value={0}>At time</option><option value={5}>5 min before</option><option value={10}>10 min before</option><option value={15}>15 min before</option><option value={30}>30 min before</option><option value={60}>1 hour before</option></select>}</>
           )}
@@ -1457,7 +1459,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
         {it.kind === 'action' && it.category !== 'sleep' && <RepeatRow it={it} />}
         {it.kind === 'action' && it.category !== 'sleep' && <CatalogLinker it={it} />}
         {it.kind === 'action' && <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 90px 110px', gap: 7, marginTop: 7 }}>
-          <textarea rows={2} value={it.notes || ''} onChange={(e) => editItemLocal(it.id, { notes: e.target.value })} onBlur={() => commitItem(it.id, ['notes'])} placeholder="Your guidance shown below this item" aria-label="Custom guidance" style={{ ...inputStyle, minWidth: 0, minHeight: 48, lineHeight: 1.4, resize: 'vertical', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }} />
+          <textarea rows={2} value={it.notes || ''} onChange={(e) => editItemLocal(it.id, { notes: e.target.value })} onBlur={() => commitItem(it.id, ['notes'])} placeholder="Your guidance shown below this item" aria-label="Custom guidance" style={{ ...inputStyle, minWidth: 0, minHeight: 48, lineHeight: 1.4, resize: 'vertical', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', fieldSizing: 'content' } as React.CSSProperties} />
           <input value={it.amount == null ? '' : String(it.amount)} onChange={(e) => editItemLocal(it.id, { amount: e.target.value || null })} onBlur={() => commitItem(it.id, ['amount'])} placeholder="Amount" aria-label="Amount or dosage" style={{ ...inputStyle, minWidth: 0 }} />
           <input value={it.amount_unit || ''} onChange={(e) => editItemLocal(it.id, { amount_unit: e.target.value })} onBlur={() => commitItem(it.id, ['amount_unit'])} placeholder="Unit / dosage" aria-label="Amount unit or dosage" style={{ ...inputStyle, minWidth: 0 }} />
         </div>}
@@ -1994,7 +1996,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   const groupCard = (label: string, list: AdminProtocolItem[]) => (
                     <div key={label} style={{ border: '1px solid ' + C.ink, background: C.paper }}>
                       <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.ink, padding: '7px 10px', borderBottom: '1px solid ' + C.ink, background: C.panel }}>{label}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 8 }}>{list.map((it) => <ItemRow key={it.id} it={it} num={stepNo.get(it.id)} />)}</div>
+                      <div className="pe-rows" style={{ display: 'flex', flexDirection: 'column' }}>{list.map((it) => <ItemRow key={it.id} it={it} num={stepNo.get(it.id)} />)}</div>
                     </div>
                   );
 

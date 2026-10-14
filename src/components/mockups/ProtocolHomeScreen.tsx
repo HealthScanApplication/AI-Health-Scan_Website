@@ -359,8 +359,8 @@ export function ProtocolHomeScreen({
                             </span>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: dark ? 10 : MT.itemRadius, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
                             <div style={{ flex: "1 1 0", minWidth: 0, overflow: "hidden" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, overflow: "hidden" }}>
-                                <span title={it.display_name} style={{ display: "block", flex: "1 1 0", minWidth: 0, fontSize: 13, fontWeight: 600, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 5, minWidth: 0, overflow: "hidden" }}>
+                                <span title={it.display_name} style={{ flex: "1 1 0", minWidth: 0, fontSize: 13, fontWeight: 600, lineHeight: 1.25, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "break-word" }}>{it.display_name}</span>
                                 {it.repeat && <Repeat size={10} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />}
                               </div>
                               {sub && <div style={{ fontSize: 10, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
