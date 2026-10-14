@@ -109,18 +109,19 @@ export interface AIProtocolDraft {
 function starterProtocolDraft(message: string): AIProtocolDraft {
   const sleepFocused = /sleep|insomnia|bedtime|menopause/i.test(message);
   const safety = 'Adjust to individual ability and stop if symptoms worsen. Seek clinical advice for persistent, severe, or concerning symptoms.';
+  // Titles are short verb + noun actions; timing lives in time/duration. Sleep is the wake and
+  // bedtime pair only, with sleep-environment advice as bullets in the bedtime notes.
   const steps = sleepFocused ? [
-    { title: 'Wake at a consistent time', time: '07:00', category: 'sleep', notes: `Keep the wake time consistent throughout the week, including after a disrupted night. ${safety}`, duration_minutes: null },
+    { title: 'Wake up', time: '07:00', category: 'sleep', notes: `Keep the wake time consistent throughout the week, including after a disrupted night. ${safety}`, duration_minutes: null },
     { title: 'Get morning daylight', time: '07:30', category: 'do', notes: 'Spend time outdoors or near bright natural light soon after waking. Use an accessible alternative when outdoor conditions are unsuitable.', duration_minutes: 20 },
-    { title: 'Complete comfortable daytime movement', time: '12:30', category: 'do', notes: 'Choose walking, mobility work, or another appropriate activity at a conversational effort. Adapt duration and intensity to current capacity.', duration_minutes: 20 },
-    { title: 'Finish caffeine for the day', time: '14:00', category: 'consume', notes: 'Choose caffeine-free drinks after this point. Earlier timing may be appropriate for people who are particularly sensitive to caffeine.', duration_minutes: null },
-    { title: 'Prepare a cooler, darker sleep space', time: '20:30', category: 'do', notes: 'Reduce bright light, prepare comfortable bedding, and adjust room temperature where possible.', duration_minutes: 10 },
-    { title: 'Follow a quiet wind-down routine', time: '21:30', category: 'do', notes: 'Use a repeatable low-stimulation routine such as reading, gentle breathing, or relaxation. Avoid activities that increase alertness.', duration_minutes: 30 },
-    { title: 'Begin the sleep opportunity', time: '22:30', category: 'sleep', notes: safety, duration_minutes: null },
+    { title: 'Go walking', time: '12:30', category: 'do', notes: 'Walk, do mobility work, or another appropriate activity at a conversational effort. Adapt duration and intensity to current capacity.', duration_minutes: 20 },
+    { title: 'Stop caffeine', time: '14:00', category: 'consume', notes: 'Choose caffeine-free drinks after this point. Earlier timing may suit people who are particularly sensitive to caffeine.', duration_minutes: null },
+    { title: 'Wind down', time: '21:30', category: 'do', notes: 'Use a repeatable low-stimulation routine such as reading, gentle breathing, or relaxation. Avoid activities that increase alertness.', duration_minutes: 30 },
+    { title: 'Go to bed', time: '22:30', category: 'sleep', notes: ['Begin the sleep opportunity at a consistent time.', '• Keep the room dark — reduce bright light and cover standby lights.', '• Keep it cool — adjust room temperature where possible.', '• Prepare comfortable bedding.', safety].join('\n'), duration_minutes: null },
   ] : [
-    { title: 'Set today’s intention', time: '08:00', category: 'do', notes: `Choose one realistic action that supports the selected goal. ${safety}`, duration_minutes: 5 },
-    { title: 'Complete comfortable movement', time: '10:00', category: 'do', notes: 'Choose an accessible activity and adapt the duration and intensity to current capacity.', duration_minutes: 20 },
-    { title: 'Plan a balanced meal', time: '12:30', category: 'consume', notes: 'Use familiar foods and account for allergies, intolerances, cultural preferences, and clinical advice.', duration_minutes: null },
+    { title: 'Set an intention', time: '08:00', category: 'do', notes: `Choose one realistic action that supports the selected goal. ${safety}`, duration_minutes: 5 },
+    { title: 'Go walking', time: '10:00', category: 'do', notes: 'Choose an accessible activity and adapt the duration and intensity to current capacity.', duration_minutes: 20 },
+    { title: 'Eat a balanced lunch', time: '12:30', category: 'consume', notes: 'Use familiar foods and account for allergies, intolerances, cultural preferences, and clinical advice.', duration_minutes: null },
     { title: 'Take a recovery pause', time: '15:30', category: 'do', notes: 'Pause for breathing, stretching, hydration, or another low-risk recovery practice.', duration_minutes: 10 },
     { title: 'Review progress', time: '20:30', category: 'do', notes: `Record what was completed and any symptoms or barriers. ${safety}`, duration_minutes: 5 },
   ];
@@ -128,6 +129,26 @@ function starterProtocolDraft(message: string): AIProtocolDraft {
     summary: 'The live AI route was unavailable, so ROUTINE³ created a conservative starter draft from the selected profile. Review and personalise every step before publishing.',
     steps: steps.map((step) => ({ ...step, day_number: 1 })),
   };
+}
+
+type DraftStep = AIProtocolDraft['steps'][number];
+const WAKE_TITLE = /^(wake|get up|rise|end sleep)\b/i;
+/**
+ * Sleep is a pair of anchors (wake, bedtime), not a list of steps. Any other sleep-category
+ * step ("Sleep in complete darkness", "Cool the bedroom") becomes a bullet in the bedtime
+ * step's notes, so the app shows one bedtime alarm with its guidance underneath.
+ */
+export function foldSleepSteps(steps: DraftStep[]): DraftStep[] {
+  const sleep = steps.filter((step) => step.category === 'sleep');
+  if (sleep.length <= 1) return steps;
+  const minutes = (step: DraftStep) => { const [h, m] = (step.time || '').split(':').map(Number); return Number.isFinite(h) ? h * 60 + (m || 0) : -1; };
+  const wake = sleep.find((step) => WAKE_TITLE.test(step.title)) || null;
+  const rest = sleep.filter((step) => step !== wake);
+  const bedtime = [...rest].sort((a, b) => minutes(b) - minutes(a))[0] || { title: 'Go to bed', time: '22:00', category: 'sleep', notes: '', day_number: 1, duration_minutes: null };
+  const tips = rest.filter((step) => step !== bedtime).map((step) => `• ${step.title}${step.notes ? ` — ${step.notes}` : ''}`);
+  const foldedBedtime: DraftStep = { ...bedtime, notes: [bedtime.notes, ...tips].filter(Boolean).join('\n') };
+  const kept = steps.filter((step) => step.category !== 'sleep');
+  return [...(wake ? [wake] : []), ...kept, foldedBedtime];
 }
 
 export async function buildProtocolWithAI(accessToken: string, protocolId: string, message: string): Promise<AIProtocolDraft> {

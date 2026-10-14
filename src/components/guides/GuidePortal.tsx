@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
 import { APP_STORE_URL } from '../../config/appLinks';
-import { buildProtocolWithAI, createProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
+import { buildProtocolWithAI, foldSleepSteps, createProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, submitGuardianSuggestion, submitGuardianOptIn,
@@ -2242,7 +2242,8 @@ function GuardianProtocolAI({ accessToken, protocol, ownerId, initialRequest, in
     try {
       const sources = [sourceUrls.trim() && `Reference websites: ${sourceUrls.trim().replace(/\n+/g, ', ')}`, sourcePath && `Uploaded reference document: ${sourcePath}`].filter(Boolean).join('\n');
       const draft = await buildProtocolWithAI(accessToken, protocol.id, `${request.trim()}${sources ? `\n\n${sources}` : ''}`);
-      await Promise.all(draft.steps.map((step, index) => createProtocolItem(accessToken, {
+      const steps = foldSleepSteps(draft.steps);
+      await Promise.all(steps.map((step, index) => createProtocolItem(accessToken, {
         protocol_id: protocol.id,
         display_name: step.title,
         item_type: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity',
@@ -2262,7 +2263,7 @@ function GuardianProtocolAI({ accessToken, protocol, ownerId, initialRequest, in
         notes: step.notes,
         recurrence_type: 'daily',
       })));
-      setMessage(`${draft.summary} Added ${draft.steps.length} editable draft steps. Review them before publishing.`);
+      setMessage(`${draft.summary} Added ${steps.length} editable draft steps. Review them before publishing.`);
       setStage(2);
       onBuilt();
     } catch (error: any) {

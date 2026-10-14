@@ -386,7 +386,11 @@ export function ProtocolHomeScreen({
                         const mobileTint = bandTint;
                         const sleepExtra = sleepWin.durationLabel && isWake(it) ? `${sleepWin.durationLabel} sleep`
                           : sleepWin.durationLabel && isBed(it) ? `${sleepWin.durationLabel} until wake` : null;
-                        const sub = [fmtTime(it.time), sleepExtra, it.duration_minutes ? `${it.duration_minutes} min` : null].filter(Boolean).join(" · ");
+                        // Titles are verb + noun ("Go cycling"), so the line under them reads on: "at 7:30am for 20 min".
+                        // Sleep anchors keep the mobile "7:00am · 8h 30m sleep" form.
+                        const sub = isWake(it) || isBed(it)
+                          ? [fmtTime(it.time), sleepExtra].filter(Boolean).join(" · ")
+                          : [it.time ? `at ${fmtTime(it.time)}` : null, it.duration_minutes ? `for ${it.duration_minutes} min` : null].filter(Boolean).join(" ");
                         const nodeH = isWake(it) || isBed(it) ? 66 : Math.max(34, Math.min(48, 34 + ((it.duration_minutes || 0) / 15) * 3));
                         const hasDetail = showDetails && (!!it.description || !!it.children?.length);
                         return (
