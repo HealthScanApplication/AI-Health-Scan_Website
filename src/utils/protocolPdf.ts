@@ -46,9 +46,9 @@ interface Recipe {
 }
 
 /* Smart grouping, as in the app (mobile timeline/smartGroups.ts): part of day, then category. */
-type PdfGroup = 'Hygiene' | 'Wellness' | 'Fitness' | 'Supplements' | 'Meal' | 'Work' | 'Home' | 'Tasks';
-const PDF_GROUP_ORDER: PdfGroup[] = ['Hygiene', 'Wellness', 'Fitness', 'Supplements', 'Meal', 'Work', 'Home', 'Tasks'];
-const PDF_SUBTYPE_GROUP: Record<string, PdfGroup> = { hygiene: 'Hygiene', wellness: 'Wellness', reflection: 'Wellness', beauty: 'Hygiene', exercise: 'Fitness', fitness: 'Fitness', supplement: 'Supplements', meal: 'Meal', beverage: 'Meal', drink: 'Meal', snack: 'Meal', work: 'Work', home: 'Home', finance: 'Home', tasks: 'Tasks', planning: 'Tasks' };
+type PdfGroup = 'Hygiene' | 'Beauty' | 'Wellness' | 'Fitness' | 'Supplements' | 'Meal' | 'Work' | 'Home' | 'Tasks';
+const PDF_GROUP_ORDER: PdfGroup[] = ['Hygiene', 'Beauty', 'Wellness', 'Fitness', 'Supplements', 'Meal', 'Work', 'Home', 'Tasks'];
+const PDF_SUBTYPE_GROUP: Record<string, PdfGroup> = { hygiene: 'Hygiene', wellness: 'Wellness', reflection: 'Wellness', beauty: 'Beauty', skin: 'Beauty', skincare: 'Beauty', exercise: 'Fitness', fitness: 'Fitness', supplement: 'Supplements', meal: 'Meal', beverage: 'Meal', drink: 'Meal', snack: 'Meal', work: 'Work', home: 'Home', finance: 'Home', tasks: 'Tasks', planning: 'Tasks' };
 function pdfGroupOf(it: PdfItem): PdfGroup {
   const sub = (it.subtype || '').toLowerCase();
   if (PDF_SUBTYPE_GROUP[sub]) return PDF_SUBTYPE_GROUP[sub];
