@@ -3,7 +3,7 @@ import {
   ArrowRight, ChevronRight, FileText, HeartPulse, LogOut,
   Mail, Package, Plus, Salad, Sparkles, Users, Globe2, Loader2,
   Upload, Check, Instagram, Youtube, Link2, AtSign, Route, CalendarDays, Download,
-  MoreHorizontal, FolderOpen, Trash2, ExternalLink, ListChecks, Tag, LayoutTemplate,
+  MoreHorizontal, FolderOpen, Trash2, ExternalLink, Hammer, PencilRuler, Blocks, LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
@@ -622,11 +622,11 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
       <header style={{ position: 'absolute', zIndex: 10, inset: '0 0 auto', height: 70, borderBottom: '1px solid rgba(255,255,255,.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(20px,5vw,72px)', background: 'rgba(9,10,8,.32)', backdropFilter: 'blur(12px)' }}>
         <Brand />
         <nav aria-label="Guardian builders" className="guardian-builders" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 'clamp(16px,2.6vw,34px)' }}>
-          {([['Protocol builder', 'protocols', ListChecks], ['Offer builder', 'offer_builder', Tag], ['Site builder', 'profile', LayoutTemplate]] as const).map(([text, tab, Icon]) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} title={isSignedIn ? text : `${text} · sign in to use`} style={{ color: ink, opacity: isSignedIn ? .86 : .42, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
+          {([['Protocol builder', 'protocols', Hammer], ['Offer builder', 'offer_builder', PencilRuler], ['Site builder', 'profile', Blocks]] as const).map(([text, tab, Icon]) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} title={isSignedIn ? text : `${text} · sign in to use`} style={{ color: ink, opacity: isSignedIn ? .86 : .42, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {isSignedIn
-            ? <button type="button" onClick={() => signOut()} style={{ height: 34, padding: '0 14px', border: '1px solid rgba(245,242,234,.6)', borderRadius: 2, background: 'transparent', color: ink, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>Sign out</button>
+            ? <><a href="/guardians/workspace" style={{ height: 34, padding: '0 14px', border: `1px solid ${ink}`, borderRadius: 2, background: ink, color: black, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7 }}><LayoutDashboard size={13} strokeWidth={1.8} />Dashboard</a><button type="button" onClick={() => signOut()} style={{ height: 34, padding: '0 14px', border: '1px solid rgba(245,242,234,.6)', borderRadius: 2, background: 'transparent', color: ink, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>Sign out</button></>
             : <>
               <a href="#guardian-apply" style={{ height: 34, padding: '0 14px', border: '1px solid rgba(245,242,234,.6)', borderRadius: 2, color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Sign in</a>
               <a href="#guardian-apply" style={{ height: 34, padding: '0 14px', border: `1px solid ${ink}`, borderRadius: 2, background: ink, color: black, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Sign up</a>
@@ -2245,11 +2245,12 @@ function GuideLibrary({ guideId, selectedIds, onSelectedIds, onUse }: { guideId:
 function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (p: GuideProfile) => void }) {
   const { user, accessToken, signOut } = useAuth();
   // Deep links from the public Guardians nav, e.g. /guardians/workspace?tab=protocols
-  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); return wanted === 'offer_builder' || wanted === 'protocols' ? wanted : 'home'; });
+  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); const tabs: Tab[] = ['home', 'profile', 'library', 'leads', 'value_ramps', 'offer_builder', 'recipes', 'protocols']; return tabs.includes(wanted as Tab) ? wanted as Tab : 'home'; });
   const [leads, setLeads] = useState<GuideLead[]>([]);
   const [offers, setOffers] = useState<GuideOffer[]>([]);
   const [recipes, setRecipes] = useState<GuideRecipe[]>([]);
   const [protocols, setProtocols] = useState<AdminProtocol[]>([]);
+  const [valueRamps, setValueRamps] = useState<GuideValueRamp[]>([]);
   const [recipeId, setRecipeId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
