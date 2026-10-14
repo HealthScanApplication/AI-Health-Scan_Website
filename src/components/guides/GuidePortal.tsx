@@ -1974,6 +1974,10 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           </div>
           </div></div>
         </div>
+        {/* Setup details stay available but collapsed: the step should end on Publish, not a wall of summary. */}
+        <details style={{ borderTop: `1px solid ${line}`, marginTop: 8, paddingTop: 14 }}>
+          <summary style={{ cursor: 'pointer', color: muted, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>Review setup summary</summary>
+          <div style={{ marginTop: 16 }}>
         <div><label style={label}>Add one personal sentence <span style={{ color: muted }}>· optional</span></label><input style={input} value={intro} onChange={(e) => setIntro(e.target.value)} placeholder="Why people come to you — or leave this blank" /></div>
         <div style={{ borderTop: `1px solid ${line}`, borderBottom: `1px solid ${line}`, padding: '22px 0', marginTop: 28, display: 'grid', gap: 13 }}>
           <div><span style={label}>Guardian</span><span style={{ fontFamily: serif, fontSize: 26 }}>{displayName}</span></div>
@@ -1985,8 +1989,13 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           {(leadMagnetTitle || orderedUpsells.length > 0) && <div><span style={label}>Offer ladder · {pricingRegion}</span><span style={{ color: ink, fontSize: 12 }}>{[leadMagnetTitle && `Free: ${leadMagnetTitle} · ${freeDelivery.join(' + ')}`, ...orderedUpsells.map((kind) => `${upsellDrafts[kind].title} · ${offerAccess[kind] === 'free' ? 'Free' : `${formatMoney(upsellDrafts[kind].price, currency)}${billingLabels[upsellDrafts[kind].billingModel].suffix}`} · ${upsellDrafts[kind].delivery.join(' + ')}`)].filter(Boolean).join(' → ')}</span></div>}
           <div><span style={label}>Website goal</span><span style={{ color: ink, fontSize: 12 }}>{websiteGoal}</span></div>
         </div>
+          </div>
+        </details>
         <div style={{ border: `1px solid ${acid}`, background: '#20251B', padding: 16, marginTop: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <span style={{ minWidth: 0 }}><span style={{ ...label, color: acid, marginBottom: 5 }}>Your public site</span><code style={{ display: 'block', color: ink, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 9, lineHeight: 1.5, overflowWrap: 'anywhere' }}>{publishedSitePath}</code></span>
+          <span style={{ minWidth: 0, display: 'grid', gap: 8 }}>
+            <span style={{ ...label, color: acid, marginBottom: 0 }}>Publishing</span>
+            {[['Profile site', `/guardians/${guardianSlug}`], ['First offer path', publishedSitePath]].map(([text, path]) => <a key={text} href={path} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'baseline', gap: 10, color: ink, textDecoration: 'none' }}><span style={{ color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', minWidth: 104 }}>{text}</span><code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10, overflowWrap: 'anywhere', borderBottom: `1px solid ${line}` }}>{path}</code><ExternalLink size={11} /></a>)}
+          </span>
           <button type="submit" disabled={busy} style={{ ...btn, flex: '0 0 auto' }}>{busy ? 'Publishing…' : 'Publish site'} <ArrowRight size={14} /></button>
         </div>
       </>}
