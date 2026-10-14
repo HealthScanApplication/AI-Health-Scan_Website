@@ -947,6 +947,27 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [currency, setCurrency] = useState<CurrencyCode>(defaultPricingRegion().currency);
   const [offerGoal, setOfferGoal] = useState<GuardianOfferGoal>('basic');
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
+  // Re-open with what was last published: theme, photo and copy, so publishing again keeps them.
+  const [savedStatus, setSavedStatus] = useState<GuideProfile['status'] | null>(null);
+  useEffect(() => {
+    getGuideProfile(userId).then((saved) => {
+      if (!saved) return;
+      const links = saved.social_links || {};
+      setSavedStatus(saved.status);
+      if (saved.display_name) setDisplayName(saved.display_name);
+      if (saved.avatar_url) setAvatarUrl(saved.avatar_url);
+      if (saved.contact_email) setContactEmail(saved.contact_email);
+      if (links.theme_background) setBackgroundUrl(links.theme_background);
+      if (links.theme_background_type === 'image' || links.theme_background_type === 'video') setBackgroundType(links.theme_background_type);
+      if (links.theme_image_treatment === 'color' || links.theme_image_treatment === 'greyscale') setImageTreatment(links.theme_image_treatment);
+      if (links.theme_header_style === 'white' || links.theme_header_style === 'hidden') setHeaderStyle(links.theme_header_style as HeaderStyle);
+      if (links.theme_page_color) setPageColor(links.theme_page_color);
+      if (links.theme_accent_color) setAccentColor(links.theme_accent_color);
+      if (links.brand_name) setBrandName(links.brand_name);
+      if (links.logo_url) setLogoUrl(links.logo_url);
+      if (links.expertise_tags) setExpertiseTags(parseExpertiseTags(links.expertise_tags));
+    }).catch(() => {});
+  }, [userId]);
   // Existing items shown under each step ("In your workspace").
   const [related, setRelated] = useState<{ leads: GuideLead[]; offers: GuideOffer[]; ramps: GuideValueRamp[]; protocols: AdminProtocol[] }>({ leads: [], offers: [], ramps: [], protocols: [] });
   useEffect(() => {
@@ -1345,7 +1366,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       const audienceText = audience.join(', ').toLowerCase();
       const headline = generatedHeadline;
       const bio = intro.trim() || `I help ${audienceText} with ${chosen.join(', ').toLowerCase()} through ${format.join(', ').toLowerCase()}.`;
-      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: 'submitted', onboarding_step: 5 });
+      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: savedStatus === 'approved' ? 'approved' : 'submitted', onboarding_step: 5 });
       const selectedBrand = currentBrandDraft();
       const brandsToSave = brandProfiles.map((brand) => brand.localId === activeBrandId ? selectedBrand : brand);
       await replaceGuideBrands(userId, brandsToSave.map(({ localId, ...brand }) => ({ ...brand, is_primary: localId === activeBrandId })));
