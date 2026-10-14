@@ -873,17 +873,28 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
       </div>
     </header>}
     <main>
-      <section style={{ minHeight: 'min(760px,calc(100vh - 64px))', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,360px),1fr))', alignItems: 'stretch' }}>
-        <div style={{ position: 'relative', overflow: 'hidden', padding: 'clamp(52px,9vw,130px) clamp(24px,8vw,110px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundImage: socials.theme_background && !publicBackgroundIsVideo ? `linear-gradient(rgba(242,239,231,.66),rgba(242,239,231,.66)),url(${socials.theme_background})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: publicGreyscale ? 'luminosity' : 'normal' }}>
-          {publicBackgroundIsVideo && <><video src={socials.theme_background} autoPlay muted loop playsInline aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: publicGreyscale ? 'grayscale(1)' : 'none' }} /><span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(242,239,231,.66)' }} /></>}
-          <span style={{ position: 'relative', zIndex: 2, color: publicAccent, fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' }}>{profile.specialties.slice(0, 3).join(' · ') || 'Personal guidance'}</span>
-          <h1 style={{ position: 'relative', zIndex: 2, fontFamily: publicHeadingFont, fontWeight: 300, fontSize: 'clamp(58px,9vw,118px)', lineHeight: .86, letterSpacing: '-.035em', margin: '24px 0' }}>{profile.headline || profile.display_name}</h1>
-          <ExpertiseTags tags={publicExpertiseTags} color={publicAccent} />
-          <p style={{ position: 'relative', zIndex: 2, color: '#66645F', fontSize: 15, lineHeight: 1.75, maxWidth: 560 }}>{profile.bio}</p>
-          {freeOffers[0] && <a href="#start" style={{ position: 'relative', zIndex: 2, marginTop: 24, width: 'fit-content', minHeight: 40, borderRadius: 4, background: publicAccent, color: readableText(publicAccent), padding: '0 16px', textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 22px rgba(17,18,15,.14)' }}>Start free <ArrowRight size={14} /></a>}
-        </div>
-        <div style={{ minHeight: 520, background: '#11120F', display: 'grid', placeItems: 'center', padding: 40 }}>
-          {profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name} style={{ width: 'min(74%,520px)', maxHeight: 620, objectFit: 'contain', filter: publicGreyscale ? 'grayscale(1) contrast(1.05)' : 'none' }} /> : <img src="/images/guides/guide-plate.png" alt="" style={{ width: 'min(74%,420px)', objectFit: 'contain', filter: publicGreyscale ? 'grayscale(1)' : 'none' }} />}
+      {/* Same design as the builder's profile site preview, so what Guardians build is what they publish. */}
+      <section style={{ position: 'relative', overflow: 'hidden', minHeight: 'min(720px,calc(100vh - 64px))', display: 'grid', alignItems: 'center', backgroundImage: socials.theme_background && !publicBackgroundIsVideo ? `linear-gradient(rgba(242,239,231,.66),rgba(242,239,231,.66)),url(${socials.theme_background})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: publicGreyscale ? 'luminosity' : 'normal' }}>
+        {publicBackgroundIsVideo && <><video src={socials.theme_background} autoPlay muted loop playsInline aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: publicGreyscale ? 'grayscale(1)' : 'none' }} /><span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(242,239,231,.66)' }} /></>}
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 1240, margin: '0 auto', boxSizing: 'border-box', padding: 'clamp(40px,7vw,96px) clamp(24px,6vw,84px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(28px,5vw,72px)', alignItems: 'center' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
+              {profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', filter: publicGreyscale ? 'grayscale(1)' : 'none' }} /> : <span style={{ width: 56, height: 56, borderRadius: '50%', background: '#D7D4CC', display: 'grid', placeItems: 'center', fontFamily: publicHeadingFont, fontSize: 24 }}>{profile.display_name.charAt(0)}</span>}
+              <span><strong style={{ display: 'block', fontSize: 15 }}>{profile.display_name}</strong><span style={{ display: 'block', marginTop: 4, fontSize: 12, color: '#6B6963' }}>{profile.specialties.slice(0, 3).join(' · ') || 'Personal guidance'}</span></span>
+            </div>
+            <h1 style={{ fontFamily: publicHeadingFont, fontWeight: 300, fontSize: 'clamp(46px,7vw,96px)', lineHeight: .95, letterSpacing: '-.035em', margin: '0 0 18px' }}>{profile.headline || profile.display_name}</h1>
+            <ExpertiseTags tags={publicExpertiseTags} color={publicAccent} />
+            <p style={{ color: '#66645F', fontSize: 15, lineHeight: 1.65, maxWidth: 560, margin: 0 }}>{profile.bio}</p>
+          </div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <span style={{ color: publicAccent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Explore my offers</span>
+            {(valueRamps.filter((ramp) => ramp.status === 'published').length ? valueRamps.filter((ramp) => ramp.status === 'published').map((ramp) => ({ key: ramp.id, eyebrow: [ramp.audience, ramp.problem].filter(Boolean).join(' · '), title: customerFacingOfferTitle(offers.find((offer) => offer.id === ramp.offer_ids[0])?.title || ramp.name), copy: offers.find((offer) => offer.id === ramp.offer_ids[0])?.description || '', href: '#offers' })) : freeOffers.slice(0, 1).map((offer) => ({ key: offer.id, eyebrow: profile.specialties.slice(0, 2).join(' · '), title: customerFacingOfferTitle(offer.title), copy: offer.description || '', href: '#start' }))).map((card) => <div key={card.key} style={{ border: '1px solid rgba(17,18,15,.16)', borderRadius: 5, padding: 22, background: 'rgba(255,255,255,.94)', boxShadow: '0 10px 28px rgba(17,18,15,.09)' }}>
+              {card.eyebrow && <span style={{ display: 'block', color: publicAccent, fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 9 }}>{card.eyebrow}</span>}
+              <strong style={{ display: 'block', fontSize: 18, lineHeight: 1.3 }}>{card.title}</strong>
+              {card.copy && <span style={{ display: 'block', color: '#66645F', fontSize: 13, lineHeight: 1.55, marginTop: 8 }}>{card.copy}</span>}
+              <a href={card.href} style={{ marginTop: 16, width: 'fit-content', minHeight: 38, padding: '0 14px', borderRadius: 3, background: publicAccent, color: readableText(publicAccent), textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 8 }}>View <ArrowRight size={13} /></a>
+            </div>)}
+          </div>
         </div>
       </section>
       <GuardianFunnel profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
@@ -1930,8 +1941,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 14 }}><span style={{ color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>Preview on</span><DeviceToggle value={previewDevice} onChange={setPreviewDevice} /></div>
         <FunnelStage number="01" eyebrow="Site 01 · Your profile" title={`${displayName || 'Your'}${displayName ? '’s' : ''} story.`} copy="Your profile site: who you are, and every published offer path.">
           {/* Builder left, live preview right (stacks on narrow screens). */}
-          <div className="g-split">
-          <div style={{ border: `1px solid ${line}`, background: panel, padding: 14 }}>
+          <div className="g-split" style={{ border: `1px solid ${line}`, background: panel, padding: 16 }}>
+          <div>
             <label style={{ ...label, color: ink }}>Style your page</label>
             <div role="tablist" aria-label="Site style steps" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', border: `1px solid ${line}`, marginBottom: 16 }}>
               {['Story', 'Identity', 'Background', 'Colors'].map((title, index) => <button type="button" role="tab" aria-selected={siteStyleStage === index} key={title} onClick={() => setSiteStyleStage(index)} style={{ minHeight: 44, border: 0, borderLeft: index ? `1px solid ${line}` : 0, background: siteStyleStage === index ? ink : 'transparent', color: siteStyleStage === index ? black : index < siteStyleStage ? acid : muted, fontFamily: sans, fontSize: 8, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}>{String(index + 1).padStart(2, '0')} · {title}</button>)}
