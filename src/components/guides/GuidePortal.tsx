@@ -486,9 +486,9 @@ function SocialUrlField({ label: text, value, placeholder, Icon, onChange }: { l
   </div>;
 }
 
-function AuthPanel({ bare = false }: { bare?: boolean }) {
+function AuthPanel({ bare = false, initialMode = 'signup' }: { bare?: boolean; initialMode?: 'login' | 'signup' }) {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'login' | 'signup'>('signup');
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -606,6 +606,13 @@ function SuggestGuardianModal({ type, onClose }: { type: string; onClose: () => 
 
 function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
   const { signOut } = useAuth();
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
+  useEffect(() => {
+    if (!authMode) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAuthMode(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [authMode]);
   const [guardians, setGuardians] = useState<GuideProfile[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [activeType, setActiveType] = useState('All');
@@ -622,15 +629,21 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
       <header style={{ position: 'absolute', zIndex: 10, inset: '0 0 auto', height: 70, borderBottom: '1px solid rgba(255,255,255,.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(20px,5vw,72px)', background: 'rgba(9,10,8,.32)', backdropFilter: 'blur(12px)' }}>
         <Brand />
         <nav aria-label="Guardian builders" className="guardian-builders" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'stretch', border: `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}`, borderRadius: 2 }}>
-          {([['Protocol builder', 'protocols', Hammer], ['Offer builder', 'offer_builder', PencilRuler], ['Site builder', 'profile', Blocks]] as const).map(([text, tab, Icon], index) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} title={isSignedIn ? text : `${text} · sign in to use`} style={{ height: 32, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, padding: '0 14px', borderLeft: index ? `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}` : 0, color: ink, opacity: isSignedIn ? 1 : .45, textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
+          {([['Protocol builder', 'protocols', Hammer], ['Offer builder', 'offer_builder', PencilRuler], ['Site builder', 'profile', Blocks]] as const).map(([text, tab, Icon], index) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} onClick={(e) => { if (!isSignedIn) { e.preventDefault(); setAuthMode('login'); } }} title={isSignedIn ? text : `${text} · sign in to use`} style={{ height: 32, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, padding: '0 14px', borderLeft: index ? `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}` : 0, color: ink, opacity: isSignedIn ? 1 : .45, textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
         </nav>
         {/* Joined hairline lockup, matching the main site header. */}
         <div style={{ display: 'flex', border: `1px solid ${ink}`, borderRadius: 2 }}>
           {isSignedIn
             ? <><a href="/guardians/workspace" style={{ height: 32, padding: '0 14px', border: 0, background: 'transparent', color: ink, textDecoration: 'none', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}><LayoutDashboard size={13} strokeWidth={1.8} />Dashboard</a><button type="button" onClick={() => signOut()} style={{ height: 32, padding: '0 14px', border: 0, background: 'transparent', color: ink, textDecoration: 'none', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap', borderLeft: `1px solid ${ink}` }}>Sign out</button></>
-            : <><a href="#guardian-apply" style={{ height: 32, padding: '0 14px', border: 0, background: 'transparent', color: ink, textDecoration: 'none', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>Sign in</a><a href="#guardian-apply" style={{ height: 32, padding: '0 14px', border: 0, background: 'transparent', color: ink, textDecoration: 'none', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap', borderLeft: `1px solid ${ink}` }}>Sign up</a></>}
+            : <><a href="#guardian-apply" onClick={(e) => { e.preventDefault(); setAuthMode('login'); }} style={{ height: 32, padding: '0 14px', border: 0, background: 'transparent', color: ink, textDecoration: 'none', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>Sign in</a><a href="#guardian-apply" onClick={(e) => { e.preventDefault(); setAuthMode('signup'); }} style={{ height: 32, padding: '0 14px', border: 0, background: 'transparent', color: ink, textDecoration: 'none', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap', borderLeft: `1px solid ${ink}` }}>Sign up</a></>}
         </div>
       </header>
+      {authMode && <div role="dialog" aria-modal="true" aria-label={authMode === 'login' ? 'Sign in' : 'Sign up'} onClick={() => setAuthMode(null)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(9,10,8,.72)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 460, background: black }}>
+          <button type="button" aria-label="Close" onClick={() => setAuthMode(null)} style={{ position: 'absolute', top: 10, right: 12, zIndex: 2, border: 0, background: 'none', color: ink, fontSize: 22, lineHeight: 1, cursor: 'pointer' }}>×</button>
+          <AuthPanel key={authMode} initialMode={authMode} />
+        </div>
+      </div>}
       <main>
         <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'center', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div style={{ width: '100%', boxSizing: 'border-box', padding: 'clamp(110px,14vh,150px) clamp(20px,6vw,90px) clamp(54px,8vh,90px)' }}>
