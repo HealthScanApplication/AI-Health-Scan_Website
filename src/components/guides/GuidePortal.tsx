@@ -526,9 +526,9 @@ function AuthPanel({ bare = false, initialMode = 'signup' }: { bare?: boolean; i
   }
   return (
     <form id="guide-signin" onSubmit={submit} style={bare ? { maxWidth: 460, width: '100%' } : { border: `1px solid ${line}`, background: panel, padding: 'clamp(24px,4vw,48px)', maxWidth: 460 }}>
-      {!bare && <><div style={{ ...label, color: acid }}>Step 1 · Sign in</div>
-      <h2 style={{ margin: '12px 0 10px', fontFamily: serif, fontSize: 'clamp(32px,4vw,52px)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.045em' }}>Build with ROUTINE³.</h2>
-      <p style={{ color: muted, fontFamily: sans, fontSize: 14, lineHeight: 1.6, margin: '0 0 24px' }}>Create your profile, collect leads, and publish paid resources, recipes and protocols from one workspace.</p></>}
+      {!bare && <><div style={{ ...label, color: acid }}>{mode === 'login' ? 'Sign in' : 'Step 1 · Create your account'}</div>
+      <h2 style={{ margin: '12px 0 10px', fontFamily: serif, fontSize: 'clamp(32px,4vw,52px)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.045em' }}>{mode === 'login' ? 'Welcome back, Guardian.' : 'Build with ROUTINE³.'}</h2>
+      <p style={{ color: muted, fontFamily: sans, fontSize: 14, lineHeight: 1.6, margin: '0 0 24px' }}>{mode === 'login' ? 'Pick up where you left off: your Protocols, offers and site are waiting.' : 'Create your profile, collect leads, and publish paid resources, recipes and protocols from one workspace.'}</p></>}
       {mode === 'signup' && <div style={{ marginBottom: 12 }}><label style={label}>Your name</label><input value={name} onChange={(e) => setName(e.target.value)} required style={input} /></div>}
       <div style={{ marginBottom: 12 }}><label style={label}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={input} /></div>
       <div style={{ marginBottom: 16 }}><label style={label}>Password</label><input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required style={input} /></div>
