@@ -249,7 +249,7 @@ export async function listRoutineOwners(userId: string, mainName: string, mainAv
   const main = (profiles || []).find((profile: any) => profile.is_main_user);
   for (const row of (active || []) as { protocol_id: string; profile_id: string | null }[]) {
     const profile: any = row.profile_id ? byId.get(row.profile_id) : main;
-    owners.set(row.protocol_id, { name: profile?.name || mainName, avatarUrl: webUrl(profile?.avatar_url) || (row.profile_id ? null : webUrl(mainAvatar)), relation: row.profile_id ? profile?.relation || null : 'self' });
+    owners.set(row.protocol_id, { name: profile?.name || mainName, avatarUrl: webUrl(profile?.avatar_url) || (row.profile_id ? null : webUrl(mainAvatar)), relation: row.profile_id ? (profile?.is_main_user ? 'self' : profile?.relation || 'family') : 'self' });
   }
   return owners;
 }
