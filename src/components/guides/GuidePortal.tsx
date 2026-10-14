@@ -64,7 +64,7 @@ function ExpertiseTags({ tags, color = '#667245', compact = false }: { tags: str
 }
 
 type Tab = 'home' | 'profile' | 'library' | 'leads' | 'value_ramps' | 'offer_builder' | 'recipes' | 'protocols';
-type FreeOfferKind = 'ebook' | 'one_to_one_call' | 'group_call' | 'recipe_book' | 'routine';
+type FreeOfferKind = 'ebook' | 'one_to_one_call' | 'group_call' | 'recipe_book' | 'routine' | 'in_person';
 type UpsellKind = 'ebook' | 'routine' | 'routine_guidance' | 'recipe_book' | 'group_call' | 'one_to_one_call' | 'in_person' | 'festival';
 type DeliveryFormat = 'Downloadable PDF' | 'Interactive Protocol' | 'PDF + Interactive Protocol' | 'Live online' | 'In person' | 'Event';
 type BookingProvider = 'ROUTINE³ Booking' | 'Cal.com' | 'Google appointment schedule' | 'Calendly' | 'Other';
@@ -205,6 +205,7 @@ const freeValueSuggestions: Record<FreeOfferKind, string> = {
   group_call: 'Join a useful weekly conversation, ask questions and learn alongside people working towards the same goal.',
   recipe_book: 'Make practical recipes they can use immediately.',
   routine: 'Follow a simple routine and experience an early result.',
+  in_person: 'Meet in person for a short, practical session or small event.',
 };
 
 const nextStepLabels: Record<OfferNextStep, { title: string; note: string }> = {
@@ -398,6 +399,7 @@ const freeOfferArt: Record<FreeOfferKind, TagArt> = {
   group_call: offerArt['Group call'],
   recipe_book: offerArt['Recipe pack'],
   routine: offerArt['ROUTINE³'],
+  in_person: offerTypeArt.in_person,
 };
 const freeOfferImages: Record<FreeOfferKind, string> = {
   ebook: '/images/guides/generated/lead-pdf-guide-v2.webp',
@@ -405,6 +407,7 @@ const freeOfferImages: Record<FreeOfferKind, string> = {
   group_call: '/images/guides/generated/lead-community-call-v2.webp',
   recipe_book: '/images/guides/generated/lead-recipes-v2.webp',
   routine: '/images/guides/generated/r3-protocol-card.png',
+  in_person: '/images/guides/delivery/in-person.png',
 };
 const deliveryCardArt: Record<DeliveryFormat, TagArt> = {
   'Downloadable PDF': offerArt['Starter guide'],
@@ -1127,7 +1130,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
     { label: 'In person', value: 'PHYSICAL', description: 'Hands-on personal support', art: supportArt['In person'] },
     { label: 'Event', value: 'PHYSICAL EVENT', description: 'A shared immersive experience', art: supportArt.Event },
   ];
-  const freeOfferCta: Record<FreeOfferKind, string> = { ebook: 'Get the guide', recipe_book: 'Get the recipes', routine: 'Start the Protocol', group_call: 'Join the weekly call', one_to_one_call: 'Book a call' };
+  const freeOfferCta: Record<FreeOfferKind, string> = { ebook: 'Get the guide', recipe_book: 'Get the recipes', routine: 'Start the Protocol', group_call: 'Join the group call', one_to_one_call: 'Book a call', in_person: 'Book your place' };
   const upsellSuggestions: { kind: UpsellKind; label: string; value: string; why: string; art: TagArt }[] = [
     { kind: 'ebook', label: 'Complete guide', value: 'Complete method', why: 'Learn the complete method and apply it at your own pace.', art: offerArt.eBook },
     { kind: 'recipe_book', label: 'Practical recipe collection', value: 'Practical toolkit', why: 'Use a complete collection of practical recipes whenever you need them.', art: offerArt['Recipe book'] },
@@ -1154,13 +1157,15 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
     routine: 'Starter Protocol',
     group_call: 'Community builder',
     one_to_one_call: 'Discovery',
+    in_person: 'Meet in person',
   };
   const freeOfferTypes: { value: FreeOfferKind; label: string; eyebrow: string; copy: string }[] = [
-    { value: 'routine', label: 'R3 Protocol', eyebrow: 'PDF + DIGITAL', copy: 'Printable PDF + digital interactive twin in the ROUTINE³ app.' },
-    { value: 'ebook', label: 'eBook', eyebrow: 'GUIDE', copy: 'Teach one useful idea.' },
-    { value: 'one_to_one_call', label: 'Call', eyebrow: 'DISCOVERY', copy: 'Find the right next step.' },
-    { value: 'group_call', label: 'Weekly call', eyebrow: 'COMMUNITY', copy: 'Bring people back each week.' },
-    { value: 'recipe_book', label: 'Recipes', eyebrow: 'COLLECTION', copy: 'Give them something practical.' },
+    { value: 'routine', label: 'Protocol / Routine', eyebrow: 'DIGITAL / PRINTED', copy: 'A daily routine in the ROUTINE³ app, with a printable PDF.' },
+    { value: 'ebook', label: 'Guide', eyebrow: 'DIGITAL / PRINTED', copy: 'A digital or printed guide that teaches one useful idea.' },
+    { value: 'recipe_book', label: 'Recipe book', eyebrow: 'DIGITAL / PRINTED', copy: 'A digital or printed recipe book with practical meals.' },
+    { value: 'group_call', label: 'Group video call', eyebrow: 'COMMUNITY', copy: 'A recurring video call that brings people back each week.' },
+    { value: 'one_to_one_call', label: 'Personal call', eyebrow: 'DISCOVERY', copy: 'A short one-to-one call to find the right next step.' },
+    { value: 'in_person', label: 'In-person meeting or event', eyebrow: 'HIGH VALUE', copy: 'Very valuable to give away. Usually best as a paid offer.' },
   ];
   const websiteGoal = offerGoal === 'audience' ? 'Collect leads' : 'Sell an offer';
   const headlineSuggestions = useMemo(() => guardianHeadlineSuggestions(chosen, audience), [chosen, audience]);
