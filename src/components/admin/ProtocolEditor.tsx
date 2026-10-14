@@ -1109,7 +1109,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     if (t === 'product') return 'product';
     if (t === 'supplement') return 'supplement';
     if (t === 'activity') return 'activity';
-    return 'ingredient'; // ingredient (and sleep) default to the ingredient catalog
+    // Every step is a task; a food step links to a meal (recipe) when one fits, else stays a task.
+    if (t === 'ingredient' || it.category === 'consume') return 'recipe';
+    return 'activity';
   }
   // Meal slot a consume item belongs to (broad/descriptive, e.g. "Nutritious
   // Lunch" → Lunch). Drives slot-aware recipe suggestions instead of blind search.
@@ -1120,7 +1122,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     const item = it || items.find((x) => x.id === linkerItemId);
     const slot = kind === 'recipe' ? itemMealSlot(item) : null;
     setLinkBusy(true);
-    try { setLinkResults(await searchCatalog(accessToken, kind, q, kind === 'activity' && !q.trim() ? 24 : slot && !q.trim() ? 6 : 10, slot ?? undefined)); }
+    try { setLinkResults(await searchCatalog(accessToken, kind, q, (kind === 'activity' || kind === 'recipe') && !q.trim() && !slot ? 24 : slot && !q.trim() ? 6 : 10, slot ?? undefined)); }
     catch { setLinkResults([]); }
     finally { setLinkBusy(false); }
   }
@@ -1131,7 +1133,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     const k = linkedKind(it) || (slot ? 'recipe' : defaultKind(it));
     // Activities open on the browsable activity list (with images); a sentence-length step
     // name like "Prepare a cooler, darker sleep space" would match nothing.
-    const q = (k === 'recipe' && slot) || (k === 'activity' && !linkedKind(it)) ? '' : (it.display_name || '');
+    const q = (k === 'recipe' && slot) || ((k === 'activity' || k === 'recipe') && !linkedKind(it)) ? '' : (it.display_name || '');
     setLinkerItemId(it.id); setLinkKind(k); setLinkQuery(q);
     runSearch(k, q, it);
   }
@@ -1338,7 +1340,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
             <button onClick={() => unlinkItem(it)} title="Unlink" style={{ ...linkBtnStyle, color: C.danger }}><X size={13} /></button>
           </div>
         ) : (
-          <button onClick={() => openLinker(it)} style={{ ...linkBtnStyle, color: C.accent }}><Link2 size={12} /> Link {defaultKind(it)}…</button>
+          <button onClick={() => openLinker(it)} style={{ ...linkBtnStyle, color: C.accent }}><Link2 size={12} /> Link {defaultKind(it) === 'recipe' ? 'meal' : defaultKind(it)}…</button>
         )}
         {open && (
           <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper }}>
@@ -1346,7 +1348,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               <IconSelect value={linkKind} options={LINK_OPTS} width={132}
                 onChange={(k) => { setLinkKind(k as CatalogKind); runSearch(k as CatalogKind, linkQuery, it); }} />
               <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value, it); }}
-                placeholder={slot && linkKind === 'recipe' ? `Suggest ${slot} recipes — or type to search…` : linkKind === 'activity' ? 'Search activities, e.g. run, yoga, walk…' : 'Search catalog…'} style={{ ...inputStyle, flex: 1 }} />
+                placeholder={slot && linkKind === 'recipe' ? `Suggest ${slot} recipes — or type to search…` : linkKind === 'activity' ? 'Search activities, e.g. run, yoga, walk…' : linkKind === 'recipe' ? 'Search meals, e.g. porridge, salad…' : 'Search catalog…'} style={{ ...inputStyle, flex: 1 }} />
               <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
             </div>
             {suggesting && (
@@ -1442,9 +1444,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           )}
           {!isRule ? (
             <>
-              <span title={`Stored type: item_type="${it.item_type || 'null'}", category="${it.category || 'none'}". Change it with the dropdown →`}
-                style={{ fontSize: 11, fontWeight: 700, fontFamily: 'ui-monospace, monospace', borderRadius: 8, height: 34, boxSizing: 'border-box', minWidth: 96, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', ...kindChip(it.item_type) }}>
-                {it.item_type || '—'}
+              <span title={linkInfo.get(it.id) ? `Task linked to ${linkInfo.get(it.id)!.kind === 'recipe' ? 'a meal' : `a ${linkInfo.get(it.id)!.kind}`}` : 'A plain task. Link an activity or meal below if one fits.'}
+                style={{ fontSize: 11, fontWeight: 700, fontFamily: 'ui-monospace, monospace', borderRadius: 8, height: 34, boxSizing: 'border-box', minWidth: 96, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', ...(linkInfo.get(it.id) ? kindChip(it.item_type) : { background: C.panel, color: C.sub, border: '1px solid ' + C.hair }) }}>
+                {linkInfo.get(it.id) ? (linkInfo.get(it.id)!.kind === 'recipe' ? 'meal' : linkInfo.get(it.id)!.kind) : 'task'}
               </span>
               <IconSelect value={primaryTypeOf(it)} options={TYPE_OPTS} onChange={(t) => setPrimaryType(it, t)} width={116} />
               {subOpts2.length > 1 && (
