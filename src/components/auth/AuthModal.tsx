@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 
 
 const R3_AUTH_CSS = `
-.r3-auth{background:#11120F!important;color:#F5F2EA!important;border:1px solid rgba(245,242,234,.28)!important;border-radius:0!important;box-shadow:0 30px 80px rgba(0,0,0,.45)!important;font-family:"EuclidCircularA","DM Sans","Helvetica Neue",Arial,sans-serif}
+.r3-auth{width:calc(100% - 32px)!important;max-width:460px!important;max-height:calc(100dvh - 32px)!important;overflow-y:auto!important;inset:auto!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;background:#11120F!important;color:#F5F2EA!important;border:1px solid rgba(245,242,234,.28)!important;border-radius:0!important;box-shadow:0 30px 80px rgba(0,0,0,.45)!important;font-family:"EuclidCircularA","DM Sans","Helvetica Neue",Arial,sans-serif}
 .r3-auth>button[class*="absolute"]{color:#F5F2EA!important;opacity:.8}
 .r3-auth-head{padding:clamp(24px,4vw,44px) clamp(24px,4vw,44px) 0!important;text-align:left!important}
 .r3-auth-eyebrow{color:#C7D8A3;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
@@ -24,7 +24,7 @@ const R3_AUTH_CSS = `
 .r3-auth .p-6{padding-left:clamp(24px,4vw,44px)!important;padding-right:clamp(24px,4vw,44px)!important;padding-bottom:clamp(24px,4vw,40px)!important}
 .r3-auth label{color:#B8B6AF!important;font-size:10px!important;font-weight:700!important;letter-spacing:.14em!important;text-transform:uppercase!important}
 .r3-auth input:not([type=checkbox]){background:#0B0C0A!important;border:1px solid rgba(245,242,234,.3)!important;border-radius:2px!important;color:#F5F2EA!important;box-shadow:none!important}
-.r3-auth input:not([type=checkbox]):focus{border-color:#F5F2EA!important}
+.r3-auth input:not([type=checkbox]):focus,.r3-auth input:not([type=checkbox]):focus-visible{border-color:#F5F2EA!important;outline:none!important;box-shadow:0 0 0 1px #F5F2EA!important;--tw-ring-color:transparent!important}
 .r3-auth input::placeholder{color:rgba(245,242,234,.35)!important}
 .r3-auth [role=tablist]{background:transparent!important;border:1px solid rgba(245,242,234,.4)!important;border-radius:2px!important;padding:0!important;height:40px!important}
 .r3-auth [role=tab]{border-radius:0!important;background:transparent!important;color:#B8B6AF!important;font-size:11px!important;font-weight:700!important;letter-spacing:.14em!important;text-transform:uppercase!important;box-shadow:none!important;height:100%!important}
