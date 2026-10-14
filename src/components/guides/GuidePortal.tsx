@@ -933,6 +933,16 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [currency, setCurrency] = useState<CurrencyCode>(defaultPricingRegion().currency);
   const [offerGoal, setOfferGoal] = useState<GuardianOfferGoal>('basic');
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
+  // Existing items shown under each step ("In your workspace").
+  const [related, setRelated] = useState<{ leads: GuideLead[]; offers: GuideOffer[]; ramps: GuideValueRamp[]; protocols: AdminProtocol[] }>({ leads: [], offers: [], ramps: [], protocols: [] });
+  useEffect(() => {
+    Promise.all([
+      listGuideLeads(userId).catch(() => []),
+      listGuideOffers(userId).catch(() => []),
+      listGuideValueRamps(userId).catch(() => []),
+      listProtocols(accessToken, userId).catch(() => []),
+    ]).then(([leads, offers, ramps, protocols]) => setRelated({ leads, offers, ramps, protocols }));
+  }, [userId, accessToken]);
   const [offerPlanStage, setOfferPlanStage] = useState(0);
   const [showProtocolInfo, setShowProtocolInfo] = useState(false);
   const [summaryView, setSummaryView] = useState<'offers' | 'sites' | null>(null);
@@ -1577,7 +1587,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         </div>)}
       </div>}
     </section>}
-    {!summaryView && <form onSubmit={submit} style={{ maxWidth: step === 5 ? 1440 : 1100 /* step 05 shows two side-by-side previews */, margin: '52px auto' }}>
+    {!summaryView && <form onSubmit={submit} style={{ maxWidth: step === 5 ? 1440 : 1100 /* step 05 shows two side-by-side previews */, margin: '52px auto', minHeight: 'calc(100vh - 220px)' }}>
       <div style={{ display: 'block' }}>
         <aside style={{ display: 'none' }}>
           <div style={{ ...label, color: acid }}>Step {step} · {activeStep.label}</div>
@@ -2055,7 +2065,31 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         </section>
       </div>
     </form>}
+    {!summaryView && <StepRelated step={step} guardianSlug={guardianSlug} displayName={displayName} related={related} />}
   </div>;
+}
+
+/** Below the fold of each setup step: the Guardian's existing items for that stage. */
+function StepRelated({ step, guardianSlug, displayName, related }: { step: number; guardianSlug: string; displayName: string; related: { leads: GuideLead[]; offers: GuideOffer[]; ramps: GuideValueRamp[]; protocols: AdminProtocol[] } }) {
+  const open = (href: string) => () => { window.location.href = href; };
+  const offerImage = (offer: GuideOffer) => offer.access_model === 'free' ? '/images/guides/lead-plate.png' : '/images/guides/offer-plate.png';
+  const rampRows = related.ramps.map((ramp) => ({ key: ramp.id, title: ramp.name, meta: `${[ramp.audience, ramp.problem].filter(Boolean).join(' · ')} · ${ramp.offer_ids.length} offers · ${ramp.status}`, image: '/images/guides/offer-plate.png', href: `/guardians/${guardianSlug}/value-ramp/${ramp.slug}` }));
+  const sections: Record<number, { title: string; tab: string; rows: { key: string; title: string; meta: string; image?: string | null; href: string }[] }> = {
+    1: { title: 'Your sites', tab: 'value_ramps', rows: [{ key: 'profile', title: `${displayName || 'Your'} profile site`, meta: `/guardians/${guardianSlug}`, image: '/images/guides/guide-plate.png', href: `/guardians/${guardianSlug}` }, ...rampRows] },
+    2: { title: 'Your Protocols', tab: 'protocols', rows: related.protocols.map((protocol) => ({ key: protocol.id, title: protocol.name, meta: `${protocol.total_days || 1} days · ${protocol.is_public ? 'Published' : 'Draft'}`, image: protocol.image_url, href: '/guardians/workspace?tab=protocols' })) },
+    3: { title: 'Your leads', tab: 'leads', rows: related.leads.map((lead) => ({ key: lead.id, title: lead.name, meta: `${lead.email} · ${lead.goal || 'No goal yet'} · ${lead.stage}`, href: '/guardians/workspace?tab=leads' })) },
+    4: { title: 'Your offers', tab: 'offer_builder', rows: related.offers.map((offer) => ({ key: offer.id, title: offer.title, meta: `${offer.kind.replaceAll('_', ' ')} · ${offer.access_model === 'free' ? 'Free' : 'Paid'} · ${offer.status}`, image: offerImage(offer), href: '/guardians/workspace?tab=offer_builder' })) },
+    5: { title: 'Your offer paths', tab: 'value_ramps', rows: rampRows },
+  };
+  const section = sections[step];
+  if (!section) return null;
+  return <section aria-label={section.title} style={{ maxWidth: 1100, margin: '0 auto 80px', borderTop: `1px solid ${line}`, paddingTop: 28 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
+      <span style={{ ...label, color: acid, marginBottom: 0 }}>In your workspace · {section.title} · {section.rows.length}</span>
+      <a href={`/guardians/workspace?tab=${section.tab}`} style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', textDecoration: 'none' }}>Open all →</a>
+    </div>
+    {section.rows.length ? section.rows.slice(0, 8).map((row) => <Row key={row.key} title={row.title} meta={row.meta} image={row.image} action="Open" onClick={open(row.href)} />) : <p style={{ color: muted, fontSize: 12 }}>Nothing here yet. What you create in this step will appear here.</p>}
+  </section>;
 }
 
 function Empty({ title, copy, action, image }: { title: string; copy: string; action?: React.ReactNode; image?: string }) {
