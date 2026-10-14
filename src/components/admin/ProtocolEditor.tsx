@@ -901,8 +901,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     setBusyItem(existing?.id || `anchor-${which}`);
     try {
       if (existing) {
-        editItemLocal(existing.id, { scheduled_time: hhmmss });
-        const updated = await updateProtocolItem(accessToken, existing.id, { scheduled_time: hhmmss });
+        // Sleep anchors are a planned daily alarm; a connected tracker (Oura,
+        // Apple Health) records what actually happened in the app.
+        const patch = { scheduled_time: hhmmss, recurrence_type: 'daily', notifications_enabled: true };
+        editItemLocal(existing.id, patch);
+        const updated = await updateProtocolItem(accessToken, existing.id, patch);
         baseline.current.set(existing.id, { ...(items.find((x) => x.id === existing.id) || existing), ...updated });
         toast.success(which === 'wake' ? 'Wake time set' : 'Bedtime set');
       } else if (hhmmss) {
@@ -913,6 +916,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           item_type: 'activity', kind: 'action', scheduled_time: hhmmss,
           group_name: 'Sleep', category: 'sleep', subtype: 'sleep',
           day_number: viewDay, sort_order: maxSort + 1, hidden: false,
+          recurrence_type: 'daily', notifications_enabled: true, notification_lead_minutes: 0,
         });
         setItems((its) => [...its, created]);
         baseline.current.set(created.id, { ...created });
@@ -1963,7 +1967,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                       </button>
                     ) : (
                       <span style={{ fontSize: 11.5, color: C.faint, maxWidth: 240 }}>
-                        {wakeItem || bedItem ? 'Pins the day’s start/end.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}
+                        {wakeItem || bedItem ? 'Daily alarm that pins the day’s start and end. With a sleep tracker (e.g. Oura) connected, the app logs when sleep really happened.' : 'Not set — app shows 6:00 AM / 10:00 PM. Set a time to pin it (e.g. 4:00 for Goggins).'}
                       </span>
                     )}
                   </div>
