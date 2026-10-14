@@ -135,11 +135,43 @@ export async function buildProtocolPdf(opts: { accessToken: string; protocol: Pd
   const heading = (t: string, size = 12) => { ensure(10); doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.text(t, M, y); y += size * 0.5; doc.setLineWidth(0.4); doc.line(M, y, M + W, y); y += 5; };
 
   // ── 1. Header ──
+  // Brand lockup (top left): the site header's boxed "ROUTINE³ | PROTOCOL" mark, drawn as vectors.
+  {
+    const h = 7, pad = 2.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+    const word = 'ROUTINE³';
+    const wordW = doc.getTextWidth(word) + doc.getStringUnitWidth(word) * 0.2;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+    const tagW = doc.getTextWidth('PROTOCOL');
+    const total = pad + wordW + pad + pad + tagW + pad;
+    doc.setLineWidth(0.3); doc.setDrawColor(0);
+    doc.rect(M, y - 2, total, h);
+    doc.line(M + pad + wordW + pad, y - 2, M + pad + wordW + pad, y - 2 + h);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(word, M + pad, y + 2.6, { charSpace: 0.2 });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('PROTOCOL', M + pad + wordW + pad + pad, y + 2.4);
+    y += h + 4;
+  }
   // QR (top right) → routine3.com/protocol/<id>, which the app claims as a universal link.
+  // Apple-style: round dots for data modules, rounded-square finder "eyes". Still a standard QR.
   const QR = 26;
   if (protocol.id) {
-    const qr = await QRCode.toDataURL(`https://routine3.com/protocol/${protocol.id}`, { margin: 0, width: 300, color: { dark: '#000000', light: '#ffffff' } });
-    doc.addImage(qr, 'PNG', PW - M - QR, M - 2, QR, QR);
+    const code = QRCode.create(`https://routine3.com/protocol/${protocol.id}`, { errorCorrectionLevel: 'M' });
+    const n = code.modules.size;
+    const cell = QR / n;
+    const x0 = PW - M - QR, y0 = M - 2;
+    const inFinder = (r: number, c: number) => (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+    doc.setFillColor(0);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      if (inFinder(r, c) || !code.modules.get(r, c)) continue;
+      doc.circle(x0 + (c + 0.5) * cell, y0 + (r + 0.5) * cell, cell * 0.42, 'F');
+    }
+    for (const [fr, fc] of [[0, 0], [0, n - 7], [n - 7, 0]]) {
+      const fx = x0 + fc * cell, fy = y0 + fr * cell;
+      doc.setLineWidth(cell); doc.setDrawColor(0);
+      doc.roundedRect(fx + cell / 2, fy + cell / 2, cell * 6, cell * 6, cell * 1.6, cell * 1.6, 'S');
+      doc.roundedRect(fx + cell * 2, fy + cell * 2, cell * 3, cell * 3, cell * 0.9, cell * 0.9, 'F');
+    }
+    doc.setLineWidth(0.3);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
     doc.text('Scan to open in the ROUTINE³ app', PW - M - QR / 2, M + QR + 1.5, { align: 'center' });
   }
