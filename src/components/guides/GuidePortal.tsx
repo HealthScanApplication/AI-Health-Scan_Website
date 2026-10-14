@@ -1533,14 +1533,14 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         </div>)}
       </div>}
     </section>}
-    {!summaryView && <form onSubmit={submit} style={{ maxWidth: 1100, margin: '52px auto' }}>
+    {!summaryView && <form onSubmit={submit} style={{ maxWidth: step === 5 ? 1440 : 1100 /* step 05 shows two side-by-side previews */, margin: '52px auto' }}>
       <div style={{ display: 'block' }}>
         <aside style={{ display: 'none' }}>
           <div style={{ ...label, color: acid }}>Step {step} · {activeStep.label}</div>
           <img src={activeStepImage} alt="" style={{ width: '100%', maxWidth: 220, height: 220, objectFit: 'contain', filter: 'grayscale(1) contrast(.92) brightness(.8)', opacity: .92, margin: '12px 0 18px' }} />
           <p style={{ color: muted, fontSize: 12, lineHeight: 1.65, maxWidth: 220, margin: 0 }}>{activeStep.copy}</p>
         </aside>
-        <section style={{ width: '100%', maxWidth: 920, minWidth: 0, margin: '0 auto' }}>
+        <section style={{ width: '100%', maxWidth: step === 5 ? 1440 : 920, minWidth: 0, margin: '0 auto' }}>
           <header style={{ maxWidth: 720, margin: '0 auto 44px', textAlign: 'center' }}>
             <div style={{ ...label, color: acid }}>Guardian setup · {step} of 5</div>
             <img src={activeStepImage} alt="" style={{ display: 'block', width: 138, height: 138, objectFit: 'contain', filter: 'grayscale(1) contrast(.92) brightness(.86)', margin: '18px auto 14px' }} />
@@ -2379,7 +2379,7 @@ function Row({ title, meta, action, onClick, image }: { title: string; meta: str
 
 // Scopes Guardian styling; globals.css exempts `.guardian-ui button` from the forced 16px button size.
 export function GuidePortal() {
-  return <div className="guardian-ui"><style>{`@media (max-width: 900px){.guardian-ui .guardian-builders{display:none !important}}.g-split{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:20px;align-items:start}.g-split>.g-sticky{position:sticky;top:16px}@media (max-width: 960px){.g-split{grid-template-columns:minmax(0,1fr)}.g-split>.g-sticky{position:static}}`}</style><GuidePortalRoutes /></div>;
+  return <div className="guardian-ui"><style>{`@media (max-width: 900px){.guardian-ui .guardian-builders{display:none !important}}.g-split{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:20px;align-items:start}.g-split>.g-sticky{position:sticky;top:16px}@media (max-width: 960px){.g-split{grid-template-columns:minmax(0,1fr)}.g-split>.g-sticky{position:static}}`}</style><GuidePortalRoutes /></div>;
 }
 
 function GuidePortalRoutes() {
