@@ -341,6 +341,8 @@ export function Header({
   const overHero = currentPage === 'home' && atTop;
   // Dark, elegant editorial text everywhere (readable on the light frosted blur).
   const navText = oura.body;
+  // Shared cell for the joined header lockups (Sign in | Subscribe, Dashboard | Sign out).
+  const lockupCell: React.CSSProperties = { height: 32, padding: '0 14px', border: 0, background: 'transparent', color: navText, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 350ms ease, border-color 350ms ease' };
   const navStrong = '#16140F';
   const navHover = oura.forest;
   const capsule = overHero
@@ -508,23 +510,17 @@ export function Header({
                   </DropdownMenuContent>
                   </DropdownMenu>
                   
-                  {/* Refer Friends — unified outlined CTA */}
-                  <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleReferralModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 16px', ...ctaWhite }}>
-                      <Share2 className="w-4 h-4" />
-                      Refer
-                    </button>
+                  {/* Signed in: Dashboard | Sign out, same joined lockup as Sign in | Subscribe */}
+                  <div className="r3-lockup" style={{ display: 'flex', border: `1px solid ${navText}`, borderRadius: 2, transition: 'border-color 350ms ease' }}>
+                    <button onClick={() => handleNavClick(onNavigateToProfile)} style={lockupCell}>Dashboard</button>
+                    <button onClick={handleSignOut} style={{ ...lockupCell, borderLeft: `1px solid ${navText}` }}>Sign out</button>
                   </div>
                 </div>
               ) : (
                 // Sign in + Subscribe share one hairline box, same joined-seam treatment as the logo lockup.
-                <div className={isShaking ? 'animate-button-shake' : ''} style={{ display: 'flex', border: `1px solid ${navText}`, borderRadius: 2, transition: 'border-color 350ms ease' }}>
-                  <button onClick={handleSignIn} style={{ height: 36, padding: '0 16px', border: 0, background: 'transparent', color: navText, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'color 350ms ease' }}>
-                    Sign in
-                  </button>
-                  <button onClick={handleWaitlistModal} style={{ height: 36, padding: '0 16px', border: 0, borderLeft: `1px solid ${navText}`, background: 'transparent', color: navText, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'color 350ms ease, border-color 350ms ease' }}>
-                    Subscribe
-                  </button>
+                <div className={`r3-lockup ${isShaking ? 'animate-button-shake' : ''}`} style={{ display: 'flex', border: `1px solid ${navText}`, borderRadius: 2, transition: 'border-color 350ms ease' }}>
+                  <button onClick={handleSignIn} style={lockupCell}>Sign in</button>
+                  <button onClick={handleWaitlistModal} style={{ ...lockupCell, borderLeft: `1px solid ${navText}` }}>Subscribe</button>
                 </div>
               )}
             </div>
