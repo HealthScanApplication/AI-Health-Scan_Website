@@ -533,11 +533,11 @@ function SocialUrlField({ label: text, value, placeholder, Icon, onChange }: { l
   </div>;
 }
 
-function AuthPanel({ bare = false, initialMode = 'signup' }: { bare?: boolean; initialMode?: 'login' | 'signup' }) {
+function AuthPanel({ bare = false, initialMode = 'signup', initialEmail = '' }: { bare?: boolean; initialMode?: 'login' | 'signup'; initialEmail?: string }) {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -654,6 +654,7 @@ function SuggestGuardianModal({ type, onClose }: { type: string; onClose: () => 
 function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
   const { signOut } = useAuth();
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
+  const [heroEmail, setHeroEmail] = useState('');
   useEffect(() => {
     if (!authMode) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAuthMode(null); };
@@ -688,7 +689,7 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
       {authMode && <div role="dialog" aria-modal="true" aria-label={authMode === 'login' ? 'Sign in' : 'Sign up'} onClick={() => setAuthMode(null)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(9,10,8,.72)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
         <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 460, background: black }}>
           <button type="button" aria-label="Close" onClick={() => setAuthMode(null)} style={{ position: 'absolute', top: 10, right: 12, zIndex: 2, border: 0, background: 'none', color: ink, fontSize: 22, lineHeight: 1, cursor: 'pointer' }}>×</button>
-          <AuthPanel key={authMode} initialMode={authMode} />
+          <AuthPanel key={authMode} initialMode={authMode} initialEmail={heroEmail.trim()} />
         </div>
       </div>}
       <main>
@@ -699,7 +700,13 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
               <h1 style={{ margin: 0, fontFamily: serif, fontWeight: 300, fontSize: 'clamp(64px,10vw,142px)', lineHeight: .84, letterSpacing: '-0.055em' }}>Become a Guardian.</h1>
               <p style={{ maxWidth: 650, margin: '30px 0 10px', fontSize: 'clamp(18px,2vw,25px)', lineHeight: 1.4, fontWeight: 600 }}>Turn what you know into guidance people can follow.</p>
               <p style={{ maxWidth: 650, margin: 0, color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7 }}>Create your public page, build your offers, collect leads, and publish guides, recipes and interactive Protocols with ROUTINE³.</p>
-              <CtaLockup href={guardianCta} label={isSignedIn ? 'Your Guardian workspace' : 'Share what you know'} action={isSignedIn ? 'Open workspace' : 'Become a Guardian'} />
+              {isSignedIn
+                ? <CtaLockup href={guardianCta} label="Your Guardian workspace" action="Open workspace" />
+                : /* Email capture is the first sign-up field: it opens the sign-up modal pre-filled. */
+                  <form onSubmit={(event) => { event.preventDefault(); setAuthMode('signup'); }} style={{ display: 'flex', marginTop: 26, maxWidth: 480 }}>
+                    <input type="email" required value={heroEmail} onChange={(event) => setHeroEmail(event.target.value)} placeholder="you@email.com" aria-label="Your email" style={{ flex: 1, minWidth: 0, height: 42, boxSizing: 'border-box', padding: '0 14px', border: '1px solid #FFFFFF', borderRight: 'none', borderRadius: '2px 0 0 2px', background: 'rgba(255,255,255,0.16)', color: '#FFFFFF', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 13, fontWeight: 600, outline: 'none' }} />
+                    <button type="submit" style={{ height: 42, boxSizing: 'border-box', padding: '0 16px', border: '1px solid #FFFFFF', borderRadius: '0 2px 2px 0', background: '#FFFFFF', color: '#16140F', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>Become a Guardian <ArrowRight size={13} /></button>
+                  </form>}
             </div>
           </div>
         </section>
