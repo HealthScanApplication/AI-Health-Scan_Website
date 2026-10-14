@@ -12,7 +12,7 @@ import {
   Plus, Trash2, Loader2, Search, Save, Check, RefreshCw, AlertCircle, CornerDownRight, Eye, EyeOff, Link2, X, ShoppingBag,
   ChevronDown, Package, Leaf, Utensils, Dumbbell, Pill, Moon, Coffee, Apple, GlassWater, Sparkles, Wind, Activity,
   Pencil, GitMerge, Download, Upload, Repeat, CalendarDays, FileText, ChevronUp, ImageOff, Image as ImageIcon,
-  AudioLines,
+  AudioLines, Bell,
 } from 'lucide-react';
 import { aiGenerateImage } from '../../utils/aiImage';
 import { buildProtocolCoverPrompt } from '../../utils/imagePromptBuilder';
@@ -49,7 +49,8 @@ const C = {
 const PROTO_FIELDS: (keyof AdminProtocol)[] = [
   'name', 'description', 'category', 'type', 'creator', 'source',
   'image_url', 'health_score', 'total_days', 'is_suggested', 'is_active',
-  'is_public', 'start_time',
+  'is_public', 'start_time', 'profile_role', 'profile_name', 'profile_image_url',
+  'schedule_basis',
 ];
 
 const ITEM_TYPES = ['supplement', 'consume', 'recipe', 'activity', 'product'];
@@ -95,6 +96,33 @@ function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | '
   if (h < 12) return 'Morning';
   if (h < 17) return 'Afternoon';
   return 'Evening';
+}
+
+const SMART_LIST_ORDER = ['Hygiene', 'Fitness', 'Wellness', 'Beauty', 'Work', 'Home', 'Other'];
+function moonPhaseName(date: Date): string {
+  const lunarCycle = 29.53058867;
+  const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14);
+  const age = ((((date.getTime() - knownNewMoon) / 86400000) % lunarCycle) + lunarCycle) % lunarCycle;
+  if (age < 1.85 || age >= 27.68) return 'New moon';
+  if (age < 5.54) return 'Waxing crescent';
+  if (age < 9.23) return 'First quarter';
+  if (age < 12.92) return 'Waxing gibbous';
+  if (age < 16.61) return 'Full moon';
+  if (age < 20.30) return 'Waning gibbous';
+  if (age < 23.99) return 'Last quarter';
+  return 'Waning crescent';
+}
+function smartListGroup(it: AdminProtocolItem): string {
+  const text = `${it.group_name || ''} ${it.subtype || ''} ${it.category || ''} ${it.display_name || ''}`.toLowerCase();
+  if (/hygiene|wash|cleanse|brush|floss|shower|bath/.test(text)) return 'Hygiene';
+  if (/fitness|exercise|workout|walk|run|strength|mobility|stretch|train/.test(text)) return 'Fitness';
+  if (/beauty|skin|hair|makeup|moisturi|exfoliat|facial/.test(text)) return 'Beauty';
+  if (/work|focus|meeting|email|desk|commute/.test(text)) return 'Work';
+  if (/home|house|clean|laundry|garden|kitchen|chores/.test(text)) return 'Home';
+  if (/wellness|sleep|meditat|breath|recover|meal|drink|snack|supplement|health/.test(text)) return 'Wellness';
+  return it.category === 'do' || it.category === 'sleep' || it.category === 'consume' || it.category === 'supplement'
+    ? 'Wellness'
+    : 'Other';
 }
 const POD_ORDER = ['Morning', 'Afternoon', 'Evening', 'Anytime'] as const;
 const minutesOf = (t: string | null) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 1e9; };
@@ -159,10 +187,10 @@ function toHomeItems(items: AdminProtocolItem[], linkImages?: Map<string, string
 }
 
 /* ── live preview — the exact app home screen, fed the saved steps ── */
-function PhonePreview({ name, items, imageUrl, linkImages }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null; linkImages?: Map<string, string> }) {
+function PhonePreview({ name, items, imageUrl, profileName, linkImages }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null; profileName?: string | null; linkImages?: Map<string, string> }) {
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">
-      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} />
+      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} imageUrl={imageUrl} profileName={profileName || 'Protocol owner'} />
     </PhoneFrame>
   );
 }
@@ -243,6 +271,7 @@ const MEAL_PRESETS: { label: string; Icon: any; color: string; preset: AddPreset
   { label: 'Lunch', Icon: Utensils, color: '#388E3C', preset: { type: 'recipe', group_name: 'Lunch', display_name: 'Lunch', subtype: 'meal', scheduled_time: '12:00:00' } },
   { label: 'Dinner', Icon: Utensils, color: '#388E3C', preset: { type: 'recipe', group_name: 'Dinner', display_name: 'Dinner', subtype: 'meal', scheduled_time: '18:00:00' } },
   { label: 'Snack', Icon: Apple, color: '#E64A19', preset: { type: 'recipe', group_name: 'Snack', display_name: 'Snack', subtype: 'snack', scheduled_time: '10:00:00' } },
+  { label: 'Drink', Icon: GlassWater, color: '#039BE5', preset: { type: 'ingredient', group_name: 'Drink', display_name: 'Drink', subtype: 'drink', scheduled_time: '08:00:00' } },
 ];
 function primaryTypeOf(it: AdminProtocolItem): string {
   // item_type is the source of truth for the definitive types — a supplement or
@@ -267,6 +296,7 @@ const SLOT_OPTS: Opt[] = [
   { value: 'Lunch', label: 'Lunch', Icon: Utensils, color: '#388E3C' },
   { value: 'Dinner', label: 'Dinner', Icon: Utensils, color: '#388E3C' },
   { value: 'Snack', label: 'Snack', Icon: Apple, color: '#E64A19' },
+  { value: 'Drink', label: 'Drink', Icon: GlassWater, color: '#039BE5' },
 ];
 const SCOPE_OPTS: Opt[] = SCOPES.map((s) => ({ value: s, label: s }));
 // cadence — maps to protocol_items.recurrence_type (the mobile app's itemShowsOnDate honours these)
@@ -291,11 +321,11 @@ function IconSelect({ value, options, onChange, width = 132, placeholder }: { va
   const [open, setOpen] = useState(false);
   const cur = options.find((o) => o.value === value);
   return (
-    <div style={{ position: 'relative', width, flexShrink: 0 }}>
+    <div style={{ position: 'relative', width, minWidth: width, flex: '0 1 auto' }}>
       <button type="button" onClick={() => setOpen((o) => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 8px', fontSize: 12.5, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, cursor: 'pointer', boxSizing: 'border-box' }}>
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, minHeight: 34, padding: '6px 8px', fontSize: 12.5, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, cursor: 'pointer', boxSizing: 'border-box' }}>
         {cur?.Icon && <cur.Icon size={14} color={cur.color || C.sub} style={{ flexShrink: 0 }} />}
-        <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cur?.label || placeholder || '—'}</span>
+        <span style={{ flex: 1, minWidth: 0, textAlign: 'left', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25 }}>{cur?.label || placeholder || '—'}</span>
         <ChevronDown size={13} color={C.faint} style={{ flexShrink: 0 }} />
       </button>
       {open && (
@@ -361,9 +391,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [kindTab, setKindTab] = useState<Kind>('action');
+  const [editorFocus, setEditorFocus] = useState<'timeline' | 'details'>('timeline');
+  const [routineCovers, setRoutineCovers] = useState<Map<string, string>>(new Map());
   // multi-day protocols (day_number cycles): which cycle day the editor shows
   const [viewDay, setViewDay] = useState(1);
-  useEffect(() => { setViewDay(1); }, [selectedId]);
+  useEffect(() => { setViewDay(1); setEditorFocus('timeline'); }, [selectedId]);
   // catalog linking
   const [linkInfo, setLinkInfo] = useState<Map<string, CatalogHit & { kind: CatalogKind }>>(new Map());
   const [linkerItemId, setLinkerItemId] = useState<string | null>(null);
@@ -475,9 +507,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const typeOpts = useMemo(() => distinctOf('type'), [protocols]);
   const filtersActive = !!(fGender || fCategory || fType || query.trim() || fNoCover);
 
-  const filtered = useMemo(() => {
+  const { filtered, hiddenDuplicateCount } = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return protocols.filter((p) => {
+    const matches = protocols.filter((p) => {
       if (q && !(
         (p.name || '').toLowerCase().includes(q) ||
         (p.category || '').toLowerCase().includes(q) ||
@@ -491,12 +523,54 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
       if (fNoCover && (p.image_url || '').trim()) return false;
       return true;
     });
-  }, [protocols, query, fGender, fCategory, fType, fNoCover]);
+    const unique = new Map<string, AdminProtocol>();
+    for (const protocol of matches) {
+      const key = (protocol.name || 'untitled').trim().toLowerCase().replace(/\s+/g, ' ');
+      const current = unique.get(key);
+      if (!current || protocol.id === selectedId || (!current.updated_at && protocol.updated_at) || String(protocol.updated_at || '') > String(current.updated_at || '')) unique.set(key, protocol);
+    }
+    return { filtered: [...unique.values()], hiddenDuplicateCount: matches.length - unique.size };
+  }, [protocols, query, fGender, fCategory, fType, fNoCover, selectedId]);
 
-  // how many protocols still have no cover image (drives the "Needs cover" chip)
+  // Load the first image attached to each visible protocol's Routine database
+  // records. This keeps cards useful without copying catalog media into every
+  // protocol row, while an explicitly saved protocol cover still wins.
+  useEffect(() => {
+    let cancelled = false;
+    const missing = filtered.filter((p) => !p.image_url && !routineCovers.has(p.id)).slice(0, 24);
+    if (!missing.length) return undefined;
+    void Promise.all(missing.map(async (protocol) => {
+      try {
+        const protocolItems = await listProtocolItems(accessToken, protocol.id);
+        const direct = protocolItems.find((item) => item.media_image_url)?.media_image_url;
+        if (direct) return [protocol.id, direct] as const;
+        for (const item of protocolItems) {
+          const kind = linkedKind(item);
+          if (!kind) continue;
+          const catalogId = (item as any)[CATALOG_CFG[kind].fk] as string | null;
+          if (!catalogId) continue;
+          const [record] = await getCatalogByIds(accessToken, kind, [catalogId]);
+          if (record?.image) return [protocol.id, record.image] as const;
+        }
+      } catch { /* a missing thumbnail must never block protocol editing */ }
+      return null;
+    })).then((results) => {
+      if (cancelled) return;
+      setRoutineCovers((current) => {
+        const next = new Map(current);
+        for (const result of results) if (result) next.set(result[0], result[1]);
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  // routineCovers is intentionally excluded: filtered changes trigger the next batch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, filtered]);
+
+  // Count unique protocols that have neither an explicit cover nor Routine media.
   const missingCovers = useMemo(
-    () => protocols.filter((p) => !(p.image_url || '').trim()).length,
-    [protocols],
+    () => filtered.filter((p) => !p.image_url && !routineCovers.has(p.id)).length,
+    [filtered, routineCovers],
   );
 
   function setField<K extends keyof AdminProtocol>(key: K, value: AdminProtocol[K]) {
@@ -509,6 +583,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     [form.name, form.category, form.type],
   );
   const effectiveCoverPrompt = coverPrompt ?? defaultCoverPrompt;
+  const routineCoverImage = useMemo(() => [...linkInfo.values()].find((record) => record.image)?.image || null, [linkInfo]);
 
   // Frame any image into the app-icon template (square-in-square + blurred bg)
   // and upload the result. Falls back to the raw URL if canvas framing fails.
@@ -936,7 +1011,13 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   // cadence: set recurrence_type + sensible defaults, clearing the now-irrelevant fields
   function setRecurType(it: AdminProtocolItem, type: string) {
     const patch: Partial<AdminProtocolItem> = {
-      recurrence_type: type, recurrence_days_of_week: null, recurrence_interval_days: null, scheduled_date: null,
+      recurrence_type: type,
+      recurrence_days_of_week: null,
+      recurrence_interval_days: null,
+      recurrence_start_date: type === 'monthly' || type === 'custom'
+        ? (it.recurrence_start_date || new Date().toISOString().slice(0, 10))
+        : null,
+      scheduled_date: null,
     };
     if (type === 'weekly') patch.recurrence_days_of_week = it.recurrence_days_of_week?.length ? it.recurrence_days_of_week : [1, 3, 5];
     if (type === 'custom') patch.recurrence_interval_days = it.recurrence_interval_days || 2;
@@ -1183,7 +1264,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
             onChange={(e) => editItemLocal(it.id, { scheduled_date: e.target.value || null })}
             onBlur={() => commitItem(it.id, ['scheduled_date'])} style={{ ...mini, width: 148 }} />
         )}
-        {rt === 'monthly' && <span style={{ fontSize: 11, color: C.faint }}>same day each month</span>}
+        {rt === 'daily' && <span style={{ fontSize: 11, color: C.faint }}>runs every day at the alarm time</span>}
+        {rt === 'weekly' && <span style={{ fontSize: 11, color: C.faint }}>only on selected weekdays</span>}
+        {rt === 'monthly' && <span style={{ fontSize: 12, color: C.sub, display: 'inline-flex', alignItems: 'center', gap: 6 }}>starting <input type="date" value={it.recurrence_start_date || ''} onChange={(e) => editItemLocal(it.id, { recurrence_start_date: e.target.value || null })} onBlur={() => commitItem(it.id, ['recurrence_start_date'])} style={{ ...mini, width: 148 }} /><span style={{ fontSize: 11, color: C.faint }}>same date each month</span></span>}
       </div>
     );
   }
@@ -1195,12 +1278,12 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     return (
       <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px dashed ' + C.hair }}>
         {link ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => link && openRecord(link, it.id)} title={`Open ${link.kind} record`} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex' }}>
               {thumb(link.image)}
             </button>
             <button type="button" onClick={() => link && openRecord(link, it.id)} title={`Open ${link.kind} record`}
-              style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150, textAlign: 'left' }}>{link.name}</button>
+              style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: C.ink, whiteSpace: 'normal', overflowWrap: 'anywhere', maxWidth: 240, textAlign: 'left' }}>{link.name}</button>
             <span style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 4, padding: '2px 5px', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', ...kindChip(link.kind) }}>{link.kind}</span>
             {link.kind === 'product' && (link.price != null || link.buyUrl) && (
               <span style={{ fontSize: 11.5, fontWeight: 600, color: C.good, whiteSpace: 'nowrap' }}>
@@ -1238,7 +1321,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   <button key={h.id} onClick={() => linkItemTo(it, linkKind, h)}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: 'var(--sb-panel)', cursor: 'pointer', textAlign: 'left' }}>
                     {thumb(h.image)}
-                    <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
+                    <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.35 }}>{h.name}</span>
                     {h.healthScore != null && (
                       <span title="Health score" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.good, background: C.goodBg, border: '1px solid ' + C.goodBorder, borderRadius: 999, padding: '1px 6px' }}>{h.healthScore}</span>
                     )}
@@ -1291,24 +1374,28 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: it.kind === 'rule_dont' ? 'rgba(239,68,68,0.14)' : 'var(--sb-brand-soft)', color: it.kind === 'rule_dont' ? C.danger : C.accent }}>{num ?? '·'}</span>
           {(() => {
             const lk = linkInfo.get(it.id);
-            return lk?.image ? (
-              <button type="button" onClick={() => openRecord(lk, it.id)} title={`Open ${lk.kind}: ${lk.name}`}
-                style={{ width: 30, height: 30, borderRadius: 7, overflow: 'hidden', border: '1px solid ' + C.hair, padding: 0, cursor: 'pointer', flexShrink: 0, background: C.panel }}>
-                <img src={lk.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            const image = it.media_image_url || lk?.image;
+            return image ? (
+              <button type="button" onClick={() => lk && openRecord(lk, it.id)} title={lk ? `Open ${lk.kind}: ${lk.name}` : 'Item image'}
+                style={{ width: 42, height: 42, borderRadius: 7, overflow: 'hidden', border: '1px solid ' + C.ink, padding: 0, cursor: lk ? 'pointer' : 'default', flexShrink: 0, background: C.panel }}>
+                <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </button>
             ) : null;
           })()}
-          <input
+          <textarea
+            rows={2}
             value={it.display_name || ''}
             onChange={(e) => editItemLocal(it.id, { display_name: e.target.value })}
             onBlur={() => commitItem(it.id, ['display_name'])}
-            style={{ ...inputStyle, flex: '1 1 150px', minWidth: 120, width: 'auto', textDecoration: it.hidden ? 'line-through' : 'none' }}
+            style={{ ...inputStyle, flex: '1 1 240px', minWidth: 180, width: 'auto', minHeight: 48, lineHeight: 1.35, resize: 'vertical', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', textDecoration: it.hidden ? 'line-through' : 'none' }}
           />
           {!isRule && (
-            <input type="time" value={toTimeInput(it.scheduled_time)}
+            <><label title="Alarm time" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: C.sub, fontSize: 10 }}><Bell size={12} /><input type="time" value={toTimeInput(it.scheduled_time)}
               onChange={(e) => editItemLocal(it.id, { scheduled_time: e.target.value ? `${e.target.value}:00` : null })}
               onBlur={() => commitItem(it.id, ['scheduled_time'])}
-              style={{ ...inputStyle, width: 96, flexShrink: 0, padding: '7px 6px' }} />
+              style={{ ...inputStyle, width: 96, flexShrink: 0, padding: '7px 6px' }} /></label>
+              <button type="button" onClick={() => commitField(it, { notifications_enabled: !it.notifications_enabled })} title={it.notifications_enabled ? 'Alarm enabled' : 'Enable alarm'} style={{ height: 32, border: '1px solid ' + (it.notifications_enabled ? C.accent : C.hair), borderRadius: 7, background: it.notifications_enabled ? 'var(--sb-brand-soft)' : C.paper, color: it.notifications_enabled ? C.accent : C.faint, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}><Bell size={12} />{it.notifications_enabled ? 'Alarm on' : 'Alarm off'}</button>
+              {it.notifications_enabled && <select aria-label="Alarm lead time" value={it.notification_lead_minutes ?? 0} onChange={(e) => commitField(it, { notification_lead_minutes: Number(e.target.value) })} style={{ ...inputStyle, width: 104, flexShrink: 0, padding: '7px 5px' }}><option value={0}>At time</option><option value={5}>5 min before</option><option value={10}>10 min before</option><option value={15}>15 min before</option><option value={30}>30 min before</option><option value={60}>1 hour before</option></select>}</>
           )}
           {!isRule ? (
             <>
@@ -1369,8 +1456,12 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
         </div>
         {it.kind === 'action' && it.category !== 'sleep' && <RepeatRow it={it} />}
         {it.kind === 'action' && it.category !== 'sleep' && <CatalogLinker it={it} />}
+        {it.kind === 'action' && <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 90px 110px', gap: 7, marginTop: 7 }}>
+          <textarea rows={2} value={it.notes || ''} onChange={(e) => editItemLocal(it.id, { notes: e.target.value })} onBlur={() => commitItem(it.id, ['notes'])} placeholder="Your guidance shown below this item" aria-label="Custom guidance" style={{ ...inputStyle, minWidth: 0, minHeight: 48, lineHeight: 1.4, resize: 'vertical', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }} />
+          <input value={it.amount == null ? '' : String(it.amount)} onChange={(e) => editItemLocal(it.id, { amount: e.target.value || null })} onBlur={() => commitItem(it.id, ['amount'])} placeholder="Amount" aria-label="Amount or dosage" style={{ ...inputStyle, minWidth: 0 }} />
+          <input value={it.amount_unit || ''} onChange={(e) => editItemLocal(it.id, { amount_unit: e.target.value })} onBlur={() => commitItem(it.id, ['amount_unit'])} placeholder="Unit / dosage" aria-label="Amount unit or dosage" style={{ ...inputStyle, minWidth: 0 }} />
+        </div>}
         {it.kind === 'action' && <div style={{ marginTop: 7, padding: 8, border: '1px dashed ' + C.hair, borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {it.media_image_url && <img src={it.media_image_url} alt="Step media" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 7, border: '1px solid ' + C.hair }} />}
           {it.media_audio_url && <audio controls preload="metadata" src={it.media_audio_url} style={{ height: 34, maxWidth: 250 }} />}
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid ' + C.hair, borderRadius: 7, padding: '6px 9px', color: C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}><ImageIcon size={13} />{it.media_image_url ? 'Replace image' : 'Add image'}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => uploadStepMedia(it, e.target.files?.[0], 'media_image_url')} style={{ display: 'none' }} /></label>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: '1px solid ' + C.hair, borderRadius: 7, padding: '6px 9px', color: C.sub, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}><AudioLines size={13} />{it.media_audio_url ? 'Replace audio' : 'Add audio'}<input type="file" accept="audio/mpeg,audio/mp4,audio/wav,audio/webm,audio/ogg" onChange={(e) => uploadStepMedia(it, e.target.files?.[0], 'media_audio_url')} style={{ display: 'none' }} /></label>
@@ -1502,7 +1593,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                         <button key={h.id} onClick={() => doMerge(h)} disabled={mergeBusy}
                           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: 'var(--sb-panel)', cursor: 'pointer', textAlign: 'left' }}>
                           {thumb(h.image)}
-                          <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
+                          <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.35 }}>{h.name}</span>
                           <span style={{ fontSize: 11, fontWeight: 600, color: C.accent, display: 'inline-flex', alignItems: 'center', gap: 3 }}><GitMerge size={12} /> merge in</span>
                         </button>
                       ))}
@@ -1562,7 +1653,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
             <span style={{ fontSize: 11, color: C.faint }}>
-              {filtered.length} of {protocols.length}
+              {filtered.length} unique of {protocols.length}{hiddenDuplicateCount > 0 ? ` · ${hiddenDuplicateCount} duplicate${hiddenDuplicateCount === 1 ? '' : 's'} hidden` : ''}
               {filtersActive && (
                 <button onClick={() => { setQuery(''); setFGender(''); setFCategory(''); setFType(''); setFNoCover(false); }}
                   style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.accent, fontSize: 11, marginLeft: 8, padding: 0 }}>Clear</button>
@@ -1602,12 +1693,12 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 }}
               >
                 <span style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, overflow: 'hidden', background: C.panel, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {p.image_url
-                    ? <img src={p.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {p.image_url || routineCovers.get(p.id) || (on ? routineCoverImage : null)
+                    ? <img src={p.image_url || routineCovers.get(p.id) || routineCoverImage || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <span style={{ fontSize: 13, fontWeight: 700, color: C.faint }}>{(p.name || '?').charAt(0)}</span>}
                 </span>
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name || 'Untitled'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.3, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{p.name || 'Untitled'}</div>
                   <div style={{ fontSize: 11, color: C.faint, marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
                     {p.is_suggested && <span style={{ color: C.accent, fontWeight: 600 }}>Suggested</span>}
                     {p.category && <span>{p.category}</span>}
@@ -1629,8 +1720,22 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
             {/* fields + steps */}
             <div style={{ flex: '1 1 420px', minWidth: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+                  <span style={{ width: 34, height: 34, borderRadius: 17, overflow: 'hidden', background: C.panel, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {form.profile_image_url || form.image_url ? <img src={form.profile_image_url || form.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontWeight: 800, color: C.sub }}>{(form.profile_name || form.creator || 'P').charAt(0)}</span>}
+                  </span>
+                  <div><div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em' }}>{form.profile_name || form.creator || 'Protocol owner'} · {form.profile_role || 'self'}</div><div style={{ fontSize: 11, color: C.sub }}>Assigned profile</div></div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <strong style={{ color: C.ink, fontSize: 16, flex: '1 1 240px' }}>{form.name || 'Untitled Protocol'}</strong>
+                  <button type="button" onClick={() => setEditorFocus('timeline')} style={{ padding: '8px 13px', borderRadius: 8, border: '1px solid ' + (editorFocus === 'timeline' ? C.accent : C.hair), background: editorFocus === 'timeline' ? 'var(--sb-brand-soft)' : C.paper, color: editorFocus === 'timeline' ? C.accent : C.sub, fontWeight: 700, cursor: 'pointer' }}><CalendarDays size={13} style={{ display: 'inline', marginRight: 6, verticalAlign: '-2px' }} />Timeline & rules</button>
+                  <button type="button" onClick={() => setEditorFocus('details')} style={{ padding: '8px 13px', borderRadius: 8, border: '1px solid ' + (editorFocus === 'details' ? C.accent : C.hair), background: editorFocus === 'details' ? 'var(--sb-brand-soft)' : C.paper, color: editorFocus === 'details' ? C.accent : C.sub, fontWeight: 700, cursor: 'pointer' }}><ImageIcon size={13} style={{ display: 'inline', marginRight: 6, verticalAlign: '-2px' }} />Details & cover</button>
+                </div>
+                <p style={{ color: C.faint, fontSize: 11, margin: '8px 0 0' }}>{editorFocus === 'timeline' ? 'Set what happens, its alarm time, and whether it repeats daily, weekly, monthly or once.' : 'Edit the Protocol identity and choose a cover from linked Routine content or upload your own.'}</p>
+              </div>
               {/* protocol fields */}
-              <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 16 }}>
+              {editorFocus === 'details' && <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
                   <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.ink }}>Protocol details</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1674,6 +1779,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                       <MarkdownField value={form.description || ''} onChange={(v) => setField('description', v)} minHeight={120} />
                     </Field>
                   </div>
+                  <Field label="Profile name"><input style={inputStyle} value={form.profile_name || ''} placeholder={form.creator || 'John Ferreira'} onChange={(e) => setField('profile_name', e.target.value || null)} /></Field>
+                  <Field label="Profile role"><select style={inputStyle} value={form.profile_role || 'self'} onChange={(e) => setField('profile_role', e.target.value as AdminProtocol['profile_role'])}><option value="self">Self</option><option value="partner">Partner</option><option value="child">Child</option></select></Field>
+                  <div style={{ gridColumn: '1 / -1' }}><Field label="Profile image URL"><input style={inputStyle} value={form.profile_image_url || ''} placeholder="Use a portrait for this person" onChange={(e) => setField('profile_image_url', e.target.value || null)} /></Field></div>
                   <Field label="Category"><input style={inputStyle} value={form.category || ''} onChange={(e) => setField('category', e.target.value)} /></Field>
                   <Field label="Type"><input style={inputStyle} value={form.type || ''} onChange={(e) => setField('type', e.target.value)} /></Field>
                   <Field label="Creator"><input style={inputStyle} value={form.creator || ''} onChange={(e) => setField('creator', e.target.value)} /></Field>
@@ -1681,6 +1789,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   <Field label="Health score"><input type="number" style={inputStyle} value={form.health_score ?? ''} onChange={(e) => setField('health_score', e.target.value === '' ? null : Number(e.target.value))} /></Field>
                   <Field label="Total days"><input type="number" style={inputStyle} value={form.total_days ?? ''} onChange={(e) => setField('total_days', e.target.value === '' ? null : Number(e.target.value))} /></Field>
                   <div style={{ gridColumn: '1 / -1' }}>
+                    {!form.image_url && routineCoverImage && <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: '1px solid ' + C.goodBorder, background: C.goodBg, padding: 10, borderRadius: 10, marginBottom: 10 }}><img src={routineCoverImage} alt="Routine database cover suggestion" style={{ width: 62, height: 62, borderRadius: 9, objectFit: 'cover' }} /><span style={{ flex: 1 }}><strong style={{ display: 'block', color: C.ink, fontSize: 12 }}>Cover from linked Routine content</strong><span style={{ display: 'block', color: C.sub, fontSize: 11, marginTop: 3 }}>This image is already attached to one of this Protocol’s database records.</span></span><button type="button" onClick={() => setField('image_url', routineCoverImage)} style={{ border: '1px solid ' + C.good, background: C.good, color: '#fff', borderRadius: 8, padding: '7px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Use as cover</button></div>}
                     <MediaUploadField
                       label="Protocol image"
                       mediaType="image"
@@ -1761,10 +1870,10 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     ))}
                   </div>
                 </div>
-              </div>
+              </div>}
 
               {/* items editor — Timeline / Do's / Don'ts, each with child details */}
-              <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 16 }}>
+              {editorFocus === 'timeline' && <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {KIND_TABS.map(({ k, label }) => {
@@ -1781,6 +1890,13 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   </div>
                   <AddStepMenu />
                 </div>
+                {kindTab === 'action' && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 10, marginBottom: 12, border: '1px solid ' + C.ink, background: C.panel }}>
+                  <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: C.ink }}>Schedule basis</strong>
+                  <select value={form.schedule_basis || 'calendar'} onChange={(e) => setField('schedule_basis', e.target.value as AdminProtocol['schedule_basis'])} style={{ ...inputStyle, width: 170 }}><option value="calendar">Calendar</option><option value="menstrual_cycle">Menstrual cycle</option><option value="lunar_cycle">Lunar cycle</option></select>
+                  {form.schedule_basis === 'menstrual_cycle' && <span style={{ fontSize: 11, color: C.sub, lineHeight: 1.4 }}>Uses the selected profile’s existing app period tracker. No cycle health data is copied into this protocol.</span>}
+                  <span style={{ flex: 1 }} />
+                  {dirty && <button type="button" onClick={saveProtocol} disabled={savingProtocol} style={{ border: '1px solid ' + C.good, background: C.good, color: '#fff', padding: '7px 11px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{savingProtocol ? 'Saving…' : 'Save schedule'}</button>}
+                </div>}
                 {/* Day strip — one cycle day at a time (like the app's day_number cycling) */}
                 {kindTab === 'action' && cycleLen > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -1790,10 +1906,12 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     {Array.from({ length: cycleLen }, (_, i) => i + 1).map((d) => {
                       const on = viewDay === d;
                       const n = allDayItems.filter((i) => showsOnDay(i, d)).length;
+                      const date = new Date(); date.setDate(date.getDate() + d - 1);
+                      const phase = moonPhaseName(date);
                       return (
-                        <button key={d} onClick={() => setViewDay(d)} title={`${n} steps on day ${d}`}
-                          style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, fontSize: 12.5, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.ink : C.hair), background: on ? C.ink : 'var(--sb-panel)', color: on ? '#fff' : C.sub }}>
-                          {d}<span style={{ fontSize: 11.5, fontWeight: 600, opacity: 0.65 }}>{n}</span>
+                        <button key={d} onClick={() => setViewDay(d)} title={`${phase} · ${n} steps on day ${d}`}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 700, padding: '5px 9px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (on ? C.ink : C.hair), background: on ? C.ink : 'var(--sb-panel)', color: on ? '#fff' : C.sub }}>
+                          <Moon size={11} aria-label={phase} />{d}<span style={{ fontSize: 11.5, fontWeight: 600, opacity: 0.65 }}>{n}</span>
                         </button>
                       );
                     })}
@@ -1873,13 +1991,10 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   const sorted = [...tops].sort((a, b) => anchorKey(a) - anchorKey(b));
                   const ordered = kindTab === 'action' ? sorted : tops;
                   const stepNo = new Map<string, number>(ordered.map((it, i) => [it.id, i + 1]));
-                  const podHeader = (t: string) => (
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.sub, margin: '2px 0 6px' }}>{t}</div>
-                  );
                   const groupCard = (label: string, list: AdminProtocolItem[]) => (
-                    <div key={label} style={{ border: '1px solid ' + C.hair, borderRadius: 10, padding: 8, background: C.panel }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: C.sub, marginBottom: 6, paddingLeft: 2 }}>{label}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{list.map((it) => <ItemRow key={it.id} it={it} num={stepNo.get(it.id)} />)}</div>
+                    <div key={label} style={{ border: '1px solid ' + C.ink, background: C.paper }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.ink, padding: '7px 10px', borderBottom: '1px solid ' + C.ink, background: C.panel }}>{label}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 8 }}>{list.map((it) => <ItemRow key={it.id} it={it} num={stepNo.get(it.id)} />)}</div>
                     </div>
                   );
 
@@ -1891,22 +2006,23 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
 
                   const byPod = group(sorted, (i) => partOfDay(i.scheduled_time));
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {POD_ORDER.filter((p) => byPod.has(p)).map((pod) => {
-                        const byGroup = group(byPod.get(pod)!, (i) => i.group_name || 'Ungrouped');
+                        const byGroup = group(byPod.get(pod)!, smartListGroup);
+                        const smartLists = [...byGroup.entries()].sort(([a], [b]) => SMART_LIST_ORDER.indexOf(a) - SMART_LIST_ORDER.indexOf(b));
                         return (
-                          <div key={pod}>
-                            {podHeader(pod)}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                              {[...byGroup.entries()].map(([g, list]) => groupCard(g, list))}
+                          <section key={pod} style={{ border: '2px solid ' + C.ink, background: C.paper }}>
+                            <div style={{ padding: '9px 12px', fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--sb-panel)', background: C.ink }}>{pod}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8, padding: 8 }}>
+                              {smartLists.map(([g, list]) => groupCard(g, list))}
                             </div>
-                          </div>
+                          </section>
                         );
                       })}
                     </div>
                   );
                 })()}
-              </div>
+              </div>}
             </div>
 
             {/* live mobile preview */}
@@ -1916,7 +2032,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 items={cycleLen > 1
                   ? items.filter((i) => i.parent_protocol_item_id != null || (i.kind && i.kind !== 'action') || showsOnDay(i, viewDay))
                   : items}
-                imageUrl={form.image_url || selected.image_url}
+                imageUrl={form.profile_image_url || form.image_url || selected.image_url || routineCoverImage || routineCovers.get(selected.id)}
+                profileName={form.profile_name || form.creator}
                 linkImages={new Map([...linkInfo].filter(([, v]) => v.image).map(([id, v]) => [id, v.image as string]))}
               />
               <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 280 }}>

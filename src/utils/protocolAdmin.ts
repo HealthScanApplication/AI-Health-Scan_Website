@@ -38,6 +38,10 @@ export interface AdminProtocol {
   start_time: string | null;
   sort_order: number | null;
   updated_at?: string | null;
+  profile_role?: 'self' | 'partner' | 'child' | null;
+  profile_name?: string | null;
+  profile_image_url?: string | null;
+  schedule_basis?: 'calendar' | 'menstrual_cycle' | 'lunar_cycle' | null;
 }
 
 export interface AdminProtocolItem {
@@ -102,19 +106,50 @@ export interface AIProtocolDraft {
   steps: { title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null }[];
 }
 
+function starterProtocolDraft(message: string): AIProtocolDraft {
+  const sleepFocused = /sleep|insomnia|bedtime|menopause/i.test(message);
+  const safety = 'Adjust to individual ability and stop if symptoms worsen. Seek clinical advice for persistent, severe, or concerning symptoms.';
+  const steps = sleepFocused ? [
+    { title: 'Wake at a consistent time', time: '07:00', category: 'sleep', notes: `Keep the wake time consistent throughout the week, including after a disrupted night. ${safety}`, duration_minutes: null },
+    { title: 'Get morning daylight', time: '07:30', category: 'do', notes: 'Spend time outdoors or near bright natural light soon after waking. Use an accessible alternative when outdoor conditions are unsuitable.', duration_minutes: 20 },
+    { title: 'Complete comfortable daytime movement', time: '12:30', category: 'do', notes: 'Choose walking, mobility work, or another appropriate activity at a conversational effort. Adapt duration and intensity to current capacity.', duration_minutes: 20 },
+    { title: 'Finish caffeine for the day', time: '14:00', category: 'consume', notes: 'Choose caffeine-free drinks after this point. Earlier timing may be appropriate for people who are particularly sensitive to caffeine.', duration_minutes: null },
+    { title: 'Prepare a cooler, darker sleep space', time: '20:30', category: 'do', notes: 'Reduce bright light, prepare comfortable bedding, and adjust room temperature where possible.', duration_minutes: 10 },
+    { title: 'Follow a quiet wind-down routine', time: '21:30', category: 'do', notes: 'Use a repeatable low-stimulation routine such as reading, gentle breathing, or relaxation. Avoid activities that increase alertness.', duration_minutes: 30 },
+    { title: 'Begin the sleep opportunity', time: '22:30', category: 'sleep', notes: safety, duration_minutes: null },
+  ] : [
+    { title: 'Set today’s intention', time: '08:00', category: 'do', notes: `Choose one realistic action that supports the selected goal. ${safety}`, duration_minutes: 5 },
+    { title: 'Complete comfortable movement', time: '10:00', category: 'do', notes: 'Choose an accessible activity and adapt the duration and intensity to current capacity.', duration_minutes: 20 },
+    { title: 'Plan a balanced meal', time: '12:30', category: 'consume', notes: 'Use familiar foods and account for allergies, intolerances, cultural preferences, and clinical advice.', duration_minutes: null },
+    { title: 'Take a recovery pause', time: '15:30', category: 'do', notes: 'Pause for breathing, stretching, hydration, or another low-risk recovery practice.', duration_minutes: 10 },
+    { title: 'Review progress', time: '20:30', category: 'do', notes: `Record what was completed and any symptoms or barriers. ${safety}`, duration_minutes: 5 },
+  ];
+  return {
+    summary: 'The live AI route was unavailable, so ROUTINE³ created a conservative starter draft from the selected profile. Review and personalise every step before publishing.',
+    steps: steps.map((step) => ({ ...step, day_number: 1 })),
+  };
+}
+
 export async function buildProtocolWithAI(accessToken: string, protocolId: string, message: string): Promise<AIProtocolDraft> {
   const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/guides/build-protocol`, {
     method: 'POST',
     headers: headers(accessToken),
     body: JSON.stringify({ protocolId, message }),
   });
+  if (res.status === 404) {
+    const detail = await res.clone().json().catch(() => null) as { error?: string; message?: string } | null;
+    const reason = `${detail?.error || ''} ${detail?.message || ''}`;
+    if (!/protocol not found/i.test(reason)) return starterProtocolDraft(message);
+  }
   return handle(res, 'Build protocol with AI');
 }
 
 const PROTOCOL_COLS =
-  'id,user_id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
+  'id,user_id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at,profile_role,profile_name,profile_image_url,schedule_basis';
+const LEGACY_PROTOCOL_COLS = PROTOCOL_COLS.split(',').filter((column) => !['profile_role', 'profile_name', 'profile_image_url', 'schedule_basis'].includes(column)).join(',');
 const ITEM_COLS =
   'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,enabled,notes,media_image_url,media_audio_url,amount,amount_unit,frequency_override,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id,recurrence_type,recurrence_days_of_week,recurrence_interval_days,recurrence_interval_unit,recurrence_start_date,recurrence_end_date,scheduled_date,notifications_enabled,notification_lead_minutes,sets,reps,reps_display,weight_value,weight_unit,weight_display,rest_seconds,work_seconds,rounds,intensity,distance_value,distance_unit,load_type,intensity_variants,selected_intensity,filter';
+const LEGACY_ITEM_COLS = ITEM_COLS.split(',').filter((column) => !column.startsWith('media_')).join(',');
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return {
@@ -146,11 +181,14 @@ function first<T>(rows: T | T[]): T {
 
 /** All protocols, suggested ones first, then by sort order / name. */
 export async function listProtocols(accessToken: string, ownerId?: string | null): Promise<AdminProtocol[]> {
-  const url =
-    `${rest()}/protocols?select=${PROTOCOL_COLS}` +
+  const suffix =
     (ownerId ? `&user_id=eq.${encodeURIComponent(ownerId)}` : '') +
     `&order=is_suggested.desc.nullslast,sort_order.asc.nullslast,name.asc`;
-  const res = await fetch(url, { headers: headers(accessToken) });
+  let res = await fetch(`${rest()}/protocols?select=${PROTOCOL_COLS}${suffix}`, { headers: headers(accessToken) });
+  if (!res.ok) {
+    const failure = await res.clone().json().catch(() => null) as { code?: string; message?: string } | null;
+    if (failure?.code === '42703') res = await fetch(`${rest()}/protocols?select=${LEGACY_PROTOCOL_COLS}${suffix}`, { headers: headers(accessToken) });
+  }
   return (await handle(res, 'List protocols')) || [];
 }
 
@@ -175,11 +213,19 @@ export async function listProtocolItems(
   accessToken: string,
   protocolId: string,
 ): Promise<AdminProtocolItem[]> {
-  const url =
-    `${rest()}/protocol_items?protocol_id=eq.${protocolId}&select=${ITEM_COLS}` +
-    `&order=scheduled_time.asc.nullslast,sort_order.asc.nullslast`;
-  const res = await fetch(url, { headers: headers(accessToken) });
-  return (await handle(res, 'List protocol steps')) || [];
+  const request = (columns: string) => fetch(
+    `${rest()}/protocol_items?protocol_id=eq.${protocolId}&select=${columns}` +
+    `&order=scheduled_time.asc.nullslast,sort_order.asc.nullslast`,
+    { headers: headers(accessToken) },
+  );
+  let res = await request(ITEM_COLS);
+  if (!res.ok) {
+    const failure = await res.clone().json().catch(() => null) as { code?: string; message?: string } | null;
+    const missingMediaColumn = failure?.code === '42703' && /protocol_items\.media_(image|audio)_url/.test(failure.message || '');
+    if (missingMediaColumn) res = await request(LEGACY_ITEM_COLS);
+  }
+  const items = ((await handle(res, 'List protocol steps')) || []) as Partial<AdminProtocolItem>[];
+  return items.map((item) => ({ ...item, media_image_url: item.media_image_url ?? null, media_audio_url: item.media_audio_url ?? null } as AdminProtocolItem));
 }
 
 export async function updateProtocol(
