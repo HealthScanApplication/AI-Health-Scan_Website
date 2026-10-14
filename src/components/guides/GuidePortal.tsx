@@ -887,7 +887,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [headerStyle, setHeaderStyle] = useState<HeaderStyle>('white');
   const [pricingRegion, setPricingRegion] = useState(defaultPricingRegion().region);
   const [currency, setCurrency] = useState<CurrencyCode>(defaultPricingRegion().currency);
-  const [offerGoal, setOfferGoal] = useState<GuardianOfferGoal>('sell');
+  const [offerGoal, setOfferGoal] = useState<GuardianOfferGoal>('basic');
   const [offerPlanStage, setOfferPlanStage] = useState(0);
   const [showProtocolInfo, setShowProtocolInfo] = useState(false);
   const [summaryView, setSummaryView] = useState<'offers' | 'sites' | null>(null);
@@ -919,7 +919,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [protocolBuilderOpen, setProtocolBuilderOpen] = useState(false);
   const [protocolEditorVisible, setProtocolEditorVisible] = useState(false);
   const [creatingProtocol, setCreatingProtocol] = useState(false);
-  const [selectedUpsells, setSelectedUpsells] = useState<UpsellKind[]>(['one_to_one_call']);
+  // Matches the default 'basic' goal: free guide -> paid Protocol.
+  const [selectedUpsells, setSelectedUpsells] = useState<UpsellKind[]>(['routine']);
   const [showAddOfferOptions, setShowAddOfferOptions] = useState(false);
   const [upsellDrafts, setUpsellDrafts] = useState<Record<UpsellKind, { title: string; price: string; url: string; delivery: DeliveryFormat[]; audienceValue: string; nextStep: OfferNextStep; billingModel: BillingModel }>>({
     ebook: { title: 'Complete guide', price: '29', url: '', delivery: ['Downloadable PDF'], audienceValue: 'Learn the complete method and apply it at your own pace.', nextStep: 'link', billingModel: 'one_time' },
