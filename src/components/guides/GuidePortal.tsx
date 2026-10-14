@@ -416,16 +416,16 @@ const deliveryCardArt: Record<DeliveryFormat, TagArt> = {
 };
 
 // One card spec for every setup stage (Guidance, Audience, Offers): same size, image, divider and selected state.
-const CHOICE_GRID: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,232px),232px))', gap: 10, justifyContent: 'start' };
+const CHOICE_GRID: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,220px),1fr))', gap: 10 };
 const CHOICE_CARD_HEIGHT = 156;
 function choiceCardStyle(active: boolean): React.CSSProperties {
-  return { position: 'relative', height: CHOICE_CARD_HEIGHT, overflow: 'hidden', padding: '26px 14px 14px', border: `1px solid ${active ? acid : line}`, background: active ? '#20251B' : 'transparent', color: ink, fontFamily: sans, cursor: 'pointer', display: 'grid', gridTemplateColumns: '64px 1px minmax(0,1fr)', gap: 12, alignItems: 'center', textAlign: 'left', minWidth: 0, width: '100%', boxSizing: 'border-box' };
+  return { position: 'relative', height: CHOICE_CARD_HEIGHT, overflow: 'hidden', padding: 0, border: `1px solid ${active ? acid : line}`, background: active ? '#20251B' : 'transparent', color: ink, fontFamily: sans, cursor: 'pointer', display: 'grid', gridTemplateColumns: '92px 1px minmax(0,1fr)', gap: 0, alignItems: 'stretch', textAlign: 'left', minWidth: 0, width: '100%', boxSizing: 'border-box' };
 }
 function ChoiceCheck() {
   return <span aria-hidden="true" style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, display: 'grid', placeItems: 'center', border: `1px solid ${acid}`, borderRadius: '50%', color: acid }}><Check size={10} strokeWidth={2.5} /></span>;
 }
 function ChoiceText({ title, description, footer, active }: { title: string; description?: string; footer?: string; active: boolean }) {
-  return <span style={{ minWidth: 0 }}>
+  return <span style={{ minWidth: 0, padding: '24px 14px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
     <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title}</span>
     {description && <span title={description} style={{ color: muted, fontSize: 10, lineHeight: 1.45, marginTop: 5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</span>}
     {footer && <span style={{ display: 'block', color: active ? acid : muted, fontSize: 8.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginTop: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{footer}</span>}
@@ -438,7 +438,7 @@ function TagChoice({ text, description, active, art, onClick, badge }: { text: s
   return <button className="guardian-card" type="button" onClick={onClick} aria-pressed={active} style={choiceCardStyle(active)}>
     {active && <ChoiceCheck />}
     {badge && <span style={{ position: 'absolute', top: 9, right: 10, color: badge === 'FREE' ? acid : '#C88A66', fontSize: 8, fontWeight: 700, letterSpacing: '.14em' }}>{badge}</span>}
-    <span role="img" aria-label="" style={{ width: 64, height: 64, justifySelf: 'center', backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${art.cols === 1 ? 0 : col * 100 / (art.cols - 1)}% ${art.rows === 1 ? 0 : row * 100 / (art.rows - 1)}%`, filter: 'grayscale(1) contrast(.92)' }} />
+    <span role="img" aria-label="" style={{ width: 64, height: 64, justifySelf: 'center', alignSelf: 'center', backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${art.cols === 1 ? 0 : col * 100 / (art.cols - 1)}% ${art.rows === 1 ? 0 : row * 100 / (art.rows - 1)}%`, filter: 'grayscale(1) contrast(.92)' }} />
     <span aria-hidden="true" style={{ alignSelf: 'stretch', background: line }} />
     <ChoiceText title={text} description={description} active={active} />
   </button>;
@@ -452,7 +452,7 @@ function CreatorChoiceCard({ badge, title, description, footer, active, art, ima
       {active && <ChoiceCheck />}
       {active && corner && <span style={{ position: 'absolute', top: 10, left: 32, color: acid, fontSize: 8, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{corner}</span>}
       <span style={{ position: 'absolute', top: 9, right: onInfo ? 54 : 10, color: active ? acid : muted, fontSize: 8, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{badge}</span>
-      {image ? <img src={image} alt="" loading="lazy" style={{ width: 64, height: 64, objectFit: 'contain', justifySelf: 'center' }} /> : art ? <span role="img" aria-label="" style={{ width: 64, height: 64, justifySelf: 'center', backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${col * 100 / Math.max(1, art.cols - 1)}% ${row * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.94)' }} /> : <span />}
+      {image ? <img src={image} alt="" loading="lazy" style={{ width: 64, height: 64, objectFit: 'contain', justifySelf: 'center', alignSelf: 'center' }} /> : art ? <span role="img" aria-label="" style={{ width: 64, height: 64, justifySelf: 'center', backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${col * 100 / Math.max(1, art.cols - 1)}% ${row * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.94)', alignSelf: 'center' }} /> : <span />}
       <span aria-hidden="true" style={{ alignSelf: 'stretch', background: line }} />
       <ChoiceText title={title} description={description} footer={footer} active={active} />
     </button>
@@ -1097,6 +1097,15 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const audiences = ['Everyone', 'Busy families', 'Women', 'Men', 'Children', 'Athletes', 'Adults 50+'];
+  const audienceHelp: Record<string, string> = {
+    Everyone: 'General guidance that works for most people',
+    'Busy families': 'Parents fitting health around family life',
+    Women: 'Cycles, pregnancy, menopause and more',
+    Men: 'Strength, energy and long-term health',
+    Children: 'Healthy habits for growing kids',
+    Athletes: 'Training, recovery and performance',
+    'Adults 50+': 'Mobility, energy and healthy ageing',
+  };
   const audienceProblemSuggestions = ['Sleep problems', 'Hot flushes', 'Low energy', 'Brain fog', 'Stress or anxiety', 'Weight changes', 'Digestive discomfort', 'Skin changes', 'Pain or mobility', 'Fitness confidence', 'Meal planning', 'Healthy routines'];
   const audienceProblemSuggestionsByGroup: Record<string, string[]> = {
     Everyone: audienceProblemSuggestions,
@@ -1669,7 +1678,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
 
       {step === 3 && <>
         {audienceSetupStage > 0 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(0)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
-        {audienceSetupStage === 0 && <div><label style={label}>Who do you usually help? <span style={{ color: acid }}>· choose all that apply</span></label><div style={CHOICE_GRID}>{audiences.map((x) => <TagChoice key={x} text={x} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />)}</div><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 14 }}><button type="button" onClick={() => setStep(2)} style={{ ...btn, background: 'transparent', color: ink }}>← Back</button><button type="button" disabled={!audience.length} onClick={() => setAudienceSetupStage(1)} style={btn}>Continue <ArrowRight size={14} /></button></div></div>}
+        {audienceSetupStage === 0 && <div><label style={label}>Who do you usually help? <span style={{ color: acid }}>· choose all that apply</span></label><div style={CHOICE_GRID}>{audiences.map((x) => <TagChoice key={x} text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />)}</div><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 14 }}><button type="button" onClick={() => setStep(2)} style={{ ...btn, background: 'transparent', color: ink }}>← Back</button><button type="button" disabled={!audience.length} onClick={() => setAudienceSetupStage(1)} style={btn}>Continue <ArrowRight size={14} /></button></div></div>}
         {audienceSetupStage > 1 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Problems by audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.map((group) => `${group}: ${(audienceProblemsByGroup[group] || []).join(', ')}`).join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(1)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
         {audienceSetupStage === 1 && <div>
           <label style={label}>What problems do you help each audience with? <span style={{ color: acid }}>· choose more than one</span></label>
