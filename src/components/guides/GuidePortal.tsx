@@ -2448,7 +2448,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
   const [recipes, setRecipes] = useState<GuideRecipe[]>([]);
   const [protocols, setProtocols] = useState<AdminProtocol[]>([]);
   const [valueRamps, setValueRamps] = useState<GuideValueRamp[]>([]);
-  const [routineOwners, setRoutineOwners] = useState<Map<string, { name: string; avatarUrl: string | null }>>(new Map());
+  const [routineOwners, setRoutineOwners] = useState<Map<string, { name: string; avatarUrl: string | null; relation: string | null }>>(new Map());
   const [recipeId, setRecipeId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');

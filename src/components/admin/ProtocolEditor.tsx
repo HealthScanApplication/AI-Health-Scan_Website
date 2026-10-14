@@ -26,6 +26,7 @@ import { PhoneFrame } from '../mockups/PhoneFrame';
 import { ProtocolHomeScreen, type HomeItem } from '../mockups/ProtocolHomeScreen';
 import { MediaUploadField } from './MediaUploadField';
 import { MarkdownField } from './MarkdownField';
+import { listRoutineOwners } from '../../utils/guidePortal';
 import { computeSleepWindow, isWakeName, isBedName } from '../../utils/sleepWindow';
 import { descriptiveMealSlot } from '../../protocolDomain/mealSlot';
 import {
@@ -415,6 +416,13 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [routineCovers, setRoutineCovers] = useState<Map<string, string>>(new Map());
   // multi-day protocols (day_number cycles): which cycle day the editor shows
   const [viewDay, setViewDay] = useState(1);
+  // A personal routine shows its person (family profile name + photo) in the header and phone preview.
+  const [routineOwners, setRoutineOwners] = useState<Map<string, { name: string; avatarUrl: string | null; relation: string | null }>>(new Map());
+  useEffect(() => {
+    const owner = ownerId || null;
+    if (!owner) return;
+    listRoutineOwners(owner, '').then(setRoutineOwners).catch(() => setRoutineOwners(new Map()));
+  }, [ownerId]);
   // Calendar emulation: which real date day 1 lands on, so each cycle day shows its date and moon phase.
   const [previewStart, setPreviewStart] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
   // Sample cycle for previewing cycle-based protocols (not saved; real data stays on-device).
@@ -444,6 +452,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const baseline = useRef<Map<string, AdminProtocolItem>>(new Map());
 
   const selected = protocols.find((p) => p.id === selectedId) || null;
+  const routineOwner = selected ? routineOwners.get(selected.id) : undefined;
+  const routinePerson = routineOwner && routineOwner.name ? routineOwner : routineOwner?.avatarUrl ? { name: '', avatarUrl: routineOwner.avatarUrl, relation: routineOwner.relation } : null;
 
   async function loadList(keepSelection = false) {
     setLoadingList(true); setListError(null);
@@ -1758,9 +1768,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               <div style={{ border: '1px solid ' + C.hair, borderRadius: 12, background: C.paper, padding: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
                   <span style={{ width: 34, height: 34, borderRadius: 17, overflow: 'hidden', background: C.panel, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {form.profile_image_url || form.image_url ? <img src={form.profile_image_url || form.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontWeight: 800, color: C.sub }}>{(form.profile_name || form.creator || 'P').charAt(0)}</span>}
+                    {form.profile_image_url || routinePerson?.avatarUrl || form.image_url ? <img src={form.profile_image_url || routinePerson?.avatarUrl || form.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontWeight: 800, color: C.sub }}>{(form.profile_name || form.creator || 'P').charAt(0)}</span>}
                   </span>
-                  <div><div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em' }}>{form.profile_name || form.creator || 'Protocol owner'} · {form.profile_role || 'self'}</div><div style={{ fontSize: 11, color: C.sub }}>Assigned profile</div></div>
+                  <div><div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em' }}>{form.profile_name || routinePerson?.name || form.creator || 'Protocol owner'} · {form.profile_role || routinePerson?.relation || 'self'}</div><div style={{ fontSize: 11, color: C.sub }}>Assigned profile</div></div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <strong style={{ color: C.ink, fontSize: 16, flex: '1 1 240px' }}>{form.name || 'Untitled Protocol'}</strong>
@@ -2081,8 +2091,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 items={cycleLen > 1
                   ? items.filter((i) => i.parent_protocol_item_id != null || (i.kind && i.kind !== 'action') || showsOnDay(i, viewDay))
                   : items}
-                imageUrl={form.profile_image_url || form.image_url || selected.image_url || routineCoverImage || routineCovers.get(selected.id)}
-                profileName={form.profile_name || form.creator}
+                imageUrl={form.profile_image_url || routinePerson?.avatarUrl || form.image_url || selected.image_url || routineCoverImage || routineCovers.get(selected.id)}
+                profileName={form.profile_name || routinePerson?.name || form.creator}
                 linkImages={new Map([...linkInfo].filter(([, v]) => v.image).map(([id, v]) => [id, v.image as string]))}
               />
               <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 280 }}>

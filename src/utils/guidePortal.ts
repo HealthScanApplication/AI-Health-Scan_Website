@@ -237,17 +237,19 @@ export async function submitGuardianOptIn(guideId: string, lead: { name: string;
  * (user_active_protocol.profile_id → family_profiles; null profile = the account's main user).
  * Returns protocol id → that person's name and avatar, so routines can be labelled by owner.
  */
-export async function listRoutineOwners(userId: string, mainName: string, mainAvatar?: string | null): Promise<Map<string, { name: string; avatarUrl: string | null }>> {
-  const owners = new Map<string, { name: string; avatarUrl: string | null }>();
+export async function listRoutineOwners(userId: string, mainName: string, mainAvatar?: string | null): Promise<Map<string, { name: string; avatarUrl: string | null; relation: string | null }>> {
+  const owners = new Map<string, { name: string; avatarUrl: string | null; relation: string | null }>();
+  // Avatars saved by the app can be device paths (file:///var/mobile/...); only web URLs load here.
+  const webUrl = (url?: string | null) => (url && /^https?:\/\//i.test(url) ? url : null);
   const [{ data: active }, { data: profiles }] = await Promise.all([
     db().from('user_active_protocol').select('protocol_id,profile_id').eq('user_id', userId),
-    db().from('family_profiles').select('id,name,avatar_url,is_main_user').eq('owner_id', userId),
+    db().from('family_profiles').select('id,name,avatar_url,is_main_user,relation').eq('owner_id', userId),
   ]);
   const byId = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
   const main = (profiles || []).find((profile: any) => profile.is_main_user);
   for (const row of (active || []) as { protocol_id: string; profile_id: string | null }[]) {
     const profile: any = row.profile_id ? byId.get(row.profile_id) : main;
-    owners.set(row.protocol_id, { name: profile?.name || mainName, avatarUrl: profile?.avatar_url || (row.profile_id ? null : mainAvatar || null) });
+    owners.set(row.protocol_id, { name: profile?.name || mainName, avatarUrl: webUrl(profile?.avatar_url) || (row.profile_id ? null : webUrl(mainAvatar)), relation: row.profile_id ? profile?.relation || null : 'self' });
   }
   return owners;
 }
