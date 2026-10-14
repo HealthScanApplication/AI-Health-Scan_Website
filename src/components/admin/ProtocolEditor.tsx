@@ -192,7 +192,7 @@ function toHomeItems(items: AdminProtocolItem[], linkImages?: Map<string, string
 function PhonePreview({ name, items, imageUrl, profileName, linkImages }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null; profileName?: string | null; linkImages?: Map<string, string> }) {
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">
-      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} imageUrl={imageUrl} profileName={profileName || 'Protocol owner'} />
+      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} imageUrl={imageUrl} profileName={profileName || 'Protocol owner'} grouping="smart" />
     </PhoneFrame>
   );
 }
@@ -325,9 +325,9 @@ function IconSelect({ value, options, onChange, width = 132, placeholder }: { va
   return (
     <div style={{ position: 'relative', width, minWidth: width, flex: '0 1 auto' }}>
       <button type="button" onClick={() => setOpen((o) => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, minHeight: 34, padding: '6px 8px', fontSize: 12.5, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, cursor: 'pointer', boxSizing: 'border-box' }}>
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 8px', fontSize: 13, color: C.ink, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, cursor: 'pointer', boxSizing: 'border-box' }}>
         {cur?.Icon && <cur.Icon size={14} color={cur.color || C.sub} style={{ flexShrink: 0 }} />}
-        <span style={{ flex: 1, minWidth: 0, textAlign: 'left', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25 }}>{cur?.label || placeholder || '—'}</span>
+        <span style={{ flex: 1, minWidth: 0, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.25 }}>{cur?.label || placeholder || '—'}</span>
         <ChevronDown size={13} color={C.faint} style={{ flexShrink: 0 }} />
       </button>
       {open && (
@@ -1533,7 +1533,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
 
   /* ── render ── */
   return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minHeight: 560 }}>
+    <div className="r3-compact" style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minHeight: 560 }}>
+      {/* One control size across the editor (globals force 16px on inputs; .r3-compact is exempt). */}
+      <style>{`.r3-compact select,.r3-compact input[type=time],.r3-compact input[type=text],.r3-compact input[type=number],.r3-compact input:not([type]){height:34px;font-size:13px;box-sizing:border-box;border-radius:8px}.r3-compact textarea{font-size:13px}`}</style>
       {/* linked-record lightbox (view / re-link) */}
       {viewRec && (
         <div onClick={() => setViewRec(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -2018,7 +2020,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                         const smartLists = [...byGroup.entries()].sort(([a], [b]) => SMART_LIST_ORDER.indexOf(a) - SMART_LIST_ORDER.indexOf(b));
                         return (
                           <section key={pod} style={{ border: '2px solid ' + C.ink, background: C.paper }}>
-                            <div style={{ padding: '9px 12px', fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--sb-panel)', background: C.ink }}>{pod}</div>
+                            <div style={{ padding: '9px 12px', fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#FFFFFF', background: '#11120F' }}>{pod}</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8, padding: 8 }}>
                               {smartLists.map(([g, list]) => groupCard(g, list))}
                             </div>

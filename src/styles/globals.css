@@ -1528,13 +1528,13 @@ html {
 }
 
 /* Prevent zoom on input focus for mobile devices while maintaining consistency */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="search"],
-input[type="tel"],
-input[type="url"],
+input[type="text"]:not(.r3-compact *),
+input[type="email"]:not(.r3-compact *),
+input[type="password"]:not(.r3-compact *),
+input[type="number"]:not(.r3-compact *),
+input[type="search"]:not(.r3-compact *),
+input[type="tel"]:not(.r3-compact *),
+input[type="url"]:not(.r3-compact *),
 textarea,
 select {
   font-size: max(16px, var(--text-base)) !important; /* Prevent iOS zoom while respecting base size */
@@ -1546,15 +1546,15 @@ button:not(.guardian-ui button):not(.r3-lockup button) {
 
 @media (max-width: 640px) {
   /* Additional mobile input zoom prevention - ensure buttons and inputs are consistent */
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  input[type="search"],
-  input[type="tel"],
-  input[type="url"],
-  textarea,
-  select,
+  input[type="text"]:not(.r3-compact *),
+  input[type="email"]:not(.r3-compact *),
+  input[type="password"]:not(.r3-compact *),
+  input[type="number"]:not(.r3-compact *),
+  input[type="search"]:not(.r3-compact *),
+  input[type="tel"]:not(.r3-compact *),
+  input[type="url"]:not(.r3-compact *),
+  textarea:not(.r3-compact *),
+  select:not(.r3-compact *),
   button:not(.guardian-ui button):not(.r3-lockup button) {
     font-size: max(16px, var(--text-base)) !important; /* Force minimum 16px to prevent zoom while keeping consistency */
     transform-origin: top left;
@@ -1563,8 +1563,8 @@ button:not(.guardian-ui button):not(.r3-lockup button) {
   
   /* Prevent zoom on focus while maintaining size consistency */
   input:focus,
-  textarea:focus,
-  select:focus,
+  textarea:not(.r3-compact *):focus,
+  select:not(.r3-compact *):focus,
   button:not(.guardian-ui button):not(.r3-lockup button):focus {
     font-size: max(16px, var(--text-base)) !important;
     zoom: 1 !important;

@@ -147,6 +147,43 @@ function buildBands(list: HomeItem[]): Band[] {
   return bands;
 }
 
+
+/* ───────── smart lists (mirrors mobile timeline/smartGroups.ts) ─────────
+   A group is a function of (time-of-day phase, subtype): "Morning Hygiene",
+   "Evening Meal". Sleep anchors stay their own unprefixed "Sleep" group. */
+type SmartCategory = "hygiene" | "wellness" | "fitness" | "supplements" | "meal" | "work" | "home" | "tasks";
+const SMART_ORDER: SmartCategory[] = ["hygiene", "wellness", "fitness", "supplements", "meal", "work", "home", "tasks"];
+const SMART_TITLE: Record<SmartCategory, string> = { hygiene: "Hygiene", wellness: "Wellness", fitness: "Fitness", supplements: "Supplements", meal: "Meal", work: "Work", home: "Home", tasks: "Tasks" };
+const SUBTYPE_TO_SMART: Record<string, SmartCategory> = { hygiene: "hygiene", wellness: "wellness", reflection: "wellness", finance: "home", planning: "tasks", work: "work", home: "home", tasks: "tasks", exercise: "fitness", supplement: "supplements", meal: "meal", beverage: "meal", drink: "meal", snack: "meal" };
+const SMART_CATEGORY_FALLBACK: Record<string, SmartCategory> = { supplement: "supplements", supplements: "supplements", consume: "meal", do: "wellness" };
+const SMART_TYPE_FALLBACK: Record<string, SmartCategory> = { supplement: "supplements", consume: "meal", recipe: "meal", product: "supplements", activity: "wellness", rule: "wellness" };
+function smartCategoryFor(it: HomeItem): SmartCategory {
+  const sub = (it.subtype || "").toLowerCase().trim();
+  if (SUBTYPE_TO_SMART[sub]) return SUBTYPE_TO_SMART[sub];
+  const cat = (it.category || "").toLowerCase().trim();
+  if (SMART_CATEGORY_FALLBACK[cat]) return SMART_CATEGORY_FALLBACK[cat];
+  const type = (it.item_type || "").toLowerCase().trim();
+  return SMART_TYPE_FALLBACK[type] || "wellness";
+}
+const SMART_TINT: Record<SmartCategory, CatKey> = { hygiene: "do", wellness: "do", fitness: "do", supplements: "supplements", meal: "consume", work: "do", home: "do", tasks: "do" };
+function buildSmartBands(list: HomeItem[], tod: string): Band[] {
+  const bands: Band[] = [];
+  const sleepItems = list.filter((it) => categorizeFull(it) === "sleep");
+  const rest = list.filter((it) => categorizeFull(it) !== "sleep");
+  const byCat = new Map<SmartCategory, HomeItem[]>();
+  for (const it of rest) { const c = smartCategoryFor(it); byCat.set(c, [...(byCat.get(c) || []), it]); }
+  const sortItems = (xs: HomeItem[]) => [...xs].sort((a, b) => orderKey(a) - orderKey(b));
+  for (const it of sortItems(sleepItems)) bands.push({ cat: "sleep", slot: null, firstMin: parseHM(it.time)?.mins ?? null, order: orderKey(it), time: it.time, label: "SLEEP", items: [it] });
+  for (const c of SMART_ORDER) {
+    const items = byCat.get(c);
+    if (!items?.length) continue;
+    const sorted = sortItems(items);
+    bands.push({ cat: SMART_TINT[c], slot: "smart", firstMin: parseHM(sorted[0].time)?.mins ?? null, order: orderKey(sorted[0]), time: sorted[0].time, label: `${tod} ${SMART_TITLE[c]}`.toUpperCase(), items: sorted });
+  }
+  // Wake leads the morning and bedtime closes the evening; smart groups sit between in category order.
+  return bands.sort((a, b) => (a.cat === "sleep" && a.order < 0 ? -1 : 0) - (b.cat === "sleep" && b.order < 0 ? -1 : 0) || (a.cat === "sleep" && a.order >= 1e9 ? 1 : 0) - (b.cat === "sleep" && b.order >= 1e9 ? 1 : 0) || SMART_ORDER.indexOf(a.label.split(" ").pop()!.toLowerCase() as SmartCategory) - SMART_ORDER.indexOf(b.label.split(" ").pop()!.toLowerCase() as SmartCategory));
+}
+
 /* ───────── date helpers for header + week strip ───────── */
 const WD = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const WD_FULL = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
@@ -172,7 +209,10 @@ export function ProtocolHomeScreen({
   showDetails: showDetailsProp = true,
   theme = "light",
   profileName = "John Ferreira",
+  grouping = "time",
 }: {
+  /** 'smart' groups by phase + category like the mobile smart lists. */
+  grouping?: "time" | "smart";
   protocolName: string;
   items: HomeItem[];
   date?: Date;
@@ -214,7 +254,7 @@ export function ProtocolHomeScreen({
   const byTod: Record<Tod, HomeItem[]> = { Morning: [], Afternoon: [], Evening: [] };
   for (const it of allItems) byTod[todForItem(it, wakeHour)].push(it);
   const sections = todOrder
-    .map((tod) => ({ tod, bands: buildBands(byTod[tod]) }))
+    .map((tod) => ({ tod, bands: grouping === "smart" ? buildSmartBands(byTod[tod], tod) : buildBands(byTod[tod]) }))
     .filter((s) => s.bands.length);
 
   // The current mobile strip begins on the selected day, keeping the selected
