@@ -1098,7 +1098,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     if (t === 'recipe') return 'recipe';
     if (t === 'product') return 'product';
     if (t === 'supplement') return 'supplement';
-    if (t === 'activity') return it.subtype === 'exercise' ? 'activity' : 'product';
+    if (t === 'activity') return 'activity';
     return 'ingredient'; // ingredient (and sleep) default to the ingredient catalog
   }
   // Meal slot a consume item belongs to (broad/descriptive, e.g. "Nutritious
@@ -1110,7 +1110,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     const item = it || items.find((x) => x.id === linkerItemId);
     const slot = kind === 'recipe' ? itemMealSlot(item) : null;
     setLinkBusy(true);
-    try { setLinkResults(await searchCatalog(accessToken, kind, q, slot && !q.trim() ? 6 : 10, slot ?? undefined)); }
+    try { setLinkResults(await searchCatalog(accessToken, kind, q, kind === 'activity' && !q.trim() ? 24 : slot && !q.trim() ? 6 : 10, slot ?? undefined)); }
     catch { setLinkResults([]); }
     finally { setLinkBusy(false); }
   }
@@ -1119,7 +1119,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     // A meal-slot item with nothing linked yet opens straight into recipe
     // suggestions (empty query so the ranker, not name-match, drives results).
     const k = linkedKind(it) || (slot ? 'recipe' : defaultKind(it));
-    const q = k === 'recipe' && slot ? '' : (it.display_name || '');
+    // Activities open on the browsable activity list (with images); a sentence-length step
+    // name like "Prepare a cooler, darker sleep space" would match nothing.
+    const q = (k === 'recipe' && slot) || (k === 'activity' && !linkedKind(it)) ? '' : (it.display_name || '');
     setLinkerItemId(it.id); setLinkKind(k); setLinkQuery(q);
     runSearch(k, q, it);
   }
@@ -1329,12 +1331,12 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           <button onClick={() => openLinker(it)} style={{ ...linkBtnStyle, color: C.accent }}><Link2 size={12} /> Link {defaultKind(it)}…</button>
         )}
         {open && (
-          <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: 'var(--sb-panel)' }}>
+          <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
               <IconSelect value={linkKind} options={LINK_OPTS} width={132}
                 onChange={(k) => { setLinkKind(k as CatalogKind); runSearch(k as CatalogKind, linkQuery, it); }} />
               <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value, it); }}
-                placeholder={slot && linkKind === 'recipe' ? `Suggest ${slot} recipes — or type to search…` : 'Search catalog…'} style={{ ...inputStyle, flex: 1 }} />
+                placeholder={slot && linkKind === 'recipe' ? `Suggest ${slot} recipes — or type to search…` : linkKind === 'activity' ? 'Search activities, e.g. run, yoga, walk…' : 'Search catalog…'} style={{ ...inputStyle, flex: 1 }} />
               <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
             </div>
             {suggesting && (
@@ -1350,7 +1352,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
                 {linkResults.map((h) => (
                   <button key={h.id} onClick={() => linkItemTo(it, linkKind, h)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: 'var(--sb-panel)', cursor: 'pointer', textAlign: 'left' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: C.paper, cursor: 'pointer', textAlign: 'left' }}>
                     {thumb(h.image)}
                     <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.35 }}>{h.name}</span>
                     {h.healthScore != null && (
@@ -1624,7 +1626,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
                       {mergeResults.map((h) => (
                         <button key={h.id} onClick={() => doMerge(h)} disabled={mergeBusy}
-                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: 'var(--sb-panel)', cursor: 'pointer', textAlign: 'left' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: C.paper, cursor: 'pointer', textAlign: 'left' }}>
                           {thumb(h.image)}
                           <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.35 }}>{h.name}</span>
                           <span style={{ fontSize: 11, fontWeight: 600, color: C.accent, display: 'inline-flex', alignItems: 'center', gap: 3 }}><GitMerge size={12} /> merge in</span>
