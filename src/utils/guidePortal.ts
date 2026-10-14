@@ -36,7 +36,7 @@ export interface GuideOffer {
   title: string;
   description: string | null;
   price_cents: number;
-  currency: 'GBP' | 'EUR' | 'USD';
+  currency: string;
   affiliate_url: string | null;
   access_model: 'free' | 'paid';
   file_path: string | null;
@@ -53,6 +53,58 @@ export interface GuideRecipe {
   ingredients: unknown[];
   instructions: unknown[];
   status: 'draft' | 'submitted' | 'published';
+}
+
+export interface GuideValueRamp {
+  id: string;
+  guide_id: string;
+  name: string;
+  slug: string;
+  audience: string;
+  problem: string;
+  offer_ids: string[];
+  status: 'draft' | 'published';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GuideBrand {
+  id?: string;
+  guide_id: string;
+  name: string;
+  kind: 'personal' | 'business';
+  logo_url: string | null;
+  contact_email: string;
+  whatsapp_phone: string;
+  website_url: string;
+  social_links: Record<string, string>;
+  language: string;
+  pricing_region: string;
+  currency: string;
+  is_primary: boolean;
+}
+
+export type GuideLibraryKind = 'pdf' | 'url' | 'transcript';
+
+export interface GuideLibraryFolder {
+  id: string;
+  guide_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GuideLibraryItem {
+  id: string;
+  guide_id: string;
+  folder_id: string | null;
+  kind: GuideLibraryKind;
+  title: string;
+  source_url: string | null;
+  file_path: string | null;
+  transcript: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ImportedGuideProfile {
@@ -119,6 +171,15 @@ export async function getGuideProfileBySlug(slug: string): Promise<GuideProfile 
   return data as GuideProfile | null;
 }
 
+export async function listPublicGuideProfiles(): Promise<GuideProfile[]> {
+  const { data, error } = await db().from('guide_profiles')
+    .select('user_id,slug,display_name,headline,bio,avatar_url,contact_email,whatsapp_phone,social_links,specialties,status,commission_percent,onboarding_step')
+    .eq('status', 'approved')
+    .order('display_name', { ascending: true });
+  if (error) throw error;
+  return (data || []) as GuideProfile[];
+}
+
 export async function saveGuideProfile(profile: Partial<GuideProfile> & { user_id: string }): Promise<GuideProfile> {
   const { data, error } = await db().from('guide_profiles').upsert(profile, { onConflict: 'user_id' }).select().single();
   if (error) throw error;
@@ -149,6 +210,26 @@ export async function createGuideOffer(guideId: string, offer: Pick<GuideOffer, 
   return data as GuideOffer;
 }
 
+export async function listGuideValueRamps(userId: string): Promise<GuideValueRamp[]> {
+  const { data, error } = await db().from('guide_value_ramps').select('*').eq('guide_id', userId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuideValueRamp[];
+}
+
+export async function createGuideValueRamp(guideId: string, ramp: Pick<GuideValueRamp, 'name' | 'slug' | 'audience' | 'problem'>): Promise<GuideValueRamp> {
+  const { data, error } = await db().from('guide_value_ramps').insert({ guide_id: guideId, ...ramp }).select().single();
+  if (error) throw error;
+  return data as GuideValueRamp;
+}
+
+export async function replaceGuideBrands(guideId: string, brands: Omit<GuideBrand, 'id' | 'guide_id'>[]): Promise<GuideBrand[]> {
+  const { error: deleteError } = await db().from('guide_brands').delete().eq('guide_id', guideId);
+  if (deleteError) throw deleteError;
+  const { data, error } = await db().from('guide_brands').insert(brands.map((brand) => ({ ...brand, guide_id: guideId }))).select();
+  if (error) throw error;
+  return (data || []) as GuideBrand[];
+}
+
 export async function listGuideRecipes(userId: string): Promise<GuideRecipe[]> {
   const { data, error } = await db().from('guide_recipes').select('*').eq('guide_id', userId).order('created_at', { ascending: false });
   if (error) throw error;
@@ -165,4 +246,39 @@ export async function updateGuideRecipe(id: string, recipe: Partial<Pick<GuideRe
   const { data, error } = await db().from('guide_recipes').update(recipe).eq('id', id).select().single();
   if (error) throw error;
   return data as GuideRecipe;
+}
+
+export async function listGuideLibraryFolders(guideId: string): Promise<GuideLibraryFolder[]> {
+  const { data, error } = await db().from('guide_library_folders').select('*').eq('guide_id', guideId).order('name');
+  if (error) throw error;
+  return (data || []) as GuideLibraryFolder[];
+}
+
+export async function createGuideLibraryFolder(guideId: string, name: string): Promise<GuideLibraryFolder> {
+  const { data, error } = await db().from('guide_library_folders').insert({ guide_id: guideId, name }).select().single();
+  if (error) throw error;
+  return data as GuideLibraryFolder;
+}
+
+export async function listGuideLibraryItems(guideId: string): Promise<GuideLibraryItem[]> {
+  const { data, error } = await db().from('guide_library_items').select('*').eq('guide_id', guideId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuideLibraryItem[];
+}
+
+export async function createGuideLibraryItem(guideId: string, item: Pick<GuideLibraryItem, 'folder_id' | 'kind' | 'title' | 'source_url' | 'file_path' | 'transcript'>): Promise<GuideLibraryItem> {
+  const { data, error } = await db().from('guide_library_items').insert({ guide_id: guideId, ...item }).select().single();
+  if (error) throw error;
+  return data as GuideLibraryItem;
+}
+
+export async function deleteGuideLibraryItem(id: string): Promise<void> {
+  const { error } = await db().from('guide_library_items').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getGuideFileDownloadUrl(path: string): Promise<string> {
+  const { data, error } = await db().storage.from('guide-files').createSignedUrl(path, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
 }

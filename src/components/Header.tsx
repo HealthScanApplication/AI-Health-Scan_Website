@@ -31,7 +31,7 @@ import { PageType } from '../types/app';
 
 // ROUTINE³ lockup — a square, single-bordered box joining the wordmark to the BETA tag,
 // same joined-seam treatment as the email/Subscribe container.
-function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#16140F' }: { size?: number; textColor?: string; hairline?: string }) {
+export function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#16140F', suffix = 'Beta' }: { size?: number; textColor?: string; hairline?: string; suffix?: string }) {
   return (
     <div
       style={{
@@ -51,7 +51,7 @@ function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#16140F' }:
       </div>
       <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', borderLeft: `1px solid ${hairline}`, transition: 'border-color 350ms ease' }}>
         <span style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: textColor, whiteSpace: 'nowrap', transition: 'color 350ms ease' }}>
-          Beta
+          {suffix}
         </span>
       </div>
     </div>
@@ -414,7 +414,7 @@ export function Header({
                 <span style={{ fontSize: 14 }}>FAQ</span>
               </button>
               <a
-                href="/guides"
+                href="/guardians"
                 className="px-4 py-2"
                 style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.13em', color: navText, textDecoration: 'none', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
@@ -580,7 +580,7 @@ export function Header({
                       FAQ
                     </button>
                     <a
-                      href="/guides"
+                      href="/guardians"
                       className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
                       style={{ color: oura.body, textDecoration: 'none' }}
                     >
