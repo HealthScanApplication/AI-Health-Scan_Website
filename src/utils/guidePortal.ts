@@ -238,10 +238,27 @@ export async function listGuideOffers(userId: string): Promise<GuideOffer[]> {
   return (data || []) as GuideOffer[];
 }
 
-export async function createGuideOffer(guideId: string, offer: Pick<GuideOffer, 'kind' | 'title' | 'description' | 'price_cents' | 'affiliate_url' | 'access_model' | 'file_path' | 'booking_url'> & Partial<Pick<GuideOffer, 'currency'>>): Promise<GuideOffer> {
+export async function createGuideOffer(guideId: string, offer: Pick<GuideOffer, 'kind' | 'title' | 'description' | 'price_cents' | 'affiliate_url' | 'access_model' | 'file_path' | 'booking_url'> & Partial<Pick<GuideOffer, 'currency' | 'status'>>): Promise<GuideOffer> {
   const { data, error } = await db().from('guide_offers').insert({ guide_id: guideId, ...offer }).select().single();
   if (error) throw error;
   return data as GuideOffer;
+}
+
+type GuideOfferInput = Pick<GuideOffer, 'kind' | 'title' | 'description' | 'price_cents' | 'affiliate_url' | 'access_model' | 'file_path' | 'booking_url'> & Partial<Pick<GuideOffer, 'currency' | 'status'>>;
+
+/** Update the given offer when an id is passed, otherwise create it. Lets republishing reuse offers. */
+export async function upsertGuideOffer(guideId: string, offer: GuideOfferInput, existingId?: string | null): Promise<GuideOffer> {
+  if (!existingId) return createGuideOffer(guideId, offer);
+  const { data, error } = await db().from('guide_offers').update(offer).eq('id', existingId).eq('guide_id', guideId).select().single();
+  if (error) throw error;
+  return data as GuideOffer;
+}
+
+/** Create or update an offer path by slug, with its offers in funnel order. */
+export async function upsertGuideValueRamp(guideId: string, ramp: Pick<GuideValueRamp, 'name' | 'slug' | 'audience' | 'problem' | 'offer_ids' | 'status'>): Promise<GuideValueRamp> {
+  const { data, error } = await db().from('guide_value_ramps').upsert({ guide_id: guideId, ...ramp }, { onConflict: 'guide_id,slug' }).select().single();
+  if (error) throw error;
+  return data as GuideValueRamp;
 }
 
 export async function listGuideValueRamps(userId: string): Promise<GuideValueRamp[]> {
