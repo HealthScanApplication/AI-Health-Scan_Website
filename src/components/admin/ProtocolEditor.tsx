@@ -17,7 +17,7 @@ import {
 import { aiGenerateImage } from '../../utils/aiImage';
 import { buildProtocolCoverPrompt } from '../../utils/imagePromptBuilder';
 import { composeAppIconCoverFile } from '../../utils/appIconCover';
-import { generateProtocolPdf } from '../../utils/protocolPdf';
+import { generateProtocolPdf, buildProtocolPdf } from '../../utils/protocolPdf';
 import { toast } from 'sonner';
 import {
   CATEGORY_TINTS, categorize, type ProtocolItem as CatItem,
@@ -454,6 +454,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const selected = protocols.find((p) => p.id === selectedId) || null;
   const routineOwner = selected ? routineOwners.get(selected.id) : undefined;
   const routinePerson = routineOwner && routineOwner.name ? routineOwner : routineOwner?.avatarUrl ? { name: '', avatarUrl: routineOwner.avatarUrl, relation: routineOwner.relation } : null;
+  // Preview switches between the app home screen and the real printable PDF (with its QR code).
+  const [previewMode, setPreviewMode] = useState<'app' | 'pdf'>('app');
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
   async function loadList(keepSelection = false) {
     setLoadingList(true); setListError(null);
@@ -718,7 +721,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     try {
       await generateProtocolPdf({
         accessToken,
-        protocol: { ...selected, ...form } as any,
+        protocol: { ...selected, ...form, id: selected.id } as any,
         items: items as any,
         day: cycleLen > 1 ? viewDay : 1,
       });
@@ -727,6 +730,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
       toast.error(`PDF failed: ${e?.message || e}`);
     } finally { setPdfBusy(false); }
   }
+
 
   function exportProtocol() {
     if (!selected) return;
@@ -1571,6 +1575,22 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   }
 
   /* ── render ── */
+  useEffect(() => {
+    if (previewMode !== 'pdf' || !selected) return;
+    let cancelled = false;
+    let url: string | null = null;
+    // Rebuild shortly after edits settle; the viewer gets a fresh blob URL each time.
+    const timer = window.setTimeout(async () => {
+      try {
+        const { doc } = await buildProtocolPdf({ accessToken, protocol: { ...selected, ...form, id: selected.id } as any, items: items as any, day: cycleLen > 1 ? viewDay : 1 });
+        if (cancelled) return;
+        url = URL.createObjectURL(doc.output('blob'));
+        setPdfPreviewUrl(url);
+      } catch { if (!cancelled) setPdfPreviewUrl(null); }
+    }, 500);
+    return () => { cancelled = true; window.clearTimeout(timer); if (url) URL.revokeObjectURL(url); };
+  }, [previewMode, selected?.id, form, items, viewDay, cycleLen, accessToken]);
+
   return (
     <div className="r3-compact" style={{ display: 'flex', gap: 16, alignItems: 'flex-start', minHeight: 560 }}>
       {/* One control size across the editor (globals force 16px on inputs; .r3-compact is exempt). */}
@@ -2088,6 +2108,15 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
 
             {/* live mobile preview */}
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, position: 'sticky', top: 12 }}>
+              <div role="group" aria-label="Preview" style={{ display: 'inline-flex', border: '1px solid ' + C.ink, borderRadius: 8, overflow: 'hidden' }}>
+                {(['app', 'pdf'] as const).map((mode, index) => <button key={mode} type="button" aria-pressed={previewMode === mode} onClick={() => setPreviewMode(mode)} style={{ height: 30, padding: '0 16px', border: 0, borderLeft: index ? '1px solid ' + C.ink : 0, background: previewMode === mode ? C.ink : C.paper, color: previewMode === mode ? '#FFFFFF' : C.ink, fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{mode === 'app' ? 'App' : 'PDF'}</button>)}
+              </div>
+              {previewMode === 'pdf' ? <>
+                <div style={{ width: 340, aspectRatio: '210 / 297', border: '1px solid ' + C.hair, background: '#FFFFFF', boxShadow: '0 10px 30px rgba(17,18,15,.12)' }}>
+                  {pdfPreviewUrl ? <iframe title="Printable PDF preview" src={`${pdfPreviewUrl}#toolbar=0&view=FitH`} style={{ width: '100%', height: '100%', border: 0 }} /> : <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: C.faint, fontSize: 12 }}><Loader2 size={16} className="animate-spin" /></div>}
+                </div>
+                <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 300 }}>Printable PDF{cycleLen > 1 ? ` (day ${viewDay})` : ''}. The QR code opens this protocol in the app.</p>
+              </> : <>
               <PhonePreview
                 name={form.name || selected.name}
                 items={cycleLen > 1
@@ -2100,6 +2129,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 280 }}>
                 Live preview — the home screen as it appears in the mobile app{cycleLen > 1 ? ` (day ${viewDay} of ${cycleLen})` : ''}.
               </p>
+              </>}
             </div>
           </div>
         )}

@@ -12,9 +12,12 @@
  * Recipe details are fetched from the current environment via PostgREST.
  */
 import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
 import { projectId, publicAnonKey } from './supabase/info';
 
 export interface PdfProtocol {
+  /** When set, page one carries a QR code that opens this protocol in the app (universal link). */
+  id?: string | null;
   name: string;
   description?: string | null;
   creator?: string | null;
@@ -132,8 +135,16 @@ export async function buildProtocolPdf(opts: { accessToken: string; protocol: Pd
   const heading = (t: string, size = 12) => { ensure(10); doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.text(t, M, y); y += size * 0.5; doc.setLineWidth(0.4); doc.line(M, y, M + W, y); y += 5; };
 
   // ── 1. Header ──
+  // QR (top right) → routine3.com/protocol/<id>, which the app claims as a universal link.
+  const QR = 26;
+  if (protocol.id) {
+    const qr = await QRCode.toDataURL(`https://routine3.com/protocol/${protocol.id}`, { margin: 0, width: 300, color: { dark: '#000000', light: '#ffffff' } });
+    doc.addImage(qr, 'PNG', PW - M - QR, M - 2, QR, QR);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+    doc.text('Scan to open in the ROUTINE³ app', PW - M - QR / 2, M + QR + 1.5, { align: 'center' });
+  }
   doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-  const titleLines = doc.splitTextToSize(protocol.name || 'Protocol', W);
+  const titleLines = doc.splitTextToSize(protocol.name || 'Protocol', protocol.id ? W - QR - 6 : W);
   doc.text(titleLines, M, y + 5); y += 5 + titleLines.length * 8;
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
   const meta = ['Weekly tracker', protocol.creator ? `by ${protocol.creator}` : '', protocol.health_score ? `${protocol.health_score}/100` : ''].filter(Boolean).join('   ·   ');
