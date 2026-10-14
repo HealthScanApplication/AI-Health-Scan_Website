@@ -250,7 +250,7 @@ export function HeroSection({ hasReferral, isActive, referralCode }: HeroSection
                 target={APP_STORE_URL ? "_blank" : undefined}
                 rel="noopener noreferrer"
                 className="ed-cta"
-                style={{ background: "#FFFFFF", color: "#16140F", borderColor: "#FFFFFF", boxShadow: "0 2px 12px -5px rgba(0,0,0,0.35)" }}
+                style={{ height: 42, boxSizing: "border-box", padding: "0 16px", background: "#FFFFFF", color: "#16140F", border: "1px solid #FFFFFF", borderRadius: 2, fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", boxShadow: "none" }}
               >
                 <AppleMark />Try&nbsp;→
               </a>

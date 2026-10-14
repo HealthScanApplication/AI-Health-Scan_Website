@@ -70,7 +70,7 @@ export function UniversalWaitlist({
     fontSize: 11,
     fontWeight: 600,
     textTransform: 'uppercase',
-    letterSpacing: '0.1em',
+    letterSpacing: '0.12em',
     color: '#16140F',
     background: '#FFFFFF',
     border: '1px solid #FFFFFF',
@@ -444,7 +444,7 @@ export function UniversalWaitlist({
   return (
     <div className={`relative ${className}`}>
       {/* Main waitlist form */}
-      <form onSubmit={handleSubmit} className="w-full mx-auto" style={isEditorial ? { maxWidth: 460 } : isHero ? { maxWidth: 460 } : { maxWidth: 448 }}>
+      <form onSubmit={handleSubmit} className={`w-full mx-auto ${isEditorial ? 'r3-lockup' : ''}`} style={isEditorial ? { maxWidth: 460 } : isHero ? { maxWidth: 460 } : { maxWidth: 448 }}>
         <div
           className={`flex w-full ${isHero ? 'hero-waitlist-row' : ''}`}
           style={{ gap: isEditorial ? 0 : isHero ? 8 : 12, alignItems: isEditorial ? 'center' : 'stretch' }}
