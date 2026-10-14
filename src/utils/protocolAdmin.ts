@@ -103,7 +103,8 @@ export interface AdminProtocolItem {
 
 export interface AIProtocolDraft {
   summary: string;
-  steps: { title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null }[];
+  /** `tips` on the bedtime step become rule_do children of it (the app's do-checklist). */
+  steps: { title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null; tips?: string[] }[];
 }
 
 function starterProtocolDraft(message: string): AIProtocolDraft {
@@ -117,7 +118,7 @@ function starterProtocolDraft(message: string): AIProtocolDraft {
     { title: 'Go walking', time: '12:30', category: 'do', notes: 'Walk, do mobility work, or another appropriate activity at a conversational effort. Adapt duration and intensity to current capacity.', duration_minutes: 20 },
     { title: 'Stop caffeine', time: '14:00', category: 'consume', notes: 'Choose caffeine-free drinks after this point. Earlier timing may suit people who are particularly sensitive to caffeine.', duration_minutes: null },
     { title: 'Wind down', time: '21:30', category: 'do', notes: 'Use a repeatable low-stimulation routine such as reading, gentle breathing, or relaxation. Avoid activities that increase alertness.', duration_minutes: 30 },
-    { title: 'Go to bed', time: '22:30', category: 'sleep', notes: ['Begin the sleep opportunity at a consistent time.', '• Keep the room dark — reduce bright light and cover standby lights.', '• Keep it cool — adjust room temperature where possible.', '• Prepare comfortable bedding.', safety].join('\n'), duration_minutes: null },
+    { title: 'Go to bed', time: '22:30', category: 'sleep', notes: `Begin the sleep opportunity at a consistent time. ${safety}`, duration_minutes: null, tips: ['Keep the room dark', 'Keep the bedroom cool', 'Prepare comfortable bedding'] },
   ] : [
     { title: 'Set an intention', time: '08:00', category: 'do', notes: `Choose one realistic action that supports the selected goal. ${safety}`, duration_minutes: 5 },
     { title: 'Go walking', time: '10:00', category: 'do', notes: 'Choose an accessible activity and adapt the duration and intensity to current capacity.', duration_minutes: 20 },
@@ -134,19 +135,20 @@ function starterProtocolDraft(message: string): AIProtocolDraft {
 type DraftStep = AIProtocolDraft['steps'][number];
 const WAKE_TITLE = /^(wake|get up|rise|end sleep)\b/i;
 /**
- * Sleep is a pair of anchors (wake, bedtime), not a list of steps. Any other sleep-category
- * step ("Sleep in complete darkness", "Cool the bedroom") becomes a bullet in the bedtime
- * step's notes, so the app shows one bedtime alarm with its guidance underneath.
+ * Sleep is a pair of anchors (wake, bedtime), not a list of steps — exactly as the app models it.
+ * Any other sleep-category step ("Sleep in complete darkness", "Cool the bedroom") becomes a tip
+ * on the bedtime step; the caller saves tips as rule_do children of bedtime, which the app shows
+ * as the do-checklist inside the bedtime card (mobile timeline/subTaskRows.ts, "contextual rules").
  */
 export function foldSleepSteps(steps: DraftStep[]): DraftStep[] {
   const sleep = steps.filter((step) => step.category === 'sleep');
-  if (sleep.length <= 1) return steps;
   const minutes = (step: DraftStep) => { const [h, m] = (step.time || '').split(':').map(Number); return Number.isFinite(h) ? h * 60 + (m || 0) : -1; };
   const wake = sleep.find((step) => WAKE_TITLE.test(step.title)) || null;
   const rest = sleep.filter((step) => step !== wake);
-  const bedtime = [...rest].sort((a, b) => minutes(b) - minutes(a))[0] || { title: 'Go to bed', time: '22:00', category: 'sleep', notes: '', day_number: 1, duration_minutes: null };
-  const tips = rest.filter((step) => step !== bedtime).map((step) => `• ${step.title}${step.notes ? ` — ${step.notes}` : ''}`);
-  const foldedBedtime: DraftStep = { ...bedtime, notes: [bedtime.notes, ...tips].filter(Boolean).join('\n') };
+  if (!rest.length) return steps;
+  const bedtime = [...rest].sort((a, b) => minutes(b) - minutes(a))[0];
+  const extraTips = rest.filter((step) => step !== bedtime).map((step) => step.title);
+  const foldedBedtime: DraftStep = { ...bedtime, tips: [...(bedtime.tips || []), ...extraTips] };
   const kept = steps.filter((step) => step.category !== 'sleep');
   return [...(wake ? [wake] : []), ...kept, foldedBedtime];
 }

@@ -2243,7 +2243,7 @@ function GuardianProtocolAI({ accessToken, protocol, ownerId, initialRequest, in
       const sources = [sourceUrls.trim() && `Reference websites: ${sourceUrls.trim().replace(/\n+/g, ', ')}`, sourcePath && `Uploaded reference document: ${sourcePath}`].filter(Boolean).join('\n');
       const draft = await buildProtocolWithAI(accessToken, protocol.id, `${request.trim()}${sources ? `\n\n${sources}` : ''}`);
       const steps = foldSleepSteps(draft.steps);
-      await Promise.all(steps.map((step, index) => createProtocolItem(accessToken, {
+      const created = await Promise.all(steps.map((step, index) => createProtocolItem(accessToken, {
         protocol_id: protocol.id,
         display_name: step.title,
         item_type: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity',
@@ -2255,7 +2255,7 @@ function GuardianProtocolAI({ accessToken, protocol, ownerId, initialRequest, in
         day_number: step.day_number,
         sort_order: index + 1,
         parent_protocol_item_id: null,
-        has_children: false,
+        has_children: Boolean(step.tips?.length),
         category: step.category,
         subtype: step.category === 'sleep' ? 'sleep' : step.category === 'consume' ? 'meal' : step.category === 'supplement' ? 'supplement' : 'wellness',
         hidden: false,
@@ -2263,6 +2263,14 @@ function GuardianProtocolAI({ accessToken, protocol, ownerId, initialRequest, in
         notes: step.notes,
         recurrence_type: 'daily',
       })));
+      // Bedtime tips are saved the way the app models guidance: rule_do children of the step,
+      // shown as its do-checklist (no time of their own).
+      await Promise.all(steps.flatMap((step, index) => (step.tips || []).map((tip, tipIndex) => createProtocolItem(accessToken, {
+        protocol_id: protocol.id, display_name: tip, item_type: 'activity', kind: 'rule_do', scope: null,
+        scheduled_time: null, duration_minutes: null, group_name: null, day_number: step.day_number,
+        sort_order: tipIndex + 1, parent_protocol_item_id: created[index].id, has_children: false,
+        category: 'sleep', subtype: 'sleep', hidden: false, enabled: true, notes: '', recurrence_type: 'daily',
+      }))));
       setMessage(`${draft.summary} Added ${steps.length} editable draft steps. Review them before publishing.`);
       setStage(2);
       onBuilt();
