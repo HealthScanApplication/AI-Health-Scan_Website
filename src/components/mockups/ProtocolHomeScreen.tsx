@@ -209,7 +209,7 @@ export function ProtocolHomeScreen({
   showDetails: showDetailsProp = true,
   theme = "light",
   profileName = "John Ferreira",
-  grouping = "time",
+  grouping = "smart",
 }: {
   /** 'smart' groups by phase + category like the mobile smart lists. */
   grouping?: "time" | "smart";
