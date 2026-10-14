@@ -101,6 +101,23 @@ function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | '
 }
 
 const SMART_LIST_ORDER = ['Hygiene', 'Fitness', 'Wellness', 'Beauty', 'Work', 'Home', 'Other'];
+
+/* Cycle phase math, mirrored from mobile src/features/cycle/cycle.ts. Preview only:
+   real cycle data lives on the user's device (Keychain) and never reaches Supabase. */
+type CyclePhase = 'menstruation' | 'follicular' | 'ovulation' | 'luteal';
+const CYCLE_PHASE_LABEL: Record<CyclePhase, string> = { menstruation: 'Period', follicular: 'Follicular', ovulation: 'Ovulation', luteal: 'Luteal' };
+const CYCLE_PHASE_COLOR: Record<CyclePhase, string> = { menstruation: '#D9485F', follicular: '#4F8A6B', ovulation: '#C98A1B', luteal: '#7B61A8' };
+function previewCycle(periodStart: string, cycleLength: number, periodLength: number, date: Date): { day: number; phase: CyclePhase } | null {
+  const [y, m, d] = periodStart.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const cycleLen = Math.min(45, Math.max(20, cycleLength || 28));
+  const periodLen = Math.min(14, Math.max(1, periodLength || 5));
+  const diff = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(y, m - 1, d)) / 86400000);
+  const day = ((diff % cycleLen) + cycleLen) % cycleLen;
+  const ov = Math.max(10, cycleLen - 14);
+  const phase: CyclePhase = day < periodLen ? 'menstruation' : day >= ov - 1 && day <= ov + 1 ? 'ovulation' : day < ov - 1 ? 'follicular' : 'luteal';
+  return { day: day + 1, phase };
+}
 const MOON_GLYPHS: Record<string, string> = { 'New moon': '🌑', 'Waxing crescent': '🌒', 'First quarter': '🌓', 'Waxing gibbous': '🌔', 'Full moon': '🌕', 'Waning gibbous': '🌖', 'Last quarter': '🌗', 'Waning crescent': '🌘' };
 function moonPhaseName(date: Date): string {
   const lunarCycle = 29.53058867;
@@ -400,6 +417,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [viewDay, setViewDay] = useState(1);
   // Calendar emulation: which real date day 1 lands on, so each cycle day shows its date and moon phase.
   const [previewStart, setPreviewStart] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+  // Sample cycle for previewing cycle-based protocols (not saved; real data stays on-device).
+  const [cyclePreviewOn, setCyclePreviewOn] = useState(false);
+  const [cycleStart, setCycleStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+  const [cycleLength, setCycleLength] = useState(28);
+  const [periodLength, setPeriodLength] = useState(5);
   useEffect(() => { setViewDay(1); setEditorFocus('timeline'); }, [selectedId]);
   // catalog linking
   const [linkInfo, setLinkInfo] = useState<Map<string, CatalogHit & { kind: CatalogKind }>>(new Map());
@@ -1923,11 +1945,21 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                           Day {viewDay} of {cycleLen}
                           <span style={{ fontWeight: 500, opacity: 0.75 }}>{date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} · {n} steps</span>
                         </span>
+                        {(cyclePreviewOn || form.schedule_basis === 'menstrual_cycle') && (() => { const c = previewCycle(cycleStart, cycleLength, periodLength, date); return c && <span title="Preview from the sample cycle below" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 10px', border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper, fontSize: 12, fontWeight: 700, color: C.ink }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: CYCLE_PHASE_COLOR[c.phase] }} />Cycle day {c.day} · {CYCLE_PHASE_LABEL[c.phase]}</span>; })()}
                         <button type="button" aria-label="Next day" disabled={viewDay >= cycleLen} onClick={() => setViewDay((d) => Math.min(cycleLen, d + 1))} style={{ ...stepBtn, opacity: viewDay >= cycleLen ? 0.4 : 1 }}><ChevronDown size={14} style={{ transform: 'rotate(-90deg)' }} /></button>
                         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.sub, marginLeft: 6 }}>
                           <CalendarDays size={13} /> Starts
                           <input type="date" value={previewStart} onChange={(e) => e.target.value && setPreviewStart(e.target.value)} style={{ ...inputStyle, width: 150 }} />
                         </label>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.sub, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={cyclePreviewOn || form.schedule_basis === 'menstrual_cycle'} disabled={form.schedule_basis === 'menstrual_cycle'} onChange={(e) => setCyclePreviewOn(e.target.checked)} /> Preview cycle
+                        </label>
+                        {(cyclePreviewOn || form.schedule_basis === 'menstrual_cycle') && <div style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11, color: C.sub }}>
+                          <span>Sample period start</span><input type="date" value={cycleStart} onChange={(e) => e.target.value && setCycleStart(e.target.value)} style={{ ...inputStyle, width: 150 }} />
+                          <span>Cycle</span><input type="number" min={20} max={45} value={cycleLength} onChange={(e) => setCycleLength(Number(e.target.value))} style={{ ...inputStyle, width: 70 }} /><span>days</span>
+                          <span>Period</span><input type="number" min={1} max={14} value={periodLength} onChange={(e) => setPeriodLength(Number(e.target.value))} style={{ ...inputStyle, width: 64 }} /><span>days</span>
+                          <span style={{ flexBasis: '100%', lineHeight: 1.4 }}>Preview only. A user's real cycle stays on their phone and is never shared with this editor.</span>
+                        </div>}
                       </>;
                     })()}
                     {totalDaysMissing && (
