@@ -232,6 +232,26 @@ export async function submitGuardianOptIn(guideId: string, lead: { name: string;
   if (error) throw error;
 }
 
+/**
+ * Whose routine is each protocol? The app creates a personal "Your Routine" per family profile
+ * (user_active_protocol.profile_id → family_profiles; null profile = the account's main user).
+ * Returns protocol id → that person's name and avatar, so routines can be labelled by owner.
+ */
+export async function listRoutineOwners(userId: string, mainName: string, mainAvatar?: string | null): Promise<Map<string, { name: string; avatarUrl: string | null }>> {
+  const owners = new Map<string, { name: string; avatarUrl: string | null }>();
+  const [{ data: active }, { data: profiles }] = await Promise.all([
+    db().from('user_active_protocol').select('protocol_id,profile_id').eq('user_id', userId),
+    db().from('family_profiles').select('id,name,avatar_url,is_main_user').eq('owner_id', userId),
+  ]);
+  const byId = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
+  const main = (profiles || []).find((profile: any) => profile.is_main_user);
+  for (const row of (active || []) as { protocol_id: string; profile_id: string | null }[]) {
+    const profile: any = row.profile_id ? byId.get(row.profile_id) : main;
+    owners.set(row.protocol_id, { name: profile?.name || mainName, avatarUrl: profile?.avatar_url || (row.profile_id ? null : mainAvatar || null) });
+  }
+  return owners;
+}
+
 export async function listGuideOffers(userId: string): Promise<GuideOffer[]> {
   const { data, error } = await db().from('guide_offers').select('*').eq('guide_id', userId).order('created_at', { ascending: false });
   if (error) throw error;
