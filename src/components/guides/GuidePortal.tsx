@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
 import { APP_STORE_URL } from '../../config/appLinks';
-import { buildProtocolWithAI, foldSleepSteps, createProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
+import { buildProtocolWithAI, foldSleepSteps, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, submitGuardianSuggestion, submitGuardianOptIn,
@@ -1443,7 +1443,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       const protocolBuilderKind = selectedUpsells.find((kind) => (kind === 'routine' || kind === 'routine_guidance') && upsellDrafts[kind].nextStep === 'builder');
       const recipeTitle = recipeBuilderKind ? upsellDrafts[recipeBuilderKind].title : leadMagnetTitle.trim() || suggestedFreeOffer.title;
       if (wantsRecipes && !existingRecipes.some((recipe) => recipe.title === recipeTitle)) await createGuideRecipe(userId, { title: recipeBuilderKind ? upsellDrafts[recipeBuilderKind].title : leadMagnetTitle.trim() || suggestedFreeOffer.title, description: recipeBuilderKind ? upsellDrafts[recipeBuilderKind].audienceValue : freeAudienceValue.trim() || 'Recipe collection draft', meal_slot: 'any' });
-      if (wantsRoutine && !onboardingProtocol) await createProtocol(accessToken, { user_id: userId, name: protocolBuilderKind ? upsellDrafts[protocolBuilderKind].title : leadMagnetTitle.trim() || suggestedFreeOffer.title, description: `${protocolBuilderKind ? upsellDrafts[protocolBuilderKind].audienceValue : freeAudienceValue.trim()} ${protocolContext}`.trim(), target_gender: audience.length === 1 && (audience[0] === 'Women' || audience[0] === 'Men') ? audience[0] : 'Everyone', total_days: 3 });
+      if (wantsRoutine && !onboardingProtocol) await findOrCreateProtocol(accessToken, { user_id: userId, name: protocolBuilderKind ? upsellDrafts[protocolBuilderKind].title : leadMagnetTitle.trim() || suggestedFreeOffer.title, description: `${protocolBuilderKind ? upsellDrafts[protocolBuilderKind].audienceValue : freeAudienceValue.trim()} ${protocolContext}`.trim(), target_gender: audience.length === 1 && (audience[0] === 'Women' || audience[0] === 'Men') ? audience[0] : 'Everyone', total_days: 3 });
       window.history.pushState({}, '', `/guardians/${profile.slug}/value-ramp/${valueRampSlug}`);
       onDone(profile);
     } catch (e: any) { setError(e.message?.includes('guide_profiles') ? 'Guardian database is not installed yet. Apply the portal migration first.' : e.message); }
@@ -1525,7 +1525,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
     setCreatingProtocol(true); setError('');
     try {
       const draft = kind ? upsellDrafts[kind] : null;
-      const protocol = await createProtocol(accessToken, {
+      const protocol = await findOrCreateProtocol(accessToken, {
         user_id: userId,
         name: draft?.title.trim() || leadMagnetTitle.trim() || suggestedRoutineName,
         description: `${draft?.audienceValue.trim() || freeAudienceValue.trim()} Audience: ${rampTargetAudience}. Population: ${routineGender}. Age: ${routineAge}. Health stage: ${routineLifeStage}. Goal: ${rampTargetProblem}.${protocolBrief.trim() ? ` Creator brief: ${protocolBrief.trim()}` : ''}${protocolSourceUrls.trim() ? ` Sources: ${protocolSourceUrls.trim().replace(/\n+/g, ', ')}` : ''}`.trim(),

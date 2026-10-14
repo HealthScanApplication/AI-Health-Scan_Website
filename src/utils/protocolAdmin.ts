@@ -205,7 +205,8 @@ function first<T>(rows: T | T[]): T {
 /** All protocols, suggested ones first, then by sort order / name. */
 export async function listProtocols(accessToken: string, ownerId?: string | null): Promise<AdminProtocol[]> {
   const suffix =
-    (ownerId ? `&user_id=eq.${encodeURIComponent(ownerId)}` : '') +
+    // An owner's list hides archived (is_active = false) protocols, e.g. retired duplicates.
+    (ownerId ? `&user_id=eq.${encodeURIComponent(ownerId)}&is_active=not.is.false` : '') +
     `&order=is_suggested.desc.nullslast,sort_order.asc.nullslast,name.asc`;
   let res = await fetch(`${rest()}/protocols?select=${PROTOCOL_COLS}${suffix}`, { headers: headers(accessToken) });
   if (!res.ok) {
@@ -213,6 +214,22 @@ export async function listProtocols(accessToken: string, ownerId?: string | null
     if (failure?.code === '42703') res = await fetch(`${rest()}/protocols?select=${LEGACY_PROTOCOL_COLS}${suffix}`, { headers: headers(accessToken) });
   }
   return (await handle(res, 'List protocols')) || [];
+}
+
+const protocolNameKey = (name: string) => name.replace(/^R3\s+Protocol\s*>\s*/i, '').trim().toLowerCase();
+
+/**
+ * Reuse the owner's active protocol with the same name (ignoring an "R3 Protocol >" prefix and
+ * case) instead of creating another. The Guardian builder keeps its working protocol only in
+ * memory, so every reload + "Build Protocol" or publish used to mint a duplicate.
+ */
+export async function findOrCreateProtocol(
+  accessToken: string,
+  protocol: Partial<AdminProtocol> & { name: string; user_id: string },
+): Promise<AdminProtocol> {
+  const existing = await listProtocols(accessToken, protocol.user_id).catch(() => [] as AdminProtocol[]);
+  const match = existing.find((row) => protocolNameKey(row.name || '') === protocolNameKey(protocol.name));
+  return match || createProtocol(accessToken, protocol);
 }
 
 export async function createProtocol(
