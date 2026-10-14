@@ -167,6 +167,64 @@ export async function buildProtocolWithAI(accessToken: string, protocolId: strin
   return handle(res, 'Build protocol with AI');
 }
 
+/**
+ * Revise an existing protocol from a plain-language instruction. The AI gets the current steps
+ * and returns the complete revised list; steps are matched by title and updated in place, new
+ * ones are added, and dropped ones are HIDDEN (never deleted) so nothing is lost.
+ */
+export async function updateProtocolWithAI(
+  accessToken: string,
+  protocolId: string,
+  instruction: string,
+  items: AdminProtocolItem[],
+  sources = '',
+): Promise<{ summary: string; updated: number; added: number; hidden: number }> {
+  const tops = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id && !it.hidden);
+  const current = tops.map((it) => `- ${it.display_name} | ${it.scheduled_time?.slice(0, 5) || 'no time'} | ${it.category || 'do'} | ${(it.notes || '').replace(/\s+/g, ' ').slice(0, 160)}`).join('\n');
+  const message = `Revise this existing Protocol. Return the COMPLETE revised list of steps: keep every step that should stay with exactly the same title, change only what the instruction asks.\n\nInstruction: ${instruction.trim()}\n\nCurrent steps (title | time | category | notes):\n${current || '(none yet)'}${sources ? `\n\nReference material:\n${sources}` : ''}`;
+  const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/guides/build-protocol`, {
+    method: 'POST', headers: headers(accessToken), body: JSON.stringify({ protocolId, message }),
+  });
+  const draft = await handle(res, 'Update protocol with AI') as AIProtocolDraft;
+  const steps = foldSleepSteps(draft.steps || []);
+  const key = (t: string) => t.trim().toLowerCase();
+  const byTitle = new Map(tops.map((it) => [key(it.display_name || ''), it]));
+  const kept = new Set<string>();
+  let updated = 0, added = 0;
+  for (const [index, step] of steps.entries()) {
+    const match = byTitle.get(key(step.title));
+    const time = step.time ? `${step.time}:00` : null;
+    let parentId: string;
+    if (match) {
+      kept.add(match.id);
+      parentId = match.id;
+      if ((match.scheduled_time || null) !== time || (match.notes || '') !== (step.notes || '') || (match.duration_minutes ?? null) !== (step.duration_minutes ?? null)) {
+        await updateProtocolItem(accessToken, match.id, { scheduled_time: time, notes: step.notes, duration_minutes: step.duration_minutes });
+        updated++;
+      }
+    } else {
+      const created = await createProtocolItem(accessToken, {
+        protocol_id: protocolId, display_name: step.title, kind: 'action', scope: null,
+        item_type: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity',
+        scheduled_time: time, duration_minutes: step.duration_minutes, group_name: null, day_number: step.day_number || 1,
+        sort_order: tops.length + index + 1, parent_protocol_item_id: null, has_children: Boolean(step.tips?.length),
+        category: step.category, subtype: step.category === 'sleep' ? 'sleep' : step.category === 'consume' ? 'meal' : step.category === 'supplement' ? 'supplement' : 'wellness',
+        hidden: false, enabled: true, notes: step.notes, recurrence_type: 'daily',
+      } as any);
+      parentId = created.id;
+      added++;
+    }
+    const existingTips = new Set(items.filter((it) => it.parent_protocol_item_id === parentId).map((it) => key(it.display_name || '')));
+    for (const tip of step.tips || []) {
+      if (existingTips.has(key(tip))) continue;
+      await createProtocolItem(accessToken, { protocol_id: protocolId, display_name: tip, kind: 'rule_do', item_type: 'activity', scope: null, scheduled_time: null, duration_minutes: null, group_name: null, day_number: step.day_number || 1, sort_order: 1, parent_protocol_item_id: parentId, has_children: false, category: 'sleep', subtype: 'sleep', hidden: false, enabled: true, notes: '', recurrence_type: 'daily' } as any);
+    }
+  }
+  const dropped = tops.filter((it) => !kept.has(it.id));
+  for (const it of dropped) await updateProtocolItem(accessToken, it.id, { hidden: true });
+  return { summary: draft.summary || '', updated, added, hidden: dropped.length };
+}
+
 const PROTOCOL_COLS =
   'id,user_id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at,profile_role,profile_name,profile_image_url,schedule_basis';
 const LEGACY_PROTOCOL_COLS = PROTOCOL_COLS.split(',').filter((column) => !['profile_role', 'profile_name', 'profile_image_url', 'schedule_basis'].includes(column)).join(',');

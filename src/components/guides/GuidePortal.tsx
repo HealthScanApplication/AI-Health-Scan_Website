@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
 import { APP_STORE_URL } from '../../config/appLinks';
-import { buildProtocolWithAI, foldSleepSteps, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
+import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, submitGuardianSuggestion, submitGuardianOptIn,
@@ -2439,6 +2439,48 @@ function GuideLibrary({ guideId, selectedIds, onSelectedIds, onUse }: { guideId:
   </section>;
 }
 
+/** Fixed bottom bar: plain-language AI updates to the open Protocol, with a Library folder as reference. */
+function ProtocolAIBar({ accessToken, protocolId, guideId, onUpdated }: { accessToken: string; protocolId: string; guideId: string; onUpdated: () => void }) {
+  const [instruction, setInstruction] = useState('');
+  const [folders, setFolders] = useState<GuideLibraryFolder[]>([]);
+  const [libraryItems, setLibraryItems] = useState<GuideLibraryItem[]>([]);
+  const [folderId, setFolderId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState('');
+  useEffect(() => {
+    Promise.all([listGuideLibraryFolders(guideId), listGuideLibraryItems(guideId)]).then(([f, i]) => { setFolders(f); setLibraryItems(i); }).catch(() => {});
+  }, [guideId]);
+  async function send(event: React.FormEvent) {
+    event.preventDefault();
+    if (!instruction.trim() || busy) return;
+    setBusy(true); setResult('');
+    try {
+      const refs = libraryItems.filter((item) => folderId && item.folder_id === folderId).map((item) => item.kind === 'url' ? `- ${item.title}: ${item.source_url}` : item.kind === 'transcript' ? `- ${item.title}: ${(item.transcript || '').slice(0, 1500)}` : `- ${item.title} (uploaded file ${item.file_path})`).join('\n');
+      const items = await listProtocolItems(accessToken, protocolId);
+      const r = await updateProtocolWithAI(accessToken, protocolId, instruction, items, refs);
+      setResult(`${r.updated} updated · ${r.added} added · ${r.hidden} hidden${r.summary ? ` — ${r.summary}` : ''}`);
+      setInstruction('');
+      onUpdated();
+    } catch (e: any) {
+      setResult(`Could not update: ${e?.message || e}`);
+    } finally { setBusy(false); }
+  }
+  const field: React.CSSProperties = { height: 42, boxSizing: 'border-box', border: `1px solid ${line}`, background: black, color: ink, fontFamily: sans, fontSize: 13, padding: '0 12px', outline: 'none', borderRadius: 2 };
+  return <form onSubmit={send} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 40, background: 'rgba(9,10,8,.96)', borderTop: `1px solid ${line}`, padding: '10px clamp(16px,4vw,48px)', backdropFilter: 'blur(10px)' }}>
+    <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Sparkles size={16} color={acid} />
+      <select aria-label="Reference folder" value={folderId} onChange={(e) => setFolderId(e.target.value)} style={{ ...field, width: 200 }}>
+        <option value="">No reference folder</option>
+        {folders.map((folder) => <option key={folder.id} value={folder.id}>📁 {folder.name} ({libraryItems.filter((item) => item.folder_id === folder.id).length})</option>)}
+      </select>
+      <a href="/guardians/workspace?tab=library" style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap' }}>Open library ↗</a>
+      <input value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Ask AI to change this Protocol, e.g. add a tofu scramble breakfast at 8am" aria-label="AI instruction" style={{ ...field, flex: '1 1 320px', minWidth: 0 }} />
+      <button type="submit" disabled={busy || !instruction.trim()} style={{ ...btn, height: 42, minHeight: 42, borderRadius: 2, opacity: busy || !instruction.trim() ? .5 : 1 }}>{busy ? <><Loader2 size={13} className="animate-spin" /> Updating</> : <>Update with AI <ArrowRight size={13} /></>}</button>
+    </div>
+    {result && <div style={{ maxWidth: 1180, margin: '6px auto 0', color: result.startsWith('Could not') ? '#F0A7A7' : acid, fontSize: 11 }}>{result}</div>}
+  </form>;
+}
+
 function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (p: GuideProfile) => void }) {
   const { user, accessToken, signOut } = useAuth();
   // Deep links from the public Guardians nav, e.g. /guardians/workspace?tab=protocols
@@ -2538,7 +2580,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
               return child ? <div key={x.id} style={{ marginLeft: 40, paddingLeft: 16, borderLeft: `1px solid ${line}` }}>{row}</div> : row; });
           })() : <Empty image={guidePlates.protocols} title="No Protocol drafts yet" copy="Build against the full Routine database with timings, quantities, linked records and PDF export." />)}</div></>}
         {tab === 'recipes' && recipeId && <RecipeBuilder recipe={recipes.find((recipe) => recipe.id === recipeId)!} onBack={() => setRecipeId(null)} onSaved={(saved) => setRecipes((current) => current.map((recipe) => recipe.id === saved.id ? saved : recipe))} />}
-        {tab === 'protocols' && protocolId && accessToken && user && <div style={{ background: '#F5F4EF', color: '#151515', padding: 18, minHeight: 700 }}><button onClick={() => setProtocolId(null)} style={{ ...btn, marginBottom: 14, background: '#151515', color: '#FFF' }}>← Protocols</button>{protocols.find((protocol) => protocol.id === protocolId) && <GuardianProtocolAI accessToken={accessToken} protocol={protocols.find((protocol) => protocol.id === protocolId)!} ownerId={user.id} initialSourceUrls={builderLibrarySources.filter((source) => source.kind === 'url').map((source) => source.source_url).filter(Boolean).join('\n')} initialSourcePath={builderLibrarySources.find((source) => source.kind === 'pdf')?.file_path || null} initialRequest={builderLibrarySources.length ? `Build a practical Protocol using these Library sources:\n${builderLibrarySources.map((source) => `- ${source.title}${source.kind === 'transcript' ? `: ${source.transcript?.slice(0, 4000)}` : ''}`).join('\n')}` : undefined} onBuilt={() => setProtocolRevision((value) => value + 1)} />}<ProtocolEditor key={`${protocolId}-${protocolRevision}`} accessToken={accessToken} initialProtocolId={protocolId} ownerId={user.id} /></div>}
+        {tab === 'protocols' && protocolId && accessToken && user && <div style={{ background: '#F5F4EF', color: '#151515', padding: 18, minHeight: 700 }}><button onClick={() => setProtocolId(null)} style={{ ...btn, marginBottom: 14, background: '#151515', color: '#FFF' }}>← Protocols</button>{protocols.find((protocol) => protocol.id === protocolId) && <GuardianProtocolAI accessToken={accessToken} protocol={protocols.find((protocol) => protocol.id === protocolId)!} ownerId={user.id} initialSourceUrls={builderLibrarySources.filter((source) => source.kind === 'url').map((source) => source.source_url).filter(Boolean).join('\n')} initialSourcePath={builderLibrarySources.find((source) => source.kind === 'pdf')?.file_path || null} initialRequest={builderLibrarySources.length ? `Build a practical Protocol using these Library sources:\n${builderLibrarySources.map((source) => `- ${source.title}${source.kind === 'transcript' ? `: ${source.transcript?.slice(0, 4000)}` : ''}`).join('\n')}` : undefined} onBuilt={() => setProtocolRevision((value) => value + 1)} />}<ProtocolEditor key={`${protocolId}-${protocolRevision}`} accessToken={accessToken} initialProtocolId={protocolId} ownerId={user.id} /><div style={{ height: 90 }} /><ProtocolAIBar accessToken={accessToken} protocolId={protocolId} guideId={user.id} onUpdated={() => setProtocolRevision((value) => value + 1)} /></div>}
       </main>
     </div>
   </div>;
