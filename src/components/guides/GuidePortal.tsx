@@ -632,6 +632,25 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
             </div>
           </div>
         </section>
+        <section id="guardian-value" style={{ padding: 'clamp(70px,10vw,130px) clamp(20px,6vw,90px)', background: black, color: ink }}>
+          <div style={{ maxWidth: 1320, margin: '0 auto' }}>
+            <span style={{ color: acid, fontSize: 10, fontWeight: 700, letterSpacing: '.15em' }}>WHY BUILD ON ROUTINE³</span>
+            <h2 style={{ fontFamily: serif, fontSize: 'clamp(42px,6vw,78px)', fontWeight: 300, lineHeight: .95, margin: '16px 0 18px', maxWidth: 900 }}>Your knowledge, running every day in someone’s routine.</h2>
+            <p style={{ color: muted, fontSize: 15, lineHeight: 1.7, maxWidth: 640, margin: '0 0 clamp(40px,6vw,70px)' }}>Most guidance ends when the call or the PDF does. On ROUTINE³ it becomes a Protocol people follow in the app, and you see how it is going.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,250px),1fr))', borderTop: '1px solid rgba(255,255,255,.18)' }}>
+              {[
+                ['01', 'A health database to build on', 'Start from a catalogue of foods, ingredients, recipes, supplements and activities instead of a blank page. Every step you add is already structured, timed and explained.'],
+                ['02', 'A platform people already use', 'Your Protocols live inside the ROUTINE³ app, with reminders, a daily timeline and check-offs. People follow your guidance where they plan their day, not in a forgotten download.'],
+                ['03', 'A coaching feedback loop', 'See which steps get done and where people drop off. Adjust the Protocol, add a check-in, or offer one-to-one support at the moment it is needed.'],
+                ['04', 'Revenue you share in', 'Sell guides, programmes and calls through your value ramp, and earn a share when the people you bring in join ROUTINE³. Your page does the selling between sessions.'],
+              ].map(([n, title, body]) => <div key={n} style={{ padding: 'clamp(24px,3vw,34px) clamp(0px,2vw,26px) 0 0', borderRight: '1px solid rgba(255,255,255,.1)', paddingLeft: 'clamp(0px,1.5vw,22px)' }}>
+                <span style={{ color: acid, fontSize: 10, fontWeight: 700, letterSpacing: '.12em' }}>{n}</span>
+                <h3 style={{ fontFamily: serif, fontSize: 'clamp(26px,2.4vw,32px)', fontWeight: 300, lineHeight: 1.05, margin: '14px 0 12px' }}>{title}</h3>
+                <p style={{ color: muted, fontSize: 13, lineHeight: 1.65, margin: '0 0 28px' }}>{body}</p>
+              </div>)}
+            </div>
+          </div>
+        </section>
         <section id="guardian-directory" style={{ padding: 'clamp(70px,10vw,130px) clamp(20px,6vw,90px)', background: '#F2EFE7', color: '#11120F' }}>
           <div style={{ maxWidth: 1320, margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 24, flexWrap: 'wrap', marginBottom: 26 }}><div><span style={{ color: '#667245', fontSize: 10, fontWeight: 700, letterSpacing: '.15em' }}>THE ROUTINE³ NETWORK</span><h2 style={{ fontFamily: serif, fontSize: 'clamp(46px,7vw,86px)', fontWeight: 300, lineHeight: .92, margin: '15px 0 0' }}>Meet the Guardians.</h2></div><a href={guardianCta} style={{ ...btn, background: '#11120F', color: '#FFF', borderColor: '#11120F', textDecoration: 'none' }}>{isSignedIn ? 'Open workspace' : 'Apply to join'} <ArrowRight size={13} /></a></div>
