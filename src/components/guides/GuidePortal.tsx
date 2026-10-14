@@ -3,7 +3,7 @@ import {
   ArrowRight, ChevronRight, FileText, HeartPulse, LogOut,
   Mail, Package, Plus, Salad, Sparkles, Users, Globe2, Loader2,
   Upload, Check, Instagram, Youtube, Link2, AtSign, Route, CalendarDays, Download,
-  MoreHorizontal, FolderOpen, Trash2, ExternalLink,
+  MoreHorizontal, FolderOpen, Trash2, ExternalLink, ListChecks, Tag, LayoutTemplate,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
@@ -605,6 +605,7 @@ function SuggestGuardianModal({ type, onClose }: { type: string; onClose: () => 
 }
 
 function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
+  const { signOut } = useAuth();
   const [guardians, setGuardians] = useState<GuideProfile[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [activeType, setActiveType] = useState('All');
@@ -620,10 +621,17 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
     <div style={{ minHeight: '100vh', background: black, color: ink, fontFamily: sans }}>
       <header style={{ position: 'absolute', zIndex: 10, inset: '0 0 auto', height: 70, borderBottom: '1px solid rgba(255,255,255,.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(20px,5vw,72px)', background: 'rgba(9,10,8,.32)', backdropFilter: 'blur(12px)' }}>
         <Brand />
-        <nav aria-label="Guardian tools" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px,2.4vw,30px)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {[['Protocol builder', isSignedIn ? '/guardians/workspace?tab=protocols' : '#guardian-apply'], ['Offer builder', isSignedIn ? '/guardians/workspace?tab=offer_builder' : '#guardian-apply']].map(([text, href]) => <a key={text} className="guardian-nav-link" href={href} style={{ color: 'rgba(245,242,234,.78)', textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{text}</a>)}
-          <a href={guardianCta} style={{ color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em' }}>{isSignedIn ? 'OPEN WORKSPACE' : 'BECOME A GUARDIAN'} →</a>
+        <nav aria-label="Guardian builders" className="guardian-builders" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 'clamp(16px,2.6vw,34px)' }}>
+          {([['Protocol builder', 'protocols', ListChecks], ['Offer builder', 'offer_builder', Tag], ['Site builder', 'profile', LayoutTemplate]] as const).map(([text, tab, Icon]) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} title={isSignedIn ? text : `${text} · sign in to use`} style={{ color: ink, opacity: isSignedIn ? .86 : .42, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
         </nav>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {isSignedIn
+            ? <button type="button" onClick={() => signOut()} style={{ height: 34, padding: '0 14px', border: '1px solid rgba(245,242,234,.6)', borderRadius: 2, background: 'transparent', color: ink, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>Sign out</button>
+            : <>
+              <a href="#guardian-apply" style={{ height: 34, padding: '0 14px', border: '1px solid rgba(245,242,234,.6)', borderRadius: 2, color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Sign in</a>
+              <a href="#guardian-apply" style={{ height: 34, padding: '0 14px', border: `1px solid ${ink}`, borderRadius: 2, background: ink, color: black, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Sign up</a>
+            </>}
+        </div>
       </header>
       <main>
         <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'center', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
@@ -2312,7 +2320,12 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
 
 function Row({ title, meta, action, onClick }: { title: string; meta: string; action?: string; onClick?: () => void }) { const content = <><div><div style={{ fontFamily: serif, fontSize: 22 }}>{title}</div><div style={{ color: muted, fontSize: 11, marginTop: 5 }}>{meta}</div></div><span style={{ display: 'flex', alignItems: 'center', gap: 8, color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>{action}<ChevronRight size={16} /></span></>; return onClick ? <button type="button" onClick={onClick} style={{ width: '100%', border: 0, borderTop: `1px solid ${line}`, padding: '18px 4px', background: 'transparent', color: ink, display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', cursor: 'pointer' }}>{content}</button> : <div style={{ borderTop: `1px solid ${line}`, padding: '18px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>{content}</div>; }
 
+// Scopes Guardian styling; globals.css exempts `.guardian-ui button` from the forced 16px button size.
 export function GuidePortal() {
+  return <div className="guardian-ui"><style>{`@media (max-width: 900px){.guardian-ui .guardian-builders{display:none !important}}`}</style><GuidePortalRoutes /></div>;
+}
+
+function GuidePortalRoutes() {
   const { user, accessToken, loading } = useAuth();
   const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
   const isWorkspaceRoute = pathname === '/guardians/workspace';

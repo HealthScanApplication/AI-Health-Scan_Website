@@ -11386,18 +11386,18 @@ html {
   align-items: stretch !important;
 }
 
-input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], textarea, select, button {
+input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], textarea, select, button:not(.guardian-ui button) {
   font-size: max(16px, var(--text-base)) !important;
 }
 
 @media (width <= 640px) {
-  input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], textarea, select, button {
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], textarea, select, button:not(.guardian-ui button) {
     transform-origin: 0 0;
     font-size: max(16px, var(--text-base)) !important;
     zoom: 1 !important;
   }
 
-  input:focus, textarea:focus, select:focus, button:focus {
+  input:focus, textarea:focus, select:focus, button:not(.guardian-ui button):focus {
     font-size: max(16px, var(--text-base)) !important;
     zoom: 1 !important;
   }

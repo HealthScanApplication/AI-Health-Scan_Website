@@ -1540,7 +1540,7 @@ select {
   font-size: max(16px, var(--text-base)) !important; /* Prevent iOS zoom while respecting base size */
 }
 
-button {
+button:not(.guardian-ui button) {
   font-size: max(16px, var(--text-base)) !important; /* Ensure buttons match input size */
 }
 
@@ -1555,7 +1555,7 @@ button {
   input[type="url"],
   textarea,
   select,
-  button {
+  button:not(.guardian-ui button) {
     font-size: max(16px, var(--text-base)) !important; /* Force minimum 16px to prevent zoom while keeping consistency */
     transform-origin: top left;
     zoom: 1 !important;
@@ -1565,7 +1565,7 @@ button {
   input:focus,
   textarea:focus,
   select:focus,
-  button:focus {
+  button:not(.guardian-ui button):focus {
     font-size: max(16px, var(--text-base)) !important;
     zoom: 1 !important;
   }
