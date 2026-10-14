@@ -478,7 +478,13 @@ export function Header({
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-56 r3-menu">
+                    {/* Hairline, uppercase menu to match the header lockups (scoped CSS: index.css is prebuilt). */}
+                    <style>{`.r3-menu{background:#FFFFFF!important;border:1px solid #16140F!important;border-radius:2px!important;padding:0!important;box-shadow:0 14px 34px rgba(22,20,15,.14)!important}.r3-menu [role=menuitem]{border-radius:0!important;padding:11px 14px!important;font-family:"Archivo","Inter",sans-serif!important;font-size:11px!important;font-weight:600!important;letter-spacing:.12em!important;text-transform:uppercase!important;color:#16140F!important}.r3-menu [role=menuitem]+[role=menuitem]{border-top:1px solid rgba(22,20,15,.12)}.r3-menu [role=menuitem]:focus,.r3-menu [role=menuitem]:hover{background:#F2EFE7!important}.r3-menu [role=separator]{margin:0!important;background:#16140F!important}.r3-menu svg{color:#16140F!important}`}</style>
+                    <DropdownMenuItem onClick={handleReferralModal}>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      <span>Refer a friend</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleNavClick(onNavigateToProfile)}>
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
