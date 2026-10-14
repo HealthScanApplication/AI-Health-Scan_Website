@@ -12,7 +12,7 @@ import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, createProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
-  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listPublicGuideProfiles, saveGuideProfile,
+  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listPublicGuideProfiles, saveGuideProfile, submitGuardianSuggestion,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
   listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
@@ -554,6 +554,55 @@ function directoryTypesFor(guardian: GuideProfile) {
   return matches.length ? matches : ['Wellness practitioner'];
 }
 
+function SuggestGuardianModal({ type, onClose }: { type: string; onClose: () => void }) {
+  const [form, setForm] = useState({ name: '', instagram: '', tiktok: '', youtube: '', website: '', note: '', suggester_email: '' });
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [key]: e.target.value });
+  const hasSocial = [form.instagram, form.tiktok, form.youtube, form.website].some((value) => value.trim());
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus('sending');
+    try {
+      await submitGuardianSuggestion({ guardian_type: type, ...form });
+      setStatus('sent');
+    } catch {
+      setStatus('error');
+    }
+  }
+  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 42, border: '1px solid rgba(17,18,15,.24)', borderRadius: 2, padding: '0 12px', fontFamily: sans, fontSize: 13, background: '#FFF', color: '#11120F', outline: 'none' };
+  const lab: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#66645F', margin: '0 0 6px' };
+  const socials: [keyof typeof form, string, string][] = [['instagram', 'Instagram', '@handle'], ['tiktok', 'TikTok', '@handle'], ['youtube', 'YouTube', 'Channel URL'], ['website', 'Website', 'https://']];
+  return (
+    <div role="dialog" aria-modal="true" aria-label={`Suggest a ${type.toLowerCase()}`} onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(9,10,8,.62)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={submit} style={{ width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto', boxSizing: 'border-box', background: '#F2EFE7', color: '#11120F', borderRadius: 4, padding: 'clamp(22px,4vw,34px)', fontFamily: sans }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
+          <div><span style={{ color: '#667245', fontSize: 9, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' }}>Suggest a Guardian · {type}</span><h3 style={{ fontFamily: serif, fontSize: 34, fontWeight: 300, lineHeight: 1, margin: '10px 0 18px' }}>Who should we invite?</h3></div>
+          <button type="button" aria-label="Close" onClick={onClose} style={{ border: 0, background: 'none', fontSize: 22, lineHeight: 1, cursor: 'pointer', color: '#11120F' }}>×</button>
+        </div>
+        {status === 'sent' ? <>
+          <p style={{ fontSize: 14, lineHeight: 1.6 }}>Thank you. We will review {form.name.trim() || 'them'} and reach out.</p>
+          <button type="button" onClick={onClose} style={{ ...btn, background: '#11120F', color: '#FFF', borderColor: '#11120F', borderRadius: 2, width: '100%', marginTop: 10 }}>Done</button>
+        </> : <>
+          <div style={{ marginBottom: 12 }}><label style={lab}>Their name</label><input required value={form.name} onChange={set('name')} style={field} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginBottom: 12 }}>
+            {socials.map(([key, name, hint]) => <div key={key}><label style={lab}>{name}</label><input value={form[key]} onChange={set(key)} placeholder={hint} style={field} /></div>)}
+          </div>
+          <div style={{ marginBottom: 12 }}><label style={lab}>Why them? (optional)</label><textarea value={form.note} onChange={set('note')} rows={3} style={{ ...field, height: 'auto', padding: 12, resize: 'vertical' }} /></div>
+          <div style={{ marginBottom: 16 }}><label style={lab}>Your email (optional)</label><input type="email" value={form.suggester_email} onChange={set('suggester_email')} style={field} /></div>
+          {!hasSocial && <p style={{ fontSize: 11, color: '#66645F', margin: '0 0 12px' }}>Add at least one social link or website so we can find them.</p>}
+          {status === 'error' && <p style={{ fontSize: 12, color: '#A23B3B', margin: '0 0 12px' }}>We could not send that just now. Please try again.</p>}
+          <button disabled={status === 'sending' || !hasSocial || !form.name.trim()} style={{ ...btn, background: '#11120F', color: '#FFF', borderColor: '#11120F', borderRadius: 2, width: '100%', opacity: status === 'sending' || !hasSocial || !form.name.trim() ? 0.5 : 1 }}>{status === 'sending' ? 'Sending' : 'Send suggestion'} <ArrowRight size={13} /></button>
+        </>}
+      </form>
+    </div>
+  );
+}
+
 function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
   const [guardians, setGuardians] = useState<GuideProfile[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
@@ -564,6 +613,8 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
   const availableTypes = ['All', ...guardianDirectoryTypes.map((type) => type.label)];
   const visibleGuardians = activeType === 'All' ? guardians : guardians.filter((guardian) => directoryTypesFor(guardian).includes(activeType));
   const guardianCta = isSignedIn ? '/guardians/workspace' : '#guardian-apply';
+  const [suggesting, setSuggesting] = useState<string | null>(null);
+  const suggestTypes = activeType === 'All' ? guardianDirectoryTypes.map((type) => type.label) : [activeType];
   return (
     <div style={{ minHeight: '100vh', background: black, color: ink, fontFamily: sans }}>
       <header style={{ position: 'absolute', zIndex: 10, inset: '0 0 auto', height: 70, borderBottom: '1px solid rgba(255,255,255,.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(20px,5vw,72px)', background: 'rgba(9,10,8,.32)', backdropFilter: 'blur(12px)' }}>
@@ -572,11 +623,11 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
       <main>
         <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'end', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div style={{ width: '100%', boxSizing: 'border-box', padding: 'clamp(120px,16vh,190px) clamp(20px,6vw,90px) clamp(54px,8vh,90px)', display: 'grid', alignItems: 'end' }}>
-            <div style={{ maxWidth: 760 }}>
+            <div style={{ maxWidth: 860, margin: '0 auto', textAlign: 'center' }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: acid, marginBottom: 28 }}>LEARN · BUILD · GUIDE</div>
               <h1 style={{ margin: 0, fontFamily: serif, fontWeight: 300, fontSize: 'clamp(64px,10vw,142px)', lineHeight: .84, letterSpacing: '-0.055em' }}>Become a Guardian.</h1>
-              <p style={{ maxWidth: 650, margin: '30px 0 10px', fontSize: 'clamp(18px,2vw,25px)', lineHeight: 1.4, fontWeight: 600 }}>Turn what you know into guidance people can follow.</p>
-              <p style={{ maxWidth: 650, color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7 }}>Create your public page, build a value ramp, collect leads, and publish guides, recipes and interactive Protocols with ROUTINE³.</p>
+              <p style={{ maxWidth: 650, margin: '30px auto 10px', fontSize: 'clamp(18px,2vw,25px)', lineHeight: 1.4, fontWeight: 600 }}>Turn what you know into guidance people can follow.</p>
+              <p style={{ maxWidth: 650, margin: '0 auto', color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7 }}>Create your public page, build a value ramp, collect leads, and publish guides, recipes and interactive Protocols with ROUTINE³.</p>
               <CtaLockup href={guardianCta} label={isSignedIn ? 'Your Guardian workspace' : 'Share what you know'} action={isSignedIn ? 'Open workspace' : 'Become a Guardian'} />
             </div>
           </div>
@@ -587,12 +638,17 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
             <div aria-label="Filter Guardians by type" style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 18, marginBottom: 22 }}>
               {availableTypes.map((type) => <button type="button" key={type} onClick={() => setActiveType(type)} aria-pressed={activeType === type} style={{ flex: '0 0 auto', minHeight: 38, padding: '0 14px', border: `1px solid ${activeType === type ? '#11120F' : 'rgba(17,18,15,.24)'}`, borderRadius: 3, background: activeType === type ? '#11120F' : 'transparent', color: activeType === type ? '#FFF' : '#11120F', fontFamily: sans, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}>{type}</button>)}
             </div>
-            {directoryLoading ? <p style={{ color: '#686762' }}>Loading Guardians…</p> : visibleGuardians.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 14 }}>
+            {directoryLoading ? <p style={{ color: '#686762' }}>Loading Guardians…</p> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 14 }}>
               {visibleGuardians.map((guardian) => <a className="guardian-directory-card" key={guardian.user_id} href={`/guardians/${guardian.slug}`} style={{ minHeight: 390, border: '1px solid rgba(17,18,15,.18)', borderRadius: 6, background: '#FFF', color: '#11120F', textDecoration: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: 220, background: '#171812', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>{guardian.avatar_url ? <img src={guardian.avatar_url} alt={guardian.display_name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <img src="/images/guides/guide-plate.png" alt="" loading="lazy" style={{ width: 150, height: 150, objectFit: 'contain', filter: 'grayscale(1)' }} />}</div>
                 <div style={{ padding: 20, display: 'flex', flexDirection: 'column', flex: 1 }}><span style={{ color: '#667245', fontSize: 8, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>{directoryTypesFor(guardian).join(' · ')}</span><h3 style={{ fontFamily: serif, fontSize: 30, fontWeight: 300, lineHeight: 1, margin: '12px 0 8px' }}>{guardian.display_name}</h3><p style={{ color: '#66645F', fontSize: 12, lineHeight: 1.5, margin: 0 }}>{guardian.headline || guardian.bio}</p><span style={{ marginTop: 'auto', paddingTop: 20, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 7 }}>View Guardian <ArrowRight size={12} /></span></div>
               </a>)}
-            </div> : <div style={{ borderTop: '1px solid rgba(17,18,15,.18)', padding: '34px 0', color: '#686762' }}>{guardians.length ? `No ${activeType.toLowerCase()} profiles are published yet.` : 'Approved Guardian profiles will appear here.'}</div>}
+              {suggestTypes.map((type) => <div key={type} style={{ minHeight: 390, border: '1.5px dashed rgba(17,18,15,.32)', borderRadius: 6, padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundImage: 'radial-gradient(rgba(17,18,15,.16) 1px, transparent 1px)', backgroundSize: '14px 14px' }}>
+                <div><span style={{ color: '#667245', fontSize: 8, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>{type}</span><h3 style={{ fontFamily: serif, fontSize: 30, fontWeight: 300, lineHeight: 1, margin: '12px 0 8px' }}>Know a great {type.toLowerCase()}?</h3><p style={{ color: '#66645F', fontSize: 12, lineHeight: 1.5, margin: 0 }}>Tell us who should be guiding people here. We will reach out and invite them.</p></div>
+                <button type="button" onClick={() => setSuggesting(type)} style={{ ...btn, background: '#11120F', color: '#FFF', borderColor: '#11120F', borderRadius: 2, width: '100%' }}>Suggest {/^[aeiou]/i.test(type) ? 'an' : 'a'} {type.toLowerCase()} <ArrowRight size={13} /></button>
+              </div>)}
+            </div>}
+            {suggesting && <SuggestGuardianModal type={suggesting} onClose={() => setSuggesting(null)} />}
           </div>
         </section>
         {!isSignedIn && <section id="guardian-apply" style={{ padding: 'clamp(70px,10vw,130px) clamp(20px,6vw,90px)', background: black }}><div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,360px),1fr))', gap: 'clamp(34px,7vw,100px)', alignItems: 'center' }}><div><span style={{ color: acid, fontSize: 10, fontWeight: 700, letterSpacing: '.15em' }}>BECOME A GUARDIAN</span><h2 style={{ fontFamily: serif, fontSize: 'clamp(48px,7vw,86px)', fontWeight: 300, lineHeight: .92, margin: '16px 0' }}>Build your place in the network.</h2><p style={{ color: muted, lineHeight: 1.65, maxWidth: 540 }}>Use your existing ROUTINE³ account or create one to build your Guardian profile and first Protocol.</p></div><AuthPanel bare /></div></section>}

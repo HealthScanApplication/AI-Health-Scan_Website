@@ -180,6 +180,24 @@ export async function listPublicGuideProfiles(): Promise<GuideProfile[]> {
   return (data || []) as GuideProfile[];
 }
 
+export interface GuardianSuggestion {
+  guardian_type: string;
+  name: string;
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  website?: string;
+  note?: string;
+  suggester_email?: string;
+}
+
+/** Public "suggest a Guardian" submission (anon insert-only, see guardian_suggestions migration). */
+export async function submitGuardianSuggestion(suggestion: GuardianSuggestion): Promise<void> {
+  const clean = Object.fromEntries(Object.entries(suggestion).map(([key, value]) => [key, typeof value === 'string' ? value.trim() || null : value]));
+  const { error } = await db().from('guardian_suggestions').insert(clean);
+  if (error) throw error;
+}
+
 export async function saveGuideProfile(profile: Partial<GuideProfile> & { user_id: string }): Promise<GuideProfile> {
   const { data, error } = await db().from('guide_profiles').upsert(profile, { onConflict: 'user_id' }).select().single();
   if (error) throw error;
