@@ -15,7 +15,8 @@ import {
   Shield,
   MoreHorizontal,
   X,
-  Share2
+  Share2,
+  Compass
 } from 'lucide-react';
 import { isAdminUser, getAdminUserInfo } from '../utils/adminUtils';
 import { oura, ouraButton } from '../config/ouraTheme';
@@ -489,6 +490,10 @@ export function Header({
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { window.location.href = '/guardians/workspace'; }}>
+                      <Compass className="mr-2 h-4 w-4" />
+                      <span>Guardian</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleNavClick(onNavigateToSettings)}>
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Settings</span>
@@ -501,7 +506,7 @@ export function Header({
                           className="text-red-700 focus:text-red-700 focus:bg-red-50"
                         >
                           <Shield className="mr-2 h-4 w-4" />
-                          <span>Admin Panel</span>
+                          <span>Admin</span>
                           <span className="ml-auto text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">
                             {adminInfo.level?.toUpperCase() || 'ADMIN'}
                           </span>
