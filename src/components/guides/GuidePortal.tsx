@@ -618,7 +618,11 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <div style={{ minHeight: '100vh', background: black, color: ink, fontFamily: sans }}>
       <header style={{ position: 'absolute', zIndex: 10, inset: '0 0 auto', height: 70, borderBottom: '1px solid rgba(255,255,255,.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(20px,5vw,72px)', background: 'rgba(9,10,8,.32)', backdropFilter: 'blur(12px)' }}>
-        <Brand /><a href={guardianCta} style={{ color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em' }}>{isSignedIn ? 'OPEN GUARDIAN WORKSPACE' : 'BECOME A GUARDIAN'} →</a>
+        <Brand />
+        <nav aria-label="Guardian tools" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px,2.4vw,30px)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {[['Protocol builder', isSignedIn ? '/guardians/workspace?tab=protocols' : '#guardian-apply'], ['Offer builder', isSignedIn ? '/guardians/workspace?tab=offer_builder' : '#guardian-apply']].map(([text, href]) => <a key={text} className="guardian-nav-link" href={href} style={{ color: 'rgba(245,242,234,.78)', textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{text}</a>)}
+          <a href={guardianCta} style={{ color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em' }}>{isSignedIn ? 'OPEN WORKSPACE' : 'BECOME A GUARDIAN'} →</a>
+        </nav>
       </header>
       <main>
         <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'center', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
@@ -1436,7 +1440,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   </div>;
   return <div onPointerMove={tiltCard} onPointerOut={resetTilt} style={{ minHeight: '100vh', background: black, color: ink, padding: '30px clamp(20px,6vw,90px)', fontFamily: sans }}>
     <style>{`@keyframes guardian-orbit{to{transform:rotate(360deg)}}.guardian-image-loader{animation:guardian-orbit 1.8s linear infinite}.guardian-card{--card-rotate-x:0deg;--card-rotate-y:0deg;transition:transform 160ms ease,border-color 180ms ease,box-shadow 180ms ease,background-color 180ms ease;transform-origin:center;transform-style:preserve-3d;will-change:transform;text-align:left}.guardian-card>span[aria-hidden="true"],.guardian-card [role="img"]{margin-left:0!important;margin-right:0!important}.guardian-card img{transition:filter 180ms ease;filter:grayscale(1) contrast(.92)!important}.guardian-card:hover{transform:perspective(700px) translateY(-5px) rotateX(var(--card-rotate-x)) rotateY(var(--card-rotate-y));box-shadow:0 16px 30px rgba(0,0,0,.3)}.guardian-card:not([aria-pressed="true"]):not([aria-disabled="true"]):hover{border-color:#A56B48!important;background-color:#171811!important}.guardian-card:hover img{filter:grayscale(0) contrast(1.02) saturate(1.08)!important}.guardian-card[aria-disabled="true"]:hover{transform:none;box-shadow:none}.guardian-card:focus-visible{outline:2px solid #C7D8A3;outline-offset:3px}@media(prefers-reduced-motion:reduce){.guardian-card,.guardian-image-loader{transition:none;animation:none}.guardian-card:hover{transform:none!important}}`}</style>
-    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
       <Brand />
       <nav aria-label="Guardian workspace" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
         <button type="button" onClick={() => setSummaryView('offers')} style={{ padding: 0, border: 0, borderBottom: summaryView === 'offers' ? `1px solid ${ink}` : '1px solid transparent', background: 'transparent', color: summaryView === 'offers' ? ink : muted, cursor: 'pointer', fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>Offers <span style={{ color: acid }}>{builtOfferCount}/{totalOfferCount}</span></button>
@@ -2231,7 +2235,8 @@ function GuideLibrary({ guideId, selectedIds, onSelectedIds, onUse }: { guideId:
 
 function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (p: GuideProfile) => void }) {
   const { user, accessToken, signOut } = useAuth();
-  const [tab, setTab] = useState<Tab>('home');
+  // Deep links from the public Guardians nav, e.g. /guardians/workspace?tab=protocols
+  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); return wanted === 'offer_builder' || wanted === 'protocols' ? wanted : 'home'; });
   const [leads, setLeads] = useState<GuideLead[]>([]);
   const [offers, setOffers] = useState<GuideOffer[]>([]);
   const [recipes, setRecipes] = useState<GuideRecipe[]>([]);
