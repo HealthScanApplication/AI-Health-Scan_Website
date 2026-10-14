@@ -621,13 +621,13 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
         <Brand /><a href={guardianCta} style={{ color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em' }}>{isSignedIn ? 'OPEN GUARDIAN WORKSPACE' : 'BECOME A GUARDIAN'} →</a>
       </header>
       <main>
-        <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'end', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-          <div style={{ width: '100%', boxSizing: 'border-box', padding: 'clamp(120px,16vh,190px) clamp(20px,6vw,90px) clamp(54px,8vh,90px)', display: 'grid', alignItems: 'end' }}>
-            <div style={{ maxWidth: 860, margin: '0 auto', textAlign: 'center' }}>
+        <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'center', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+          <div style={{ width: '100%', boxSizing: 'border-box', padding: 'clamp(110px,14vh,150px) clamp(20px,6vw,90px) clamp(54px,8vh,90px)' }}>
+            <div style={{ maxWidth: 860 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: acid, marginBottom: 28 }}>LEARN · BUILD · GUIDE</div>
               <h1 style={{ margin: 0, fontFamily: serif, fontWeight: 300, fontSize: 'clamp(64px,10vw,142px)', lineHeight: .84, letterSpacing: '-0.055em' }}>Become a Guardian.</h1>
-              <p style={{ maxWidth: 650, margin: '30px auto 10px', fontSize: 'clamp(18px,2vw,25px)', lineHeight: 1.4, fontWeight: 600 }}>Turn what you know into guidance people can follow.</p>
-              <p style={{ maxWidth: 650, margin: '0 auto', color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7 }}>Create your public page, build a value ramp, collect leads, and publish guides, recipes and interactive Protocols with ROUTINE³.</p>
+              <p style={{ maxWidth: 650, margin: '30px 0 10px', fontSize: 'clamp(18px,2vw,25px)', lineHeight: 1.4, fontWeight: 600 }}>Turn what you know into guidance people can follow.</p>
+              <p style={{ maxWidth: 650, margin: 0, color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7 }}>Create your public page, build a value ramp, collect leads, and publish guides, recipes and interactive Protocols with ROUTINE³.</p>
               <CtaLockup href={guardianCta} label={isSignedIn ? 'Your Guardian workspace' : 'Share what you know'} action={isSignedIn ? 'Open workspace' : 'Become a Guardian'} />
             </div>
           </div>
