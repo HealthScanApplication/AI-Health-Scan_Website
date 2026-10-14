@@ -245,15 +245,11 @@ export function ProtocolHomeScreen({
         <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>7:20 pm</span>
       </div>
 
-      {/* scrollable app canvas */}
-      <div className="phone-scroll" style={{ flex: 1, overflowY: "auto", margin: `0 ${MT.screenCardInset}px`, borderRadius: "22px 22px 0 0", background: ui.surface, padding: "13px 0 108px", display: "flex", flexDirection: "column", position: "relative" }}>
-        {/* One day spine, matching mobile. Per-row colour segments paint over
-            this base rail, but section and group gaps can no longer break it. */}
-        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.railWidth / 2, top: 78, bottom: 0, width: MT.railWidth, background: dark ? "#5D5D63" : "#9CA3AF", opacity: 0.62, zIndex: 0 }} />
-        {/* Selected day -> End Sleep bridge. Mobile paints this as a full sleep
-            column, not a hairline: both side edges continue from the bottom of
-            the selected date ring into the square top of the wake capsule. */}
-        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.nodeWidth / 2, top: 105, height: 160, width: MT.nodeWidth, background: `linear-gradient(180deg, ${purple} 0%, #965BD2 54%, #A96EAE 100%)`, borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", opacity: 0.96, zIndex: 0 }} />
+      {/* Fixed profile/calendar header with an independently scrolling timeline. */}
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", margin: `0 ${MT.screenCardInset}px`, borderRadius: "22px 22px 0 0", background: ui.surface, display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "relative", zIndex: 10, flexShrink: 0, paddingTop: 13, background: ui.surface, boxShadow: dark ? "0 5px 12px rgba(0,0,0,0.2)" : "0 5px 12px rgba(15,23,42,0.06)" }}>
+        {/* The selected-day column terminates at the fixed day header. */}
+        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.nodeWidth / 2, top: 85, bottom: 0, width: MT.nodeWidth, background: `linear-gradient(180deg, ${purple} 0%, #965BD2 54%, #A96EAE 100%)`, borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", opacity: 0.96, zIndex: 0 }} />
         {/* HEADER */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: `0 ${MT.headerPadX}px`, marginBottom: 6, gap: 8, flexShrink: 0, position: "relative", zIndex: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: MT.headerLeadPad, flexShrink: 1, minWidth: 0 }}>
@@ -295,6 +291,12 @@ export function ProtocolHomeScreen({
         </div>
 
         <div style={{ margin: `0 15px 10px ${MT.rowContentX}px`, borderRadius: 18, background: ui.dayPill, color: ui.dayPillText, padding: "10px 14px", fontSize: 10.5, fontWeight: 700, letterSpacing: 1.2, textAlign: "center", flexShrink: 0, position: "relative", zIndex: 1 }}>{headerDate} · TODAY</div>
+        </div>
+
+        <div className="phone-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 0 108px", position: "relative" }}>
+        {/* One day spine, matching mobile. Per-row colour segments paint over
+            this base rail, but section and group gaps can no longer break it. */}
+        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.railWidth / 2, top: 0, bottom: 0, width: MT.railWidth, background: dark ? "#5D5D63" : "#9CA3AF", opacity: 0.62, zIndex: 0 }} />
 
         {/* SECTIONS */}
         {sections.length === 0 && (
@@ -355,10 +357,10 @@ export function ProtocolHomeScreen({
                                 : isWake(it) ? <Sun size={16} strokeWidth={1.8} color="#FFFFFF" />
                                   : <ItemIcon size={15} strokeWidth={1.8} color={isDone ? "#FFFFFF" : "#9CA3AF"} />}
                             </span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: dark ? 10 : MT.itemRadius, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: dark ? 10 : MT.itemRadius, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
+                            <div style={{ flex: "1 1 0", minWidth: 0, overflow: "hidden" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, overflow: "hidden" }}>
+                                <span title={it.display_name} style={{ display: "block", flex: "1 1 0", minWidth: 0, fontSize: 13, fontWeight: 600, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
                                 {it.repeat && <Repeat size={10} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />}
                               </div>
                               {sub && <div style={{ fontSize: 10, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
@@ -393,6 +395,7 @@ export function ProtocolHomeScreen({
           </div>
         ))}
 
+        </div>
       </div>
 
       {/* floating TAB BAR */}
