@@ -1554,16 +1554,14 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         <div><label style={label}>Main language</label><div style={{ position: 'relative' }}><span aria-hidden="true" style={{ position: 'absolute', zIndex: 1, left: 11, top: 11, fontSize: 16 }}>{languageOptions.find((language) => language.name === mainLanguage)?.flag || '🌐'}</span><select style={{ ...input, paddingLeft: 42 }} value={mainLanguage} onChange={(event) => setMainLanguage(event.target.value)}>{languageOptions.map((language) => <option key={language.code} value={language.name}>{language.name}</option>)}</select></div></div>
         <div><label style={label}>Pricing region</label><select style={input} value={pricingRegion} onChange={(event) => { const option = pricingRegions.find((item) => item.region === event.target.value); if (option) { setPricingRegion(option.region); setCurrency(option.currency); } }}>{pricingRegions.map((option) => <option key={option.region} value={option.region}>{option.label}</option>)}</select></div>
       </div>
-      <div style={{ borderTop: `1px solid ${line}`, paddingTop: 18, marginTop: 20 }}>
-        <label style={{ ...label, color: ink }}>Profile image <span style={{ color: muted }}>· optional</span></label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {avatarUrl ? <img src={avatarUrl} alt="Profile" referrerPolicy="no-referrer" style={{ width: 64, height: 64, objectFit: 'cover', border: `1px solid ${line}` }} /> : <span aria-hidden="true" style={{ width: 64, height: 64, display: 'grid', placeItems: 'center', border: `1px solid ${line}`, color: muted, fontFamily: serif, fontSize: 24 }}>{displayName.trim().charAt(0) || 'B'}</span>}
-          <label style={{ ...btn, height: 38, boxSizing: 'border-box', background: 'transparent', color: ink, fontSize: 9 }}>
-            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}{uploading ? 'Uploading' : avatarUrl ? 'Replace image' : 'Upload image'}
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadPortrait(event.target.files?.[0])} style={{ display: 'none' }} />
-          </label>
-        </div>
-        <p style={{ color: muted, fontSize: 10, lineHeight: 1.5, margin: '9px 0 0' }}>Used on your brand card, profile and published site.</p>
+      {/* Profile image: one compact row, like the brand line above. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18 }}>
+        {avatarUrl ? <img src={avatarUrl} alt="Profile" referrerPolicy="no-referrer" style={{ width: 36, height: 36, objectFit: 'cover', border: `1px solid ${line}` }} /> : <span aria-hidden="true" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', border: `1px solid ${line}`, color: muted, fontFamily: serif, fontSize: 16 }}>{displayName.trim().charAt(0) || 'B'}</span>}
+        <span style={{ color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>Profile image · optional</span>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: ink, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}>
+          {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}{uploading ? 'Uploading' : avatarUrl ? 'Replace' : 'Upload'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadPortrait(event.target.files?.[0])} style={{ display: 'none' }} />
+        </label>
         {importMessage && <p style={{ color: importMessage.startsWith('Imported') ? acid : muted, fontSize: 11, lineHeight: 1.5, margin: '10px 0 0' }}>{importMessage}</p>}
       </div>
       <p style={{ color: muted, fontSize: 10, lineHeight: 1.5, margin: '9px 0 0' }}>Language applies to your page and content. Pricing region sets the currency for every paid stage.</p>
