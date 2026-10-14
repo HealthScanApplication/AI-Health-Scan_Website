@@ -517,22 +517,14 @@ export function Header({
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center space-x-3">
-                  <Button
-                    variant="ghost"
-                    onClick={handleSignIn}
-                    className="font-medium"
-                    style={{ color: navText, transition: 'color 350ms ease' }}
-                  >
-                    Sign In
-                  </Button>
-
-                  {/* Subscribe — unified outlined CTA */}
-                  <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px', background: 'transparent', color: navText, borderColor: 'rgba(22,20,15,0.5)' }}>
-                      Subscribe
-                    </button>
-                  </div>
+                // Sign in + Subscribe share one hairline box, same joined-seam treatment as the logo lockup.
+                <div className={isShaking ? 'animate-button-shake' : ''} style={{ display: 'flex', border: `1px solid ${navText}`, borderRadius: 2, transition: 'border-color 350ms ease' }}>
+                  <button onClick={handleSignIn} style={{ height: 36, padding: '0 16px', border: 0, background: 'transparent', color: navText, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'color 350ms ease' }}>
+                    Sign in
+                  </button>
+                  <button onClick={handleWaitlistModal} style={{ height: 36, padding: '0 16px', border: 0, borderLeft: `1px solid ${navText}`, background: 'transparent', color: navText, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'color 350ms ease, border-color 350ms ease' }}>
+                    Subscribe
+                  </button>
                 </div>
               )}
             </div>
@@ -658,21 +650,13 @@ export function Header({
                       <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: oura.muted, fontWeight: 600 }}>
                         Get Started
                       </h3>
-                      <div className="space-y-3">
-                        <button
-                          onClick={handleSignIn}
-                          className="block w-full text-center px-3 py-3 font-medium transition-colors"
-                          style={{ color: oura.ink, background: 'transparent', border: `1px solid ${oura.hairline}`, borderRadius: 999 }}
-                        >
-                          Sign In
+                      <div className={isShaking ? 'animate-button-shake' : ''} style={{ display: 'flex', border: `1px solid ${oura.ink}`, borderRadius: 2 }}>
+                        <button onClick={handleSignIn} style={{ flex: 1, height: 46, border: 0, background: 'transparent', color: oura.ink, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer' }}>
+                          Sign in
                         </button>
-
-                        {/* Mobile Subscribe — unified outlined CTA */}
-                        <div className={`w-full ${isShaking ? 'animate-button-shake' : ''}`}>
-                          <button onClick={handleWaitlistModal} className="ed-cta" style={{ width: '100%' }}>
-                            Subscribe
-                          </button>
-                        </div>
+                        <button onClick={handleWaitlistModal} style={{ flex: 1, height: 46, border: 0, borderLeft: `1px solid ${oura.ink}`, background: 'transparent', color: oura.ink, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer' }}>
+                          Subscribe
+                        </button>
                       </div>
                     </div>
                   </>
