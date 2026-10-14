@@ -419,7 +419,7 @@ const deliveryCardArt: Record<DeliveryFormat, TagArt> = {
 const CHOICE_GRID: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,220px),1fr))', gap: 10 };
 const CHOICE_CARD_HEIGHT = 156;
 function choiceCardStyle(active: boolean): React.CSSProperties {
-  return { position: 'relative', height: CHOICE_CARD_HEIGHT, overflow: 'hidden', padding: 0, border: `1px solid ${active ? acid : line}`, background: active ? '#20251B' : 'transparent', color: ink, fontFamily: sans, cursor: 'pointer', display: 'grid', gridTemplateColumns: '92px 1px minmax(0,1fr)', gap: 0, alignItems: 'stretch', textAlign: 'left', minWidth: 0, width: '100%', boxSizing: 'border-box' };
+  return { position: 'relative', height: CHOICE_CARD_HEIGHT, overflow: 'hidden', padding: 0, border: `1px solid ${active ? acid : line}`, background: active ? '#20251B' : 'rgba(245,242,234,.04)', color: ink, fontFamily: sans, cursor: 'pointer', display: 'grid', gridTemplateColumns: '92px 1px minmax(0,1fr)', gap: 0, alignItems: 'stretch', textAlign: 'left', minWidth: 0, width: '100%', boxSizing: 'border-box' };
 }
 function ChoiceCheck() {
   return <span aria-hidden="true" style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, display: 'grid', placeItems: 'center', border: `1px solid ${acid}`, borderRadius: '50%', color: acid }}><Check size={10} strokeWidth={2.5} /></span>;
