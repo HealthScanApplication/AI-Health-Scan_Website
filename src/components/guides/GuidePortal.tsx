@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, ChevronRight, FileText, HeartPulse, LogOut,
   Mail, Package, Plus, Salad, Sparkles, Users, Globe2, Loader2,
@@ -447,6 +447,36 @@ function CreatorChoiceCard({ creator, avatarUrl, badge, byline, title, descripti
   </div>;
 }
 
+type PreviewDevice = 'desktop' | 'mobile';
+const PREVIEW_SIZES: Record<PreviewDevice, { width: number; height: number }> = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } };
+
+/** Renders a site preview at a real device size and scales it to fit, so every preview keeps the same ratio. */
+function PreviewFrame({ device, children }: { device: PreviewDevice; children: React.ReactNode }) {
+  const outer = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState(0);
+  useEffect(() => {
+    if (!outer.current) return;
+    const observer = new ResizeObserver(([entry]) => setAvailable(entry.contentRect.width));
+    observer.observe(outer.current);
+    return () => observer.disconnect();
+  }, []);
+  const size = PREVIEW_SIZES[device];
+  const maxShownWidth = device === 'mobile' ? Math.min(available, 360) : available;
+  const scale = available ? Math.min(1, maxShownWidth / size.width) : 0;
+  return <div ref={outer} style={{ width: '100%' }}>
+    <div style={{ position: 'relative', width: size.width * scale, height: size.height * scale, margin: '0 auto', overflow: 'hidden', border: `1px solid ${line}`, borderRadius: device === 'mobile' ? 22 : 4, background: '#F2EFE7' }}>
+      <div className="pv-inner" style={{ position: 'absolute', top: 0, left: 0, width: size.width, height: size.height, transform: `scale(${scale})`, transformOrigin: 'top left', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>{children}</div>
+    </div>
+  </div>;
+}
+
+/** Joined Desktop | Mobile toggle, same lockup style as the headers. */
+function DeviceToggle({ value, onChange }: { value: PreviewDevice; onChange: (device: PreviewDevice) => void }) {
+  return <div role="group" aria-label="Preview size" style={{ display: 'inline-flex', border: `1px solid ${line}`, borderRadius: 2 }}>
+    {(['desktop', 'mobile'] as const).map((device, index) => <button type="button" key={device} aria-pressed={value === device} onClick={() => onChange(device)} style={{ height: 30, padding: '0 14px', border: 0, borderLeft: index ? `1px solid ${line}` : 0, background: value === device ? ink : 'transparent', color: value === device ? black : muted, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}>{device}</button>)}
+  </div>;
+}
+
 function FunnelStage({ number, eyebrow, title, copy, art, last = false, children }: { number: string; eyebrow: string; title: string; copy: string; art?: TagArt; last?: boolean; children: React.ReactNode }) {
   const artCol = art ? art.index % art.cols : 0;
   const artRow = art ? Math.floor(art.index / art.cols) : 0;
@@ -889,6 +919,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [pricingRegion, setPricingRegion] = useState(defaultPricingRegion().region);
   const [currency, setCurrency] = useState<CurrencyCode>(defaultPricingRegion().currency);
   const [offerGoal, setOfferGoal] = useState<GuardianOfferGoal>('basic');
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
   const [offerPlanStage, setOfferPlanStage] = useState(0);
   const [showProtocolInfo, setShowProtocolInfo] = useState(false);
   const [summaryView, setSummaryView] = useState<'offers' | 'sites' | null>(null);
@@ -1853,6 +1884,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       </>}
 
       {step === 5 && <>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 14 }}><span style={{ color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>Preview on</span><DeviceToggle value={previewDevice} onChange={setPreviewDevice} /></div>
         <FunnelStage number="01" eyebrow="Site 01 · Your profile" title={`${displayName || 'Your'}${displayName ? '’s' : ''} story.`} copy="Your profile site: who you are, and every published offer path.">
           {/* Builder left, live preview right (stacks on narrow screens). */}
           <div className="g-split">
@@ -1928,7 +1960,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             </div>
             </>}
           </div>
-          <div id="profile-site-preview" className="g-sticky" style={{ scrollMarginTop: 20 }}><span style={{ ...label, display: 'block', color: acid, marginBottom: 7 }}>Profile site preview <span style={{ color: muted }}>· shows every published offer path</span></span><div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', border: `1px solid ${line}`, backgroundColor: pageColor, backgroundImage: backgroundType === 'image' ? `linear-gradient(rgba(242,239,231,.66),rgba(242,239,231,.66)),url(${effectiveBackground})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: imageTreatment === 'greyscale' ? 'luminosity' : 'normal', color: '#11120F', overflow: 'hidden', fontFamily: sans }}>
+          <div id="profile-site-preview" className="g-sticky" style={{ scrollMarginTop: 20 }}><span style={{ ...label, display: 'block', color: acid, marginBottom: 7 }}>Profile site preview <span style={{ color: muted }}>· shows every published offer path</span></span><PreviewFrame device={previewDevice}><div style={{ flex: '1 0 auto', width: '100%', maxWidth: '100%', boxSizing: 'border-box', border: `1px solid ${line}`, backgroundColor: pageColor, backgroundImage: backgroundType === 'image' ? `linear-gradient(rgba(242,239,231,.66),rgba(242,239,231,.66)),url(${effectiveBackground})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: imageTreatment === 'greyscale' ? 'luminosity' : 'normal', color: '#11120F', overflow: 'hidden', fontFamily: sans }}>
             {backgroundType === 'video' && <><video src={effectiveBackground} autoPlay muted loop playsInline aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: imageTreatment === 'greyscale' ? 'grayscale(1)' : 'none' }} /><span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(242,239,231,.66)' }} /></>}
             {headerStyle !== 'hidden' && <div style={{ position: 'relative', zIndex: 2, height: 44, background: previewHeaderBackground, color: previewHeaderText, borderBottom: '1px solid rgba(17,18,15,.16)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', fontSize: 7, fontWeight: 700, letterSpacing: '.12em' }}><span style={{ display: 'flex', alignItems: 'center', gap: 9 }}><RoutineMark size={26} textColor="#16140F" hairline="#16140F" />{brandName.trim() && <span>{brandName.trim()}</span>}</span><span>routine3.com/{displayName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-') || 'your-name'}</span></div>}
             <div style={{ position: 'relative', zIndex: 2, padding: 'clamp(18px,4vw,34px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 24, alignItems: 'center' }}>
@@ -1943,7 +1975,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
                 <div style={{ border: '1px solid rgba(17,18,15,.16)', borderRadius: 5, padding: 16, background: 'rgba(255,255,255,.94)', boxShadow: '0 10px 28px rgba(17,18,15,.09)' }}><span style={{ display: 'block', color: accentColor, fontSize: 7, fontWeight: 700, letterSpacing: '.12em', marginBottom: 7 }}>{rampTargetAudience.toUpperCase()} · {rampTargetProblem.toUpperCase()}</span><strong style={{ display: 'block', fontSize: 12, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{customerFacingOfferTitle(leadMagnetTitle || suggestedFreeOffer.title)}</strong><span style={{ display: 'block', color: '#66645F', fontSize: 8, lineHeight: 1.5, marginTop: 7 }}>{freeAudienceValue}</span><button type="button" onClick={() => document.getElementById('value-ramp-funnel-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ marginTop: 11, width: 'fit-content', minHeight: 28, padding: '0 10px', border: 0, borderRadius: 3, background: accentColor, color: readableText(accentColor), fontFamily: sans, fontSize: 7, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6 }}>View <ArrowRight size={9} /></button></div>
               </div>
             </div>
-          </div></div>
+          </div></PreviewFrame></div>
           </div>
         </FunnelStage>
         <FunnelStage number="02" eyebrow="Site 02 · First offer path" title={`${rampTargetAudience} · ${rampTargetProblem} → ${customerFacingOfferTitle(leadMagnetTitle || 'your first offer')}`} copy="Audience, problem, solution: the page a visitor lands on, from the free offer through to the next one." last>
@@ -1961,8 +1993,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             {funnelStages.map((stage, index) => { const unlocked = index <= funnelUnlockedStage; return <button type="button" key={`${stage.title}-${index}`} disabled={!unlocked} onClick={() => { setFunnelPreviewStage(index); setFunnelPageState('offer'); }} aria-current={funnelPreviewStage === index ? 'step' : undefined} aria-label={unlocked ? `Preview stage ${index + 1}: ${stage.title}` : `Stage ${index + 1} locked`} title={unlocked ? stage.title : 'Complete the current action to reveal this stage'} style={{ flex: '0 0 auto', width: 30, height: 30, borderRadius: '50%', border: `1px solid ${index <= funnelPreviewStage ? acid : line}`, background: funnelPreviewStage === index ? acid : 'transparent', color: funnelPreviewStage === index ? black : index < funnelPreviewStage ? acid : muted, fontFamily: sans, fontSize: 8, fontWeight: 700, cursor: unlocked ? 'pointer' : 'not-allowed', opacity: unlocked ? 1 : .4 }}>{unlocked ? String(index + 1).padStart(2, '0') : '—'}</button>; })}
           </div>
           <button type="button" onClick={() => { setFunnelPreviewStage(0); setFunnelUnlockedStage(0); setFunnelPageState('offer'); setFunnelTimerSeconds(600); setFunnelPurchases([]); setLeadCaptureValue(''); }} style={{ marginTop: 4, border: 0, background: 'transparent', color: muted, fontFamily: sans, fontSize: 10, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>Restart visitor journey</button>
-          </div><div className="g-sticky">
-          <div style={{ width: '100%', maxWidth: '100%', minHeight: 'clamp(420px,56vw,560px)', boxSizing: 'border-box', border: `1px solid ${line}`, borderRadius: 5, backgroundColor: '#F2EFE7', backgroundImage: backgroundType === 'image' ? `linear-gradient(rgba(242,239,231,.84),rgba(242,239,231,.84)),url(${effectiveBackground})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', color: '#11120F', padding: 'clamp(22px,5vw,52px)', display: 'grid', alignItems: 'center', overflow: 'hidden' }}>
+          </div><div className="g-sticky"><PreviewFrame device={previewDevice}>
+          <div style={{ flex: '1 0 auto', width: '100%', maxWidth: '100%', minHeight: '100%', boxSizing: 'border-box', border: `1px solid ${line}`, borderRadius: 5, backgroundColor: '#F2EFE7', backgroundImage: backgroundType === 'image' ? `linear-gradient(rgba(242,239,231,.84),rgba(242,239,231,.84)),url(${effectiveBackground})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', color: '#11120F', padding: 'clamp(22px,5vw,52px)', display: 'grid', alignItems: 'center', overflow: 'hidden' }}>
             {funnelPageState === 'offer' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,260px),1fr))', gap: 'clamp(28px,6vw,80px)', alignItems: 'center' }}><div style={{ minWidth: 0 }}><span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 13 }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(17,18,15,.22)' }} /> : <span style={{ width: 30, height: 30, borderRadius: '50%', display: 'grid', placeItems: 'center', border: '1px solid rgba(17,18,15,.22)', fontFamily: serif }}>{(displayName || 'G')[0]}</span>}<span style={{ color: '#55564F', fontSize: 8, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{displayName || 'Your Guardian'} <ChevronRight size={10} style={{ display: 'inline', verticalAlign: '-2px' }} /> {funnelPreviewStage === 0 && freeOfferType === 'routine' ? 'R3 Protocol' : 'Offer'}</span></span><span style={{ color: accentColor, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>Stage {String(funnelPreviewStage + 1).padStart(2, '0')} · {activeFunnelStage.meta}</span><h3 style={{ fontFamily: serif, fontSize: offerTitleSize(activeFunnelStage.title), fontWeight: 300, lineHeight: .95, margin: '18px 0 0', overflowWrap: 'anywhere' }}>{customerFacingOfferTitle(activeFunnelStage.title)}</h3></div><div><p style={{ color: '#66645F', fontSize: 15, lineHeight: 1.6, margin: '0 0 22px' }}>{activeFunnelStage.value}</p><button type="button" onClick={confirmFunnelOffer} style={{ ...btn, minHeight: 52, padding: '0 22px', background: accentColor, color: readableText(accentColor), borderColor: accentColor, fontSize: 10 }}>{activeFunnelStage.action} <ArrowRight size={14} /></button></div></div>}
             {funnelPageState === 'checkout' && <div style={{ width: '100%', maxWidth: 620, margin: '0 auto', textAlign: 'center' }}>
               <span style={{ color: accentColor, fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{funnelPreviewStage === 0 ? 'Free lead magnet' : 'Secure checkout'}</span>
@@ -1973,7 +2005,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             {funnelPageState === 'post_purchase' && postPurchaseOffer && <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: accentColor, fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}><Check size={15} /> Free Protocol delivered</span><h3 style={{ fontFamily: serif, fontSize: 'clamp(42px,6vw,70px)', fontWeight: 300, lineHeight: .98, margin: '18px 0 12px' }}>Get your personalised Protocol and call for 30% off.</h3><p style={{ color: '#66645F', fontSize: 14, lineHeight: 1.6, margin: '0 auto 18px', maxWidth: 600 }}>Add <strong>{customerFacingOfferTitle(postPurchaseOffer.title)}</strong> for a plan adapted to your needs and a private call with {displayName || 'your Guardian'}. Your free download is already yours.</p><div style={{ display: 'inline-block', border: `1px solid ${accentColor}`, padding: '8px 12px', color: funnelTimerSeconds ? accentColor : '#8A3D31', fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 18 }}>{funnelTimerSeconds ? `30% off · ${String(Math.floor(funnelTimerSeconds / 60)).padStart(2, '0')}:${String(funnelTimerSeconds % 60).padStart(2, '0')}` : 'Limited offer expired'}</div><div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}><button type="button" disabled={!funnelTimerSeconds} onClick={() => resolvePostPurchase(true)} style={{ ...btn, minHeight: 52, padding: '0 22px', background: accentColor, color: readableText(accentColor), borderColor: accentColor, opacity: funnelTimerSeconds ? 1 : .45 }}>Yes, add {postPurchaseOffer.meta.split(' · ')[0]} <ArrowRight size={14} /></button><button type="button" onClick={() => resolvePostPurchase(false)} style={{ ...btn, minHeight: 52, padding: '0 18px', background: 'transparent', color: '#11120F', borderColor: 'rgba(17,18,15,.35)' }}>No thanks, continue</button></div></div>}
             {funnelPageState === 'complete' && <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center' }}><span style={{ width: 52, height: 52, margin: '0 auto 18px', borderRadius: '50%', background: accentColor, color: readableText(accentColor), display: 'grid', placeItems: 'center' }}><Check size={24} /></span><h3 style={{ fontFamily: serif, fontSize: 'clamp(44px,6vw,72px)', fontWeight: 300, lineHeight: .98, margin: 0 }}>You’re all set.</h3><p style={{ color: '#66645F', fontSize: 14, lineHeight: 1.6, margin: '16px auto 22px' }}>Confirmation and access details are ready. This journey includes {funnelPurchases.length} accepted offer{funnelPurchases.length === 1 ? '' : 's'}.</p><div style={{ borderTop: '1px solid rgba(17,18,15,.2)', paddingTop: 14, fontSize: 10, lineHeight: 1.8 }}>{funnelPurchases.map((title) => <div key={title}>{customerFacingOfferTitle(title)}</div>)}</div></div>}
           </div>
-          </div></div>
+          </PreviewFrame></div></div>
         </div>
         </FunnelStage>
         {/* Setup details stay available but collapsed: the step should end on Publish, not a wall of summary. */}
