@@ -1853,7 +1853,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       </>}
 
       {step === 5 && <>
-        <FunnelStage number="01" eyebrow="Site · Style your page" title={`${displayName || 'Your'}${displayName ? '’s' : ''} story.`} copy="Style your page and preview the customer journey." last>
+        <FunnelStage number="01" eyebrow="Site 01 · Your profile" title={`${displayName || 'Your'}${displayName ? '’s' : ''} story.`} copy="Your profile site: who you are, and every published offer path.">
           {/* Builder left, live preview right (stacks on narrow screens). */}
           <div className="g-split">
           <div style={{ border: `1px solid ${line}`, background: panel, padding: 14 }}>
@@ -1946,6 +1946,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           </div></div>
           </div>
         </FunnelStage>
+        <FunnelStage number="02" eyebrow="Site 02 · First offer path" title={`${rampTargetAudience} · ${rampTargetProblem} → ${customerFacingOfferTitle(leadMagnetTitle || 'your first offer')}`} copy="Audience, problem, solution: the page a visitor lands on, from the free offer through to the next one." last>
         <div id="value-ramp-funnel-preview" style={{ scrollMarginTop: 20, border: `1px solid ${line}`, background: panel, padding: 16, marginBottom: 24 }}>
           <div className="g-split"><div>
           <label style={{ ...label, color: acid }}>Offer funnel preview <span style={{ color: muted }}>· test purchase and access</span></label>
@@ -1974,6 +1975,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           </div>
           </div></div>
         </div>
+        </FunnelStage>
         {/* Setup details stay available but collapsed: the step should end on Publish, not a wall of summary. */}
         <details style={{ borderTop: `1px solid ${line}`, marginTop: 8, paddingTop: 14 }}>
           <summary style={{ cursor: 'pointer', color: muted, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>Review setup summary</summary>
