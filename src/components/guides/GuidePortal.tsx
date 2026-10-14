@@ -344,6 +344,18 @@ const input: React.CSSProperties = {
   fontFamily: sans, fontSize: 14, outline: 'none',
 };
 const label: React.CSSProperties = { display: 'block', color: muted, fontFamily: sans, fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8, lineHeight: 1.35 };
+// Homepage-style CTA: a label cell joined to a solid button on one shared seam.
+function CtaLockup({ href, label, action, dark = false }: { href: string; label: string; action: string; dark?: boolean }) {
+  const edge = dark ? '#11120F' : '#FFFFFF';
+  const cell: React.CSSProperties = { height: 42, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, border: `1px solid ${edge}` };
+  return (
+    <a href={href} style={{ display: 'inline-flex', marginTop: 26, textDecoration: 'none', maxWidth: '100%' }}>
+      <span style={{ ...cell, padding: '0 14px', letterSpacing: '0.04em', color: edge, background: dark ? 'rgba(17,18,15,0.06)' : 'rgba(255,255,255,0.16)', borderRight: 'none', borderRadius: '2px 0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+      <span style={{ ...cell, padding: '0 16px', gap: 8, textTransform: 'uppercase', letterSpacing: '0.1em', color: dark ? '#FFFFFF' : '#16140F', background: edge, borderRadius: '0 2px 2px 0', whiteSpace: 'nowrap' }}>{action} <ArrowRight size={13} /></span>
+    </a>
+  );
+}
+
 const btn: React.CSSProperties = { minHeight: 44, border: `1px solid ${line}`, background: ink, color: black, padding: '0 18px', borderRadius: 4, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, lineHeight: 1.2 };
 const compactControl: React.CSSProperties = { height: 40, fontSize: 11, fontWeight: 600, lineHeight: 1.2 };
 const titleHighlight: React.CSSProperties = { display: 'inline', width: 'fit-content', background: 'rgba(245,242,234,.82)', color: black, padding: '3px 7px 4px', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' };
@@ -473,7 +485,7 @@ function SocialUrlField({ label: text, value, placeholder, Icon, onChange }: { l
   </div>;
 }
 
-function AuthPanel() {
+function AuthPanel({ bare = false }: { bare?: boolean }) {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
   const [name, setName] = useState('');
@@ -512,15 +524,15 @@ function AuthPanel() {
     setBusy(false);
   }
   return (
-    <form id="guide-signin" onSubmit={submit} style={{ border: `1px solid ${line}`, background: panel, padding: 'clamp(24px,4vw,48px)', maxWidth: 460 }}>
-      <div style={{ ...label, color: acid }}>Step 1 · Sign in</div>
+    <form id="guide-signin" onSubmit={submit} style={bare ? { maxWidth: 460, width: '100%' } : { border: `1px solid ${line}`, background: panel, padding: 'clamp(24px,4vw,48px)', maxWidth: 460 }}>
+      {!bare && <><div style={{ ...label, color: acid }}>Step 1 · Sign in</div>
       <h2 style={{ margin: '12px 0 10px', fontFamily: serif, fontSize: 'clamp(32px,4vw,52px)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.045em' }}>Build with ROUTINE³.</h2>
-      <p style={{ color: muted, fontFamily: sans, fontSize: 14, lineHeight: 1.6, margin: '0 0 24px' }}>Create your profile, collect leads, and publish paid resources, recipes and protocols from one workspace.</p>
+      <p style={{ color: muted, fontFamily: sans, fontSize: 14, lineHeight: 1.6, margin: '0 0 24px' }}>Create your profile, collect leads, and publish paid resources, recipes and protocols from one workspace.</p></>}
       {mode === 'signup' && <div style={{ marginBottom: 12 }}><label style={label}>Your name</label><input value={name} onChange={(e) => setName(e.target.value)} required style={input} /></div>}
       <div style={{ marginBottom: 12 }}><label style={label}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={input} /></div>
       <div style={{ marginBottom: 16 }}><label style={label}>Password</label><input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required style={input} /></div>
       {error && <div style={{ color: '#F0A7A7', fontSize: 12, fontFamily: sans, marginBottom: 14 }}>{error}</div>}
-      <button disabled={busy} style={{ ...btn, width: '100%', opacity: busy ? 0.55 : 1 }}>{busy ? 'Please wait' : mode === 'login' ? 'Sign in' : 'Create Guardian account'} <ArrowRight size={14} /></button>
+      <button disabled={busy} style={{ ...btn, width: '100%', opacity: busy ? 0.55 : 1, ...(bare ? { minHeight: 42, borderRadius: 2, fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', background: '#FFFFFF', color: '#16140F', borderColor: '#FFFFFF' } : {}) }}>{busy ? 'Please wait' : mode === 'login' ? 'Sign in' : 'Create Guardian account'} <ArrowRight size={14} /></button>
       <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} style={{ border: 0, background: 'none', color: muted, width: '100%', marginTop: 15, cursor: 'pointer', fontFamily: sans, fontSize: 12 }}>
         {mode === 'login' ? 'New Guardian? Create an account' : 'Already have an account? Sign in'}
       </button>
@@ -559,18 +571,13 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
       </header>
       <main>
         <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'end', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-          <div style={{ width: '100%', boxSizing: 'border-box', padding: 'clamp(120px,16vh,190px) clamp(20px,6vw,90px) clamp(54px,8vh,90px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,390px),1fr))', gap: 'clamp(42px,8vw,120px)', alignItems: 'end' }}>
+          <div style={{ width: '100%', boxSizing: 'border-box', padding: 'clamp(120px,16vh,190px) clamp(20px,6vw,90px) clamp(54px,8vh,90px)', display: 'grid', alignItems: 'end' }}>
             <div style={{ maxWidth: 760 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: acid, marginBottom: 28 }}>LEARN · BUILD · GUIDE</div>
               <h1 style={{ margin: 0, fontFamily: serif, fontWeight: 300, fontSize: 'clamp(64px,10vw,142px)', lineHeight: .84, letterSpacing: '-0.055em' }}>Become a Guardian.</h1>
               <p style={{ maxWidth: 650, margin: '30px 0 10px', fontSize: 'clamp(18px,2vw,25px)', lineHeight: 1.4, fontWeight: 600 }}>Turn what you know into guidance people can follow.</p>
               <p style={{ maxWidth: 650, color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7 }}>Create your public page, build a value ramp, collect leads, and publish guides, recipes and interactive Protocols with ROUTINE³.</p>
-            </div>
-            <div style={{ maxWidth: 430, justifySelf: 'end', border: '1px solid rgba(255,255,255,.28)', background: 'rgba(9,10,8,.46)', backdropFilter: 'blur(14px)', padding: 'clamp(24px,4vw,42px)' }}>
-              <span style={{ color: acid, fontSize: 9, fontWeight: 700, letterSpacing: '.15em' }}>JOIN THE NETWORK</span>
-              <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(34px,4vw,54px)', lineHeight: .95, margin: '15px 0' }}>Share what you know.</h2>
-              <p style={{ color: 'rgba(245,242,234,.72)', fontSize: 12, lineHeight: 1.6, margin: '0 0 22px' }}>Build your page, publish useful Protocols and guide people towards the next right step.</p>
-              <a href={guardianCta} style={{ ...btn, width: 'fit-content', textDecoration: 'none' }}>{isSignedIn ? 'Open workspace' : 'Become a Guardian'} <ArrowRight size={13} /></a>
+              <CtaLockup href={guardianCta} label={isSignedIn ? 'Your Guardian workspace' : 'Share what you know'} action={isSignedIn ? 'Open workspace' : 'Become a Guardian'} />
             </div>
           </div>
         </section>
@@ -588,7 +595,7 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
             </div> : <div style={{ borderTop: '1px solid rgba(17,18,15,.18)', padding: '34px 0', color: '#686762' }}>{guardians.length ? `No ${activeType.toLowerCase()} profiles are published yet.` : 'Approved Guardian profiles will appear here.'}</div>}
           </div>
         </section>
-        {!isSignedIn && <section id="guardian-apply" style={{ padding: 'clamp(70px,10vw,130px) clamp(20px,6vw,90px)', background: black }}><div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,360px),1fr))', gap: 'clamp(34px,7vw,100px)', alignItems: 'center' }}><div><span style={{ color: acid, fontSize: 10, fontWeight: 700, letterSpacing: '.15em' }}>BECOME A GUARDIAN</span><h2 style={{ fontFamily: serif, fontSize: 'clamp(48px,7vw,86px)', fontWeight: 300, lineHeight: .92, margin: '16px 0' }}>Build your place in the network.</h2><p style={{ color: muted, lineHeight: 1.65, maxWidth: 540 }}>Use your existing ROUTINE³ account or create one to build your Guardian profile and first Protocol.</p></div><AuthPanel /></div></section>}
+        {!isSignedIn && <section id="guardian-apply" style={{ padding: 'clamp(70px,10vw,130px) clamp(20px,6vw,90px)', background: black }}><div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,360px),1fr))', gap: 'clamp(34px,7vw,100px)', alignItems: 'center' }}><div><span style={{ color: acid, fontSize: 10, fontWeight: 700, letterSpacing: '.15em' }}>BECOME A GUARDIAN</span><h2 style={{ fontFamily: serif, fontSize: 'clamp(48px,7vw,86px)', fontWeight: 300, lineHeight: .92, margin: '16px 0' }}>Build your place in the network.</h2><p style={{ color: muted, lineHeight: 1.65, maxWidth: 540 }}>Use your existing ROUTINE³ account or create one to build your Guardian profile and first Protocol.</p></div><AuthPanel bare /></div></section>}
       </main>
     </div>
   );
