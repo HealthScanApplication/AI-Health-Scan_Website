@@ -13,7 +13,7 @@ export function FAQContactCTA() {
       </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
         <a
-          href="mailto:hello@healthscan.live"
+          href="mailto:hello@routine3.com"
           className="inline-flex items-center justify-center gap-2 w-full sm:w-80 h-12 px-6 bg-[var(--healthscan-green)] hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
         >
           <HelpCircle className="w-4 h-4" />

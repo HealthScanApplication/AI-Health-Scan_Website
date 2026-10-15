@@ -133,9 +133,9 @@ export function SocialSharingModal({
     const code = referralCode || 
       (typeof window !== 'undefined' ? localStorage.getItem('healthscan_referral_code') : null) || '';
     if (code) {
-      return `https://healthscan.live?ref=${encodeURIComponent(code)}`;
+      return `https://routine3.com?ref=${encodeURIComponent(code)}`;
     }
-    return 'https://healthscan.live';
+    return 'https://routine3.com';
   };
 
   // Memoize message templates with potential language and only green emojis
@@ -264,14 +264,15 @@ Worth exploring: ${currentReferralLink} 🌱💚`
     
     const currentReferralLink = getReferralLink();
     
-    // PRESERVE USER'S MESSAGE: Replace any existing healthscan.live links (with query params, paths, etc.) with the correct one
+    // PRESERVE USER'S MESSAGE: Replace any existing site links (with query params, paths, etc.) with the correct one.
+    // The old healthscan.live domain is matched too, so a message saved before the move gets the new link.
     const updatedMessage = userMessage.replace(
-      /https:\/\/healthscan\.live[^\s]*/g,
+      /https:\/\/(?:www\.)?(?:routine3\.com|healthscan\.live)[^\s]*/g,
       currentReferralLink
     );
     
     // If no ROUTINE³ link was found in user's message, append the referral link
-    if (!updatedMessage.includes('healthscan.live')) {
+    if (!/routine3\.com|healthscan\.live/.test(updatedMessage)) {
       const finalMessage = `${updatedMessage}\n\nJoin here: ${currentReferralLink}`;
       return finalMessage;
     }

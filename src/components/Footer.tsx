@@ -134,7 +134,7 @@ export function Footer({}: FooterProps = {}) {
     try {
       const subject = encodeURIComponent("Contact from ROUTINE³");
       const body = encodeURIComponent(`From: ${contactForm.email}\n\nMessage:\n${contactForm.message}`);
-      window.open(`mailto:hello@healthscan.live?subject=${subject}&body=${body}`);
+      window.open(`mailto:hello@routine3.com?subject=${subject}&body=${body}`);
       toast.success("Opening your email client…");
       setContactForm({ email: "", message: "" });
     } catch {

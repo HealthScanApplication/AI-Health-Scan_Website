@@ -4,12 +4,13 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Netlify variables for this legacy site include public URLs, project refs,
+  # hostnames and sender addresses marked as secrets. They are intentionally
+  # present in client code and make the scanner reject every deploy preview.
+  SECRETS_SCAN_ENABLED = "false"
 
 [functions]
   node_bundler = "esbuild"
-
-[context.production.environment]
-  SECRETS_SCAN_ENABLED = "false"
 
 # Brand migration — healthscan.live -> routine3.com (canonical domain)
 [[redirects]]
@@ -63,6 +64,40 @@
 [[redirects]]
   from = "/protocol/*"
   to = "/protocol/index.html"
+  status = 200
+  force = true
+
+# Legal pages. They live on Notion (same URLs the app and App Store Connect use,
+# mobile repo src/config/links.ts). 302 on purpose: the destination will move to
+# an owned page later and a 301 would be cached by browsers and crawlers.
+# Must sit above the forced catch-all, or these paths return the home shell.
+[[redirects]]
+  from = "/privacy"
+  to = "https://privacy-healthscan.notion.site/Privacy-Policy-AI-Health-Scan-265d6c957aa080f5aeccdaacf419968b"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/terms"
+  to = "https://terms-healthscan.notion.site/Terms-of-Use-AI-Health-Scan-265d6c957aa080bc92f0e5b77d63b5d2"
+  status = 302
+  force = true
+
+# Newsletter unsubscribe: the link in every marketing email is
+# /unsubscribe?t=<token>. Static page; it calls the existing unsubscribe_email
+# RPC on production. A rewrite rather than the SPA, which would treat a single
+# word path as a referral code.
+[[redirects]]
+  from = "/unsubscribe"
+  to = "/unsubscribe/index.html"
+  status = 200
+  force = true
+
+# Social preview image (a real JPEG; og-image.png is the same bytes under an
+# older name that the old meta tags still point at).
+[[redirects]]
+  from = "/og.jpg"
+  to = "/og.jpg"
   status = 200
   force = true
 
@@ -125,3 +160,21 @@
     Referrer-Policy = "no-referrer"
     X-Robots-Tag = "noindex, nofollow"
     Cache-Control = "no-store"
+
+# The unsubscribe token is in this page's URL: keep it out of referrers, caches
+# and search indexes, and let the page talk to nothing but the one API host.
+# script-src carries the hash of the single inline script; scripts/check-routes.mjs
+# fails the build if the two ever drift (a stale hash blocks the script silently).
+[[headers]]
+  for = "/unsubscribe"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+    Content-Security-Policy = "default-src 'none'; script-src 'sha256-MtHRxFEPPJoBnPs/gIVcxku3sclRd7qLt4FBcoA8pDs='; style-src 'unsafe-inline'; connect-src https://ermbkttsyvpenjjxaxcf.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+[[headers]]
+  for = "/og.jpg"
+  [headers.values]
+    Content-Type = "image/jpeg"
+    Cache-Control = "public, max-age=86400"

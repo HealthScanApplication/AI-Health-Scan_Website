@@ -72,7 +72,10 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/check-routes.mjs && node scripts/check-unsubscribe-page.mjs",
     "build": "vite build",
+    "check:routes": "node scripts/check-routes.mjs",
+    "check:unsubscribe": "node scripts/check-unsubscribe-page.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "sync:code-registry": "tsx scripts/sync-code-registry.ts"
