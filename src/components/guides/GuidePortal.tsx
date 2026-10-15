@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
+import { ContentStudio } from './ContentStudio';
 import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
@@ -1656,7 +1657,10 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             <button type="button" role="menuitem" onClick={() => openBuilder(true)} style={{ width: '100%', border: 0, borderTop: `1px solid ${line}`, background: 'transparent', color: ink, padding: '10px 12px', textAlign: 'left', fontFamily: sans, fontWeight: 700, cursor: 'pointer' }}>Create content</button>
           </div>}
         </div>;
-      })}</div></div> : <div style={{ padding: 22, display: 'grid', gap: 10 }}>
+      })}</div>
+      <ContentStudio creator={displayName} audience={audience.map(describeAudience).join(' · ') || rampTargetAudience} problem={rampTargetProblem} siteUrl={publishedSitePath}
+        offers={[{ title: customerFacingOfferTitle(leadMagnetTitle || suggestedRoutineName), free: true, description: freeAudienceValue }, ...orderedUpsells.map((kind) => ({ title: upsellDrafts[kind].title, free: offerAccess[kind] !== 'paid', price: formatMoney(upsellDrafts[kind].price, currency), description: upsellDrafts[kind].audienceValue }))]} />
+      </div> : <div style={{ padding: 22, display: 'grid', gap: 10 }}>
         {[
           { key: 'profile-site', type: 'Profile site', title: `${displayName || 'Guardian'} profile`, path: `/guardians/${guardianSlug}`, previewId: 'profile-site-preview' },
           { key: 'funnel-site', type: 'Offer funnel', title: leadMagnetTitle || 'Offer site', path: publishedSitePath, previewId: 'value-ramp-funnel-preview' },
