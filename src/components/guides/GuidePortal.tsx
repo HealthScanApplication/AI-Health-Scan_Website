@@ -817,7 +817,7 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
       const intent = await createOfferPayment(offer.id, email, name);
       setPurchaseId(intent.purchase_id);
       stripeRef.current = stripe;
-      elementsRef.current = stripe.elements({ clientSecret: intent.client_secret!, appearance: { theme: 'stripe', variables: { colorPrimary: accent, borderRadius: '2px', fontFamily: 'Inter, system-ui, sans-serif' } } });
+      elementsRef.current = stripe.elements({ clientSecret: intent.client_secret!, appearance: { theme: 'stripe', variables: { colorPrimary: '#111827', colorBackground: '#F6F8FA', colorText: '#111827', borderRadius: '12px', fontFamily: 'Poppins, Inter, system-ui, sans-serif' } }, fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap' }] });
       setStage('card');
       window.requestAnimationFrame(() => { const el = elementsRef.current.create('payment', { layout: 'tabs' }); el.mount(mountRef.current!); });
     } catch (err: any) { setMessage(err?.message || 'Could not start checkout.'); }
@@ -845,40 +845,57 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
     finally { setBusy(false); }
   }
   const nextUpsell = () => { if (upsellIndex + 1 < upsells.length) { setUpsellIndex(upsellIndex + 1); setSeconds(600); } else setStage('done'); };
-  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 46, border: '1px solid #11120F', borderRadius: 2, padding: '0 14px', fontFamily: 'inherit', fontSize: 14, background: '#FFF', color: '#11120F', outline: 'none' };
-  const solid: React.CSSProperties = { minHeight: 48, border: `1px solid ${accent}`, borderRadius: 2, background: accent, color: readableText(accent), padding: '0 20px', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' };
+  // Same look as the ROUTINE³ app's sign-up and paywall screens (see APP tokens).
+  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 56, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '0 16px', fontFamily: APP.font, fontSize: 16, background: APP.alt, color: APP.text, outline: 'none' };
   const code = `${(profile.display_name.split(' ')[0] || 'Guardian').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10)}30`;
-  return <div role="dialog" aria-modal="true" aria-label="Checkout" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(17,18,15,.55)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
-    <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 560, background: '#F7F5EF', color: '#11120F', borderRadius: 5, padding: 'clamp(20px,4vw,34px)', boxShadow: '0 24px 60px rgba(0,0,0,.3)' }}>
-      <button type="button" aria-label="Close" onClick={onClose} style={{ position: 'absolute', top: 10, right: 14, border: 0, background: 'none', fontSize: 22, cursor: 'pointer', color: '#11120F' }}>×</button>
+  const legal = <p style={{ color: APP.muted, fontSize: 11, margin: '10px 0 0', textAlign: 'center' }}>Payments are processed securely by Stripe. By paying you agree to the <span style={{ color: '#0EA5E9' }}>Terms</span> and <span style={{ color: '#0EA5E9' }}>Privacy Policy</span>.</p>;
+  const upsellPrice = upsell ? (seconds ? Math.round(upsell.price_cents * (1 - COUPON_RATE)) : upsell.price_cents) : 0;
+  return <div role="dialog" aria-modal="true" aria-label="Checkout" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(17,24,39,.55)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 440, background: APP.bg, color: APP.text, fontFamily: APP.font, borderRadius: 24, overflow: 'hidden', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.3)' }}>
+      <button type="button" aria-label="Close" onClick={stage === 'upsell' ? nextUpsell : onClose} style={{ position: 'absolute', top: 14, right: 14, width: 36, height: 36, border: 0, background: 'transparent', fontSize: 22, cursor: 'pointer', color: APP.text, zIndex: 2 }}>×</button>
       {stage === 'upsell' && upsell ? <>
-        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#11120F', color: '#F2EFE7', padding: '8px 12px', marginBottom: 16, fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}><Clock size={14} /> {seconds ? `Time-limited · 30% off · ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}` : 'Offer ended · full price'}</div>
-        <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Thank you · add this to your order</span>
-        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 36, lineHeight: 1, margin: '10px 0' }}>{upsell.title}</h2>
-        <p style={{ color: '#66645F', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px' }}>{upsell.description || 'The next step in your journey.'}</p>
-        <div style={{ display: 'inline-flex' }}>{seconds > 0 && <span style={{ border: `1px dashed ${accent}`, borderRight: 0, padding: '0 12px', display: 'grid', alignContent: 'center', color: accent, fontSize: 11, fontWeight: 800, letterSpacing: '.1em' }}>{code}</span>}<button type="button" disabled={busy} onClick={acceptUpsell} style={solid}>{busy ? 'Adding…' : `Add to my order · ${money(seconds ? Math.round(upsell.price_cents * (1 - COUPON_RATE)) : upsell.price_cents, upsell.currency)}`} <ArrowRight size={13} /></button></div>
-        <span style={{ display: 'block', color: '#66645F', fontSize: 10, marginTop: 8 }}>One click: charged to the card you just used.</span>
-        <button type="button" onClick={nextUpsell} style={{ marginTop: 10, border: 0, background: 'none', padding: 0, color: '#55564F', fontSize: 11, textDecoration: 'underline', cursor: 'pointer' }}>No thanks</button>
-      </> : stage === 'done' ? <>
-        <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Order confirmed</span>
-        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 40, lineHeight: 1, margin: '10px 0' }}>You’re all set.</h2>
-        <p style={{ color: '#66645F', fontSize: 13, lineHeight: 1.6 }}>{message || `A receipt is on its way to ${email}.`}</p>
-        <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 13, lineHeight: 1.8 }}>{bought.map((t) => <li key={t}>{t}</li>)}</ul>
-        <button type="button" onClick={onClose} style={solid}>Close</button>
-      </> : <>
-        <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Secure checkout · {money(offer.price_cents)}</span>
-        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 36, lineHeight: 1, margin: '10px 0 16px' }}>{offer.title}</h2>
-        {stage === 'details' ? <form onSubmit={start} style={{ display: 'grid', gap: 10 }}>
-          <input required placeholder="First name" aria-label="First name" value={name} onChange={(e) => setName(e.target.value)} style={field} />
-          <input required type="email" placeholder="you@email.com" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={field} />
-          <button disabled={busy} style={{ ...solid, width: 'fit-content' }}>{busy ? 'Loading…' : 'Continue to payment'} <ArrowRight size={13} /></button>
-        </form> : <form onSubmit={pay} style={{ display: 'grid', gap: 12 }}>
-          <div ref={mountRef} />
-          <span style={{ color: '#66645F', fontSize: 10, lineHeight: 1.5 }}>Your card is saved securely by Stripe so you can add follow-on offers in one click. Remove it any time by contacting {profile.display_name}.</span>
-          <button disabled={stage === 'paying'} style={{ ...solid, width: 'fit-content' }}>{stage === 'paying' ? 'Paying…' : `Pay ${money(offer.price_cents)}`} <ArrowRight size={13} /></button>
+        <div style={{ padding: '44px 20px 16px' }}>
+          <AppOfferImage kind={upsell.kind} size={80} />
+          <div style={{ color: APP.greenDark, fontSize: 18, fontWeight: 600, margin: '10px 0 8px' }}>Thank you · add this to your order</div>
+          <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '0 0 8px' }}>{upsell.title}</h2>
+          <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: '0 0 14px' }}>{upsell.description || 'The next step in your journey.'}</p>
+          <div style={{ background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)' }}>
+            <div style={{ background: APP.greenSoft, color: '#000', padding: '8px 0', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}><Clock size={12} />{seconds ? `30% off · ends in ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}` : 'Offer ended · full price'}</div>
+            <div style={{ padding: '14px 16px 16px' }}>
+              {seconds > 0 && <div style={{ color: APP.faint, fontSize: 13, textDecoration: 'line-through' }}>{money(upsell.price_cents, upsell.currency)}</div>}
+              <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{money(upsellPrice, upsell.currency)}</div>
+              <div style={{ color: APP.muted, fontSize: 11 }}>{seconds ? `with code ${code}` : 'One-time'}</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ background: APP.surface, borderRadius: '20px 20px 0 0', boxShadow: '0 -2px 8px rgba(0,0,0,.1)', padding: '16px 20px 22px' }}>
+          <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, opacity: busy ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{busy ? 'Adding…' : <>Add to my order{seconds ? <> · <span style={{ color: APP.green }}>30% off</span></> : null}</>}</span><span style={{ fontSize: 11, color: '#D1D5DB', letterSpacing: -0.2 }}>{money(upsellPrice, upsell.currency)} today, one click on the card you just used</span></button>
+          <button type="button" onClick={nextUpsell} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
+          {legal}
+        </div>
+      </> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
+        <span style={{ width: 56, height: 56, margin: '0 auto 14px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={26} /></span>
+        <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, margin: '0 0 4px' }}>You’re all set!</h2>
+        <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 18px' }}>{message || `Receipt sent to ${email}`}</p>
+        <div style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '6px 16px', textAlign: 'left', marginBottom: 18 }}>{bought.map((t) => <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{t}</div>)}</div>
+        <button type="button" onClick={onClose} style={{ ...appButton, borderRadius: 12, background: APP.text, fontSize: 16, fontWeight: 600 }}>Done</button>
+      </div> : <div style={{ padding: '44px 24px 24px' }}>
+        <AppOfferImage kind={offer.kind} size={80} />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 6px' }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{profile.display_name}</span></span>
+        <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 4px' }}>{offer.title}</h2>
+        <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 20px' }}>{money(offer.price_cents)} · secure checkout</p>
+        {stage === 'details' ? <form onSubmit={start} style={{ display: 'grid', gap: 0, textAlign: 'left' }}>
+          <input required placeholder="First name" aria-label="First name" value={name} onChange={(e) => setName(e.target.value)} style={{ ...field, borderRadius: '12px 12px 0 0' }} />
+          <input required type="email" placeholder="Email" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ ...field, borderRadius: '0 0 12px 12px', marginTop: -1 }} />
+          <button disabled={busy} style={{ ...appButton, borderRadius: 12, marginTop: 16, background: APP.text, fontSize: 16, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Loading…' : 'Continue to payment'}</button>
+        </form> : <form onSubmit={pay} style={{ display: 'grid', gap: 12, textAlign: 'left' }}>
+          <div ref={mountRef} style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: 14 }} />
+          <span style={{ color: APP.muted, fontSize: 11, lineHeight: 1.5 }}>Your card is saved securely by Stripe so you can add follow-on offers in one click.</span>
+          <button disabled={stage === 'paying'} style={{ ...appButton, opacity: stage === 'paying' ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{stage === 'paying' ? 'Paying…' : `Pay ${money(offer.price_cents)}`}</span></button>
         </form>}
-      </>}
-      {message && stage !== 'done' && <p role="alert" style={{ color: '#8A3D31', fontSize: 12, margin: '10px 0 0' }}>{message}</p>}
+        {legal}
+      </div>}
+      {message && stage !== 'done' && <p role="alert" style={{ color: '#EF4444', fontSize: 12, margin: '0 20px 16px', textAlign: 'left' }}>{message}</p>}
     </div>
   </div>;
 }
