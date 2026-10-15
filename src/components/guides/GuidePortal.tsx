@@ -397,6 +397,7 @@ const specialtyArt: Record<GuideRealm, Record<string, TagArt>> = {
   Soul: atlas('/images/guides/tags/soul.webp', 5, 3, specialtyGroups.Soul),
 };
 const audienceArt = atlas('/images/guides/tags/audience.webp', 4, 2, ['Everyone', 'Busy families', 'Women', 'Men', 'Children', 'Athletes', 'Adults 50+']);
+(audienceArt as Record<string, TagArt>).Teenagers = audienceArt.Children;
 const supportArt = atlas('/images/guides/tags/support-v3.webp', 3, 2, ['ROUTINE³ (physical + digital)', 'Recipes', 'Group call', '1:1 online', 'In person', 'Event']);
 const offerArt: Record<string, TagArt> = atlas('/images/guides/tags/offers-v2.webp', 4, 3, ['Starter guide', 'Recipe pack', 'ROUTINE³', '1:1 call', 'Group call', 'Journey', 'Event', 'eBook', 'Recipe book', 'Team program', 'Upload', 'Paid'], .75);
 const offerTypeArt = atlas('/images/guides/tags/offer-types-v3.png', 4, 2, ['routine', 'ebook', 'recipe_book', 'routine_guidance', 'festival', 'group_call', 'one_to_one_call', 'in_person']);
@@ -958,13 +959,14 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [audience, setAudience] = useState<string[]>(['Everyone']);
   // Per-gender targeting: age range plus (for women) life stages. Saved with the profile on publish.
   const [audienceDetails, setAudienceDetails] = useState<Record<string, { min: number; max: number; stages: string[] }>>({
-    Everyone: { min: 18, max: 80, stages: [] }, Women: { min: 18, max: 80, stages: [] }, Men: { min: 18, max: 80, stages: [] }, Children: { min: 4, max: 12, stages: [] }, Athletes: { min: 16, max: 45, stages: [] }, 'Busy families': { min: 0, max: 80, stages: [] },
+    Everyone: { min: 18, max: 80, stages: [] }, Women: { min: 18, max: 80, stages: [] }, Men: { min: 18, max: 80, stages: [] }, Children: { min: 4, max: 12, stages: [] }, Teenagers: { min: 13, max: 19, stages: [] }, Athletes: { min: 16, max: 45, stages: [] }, 'Busy families': { min: 0, max: 80, stages: [] },
   });
   // Chips under each audience card (Women's life stages, Men's, children's stages, athletes' focus, family mix).
   const AUDIENCE_CHIPS: Record<string, { label: string; options: string[] }> = {
     Women: { label: 'Life stage', options: ['Pregnancy', 'Postpartum', 'Premenopause', 'Perimenopause', 'Menopause', 'Postmenopause'] },
     Men: { label: 'Life stage', options: ['Fatherhood', 'Midlife', 'Andropause', 'Healthy ageing'] },
-    Children: { label: 'Stage', options: ['Infancy', 'Toddler', 'Early childhood', 'Middle childhood', 'Puberty', 'Adolescence'] },
+    Children: { label: 'Stage', options: ['Infancy', 'Toddler', 'Early childhood', 'Middle childhood'] },
+    Teenagers: { label: 'Stage', options: ['Puberty', 'Adolescence', 'Exams', 'Young adult'] },
     Athletes: { label: 'Focus', options: ['Endurance', 'Strength', 'Team sport', 'Recovery', 'Competition'] },
     'Busy families': { label: 'Family mix', options: ['Young kids', 'Teens', 'Multi-generational'] },
   };
@@ -1180,13 +1182,14 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [importMessage, setImportMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const audiences = ['Everyone', 'Busy families', 'Women', 'Men', 'Children', 'Athletes'];
+  const audiences = ['Everyone', 'Busy families', 'Women', 'Men', 'Children', 'Teenagers', 'Athletes'];
   const audienceHelp: Record<string, string> = {
     Everyone: 'General guidance that works for most people',
     'Busy families': 'Parents fitting health around family life',
     Women: 'Cycles, pregnancy, menopause and more',
     Men: 'Strength, energy and long-term health',
     Children: 'Healthy habits for growing kids',
+    Teenagers: 'Sleep, skin, food and focus through the teen years',
     Athletes: 'Training, recovery and performance',
   };
   const audienceProblemSuggestions = ['Sleep problems', 'Hot flushes', 'Low energy', 'Brain fog', 'Stress or anxiety', 'Weight changes', 'Digestive discomfort', 'Skin changes', 'Pain or mobility', 'Fitness confidence', 'Meal planning', 'Healthy routines'];
@@ -1196,6 +1199,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
     Women: ['Hot flushes', 'Sleep problems', 'Low energy', 'Brain fog', 'Stress or anxiety', 'Weight changes', 'Skin changes', 'Healthy routines'],
     Men: ['Low energy', 'Stress or anxiety', 'Weight changes', 'Fitness confidence', 'Sleep problems', 'Healthy routines'],
     Children: ['Sleep problems', 'Digestive discomfort', 'Skin changes', 'Meal planning', 'Healthy routines', 'Pain or mobility'],
+    Teenagers: ['Skin breakouts', 'Exam stress', 'Sleep problems', 'Screen time', 'Meal planning', 'Fitness confidence'],
     Athletes: ['Fitness confidence', 'Pain or mobility', 'Low energy', 'Meal planning', 'Digestive discomfort', 'Healthy routines'],
   };
   // Age shapes the problems: a group's age range adds kid, teen or healthy-ageing problems.
@@ -1211,7 +1215,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const STAGE_PROBLEMS: Record<string, string[]> = {
     Pregnancy: ['Morning sickness', 'Prenatal nutrition', 'Sleep problems'], Postpartum: ['Postpartum recovery', 'Newborn sleep', 'Low energy'], Premenopause: ['Cycle symptoms', 'Skin changes', 'Stress or anxiety'], Perimenopause: ['Hot flushes', 'Mood swings', 'Sleep problems'], Menopause: ['Hot flushes', 'Night sweats', 'Weight changes'], Postmenopause: ['Bone health', 'Heart health', 'Joint stiffness'],
     Fatherhood: ['Low energy', 'Sleep problems', 'Work stress'], Midlife: ['Belly fat', 'Work stress', 'Heart health'], Andropause: ['Testosterone', 'Low energy', 'Mood swings'], 'Healthy ageing': ['Prostate health', 'Memory', 'Joint stiffness'],
-    Infancy: ['Feeding routines', 'Bedtime routine'], Toddler: ['Picky eating', 'Tantrums', 'Bedtime routine'], 'Early childhood': ['Picky eating', 'Screen time'], 'Middle childhood': ['Focus at school', 'Growing pains'], Puberty: ['Body changes', 'Skin breakouts'], Adolescence: ['Exam stress', 'Sleep problems'],
+    Infancy: ['Feeding routines', 'Bedtime routine'], Toddler: ['Picky eating', 'Tantrums', 'Bedtime routine'], 'Early childhood': ['Picky eating', 'Screen time'], 'Middle childhood': ['Focus at school', 'Growing pains'], Puberty: ['Body changes', 'Skin breakouts'], Adolescence: ['Exam stress', 'Sleep problems'], Exams: ['Exam stress', 'Focus at school'], 'Young adult': ['Meal planning', 'Stress or anxiety'],
     Endurance: ['Endurance fuel', 'Hydration'], Strength: ['Strength gains', 'Muscle building'], 'Team sport': ['Pre-game nerves', 'Injury recovery'], Recovery: ['Injury recovery', 'Sleep problems'], Competition: ['Pre-game nerves', 'Endurance fuel'],
   };
   const ageProblems = (group: string): string[] => {
@@ -1234,11 +1238,11 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
                     <span style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>Ages</span>
       <div className="age-range" style={{ flex: '1 1 120px', minWidth: 100 }}>
         <span aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, top: 10, height: 2, background: line }} />
-        <span aria-hidden="true" style={{ position: 'absolute', top: 10, height: 2, background: acid, left: `${d.min / (g === 'Children' ? 17 : 90) * 100}%`, right: `${100 - d.max / (g === 'Children' ? 17 : 90) * 100}%` }} />
-        <input type="range" aria-label={`${g} minimum age`} min={0} max={g === 'Children' ? 17 : 90} value={d.min} onChange={(e) => set({ min: Math.min(Number(e.target.value), d.max - 1) })} />
-        <input type="range" aria-label={`${g} maximum age`} min={0} max={g === 'Children' ? 17 : 90} value={d.max} onChange={(e) => set({ max: Math.max(Number(e.target.value), d.min + 1) })} />
+        <span aria-hidden="true" style={{ position: 'absolute', top: 10, height: 2, background: acid, left: `${d.min / (g === 'Children' ? 12 : g === 'Teenagers' ? 19 : 90) * 100}%`, right: `${100 - d.max / (g === 'Children' ? 12 : g === 'Teenagers' ? 19 : 90) * 100}%` }} />
+        <input type="range" aria-label={`${g} minimum age`} min={0} max={g === 'Children' ? 12 : g === 'Teenagers' ? 19 : 90} value={d.min} onChange={(e) => set({ min: Math.min(Number(e.target.value), d.max - 1) })} />
+        <input type="range" aria-label={`${g} maximum age`} min={0} max={g === 'Children' ? 12 : g === 'Teenagers' ? 19 : 90} value={d.max} onChange={(e) => set({ max: Math.max(Number(e.target.value), d.min + 1) })} />
       </div>
-      <span style={{ color: ink, fontSize: 13, fontWeight: 600, minWidth: 44, textAlign: 'right' }}>{d.min}–{d.max}{d.max >= 90 && g !== 'Children' ? '+' : ''}</span>
+      <span style={{ color: ink, fontSize: 13, fontWeight: 600, minWidth: 44, textAlign: 'right' }}>{d.min}–{d.max}{d.max >= 90 ? '+' : ''}</span>
     </div>
     {AUDIENCE_CHIPS[g] && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
       <span style={{ flexBasis: '100%', color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>{AUDIENCE_CHIPS[g].label}</span>
@@ -1383,6 +1387,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       if (value === 'Women') setRoutineGender('Women');
       if (value === 'Men') setRoutineGender('Men');
       if (value === 'Children') { setRoutineAge('Children 6–12'); setRoutineLifeStage('Not specified'); }
+      if (value === 'Teenagers') { setRoutineAge('Teens 13–17'); setRoutineLifeStage('Not specified'); }
       if (value === 'Athletes') setProtocolTypes((current) => Array.from(new Set([...current, 'Fitness'])));
       if (value === 'Busy families') setProtocolTypes((current) => Array.from(new Set([...current, 'Meals / nutrition'])));
     }
@@ -1823,7 +1828,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           <label style={label}>Who do you help?</label>
           <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{['Everyone', 'Busy families'].map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x === 'Busy families' ? 'Families' : x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && agePanel(x)}</div>)}</div>
           <label style={{ ...label, marginTop: 18 }}>Individuals <span style={{ color: muted }}>· age range and stage for each</span></label>
-          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{['Women', 'Men', 'Children', 'Athletes'].map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && audienceDetails[x] && agePanel(x)}</div>)}</div>
+          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{['Women', 'Men', 'Children', 'Teenagers', 'Athletes'].map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && audienceDetails[x] && agePanel(x)}</div>)}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 14 }}><button type="button" onClick={() => setStep(2)} style={{ ...btn, background: 'transparent', color: ink }}>← Back</button><button type="button" disabled={!audience.length} onClick={() => setAudienceSetupStage(1)} style={btn}>Continue <ArrowRight size={14} /></button></div>
         </div>}
         {audienceSetupStage > 1 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Problems by audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.map((group) => `${group}: ${(audienceProblemsByGroup[group] || []).join(', ')}`).join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(1)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
