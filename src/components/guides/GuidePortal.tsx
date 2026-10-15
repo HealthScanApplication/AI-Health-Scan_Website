@@ -947,13 +947,13 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
       {/* Same wide ROUTINE³ app-style card as the builder's sign-up preview: offer left, form in a white panel right. */}
       <div style={{ position: 'relative', maxWidth: 880, margin: '0 auto', background: APP.bg, color: APP.text, fontFamily: APP.font, borderRadius: 24, overflow: 'hidden', boxShadow: '0 20px 50px rgba(17,24,39,.14)', display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}>
         <span style={{ position: 'absolute', zIndex: 2, top: 16, left: 16, background: '#000', color: '#FFF', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, letterSpacing: .5 }}>FREE</span>
-        <div style={{ flex: '1 1 340px', minWidth: 0, padding: '44px 24px 28px', display: 'grid', alignContent: 'center', justifyItems: 'center', textAlign: 'center' }}>
-          {leadVideo && state !== 'done' ? <video src={leadVideo} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', background: '#000', borderRadius: 12, marginBottom: 12 }} /> : <AppOfferImage kind={entry.kind} size={110} />}
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '12px 0 6px' }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{profile.display_name}</span></span>
+        <div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
+          {leadVideo && state !== 'done' ? <video src={leadVideo} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', background: '#000', borderRadius: 12, marginBottom: 12 }} /> : <AppOfferImage kind={entry.kind} size={110} align="left" />}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 6px' }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{profile.display_name}</span></span>
           <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 6px' }}>{state === 'done' ? 'You’re in!' : entry.title}</h2>
           <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, lineHeight: 1.45, margin: 0 }}>{state === 'done' ? `${entry.title} runs as a daily routine in the ROUTINE³ app, with reminders, so you keep going.` : entry.description || 'Get the guide and the interactive routine that goes with it.'}</p>
         </div>
-        <div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, padding: '28px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12 }}>
+        <div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, alignSelf: 'flex-start', padding: '24px 22px 20px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {state === 'done' ? <>
             <span style={{ width: 52, height: 52, margin: '0 auto 4px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={24} /></span>
             <a href={entry.booking_url || APP_STORE_URL} style={{ ...appButton, borderRadius: 12, background: APP.text, textDecoration: 'none', fontSize: 16, fontWeight: 600 }}>Open your free routine</a>
@@ -965,9 +965,9 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
                 <a href={offerHref(nextPaid)} onClick={openOffer(nextPaid)} style={{ ...appButton, minHeight: 48, textDecoration: 'none', fontSize: 15, fontWeight: 600 }}>See what is included</a>
               </div>
             </div>}
-          </> : <form onSubmit={optIn} style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+          </> : <form onSubmit={optIn} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <p style={{ color: APP.text, fontSize: 18, fontWeight: 600, margin: '0 0 2px', textAlign: 'center' }}>Enter your email to get it free</p>
-            <div style={{ marginTop: 'auto' }}>
+            <div>
               <input required placeholder="First name" aria-label="First name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ width: '100%', boxSizing: 'border-box', height: 56, border: `1px solid ${APP.border}`, borderRadius: '12px 12px 0 0', padding: '0 16px', fontFamily: APP.font, fontSize: 16, background: APP.alt, color: APP.text, outline: 'none' }} />
               <label style={{ display: 'flex', alignItems: 'center', height: 56, marginTop: -1, padding: '0 16px', background: APP.alt, border: `1px solid ${APP.border}`, borderRadius: '0 0 12px 12px', boxSizing: 'border-box' }}><Mail size={18} color={APP.muted} style={{ marginRight: 12, flex: '0 0 auto' }} /><input required type="email" placeholder="Email" aria-label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', fontFamily: APP.font, fontSize: 16, color: APP.text }} /></label>
             </div>
@@ -1024,10 +1024,11 @@ const PAGE_X = 'max(clamp(24px,6vw,84px), calc((100% - 1240px) / 2 + clamp(24px,
 // ROUTINE³ iOS app look (mobile repo: Paywall.tsx, SignUpScreen.tsx, designTokens.ts) for the sign-up and upsell pages.
 const APP = { bg: '#F2F4F7', surface: '#FFFFFF', alt: '#F6F8FA', text: '#111827', muted: '#6B7280', faint: '#9CA3AF', border: '#E5E7EB', green: '#10B981', greenDark: '#047857', greenSoft: '#86EFAC', font: "'Poppins', 'Inter', sans-serif" };
 const appButton: React.CSSProperties = { width: '100%', minHeight: 56, border: 0, borderRadius: 16, background: '#000', color: '#FFF', fontFamily: APP.font, cursor: 'pointer', display: 'grid', placeItems: 'center', padding: '8px 16px', boxSizing: 'border-box' };
-function AppOfferImage({ kind, size = 96 }: { kind?: string; size?: number }) {
+function AppOfferImage({ kind, size = 96, align = 'center' }: { kind?: string; size?: number; align?: 'center' | 'left' }) {
+  const m = align === 'left' ? '0' : '0 auto';
   const art = productArt(kind);
-  if (kind === 'routine' || kind === 'routine_guidance' || !art) return <img src="/images/guides/generated/r3-protocol-card.png" alt="" style={{ width: size, height: size, objectFit: 'contain', display: 'block', margin: '0 auto' }} />;
-  return <span aria-hidden="true" style={{ display: 'block', margin: '0 auto', width: size * art.cellAspect, height: size, backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${(art.index % art.cols) * 100 / Math.max(1, art.cols - 1)}% ${Math.floor(art.index / art.cols) * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.95) invert(.88)' }} />;
+  if (kind === 'routine' || kind === 'routine_guidance' || !art) return <img src="/images/guides/generated/r3-protocol-card.png" alt="" style={{ width: size, height: size, objectFit: 'contain', display: 'block', margin: m }} />;
+  return <span aria-hidden="true" style={{ display: 'block', margin: m, width: size * art.cellAspect, height: size, backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${(art.index % art.cols) * 100 / Math.max(1, art.cols - 1)}% ${Math.floor(art.index / art.cols) * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.95) invert(.88)' }} />;
 }
 const COUPON_RATE = .3;
 const SAMPLE_REVIEWS: GuardianReview[] = [
@@ -2513,15 +2514,14 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             {funnelPageState === 'checkout' && funnelPreviewStage === 0 && <div style={{ width: '100%', maxWidth: 880, margin: '0 auto', background: APP.bg, borderRadius: 24, overflow: 'hidden', boxSizing: 'border-box', fontFamily: APP.font, color: APP.text, textAlign: 'center', boxShadow: '0 20px 50px rgba(17,24,39,.18)', position: 'relative' }}>
               <span style={{ position: 'absolute', zIndex: 2, top: 16, left: 16, background: '#000', color: '#FFF', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, letterSpacing: .5 }}>FREE</span>
               {/* Wide on desktop: offer on the left, email form in a white panel on the right; stacks on phones. */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}><div style={{ flex: '1 1 340px', minWidth: 0, padding: '44px 24px 28px', display: 'grid', alignContent: 'center', justifyItems: 'center', textAlign: 'center' }}>
-              <AppOfferImage kind={activeFunnelStage.kind} size={110} />
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}><div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
+              <AppOfferImage kind={activeFunnelStage.kind} size={110} align="left" />
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 6px' }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(displayName || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{displayName || 'Your Guardian'}</span></span>
               <h3 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 4px' }}>{customerFacingOfferTitle(activeFunnelStage.title)}</h3>
               <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: 0 }}>{activeFunnelStage.value || 'Enter your email to get it free'}</p>
-              </div><div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, padding: '28px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column' }}>
+              </div><div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, alignSelf: 'flex-start', padding: '24px 22px 20px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column' }}>
               <p style={{ color: APP.text, fontSize: 18, fontWeight: 600, margin: '0 0 14px' }}>Enter your email to get it free</p>
-              {/* Email, CTA and terms sit at the bottom of the panel; the heading stays on top. */}
-              <div style={{ marginTop: 'auto' }}>
+              <div>
               <label style={{ display: 'flex', alignItems: 'center', height: 56, padding: '0 16px', background: leadCaptureValue ? APP.surface : APP.alt, border: `${leadCaptureValue ? 2 : 1}px solid ${leadCaptureValue ? APP.text : APP.border}`, borderRadius: 12, textAlign: 'left', boxSizing: 'border-box' }}><Mail size={18} color={APP.muted} style={{ marginRight: 12, flex: '0 0 auto' }} /><input type="email" inputMode="email" autoComplete="email" value={leadCaptureValue} onChange={(event) => setLeadCaptureValue(event.target.value)} placeholder="Email" aria-label="Your email" style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', fontFamily: APP.font, fontSize: 16, color: APP.text }} /></label>
               {leadCaptureValue && !leadEmailIsValid && <span role="alert" style={{ display: 'block', textAlign: 'left', color: '#EF4444', fontSize: 12, margin: '6px 0 0 16px' }}>Enter a valid email address.</span>}
               <button type="button" disabled={!leadEmailIsValid} onClick={completeFunnelCheckout} style={{ ...appButton, borderRadius: 12, marginTop: 16, background: '#000', color: '#FFF', fontSize: 16, fontWeight: 600, cursor: leadEmailIsValid ? 'pointer' : 'default' }}>Get free access</button>
