@@ -50,11 +50,11 @@ export function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#161
           ROUTINE³
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', borderLeft: `1px solid ${hairline}`, transition: 'border-color 350ms ease' }}>
+      {suffix && <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', borderLeft: `1px solid ${hairline}`, transition: 'border-color 350ms ease' }}>
         <span style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: textColor, whiteSpace: 'nowrap', transition: 'color 350ms ease' }}>
           {suffix}
         </span>
-      </div>
+      </div>}
     </div>
   );
 }
