@@ -35,6 +35,7 @@ export interface GuideOffer {
   kind: 'lead_magnet' | 'ebook' | 'recipe_book' | 'routine' | 'routine_guidance' | 'one_to_one_call' | 'group_call' | 'in_person' | 'journey' | 'festival' | 'team_program' | 'product' | 'program';
   title: string;
   description: string | null;
+  cover_url?: string | null;
   price_cents: number;
   currency: string;
   affiliate_url: string | null;
