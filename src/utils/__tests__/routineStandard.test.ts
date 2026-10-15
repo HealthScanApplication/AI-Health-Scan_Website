@@ -95,6 +95,11 @@ describe('meal slots (Breakfast / Lunch / Dinner / Snack)', () => {
     expect(field(cs2, dayPart.id, 'group_name')).toBe('Breakfast');
     expect(cs2.find((c) => c.item_id === own.id && c.field === 'group_name')?.action).toBe('flag');
   });
+  it('items in the Supplements group stay in Supplements (Morning → Supplements), not a meal slot', () => {
+    const flax = row({ display_name: 'Freshly ground flaxseed', category: 'consume', subtype: 'meal', scheduled_time: '07:30:00', group_name: 'Supplement' });
+    const cs = changesFor([flax]);
+    expect(cs.filter((c) => c.item_id === flax.id && (c.field === 'group_name' || c.field === 'scheduled_time'))).toHaveLength(0);
+  });
   it('every meal sharing one time is spread by slot', () => {
     const ms = ['Porridge', 'Soup', 'Stew'].map((t, i) => row({ display_name: t, category: 'consume', subtype: 'meal', scheduled_time: '08:00:00', sort_order: i, day_number: 1 }));
     const cs = changesFor(ms);

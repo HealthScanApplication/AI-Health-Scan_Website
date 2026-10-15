@@ -75,7 +75,7 @@ export function slotFromGroupName(groupName?: string | null): MealSlot | null {
 }
 // Group labels that only say "when" or "food" (the day part comes from the time anyway) — replaced by the slot.
 // Anything else ("Recovery", "Cleanse", "PAGG Supplement Stack") is the Guardian's own section: kept and flagged.
-const GENERIC_WORDS = new Set('consume consumption food foods meal meals nutrition drink drinks beverage beverages supplement supplements eat eating hydration nourishment fuel feed morning midday afternoon evening night daily all day schedule rhythm essentials hourly and'.split(' '));
+const GENERIC_WORDS = new Set('consume consumption food foods meal meals nutrition drink drinks beverage beverages eat eating hydration nourishment fuel feed morning midday afternoon evening night daily all day schedule rhythm essentials hourly and'.split(' '));
 const GENERIC_GROUP = { test: (name: string) => name.toLowerCase().replace(/[&()\-–—,/]/g, ' ').split(/\s+/).filter(Boolean).every((w) => GENERIC_WORDS.has(w)) };
 const inSlot = (slot: MealSlot, min: number | null) => min != null && min >= SLOT_WINDOW[slot].from && min <= SLOT_WINDOW[slot].to;
 /** "Oats with green tea" → { meal: "Oats", drink: "Green tea" }. */
@@ -221,7 +221,9 @@ export function standardiseProtocol(rows: Row[], mode: Mode = 'cleanup'): Change
       changes.push({ item_id: r.id, action: 'update', field: 'subtype', from: r.subtype, to: consumeKind(t) === 'drink' ? 'drink' : 'meal', reason: 'Meal filed outside Consume' });
     }
   }
-  const consumeRows = tops.filter((r) => (isConsumeRow(r) || r.catalog_recipe_id || r.catalog_ingredient_id) && r.category !== 'sleep' && !isCalendarEntry(r.display_name || '') && !isRuleLikeTitle(r.display_name || ''));
+  // Supplements is its own smart list (Morning → Supplements): anything filed there stays there.
+  const inSupplements = (r: Row) => /^supplements?$/i.test((r.group_name || '').trim()) || r.category === 'supplement';
+  const consumeRows = tops.filter((r) => !inSupplements(r) && (isConsumeRow(r) || r.catalog_recipe_id || r.catalog_ingredient_id) && r.category !== 'sleep' && !isCalendarEntry(r.display_name || '') && !isRuleLikeTitle(r.display_name || ''));
   // Every meal of a day at one time = the times were never set: spread them by slot order.
   const byDay = new Map<string, Row[]>();
   for (const r of consumeRows) if (consumeKind(r.display_name || '') !== 'drink') byDay.set(`${r.day_number ?? ''}|${r.recurrence_start_date ?? ''}`, [...(byDay.get(`${r.day_number ?? ''}|${r.recurrence_start_date ?? ''}`) || []), r]);
