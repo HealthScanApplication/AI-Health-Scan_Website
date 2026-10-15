@@ -247,13 +247,18 @@ async function saveBuilderMeta(accessToken: string, id: string, patch: Record<st
 }
 
 /** Do's as checkable rule_do items: under a parent item (its do-checklist) or top-level in a group (that group's checklist). */
-async function addRules(accessToken: string, protocolId: string, rules: string[] | undefined, opts: { parentId?: string | null; group?: string | null; category: string; days?: number[] }) {
-  for (const [i, rule] of (rules || []).map((x) => x.trim()).filter(Boolean).entries()) await createProtocolItem(accessToken, {
+async function addRules(accessToken: string, protocolId: string, rules: string[] | undefined, opts: { parentId?: string | null; group?: string | null; category: string; days?: number[]; next: () => number }) {
+  for (const [, rule] of (rules || []).map((x) => x.trim()).filter(Boolean).entries()) await createProtocolItem(accessToken, {
     protocol_id: protocolId, display_name: rule, kind: 'rule_do', item_type: 'activity', category: opts.category, subtype: null,
     parent_protocol_item_id: opts.parentId || null, group_name: opts.parentId ? null : opts.group || null, scheduled_time: null, day_number: 1,
-    sort_order: i, has_children: false, enabled: true, hidden: false, notes: '',
+    sort_order: opts.next() , has_children: false, enabled: true, hidden: false, notes: '',
     ...(opts.days ? { recurrence_type: 'weekly', recurrence_days_of_week: opts.days } : { recurrence_type: 'daily' }),
   } as Partial<AdminProtocolItem>);
+}
+
+/** Run the item writes; on failure the error carries the protocol id so a retry updates the same protocol. */
+async function withProtocol<T>(protocol: AdminProtocol, work: () => Promise<T>): Promise<T> {
+  try { return await work(); } catch (error) { throw Object.assign(error as Error, { protocolId: protocol.id }); }
 }
 
 async function ensureProtocol(accessToken: string, ownerId: string, existingId: string | null, name: string, extra: Partial<AdminProtocol>) {
@@ -265,6 +270,7 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
   const framework = DIET_FRAMEWORKS.find((f) => f.id === cfg.framework) || DIET_FRAMEWORKS[0];
   const t = macroGrams(cfg);
   const protocol = await ensureProtocol(accessToken, ownerId, existingId, name, { category: 'Nutrition', description: `${framework.label} · ${t.energy_kcal} kcal/day · P ${t.protein_g} g · C ${t.carbohydrates_g} g · F ${t.fats_g} g` });
+  return withProtocol(protocol, async () => {
   await clearItems(accessToken, protocol.id);
   let order = 0;
   for (const { day } of WEEK) for (const slot of MEAL_SLOTS.filter((s) => cfg.slots.includes(s.id))) {
@@ -280,16 +286,18 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
       notes: nut ? `${Math.round(nut.energy_kcal)} kcal · P ${Math.round(nut.protein_g)} g · C ${Math.round(nut.carbohydrates_g)} g · F ${Math.round(nut.fats_g)} g per serving${pick.source === 'guide' ? ' · Guardian recipe' : ''}${timing.anchor !== 'clock' ? ` · ${describeTiming(timing)}` : ''}` : '',
       ...weekly(day),
     } as Partial<AdminProtocolItem>);
-    await addRules(accessToken, protocol.id, slotRules, { parentId: meal.id, category: 'consume', days: weekly(day).recurrence_days_of_week });
+    await addRules(accessToken, protocol.id, slotRules, { parentId: meal.id, category: 'consume', days: weekly(day).recurrence_days_of_week, next: () => order++ });
   }
-  await addRules(accessToken, protocol.id, cfg.rules, { group: 'Meal', category: 'consume' });
+  await addRules(accessToken, protocol.id, cfg.rules, { group: 'Meal', category: 'consume', next: () => order++ });
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'diet', builder_config: cfg });
   return { protocol, metaSaved: saved };
+  });
 }
 
 export async function saveFitnessProtocol(accessToken: string, ownerId: string, existingId: string | null, name: string, cfg: FitnessConfig) {
   const goal = FITNESS_GOALS.find((g) => g.id === cfg.goal) || FITNESS_GOALS[0];
   const protocol = await ensureProtocol(accessToken, ownerId, existingId, name, { category: 'Fitness', description: `${goal.label} · ${cfg.level} · ${cfg.sessions.length} sessions/week` });
+  return withProtocol(protocol, async () => {
   await clearItems(accessToken, protocol.id);
   let order = 0;
   for (const s of [...cfg.sessions].sort((a, b) => a.day - b.day)) {
@@ -300,16 +308,17 @@ export async function saveFitnessProtocol(accessToken: string, ownerId: string, 
       has_children: s.exercises.length > 0 || !!s.rules?.length, enabled: true, hidden: false,
       notes: [s.anchor && s.anchor !== 'clock' ? describeTiming(sessionTiming(s)) : '', s.exercises.map((e) => e.name).join(' · ')].filter(Boolean).join(' · '), ...weekly(s.day),
     } as Partial<AdminProtocolItem>);
-    for (const [i, e] of s.exercises.entries()) await createProtocolItem(accessToken, {
+    for (const e of s.exercises) await createProtocolItem(accessToken, {
       protocol_id: protocol.id, parent_protocol_item_id: parent.id, display_name: e.name, kind: 'action', item_type: 'activity', category: 'do', subtype: 'exercise',
       catalog_activity_id: e.id, sets: e.sets, reps: e.reps ? parseInt(e.reps, 10) || null : null, reps_display: e.reps, rest_seconds: e.rest_seconds,
-      duration_minutes: e.minutes, day_number: 1, sort_order: i, has_children: false, enabled: true, hidden: false, notes: '', ...weekly(s.day),
+      duration_minutes: e.minutes, day_number: 1, sort_order: order++, has_children: false, enabled: true, hidden: false, notes: '', ...weekly(s.day),
     } as Partial<AdminProtocolItem>);
-    await addRules(accessToken, protocol.id, s.rules, { parentId: parent.id, category: 'do', days: weekly(s.day).recurrence_days_of_week });
+    await addRules(accessToken, protocol.id, s.rules, { parentId: parent.id, category: 'do', days: weekly(s.day).recurrence_days_of_week, next: () => order++ });
   }
-  await addRules(accessToken, protocol.id, cfg.rules, { group: 'Fitness', category: 'do' });
+  await addRules(accessToken, protocol.id, cfg.rules, { group: 'Fitness', category: 'do', next: () => order++ });
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'fitness', builder_config: cfg });
   return { protocol, metaSaved: saved };
+  });
 }
 
 /* ── combine ── */
@@ -359,7 +368,7 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
       const created = await createProtocolItem(accessToken, {
         ...copy, protocol_id: protocol.id,
         parent_protocol_item_id: it.parent_protocol_item_id ? idMap.get(it.parent_protocol_item_id) || null : null,
-        sort_order: it.parent_protocol_item_id ? it.sort_order : order++,
+        sort_order: order++, // unique per protocol (idx_protocol_items_no_dupes includes sort_order)
       } as Partial<AdminProtocolItem>);
       idMap.set(it.id, created.id);
     }
