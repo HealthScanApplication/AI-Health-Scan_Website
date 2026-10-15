@@ -28,7 +28,8 @@ import { MediaUploadField } from './MediaUploadField';
 import { MarkdownField } from './MarkdownField';
 import { listRoutineOwners } from '../../utils/guidePortal';
 import { computeSleepWindow, isWakeName, isBedName } from '../../utils/sleepWindow';
-import { descriptiveMealSlot } from '../../protocolDomain/mealSlot';
+import { descriptiveMealSlot, mealSlotName } from '../../protocolDomain/mealSlot';
+import { slotForTime } from '../../utils/protocolBuilders';
 import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
@@ -101,7 +102,7 @@ function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | '
   return 'Evening';
 }
 
-const SMART_LIST_ORDER = ['Hygiene', 'Fitness', 'Wellness', 'Beauty', 'Work', 'Home', 'Other'];
+const SMART_LIST_ORDER = ['Breakfast', 'Lunch', 'Snack', 'Dinner', 'Drink', 'Hygiene', 'Fitness', 'Wellness', 'Beauty', 'Work', 'Home', 'Other'];
 
 /* Cycle phase math, mirrored from mobile src/features/cycle/cycle.ts. Preview only:
    real cycle data lives on the user's device (Keychain) and never reaches Supabase. */
@@ -145,6 +146,13 @@ function moonPhaseName(date: Date): string {
   return 'Waning crescent';
 }
 function smartListGroup(it: AdminProtocolItem): string {
+  // Meals live in their consume slot list (Breakfast/Lunch/Dinner/Snack), never Wellness.
+  if (it.category === 'consume' || it.item_type === 'recipe' || it.item_type === 'consume') {
+    const slot = mealSlotName(it.group_name);
+    if (slot) return slot === 'Supper' ? 'Dinner' : slot;
+    if (/drink|water|tea|coffee|juice/i.test(`${it.group_name || ''} ${it.subtype || ''}`)) return 'Drink';
+    return slotForTime(it.scheduled_time);
+  }
   const text = `${it.group_name || ''} ${it.subtype || ''} ${it.category || ''} ${it.display_name || ''}`.toLowerCase();
   if (/hygiene|wash|cleanse|brush|floss|shower|bath/.test(text)) return 'Hygiene';
   if (/fitness|exercise|workout|walk|run|strength|mobility|stretch|train/.test(text)) return 'Fitness';
