@@ -1194,6 +1194,23 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       ...(d.max >= 50 ? ['Joint stiffness', 'Bone health', 'Memory', 'Balance and falls', 'Heart health'] : []),
     ];
   };
+  // Age slider (and women's life stages) stacked directly under each selected audience card.
+  const agePanel = (g: string) => { const d = audienceDetails[g]; const set = (patch: Partial<typeof d>) => setAudienceDetails((current) => ({ ...current, [g]: { ...current[g], ...patch } })); return <div style={{ border: `1px solid ${line}`, borderTop: 0, background: 'rgba(245,242,234,.04)', padding: '10px 12px 12px', display: 'grid', gap: 10 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>Ages</span>
+      <div className="age-range" style={{ flex: '1 1 120px', minWidth: 100 }}>
+        <span aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, top: 10, height: 2, background: line }} />
+        <span aria-hidden="true" style={{ position: 'absolute', top: 10, height: 2, background: acid, left: `${d.min / (g === 'Children' ? 17 : 90) * 100}%`, right: `${100 - d.max / (g === 'Children' ? 17 : 90) * 100}%` }} />
+        <input type="range" aria-label={`${g} minimum age`} min={0} max={g === 'Children' ? 17 : 90} value={d.min} onChange={(e) => set({ min: Math.min(Number(e.target.value), d.max - 1) })} />
+        <input type="range" aria-label={`${g} maximum age`} min={0} max={g === 'Children' ? 17 : 90} value={d.max} onChange={(e) => set({ max: Math.max(Number(e.target.value), d.min + 1) })} />
+      </div>
+      <span style={{ color: ink, fontSize: 13, fontWeight: 600, minWidth: 44, textAlign: 'right' }}>{d.min}–{d.max}{d.max >= 90 && g !== 'Children' ? '+' : ''}</span>
+    </div>
+    {g === 'Women' && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+      <span style={{ flexBasis: '100%', color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>Life stage</span>
+      {['Pregnancy', 'Postpartum', 'Premenopause', 'Perimenopause', 'Menopause', 'Postmenopause'].map((stage) => { const on = d.stages.includes(stage); return <button type="button" key={stage} aria-pressed={on} onClick={() => { const stages = on ? d.stages.filter((x) => x !== stage) : [...d.stages, stage]; set({ stages }); if (!on) setRoutineLifeStage(stage); }} style={{ height: 26, padding: '0 9px', border: `1px solid ${on ? acid : line}`, borderRadius: 2, background: on ? '#20251B' : 'transparent', color: on ? acid : ink, fontFamily: sans, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{stage}</button>; })}
+    </div>}
+  </div>; };
   const audienceProblems = Array.from(new Set(audience.flatMap((group) => audienceProblemsByGroup[group] || [])));
   const audienceProblemArt = atlas('/images/guides/tags/body.webp', 4, 3, audienceProblemSuggestions);
   const formats: { label: string; value: string; description: string; art: TagArt }[] = [
@@ -1770,26 +1787,9 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         {audienceSetupStage === 0 && <div>
           <style>{`.age-range{position:relative;height:22px}.age-range input[type=range]{position:absolute;inset:0;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}.age-range input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:${ink};border:2px solid ${black};cursor:pointer}.age-range input[type=range]::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:${ink};border:2px solid ${black};cursor:pointer}`}</style>
           <label style={label}>Who do you help? <span style={{ color: acid }}>· start with gender</span></label>
-          <div style={CHOICE_GRID}>{['Everyone', 'Women', 'Men'].map((x) => <TagChoice key={x} text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />)}</div>
-          {['Everyone', 'Women', 'Men', 'Children'].filter((g) => audience.includes(g)).map((g) => { const d = audienceDetails[g]; const set = (patch: Partial<typeof d>) => setAudienceDetails((current) => ({ ...current, [g]: { ...current[g], ...patch } })); return <div key={g} style={{ border: `1px solid ${line}`, background: 'rgba(245,242,234,.04)', padding: '14px 16px', marginTop: 10, display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-              <strong style={{ color: ink, fontSize: 13, minWidth: 90 }}>{g}</strong>
-              <span style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>Ages</span>
-              <div className="age-range" style={{ flex: '1 1 220px', minWidth: 180 }}>
-                <span aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, top: 10, height: 2, background: line }} />
-                <span aria-hidden="true" style={{ position: 'absolute', top: 10, height: 2, background: acid, left: `${d.min / (g === 'Children' ? 17 : 90) * 100}%`, right: `${100 - d.max / (g === 'Children' ? 17 : 90) * 100}%` }} />
-                <input type="range" aria-label={`${g} minimum age`} min={0} max={g === 'Children' ? 17 : 90} value={d.min} onChange={(e) => set({ min: Math.min(Number(e.target.value), d.max - 1) })} />
-                <input type="range" aria-label={`${g} maximum age`} min={0} max={g === 'Children' ? 17 : 90} value={d.max} onChange={(e) => set({ max: Math.max(Number(e.target.value), d.min + 1) })} />
-              </div>
-              <span style={{ color: ink, fontSize: 13, fontWeight: 600, minWidth: 64, textAlign: 'right' }}>{d.min}–{d.max}{d.max >= 90 && g !== 'Children' ? '+' : ''}</span>
-            </div>
-            {g === 'Women' && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', marginRight: 6 }}>Life stage</span>
-              {['Pregnancy', 'Postpartum', 'Premenopause', 'Perimenopause', 'Menopause', 'Postmenopause'].map((stage) => { const on = d.stages.includes(stage); return <button type="button" key={stage} aria-pressed={on} onClick={() => { const stages = on ? d.stages.filter((x) => x !== stage) : [...d.stages, stage]; set({ stages }); if (!on) setRoutineLifeStage(stage); }} style={{ height: 30, padding: '0 12px', border: `1px solid ${on ? acid : line}`, borderRadius: 2, background: on ? '#20251B' : 'transparent', color: on ? acid : ink, fontFamily: sans, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{stage}</button>; })}
-            </div>}
-          </div>; })}
+          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{['Everyone', 'Women', 'Men'].map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && agePanel(x)}</div>)}</div>
           <label style={{ ...label, marginTop: 18 }}>Other groups <span style={{ color: muted }}>· optional</span></label>
-          <div style={CHOICE_GRID}>{audiences.filter((x) => !['Everyone', 'Women', 'Men'].includes(x)).map((x) => <TagChoice key={x} text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />)}</div>
+          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{audiences.filter((x) => !['Everyone', 'Women', 'Men'].includes(x)).map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && audienceDetails[x] && agePanel(x)}</div>)}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 14 }}><button type="button" onClick={() => setStep(2)} style={{ ...btn, background: 'transparent', color: ink }}>← Back</button><button type="button" disabled={!audience.length} onClick={() => setAudienceSetupStage(1)} style={btn}>Continue <ArrowRight size={14} /></button></div>
         </div>}
         {audienceSetupStage > 1 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Problems by audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.map((group) => `${group}: ${(audienceProblemsByGroup[group] || []).join(', ')}`).join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(1)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
