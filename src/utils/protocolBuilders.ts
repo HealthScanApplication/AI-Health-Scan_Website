@@ -17,6 +17,7 @@ import {
 } from './protocolAdmin';
 import type { GuideRecipe } from './guidePortal';
 import { isBedName, isWakeName } from './sleepWindow';
+import { END_SLEEP, START_SLEEP, enforceProtocolRules, isRuleTitle, type RuleIssue, type RuleStep } from './protocolRules';
 
 const rest = () => `https://${projectId}.supabase.co/rest/v1`;
 const headers = (accessToken: string, extra: Record<string, string> = {}) => ({
@@ -246,10 +247,116 @@ async function saveBuilderMeta(accessToken: string, id: string, patch: Record<st
   }
 }
 
+/* ── shared item rules + review (protocolRules.ts is the single checker; conflicts are flagged, never auto-resolved) ── */
+export interface RuleList { dos: string[]; donts: string[] }
+/** "Avoid added sugar" / "No coffee after 2pm" → don't ("Added sugar"); anything else → do. Uses the shared isRuleTitle. */
+export function splitRules(lines: string[]): RuleList {
+  const out: RuleList = { dos: [], donts: [] };
+  for (const raw of lines.map((x) => x.trim()).filter(Boolean)) {
+    if (isRuleTitle(raw)) out.donts.push(raw.replace(/^(avoid|no|skip|don'?t|do not|cut out|cut)\s+/i, '').replace(/^./, (c) => c.toUpperCase()));
+    else out.dos.push(raw);
+  }
+  return out;
+}
+
+export interface Conflict { rule: string; item: string; where: string; reason: string }
+export interface ReviewNote { where: string; message: string }
+export interface CheckedStep extends RuleStep { key: string }
+export interface Review { steps: Record<string, CheckedStep>; notes: ReviewNote[]; conflicts: Conflict[]; weekRules: RuleList }
+
+// Interim subject tags for flagging only. Replace with the shared resolveConflicts once it is approved and built.
+const SUBJECTS: { tag: string; rule: RegExp; item: RegExp }[] = [
+  { tag: 'sugar', rule: /sugar|sweet/i, item: /sugar|honey|syrup|cake|cookie|biscuit|candy|chocolate|dessert|brownie|jam|caramel/i },
+  { tag: 'caffeine', rule: /caffeine|coffee/i, item: /coffee|espresso|latte|cappuccino|\btea\b|matcha|cola|energy drink/i },
+  { tag: 'alcohol', rule: /alcohol|wine|beer/i, item: /wine|beer|cocktail|spirit|liqueur|gin|vodka|rum/i },
+  { tag: 'meat', rule: /\bmeat|red meat|pork|beef/i, item: /beef|pork|lamb|bacon|ham|sausage|chicken|turkey|veal|mince|steak|faggot/i },
+  { tag: 'dairy', rule: /dairy|milk|cheese/i, item: /milk|cheese|yog(h)?urt|cream|butter|paneer|kefir/i },
+  { tag: 'gluten', rule: /gluten|wheat|bread/i, item: /bread|baguette|pasta|wheat|couscous|bulgur|pizza|wrap|bagel|cake/i },
+  { tag: 'fried food', rule: /fried|deep[- ]fr/i, item: /fried|nugget|chips|fries|tempura|crispy/i },
+  { tag: 'processed food', rule: /processed|ultra[- ]processed|fast food/i, item: /nugget|sausage|bacon|ham|crisps|instant/i },
+];
+const DAYS_RE: [RegExp, number][] = [[/\bmon(day)?s?\b/i, 1], [/\btue(s(day)?)?s?\b/i, 2], [/\bwed(nesday)?s?\b/i, 3], [/\bthu(rs(day)?)?s?\b/i, 4], [/\bfri(day)?s?\b/i, 5], [/\bsat(urday)?s?\b/i, 6], [/\bsun(day)?s?\b/i, 7]];
+
+/** A don't (or a "rest on Sunday" do) that an item in the same plan breaks. Flags only — the Guardian decides. */
+export function findConflicts(rules: { text: string; scope: string; isDont: boolean }[], items: { title: string; where: string; day?: number; kind: 'meal' | 'session' | 'item' }[]): Conflict[] {
+  const out: Conflict[] = [];
+  for (const rule of rules) {
+    if (rule.isDont) for (const subject of SUBJECTS) {
+      if (!subject.rule.test(rule.text)) continue;
+      for (const it of items) if (subject.item.test(it.title)) out.push({ rule: `Avoid ${rule.text.replace(/^avoid\s+/i, '').replace(/^./, (c) => c.toLowerCase())}`, item: it.title, where: it.where, reason: `${it.title} may contain ${subject.tag} (${rule.scope})` });
+    }
+    if (/\b(rest|recover|no (training|exercise|workout))\b/i.test(rule.text)) {
+      const days = DAYS_RE.filter(([re]) => re.test(rule.text)).map(([, d]) => d);
+      for (const it of items) if (it.kind === 'session' && it.day && days.includes(it.day)) out.push({ rule: rule.text, item: it.title, where: it.where, reason: `${it.title} is scheduled on a rest day` });
+    }
+  }
+  return out.filter((c, i) => out.findIndex((x) => x.rule === c.rule && x.item === c.item && x.where === c.where) === i);
+}
+
+const ruleRows = (list: RuleList, scope: string) => [...list.dos.map((text) => ({ text, scope, isDont: false })), ...list.donts.map((text) => ({ text, scope, isDont: true }))];
+const notesOf = (steps: CheckedStep[], where: (s: CheckedStep) => string): ReviewNote[] =>
+  steps.flatMap((s) => (s.issues || []).map((i: RuleIssue) => ({ where: where(s), message: i.code === 'renamed' ? `${i.message} → “${s.title}”` : i.message })));
+
+/** Every diet meal through the shared checker: dish name, a time, rule children; plus flagged contradictions. */
+export function reviewDiet(cfg: DietConfig): Review {
+  const slots = MEAL_SLOTS.filter((x) => cfg.slots.includes(x.id));
+  const steps: CheckedStep[] = [];
+  for (const { day } of WEEK) for (const slot of slots) {
+    const pick = cfg.plan[`${day}:${slot.id}`];
+    if (!pick) continue;
+    const t = mealTiming(cfg, slot.id);
+    const rules = splitRules(cfg.mealRules?.[slot.id] || []);
+    steps.push({ key: `${day}:${slot.id}`, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
+  }
+  const checked = enforceProtocolRules(steps);
+  const label = (s: CheckedStep) => { const [d, slot] = s.key.split(':'); return `${WEEK.find((w) => w.day === Number(d))?.short} ${MEAL_SLOTS.find((m) => m.id === slot)?.label}`; };
+  const weekRules = splitRules(cfg.rules || []);
+  const items = checked.map((s) => ({ title: s.title, where: label(s), day: Number(s.key.split(':')[0]), kind: 'meal' as const }));
+  const conflicts = [
+    ...findConflicts(ruleRows(weekRules, 'week Meal checklist'), items),
+    ...slots.flatMap((slot) => findConflicts(ruleRows(splitRules(cfg.mealRules?.[slot.id] || []), `${slot.label} checklist`), items.filter((i) => i.where.endsWith(slot.label)))),
+  ];
+  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label), conflicts, weekRules };
+}
+
+/** Every fitness session through the shared checker: verb + noun title, a time, rule children; plus flagged contradictions. */
+export function reviewFitness(cfg: FitnessConfig): Review {
+  const steps: CheckedStep[] = cfg.sessions.map((s, i) => {
+    const rules = splitRules(s.rules || []);
+    const anchor = s.anchor === 'wake' ? 'wake' : s.anchor === 'bed' ? 'bedtime' : null;
+    return { key: String(i), title: s.title, group: 'fitness', time: anchor ? null : s.time, anchor, offsetMinutes: anchor ? (s.offset || 0) : null, durationMinutes: s.minutes, notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(s.day), link: s.exercises[0] ? { kind: 'activity', query: s.exercises[0].name } : null };
+  });
+  const checked = enforceProtocolRules(steps);
+  const label = (s: CheckedStep) => { const session = cfg.sessions[Number(s.key)]; return `${WEEK.find((w) => w.day === session.day)?.short} ${session.title}`; };
+  const weekRules = splitRules(cfg.rules || []);
+  const items = cfg.sessions.flatMap((s) => [{ title: s.title, where: WEEK.find((w) => w.day === s.day)!.short, day: s.day, kind: 'session' as const }, ...s.exercises.map((e) => ({ title: e.name, where: `${WEEK.find((w) => w.day === s.day)!.short} ${s.title}`, day: s.day, kind: 'item' as const }))]);
+  const conflicts = [
+    ...findConflicts(ruleRows(weekRules, 'week Fitness checklist'), items),
+    ...cfg.sessions.flatMap((s) => findConflicts(ruleRows(splitRules(s.rules || []), `${s.title} checklist`), items.filter((i) => i.day === s.day))),
+  ];
+  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label), conflicts, weekRules };
+}
+
+/** Combine review: the chosen protocols' top-level steps through the checker (notes only, nothing rewritten) plus rule-vs-item conflicts across protocols. */
+export function reviewCombined(itemsByProtocol: { name: string; items: AdminProtocolItem[] }[]): { notes: ReviewNote[]; conflicts: Conflict[] } {
+  const groupOf = (it: AdminProtocolItem) => it.category === 'sleep' ? 'sleep' : it.category === 'consume' ? 'meal' : it.subtype === 'exercise' ? 'fitness' : it.category || 'do';
+  const steps: CheckedStep[] = itemsByProtocol.flatMap(({ name, items }) => items.filter((it) => !it.parent_protocol_item_id && it.kind === 'action').map((it) => ({
+    key: `${name}|${it.id}`, title: it.display_name || '', group: groupOf(it), time: it.scheduled_time?.slice(0, 5) || null, notes: '', dos: [], donts: [], windowKey: name,
+  })));
+  // Sleep is checked across the combined plan (one window) so duplicate wake/bed items show up.
+  const checked = enforceProtocolRules(steps.map((s) => s.group === 'sleep' ? { ...s, windowKey: 'all' } : s));
+  const notes = notesOf(checked, (s) => s.key.split('|')[0]);
+  const rules = itemsByProtocol.flatMap(({ name, items }) => items.filter((it) => it.kind === 'rule_dont' || it.kind === 'rule_do').map((it) => ({ text: it.display_name || '', scope: name, isDont: it.kind === 'rule_dont' || isRuleTitle(it.display_name || '') })));
+  const actions = itemsByProtocol.flatMap(({ name, items }) => items.filter((it) => it.kind === 'action').map((it) => ({ title: it.display_name || '', where: name, day: it.recurrence_days_of_week?.length === 1 ? (WEEK.find((w) => w.dow === it.recurrence_days_of_week![0])?.day) : undefined, kind: (it.subtype === 'exercise' && !it.parent_protocol_item_id ? 'session' : it.category === 'consume' ? 'meal' : 'item') as 'session' | 'meal' | 'item' })));
+  return { notes, conflicts: findConflicts(rules, actions) };
+}
+
 /** Do's as checkable rule_do items: under a parent item (its do-checklist) or top-level in a group (that group's checklist). */
-async function addRules(accessToken: string, protocolId: string, rules: string[] | undefined, opts: { parentId?: string | null; group?: string | null; category: string; days?: number[]; next: () => number }) {
-  for (const [, rule] of (rules || []).map((x) => x.trim()).filter(Boolean).entries()) await createProtocolItem(accessToken, {
-    protocol_id: protocolId, display_name: rule, kind: 'rule_do', item_type: 'activity', category: opts.category, subtype: null,
+async function addRules(accessToken: string, protocolId: string, rules: string[] | RuleList | undefined, opts: { parentId?: string | null; group?: string | null; category: string; days?: number[]; next: () => number }) {
+  const list = Array.isArray(rules) || !rules ? splitRules(rules || []) : rules;
+  const all = [...list.dos.map((t) => ['rule_do', t]), ...list.donts.map((t) => ['rule_dont', t])];
+  for (const [kind, rule] of all) await createProtocolItem(accessToken, {
+    protocol_id: protocolId, display_name: rule, kind, item_type: 'activity', category: opts.category, subtype: null,
     parent_protocol_item_id: opts.parentId || null, group_name: opts.parentId ? null : opts.group || null, scheduled_time: null, day_number: 1,
     sort_order: opts.next() , has_children: false, enabled: true, hidden: false, notes: '',
     ...(opts.days ? { recurrence_type: 'weekly', recurrence_days_of_week: opts.days } : { recurrence_type: 'daily' }),
@@ -272,23 +379,25 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
   const protocol = await ensureProtocol(accessToken, ownerId, existingId, name, { category: 'Nutrition', description: `${framework.label} · ${t.energy_kcal} kcal/day · P ${t.protein_g} g · C ${t.carbohydrates_g} g · F ${t.fats_g} g` });
   return withProtocol(protocol, async () => {
   await clearItems(accessToken, protocol.id);
+  const review = reviewDiet(cfg);
   let order = 0;
   for (const { day } of WEEK) for (const slot of MEAL_SLOTS.filter((s) => cfg.slots.includes(s.id))) {
     const pick = cfg.plan[`${day}:${slot.id}`];
-    if (!pick) continue;
+    const step = review.steps[`${day}:${slot.id}`];
+    if (!pick || !step) continue;
     const nut = pick.nutrition;
     const timing = mealTiming(cfg, slot.id);
-    const slotRules = cfg.mealRules?.[slot.id] || [];
+    const slotRules = { dos: step.dos, donts: step.donts };
     const meal = await createProtocolItem(accessToken, {
-      protocol_id: protocol.id, display_name: pick.name, kind: 'action', item_type: 'recipe', category: 'consume', subtype: 'meal',
-      group_name: slot.label, scheduled_time: hhmmss(resolveTiming(timing)), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: slotRules.length > 0,
+      protocol_id: protocol.id, display_name: step.title, kind: 'action', item_type: 'recipe', category: 'consume', subtype: 'meal',
+      group_name: slot.label, scheduled_time: hhmmss(step.time || resolveTiming(timing)), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: slotRules.dos.length + slotRules.donts.length > 0,
       catalog_recipe_id: pick.source === 'catalog' ? pick.id : null, media_image_url: pick.image,
       notes: nut ? `${Math.round(nut.energy_kcal)} kcal · P ${Math.round(nut.protein_g)} g · C ${Math.round(nut.carbohydrates_g)} g · F ${Math.round(nut.fats_g)} g per serving${pick.source === 'guide' ? ' · Guardian recipe' : ''}${timing.anchor !== 'clock' ? ` · ${describeTiming(timing)}` : ''}` : '',
       ...weekly(day),
     } as Partial<AdminProtocolItem>);
     await addRules(accessToken, protocol.id, slotRules, { parentId: meal.id, category: 'consume', days: weekly(day).recurrence_days_of_week, next: () => order++ });
   }
-  await addRules(accessToken, protocol.id, cfg.rules, { group: 'Meal', category: 'consume', next: () => order++ });
+  await addRules(accessToken, protocol.id, review.weekRules, { group: 'Meal', category: 'consume', next: () => order++ });
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'diet', builder_config: cfg });
   return { protocol, metaSaved: saved };
   });
@@ -299,13 +408,15 @@ export async function saveFitnessProtocol(accessToken: string, ownerId: string, 
   const protocol = await ensureProtocol(accessToken, ownerId, existingId, name, { category: 'Fitness', description: `${goal.label} · ${cfg.level} · ${cfg.sessions.length} sessions/week` });
   return withProtocol(protocol, async () => {
   await clearItems(accessToken, protocol.id);
+  const review = reviewFitness(cfg);
   let order = 0;
-  for (const s of [...cfg.sessions].sort((a, b) => a.day - b.day)) {
+  for (const [index, s] of cfg.sessions.map((x, i) => [i, x] as const).sort((a, b) => a[1].day - b[1].day)) {
+    const step = review.steps[String(index)];
     const parent = await createProtocolItem(accessToken, {
-      protocol_id: protocol.id, display_name: s.title, kind: 'action', item_type: 'activity', category: 'do', subtype: 'exercise',
-      scheduled_time: hhmmss(resolveTiming(sessionTiming(s))), duration_minutes: s.minutes, intensity: s.intensity, day_number: 1, sort_order: order++,
+      protocol_id: protocol.id, display_name: step?.title || s.title, kind: 'action', item_type: 'activity', category: 'do', subtype: 'exercise',
+      scheduled_time: hhmmss(step?.time || resolveTiming(sessionTiming(s))), duration_minutes: s.minutes, intensity: s.intensity, day_number: 1, sort_order: order++,
       catalog_activity_id: s.exercises[0]?.id || null, media_image_url: s.exercises[0]?.image || null,
-      has_children: s.exercises.length > 0 || !!s.rules?.length, enabled: true, hidden: false,
+      has_children: s.exercises.length > 0 || !!(step?.dos.length || step?.donts.length), enabled: true, hidden: false,
       notes: [s.anchor && s.anchor !== 'clock' ? describeTiming(sessionTiming(s)) : '', s.exercises.map((e) => e.name).join(' · ')].filter(Boolean).join(' · '), ...weekly(s.day),
     } as Partial<AdminProtocolItem>);
     for (const e of s.exercises) await createProtocolItem(accessToken, {
@@ -313,9 +424,9 @@ export async function saveFitnessProtocol(accessToken: string, ownerId: string, 
       catalog_activity_id: e.id, sets: e.sets, reps: e.reps ? parseInt(e.reps, 10) || null : null, reps_display: e.reps, rest_seconds: e.rest_seconds,
       duration_minutes: e.minutes, day_number: 1, sort_order: order++, has_children: false, enabled: true, hidden: false, notes: '', ...weekly(s.day),
     } as Partial<AdminProtocolItem>);
-    await addRules(accessToken, protocol.id, s.rules, { parentId: parent.id, category: 'do', days: weekly(s.day).recurrence_days_of_week, next: () => order++ });
+    await addRules(accessToken, protocol.id, step ? { dos: step.dos, donts: step.donts } : s.rules, { parentId: parent.id, category: 'do', days: weekly(s.day).recurrence_days_of_week, next: () => order++ });
   }
-  await addRules(accessToken, protocol.id, cfg.rules, { group: 'Fitness', category: 'do', next: () => order++ });
+  await addRules(accessToken, protocol.id, review.weekRules, { group: 'Fitness', category: 'do', next: () => order++ });
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'fitness', builder_config: cfg });
   return { protocol, metaSaved: saved };
   });
@@ -378,8 +489,8 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
     protocol_id: protocol.id, display_name: name, kind: 'action', item_type: 'activity', category: 'sleep', subtype: 'sleep', scheduled_time: hhmmss(time),
     day_number: 1, sort_order: order++, has_children: false, enabled: true, hidden: false, notes: '', recurrence_type: 'daily',
   } as Partial<AdminProtocolItem>);
-  if (!haveSleep.has('wake')) await sleepItem('End sleep', DEFAULT_WAKE);
-  if (!haveSleep.has('bed')) await sleepItem('Start sleep', DEFAULT_BED);
+  if (!haveSleep.has('wake')) await sleepItem(END_SLEEP, DEFAULT_WAKE);
+  if (!haveSleep.has('bed')) await sleepItem(START_SLEEP, DEFAULT_BED);
   const metaSaved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'personal', builder_config: { person }, source_protocol_ids: sources.map((s) => s.id) });
   return { protocol, metaSaved };
 }
