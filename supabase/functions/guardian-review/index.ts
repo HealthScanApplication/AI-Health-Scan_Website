@@ -37,6 +37,16 @@ Deno.serve(async (req) => {
     return json({ status: 'submitted', email });
   }
 
+  if (body.action === 'test') {
+    // Admin-only: send the review email to the admin inbox without changing any profile.
+    if (!isAdmin(user)) return json({ error: 'Admins only.' }, 403);
+    const { data: profile } = await service.from('guide_profiles').select('slug, display_name, contact_email, headline').eq('user_id', user.id).maybeSingle();
+    const name = profile?.display_name || 'Test Guardian';
+    const page = `${SITE}/guardians/${encodeURIComponent(profile?.slug || 'test')}`;
+    const email = await sendEmail(ADMIN_EMAIL, `[Test] Review: ${name}'s Guardian site`, `<p>This is a test of the Guardian review email.</p><p><strong>${esc(name)}</strong> (${esc(profile?.contact_email || user.email || '')}) asked you to check their Guardian site before it goes live.</p><p>${esc(profile?.headline || '')}</p><p><a href="${page}">Open their site</a> · <a href="${SITE}/guardians/workspace?tab=admin">Approve or reject in Guardian admin</a></p>`);
+    return json({ to: ADMIN_EMAIL, email });
+  }
+
   if (body.action === 'decide') {
     if (!isAdmin(user)) return json({ error: 'Admins only.' }, 403);
     const status = body.status === 'approved' ? 'approved' : 'paused';
