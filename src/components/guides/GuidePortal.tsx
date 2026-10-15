@@ -872,7 +872,6 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
           </div>
           <div>
             <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Adding…' : `Add to my order · ${money(upsellPrice, upsell.currency)}`}</button>
-            <button type="button" onClick={nextUpsell} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
           </div>
         </div>
       </div> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
@@ -1934,7 +1933,6 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         </div>
       <div>
         <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}>{amount ? `Add to my order · ${formatMoney(total, currency)}` : 'Add to my plan'}</button>
-        <button type="button" onClick={onNo} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
       </div>
       </div></div>
     </div>;
