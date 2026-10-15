@@ -1029,7 +1029,7 @@ const PAGE_X = 'max(clamp(24px,6vw,84px), calc((100% - 1240px) / 2 + clamp(24px,
 const APP = { bg: '#F2F4F7', surface: '#FFFFFF', alt: '#F6F8FA', text: '#111827', muted: '#6B7280', faint: '#9CA3AF', border: '#E5E7EB', green: '#10B981', greenDark: '#047857', greenSoft: '#86EFAC', font: "'Poppins', 'Inter', sans-serif" };
 const appButton: React.CSSProperties = { width: '100%', minHeight: 56, border: 0, borderRadius: 16, background: '#000', color: '#FFF', fontFamily: APP.font, cursor: 'pointer', display: 'grid', placeItems: 'center', padding: '8px 16px', boxSizing: 'border-box' };
 // Format tag for Protocol offers: printable PDF plus the interactive version in the ROUTINE³ app.
-const ProtocolFormatTag = () => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 999, background: APP.surface, border: `1px solid ${APP.border}`, color: APP.text, fontFamily: APP.font, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}><FileText size={13} />PDF + in <RoutineMark size={16} textColor="#111827" hairline="#111827" suffix="" /> app</span>;
+const ProtocolFormatTag = () => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: APP.text, fontFamily: APP.font, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}><FileText size={14} />PDF<span aria-hidden="true" style={{ color: APP.muted }}>+</span><RoutineMark size={18} textColor="#111827" hairline="#111827" suffix="" /></span>;
 const isProtocolKind = (kind?: string) => kind === 'routine' || kind === 'routine_guidance';
 function AppOfferImage({ kind, size = 96, align = 'center' }: { kind?: string; size?: number; align?: 'center' | 'left' }) {
   const m = align === 'left' ? '0' : '0 auto';
