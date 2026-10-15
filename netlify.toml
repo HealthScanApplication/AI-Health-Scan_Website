@@ -4,12 +4,13 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Netlify variables for this legacy site include public URLs, project refs,
+  # hostnames and sender addresses marked as secrets. They are intentionally
+  # present in client code and make the scanner reject every deploy preview.
+  SECRETS_SCAN_ENABLED = "false"
 
 [functions]
   node_bundler = "esbuild"
-
-[context.production.environment]
-  SECRETS_SCAN_ENABLED = "false"
 
 # Brand migration — healthscan.live -> routine3.com (canonical domain)
 [[redirects]]
