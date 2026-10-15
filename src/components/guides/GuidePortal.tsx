@@ -865,11 +865,9 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [],
           <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: 0 }}>{upsell.description || 'The next step in your journey.'}</p>
         </div>
         <div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, alignSelf: 'stretch', justifyContent: 'center', padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)' }}>
-            <div style={{ padding: '14px 16px 16px' }}>
-              {seconds > 0 && <div style={{ color: APP.faint, fontSize: 13, textDecoration: 'line-through' }}>{money(upsell.price_cents, upsell.currency)}</div>}
-              <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{money(upsellPrice, upsell.currency)}</div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 12, padding: '6px 0 4px' }}>
+            {seconds > 0 && <span style={{ color: APP.faint, fontSize: 20, fontWeight: 500, textDecoration: 'line-through' }}>{money(upsell.price_cents, upsell.currency)}</span>}
+            <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: -0.8 }}>{money(upsellPrice, upsell.currency)}</span>
           </div>
           <div>
             <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Locking in…' : 'Lock it in'}</button>
@@ -1003,7 +1001,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
         <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}><span style={{ width: 32, height: 32, flex: '0 0 32px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={16} strokeWidth={2.5} /></span><span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{entry.title} is ready</strong><span style={{ color: APP.muted, fontSize: 12 }}>Sent to {form.email}</span></span></span>
         <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {entry.file_path && <button type="button" onClick={downloadEntryFile} disabled={downloading} style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: `1px solid ${APP.border}`, background: APP.alt, color: APP.text }}><Download size={16} />{downloading ? 'Preparing…' : 'PDF'}</button>}
-          <a href={entry.booking_url || APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Open in ROUTINE³" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: 0, background: '#000', color: '#FFF' }}>Open in <RoutineMark size={20} textColor="#FFFFFF" hairline="rgba(255,255,255,.7)" suffix="" /></a>
+          <a href={entry.booking_url || APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Open in ROUTINE³" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: `1px solid ${APP.border}`, background: APP.alt, color: APP.text }}>Open in <RoutineMark size={20} textColor="#111827" hairline="#111827" suffix="" /></a>
         </span>
       </div>}
       {downloadError && <p role="alert" style={{ maxWidth: 880, margin: '8px auto 0', color: '#EF4444', fontFamily: APP.font, fontSize: 12 }}>{downloadError}</p>}
@@ -1971,12 +1969,10 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: '0 0 14px' }}>{offer.value}</p>
       </div>
       <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignSelf: 'stretch', gap: 14, margin: 16, padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)' }}>
-        <div style={{ position: 'relative', background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)', textAlign: 'center' }}>
-          <div style={{ padding: '14px 16px 16px' }}>
-            {live && amount > 0 && <div style={{ color: APP.faint, fontSize: 13, textDecoration: 'line-through' }}>{formatMoney(amount, currency)}</div>}
-            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{amount ? formatMoney(total, currency) : 'Free'}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 12, padding: '6px 0 4px' }}>
+            {live && amount > 0 && <span style={{ color: APP.faint, fontSize: 20, fontWeight: 500, textDecoration: 'line-through' }}>{formatMoney(amount, currency)}</span>}
+            <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: -0.8 }}>{amount ? formatMoney(total, currency) : 'Free'}</span>
           </div>
-        </div>
       <div>
         <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}>Lock it in</button>
       </div>
@@ -2615,7 +2611,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
                 <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}><span style={{ width: 32, height: 32, flex: '0 0 32px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={16} strokeWidth={2.5} /></span><span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{funnelPreviewStage === 0 ? `${customerFacingOfferTitle(funnelStages[0].title)} is ready` : 'Purchase confirmed'}</strong><span style={{ color: APP.muted, fontSize: 12 }}>{funnelPreviewStage === 0 ? `Sent to ${leadCaptureValue}` : 'Access details are ready.'}</span></span></span>
                 {funnelPreviewStage === 0 && <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {freeDelivery.includes('Downloadable PDF') && <button type="button" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: `1px solid ${APP.border}`, background: APP.alt, color: APP.text }}><Download size={16} />PDF</button>}
-                  {freeDelivery.includes('Interactive Protocol') && <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Open in ROUTINE³" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: 0, background: '#000', color: '#FFF' }}>Open in <RoutineMark size={20} textColor="#FFFFFF" hairline="rgba(255,255,255,.7)" suffix="" /></a>}
+                  {freeDelivery.includes('Interactive Protocol') && <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Open in ROUTINE³" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: `1px solid ${APP.border}`, background: APP.alt, color: APP.text }}>Open in <RoutineMark size={20} textColor="#111827" hairline="#111827" suffix="" /></a>}
                   {!freeDelivery.some((delivery) => delivery === 'Downloadable PDF' || delivery === 'Interactive Protocol') && <button type="button" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: 0, background: '#000', color: '#FFF' }}>{freeOfferCta[freeOfferType]}</button>}
                 </span>}
               </div>
