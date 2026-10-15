@@ -46,7 +46,8 @@ function parseExpertiseTags(value?: string) {
 }
 
 function customerFacingOfferTitle(value: string) {
-  return value.replace(/^R3\s+Protocol\s*>\s*/i, '').trim();
+  // Older drafts were saved as "Custom Protocol"; customers see "Personalised Protocol".
+  return value.replace(/^R3\s+Protocol\s*>\s*/i, '').replace(/^Custom Protocol\b/i, 'Personalised Protocol').trim();
 }
 
 function offerTitleSize(value: string) {
@@ -857,6 +858,7 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
         {/* Wide like the builder's upsell: offer on the left, price on top and CTA pinned to the bottom of the right panel. */}
         <div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
           <AppOfferImage kind={upsell.kind} size={110} align="left" />
+          {isProtocolKind(upsell.kind) && <div style={{ margin: '12px 0 2px' }}><ProtocolFormatTag /></div>}
           <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '14px 0 8px' }}>{upsell.title}</h2>
           <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: 0 }}>{upsell.description || 'The next step in your journey.'}</p>
         </div>
@@ -881,6 +883,7 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
         <button type="button" onClick={onClose} style={{ ...appButton, borderRadius: 12, background: APP.text, fontSize: 16, fontWeight: 600 }}>Done</button>
       </div> : <div style={{ padding: '44px 24px 24px' }}>
         <AppOfferImage kind={offer.kind} size={80} />
+        {isProtocolKind(offer.kind) && <div style={{ margin: '12px 0 2px' }}><ProtocolFormatTag /></div>}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 6px' }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{profile.display_name}</span></span>
         <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 4px' }}>{offer.title}</h2>
         <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 20px' }}>{money(offer.price_cents)} · secure checkout</p>
@@ -949,6 +952,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
         <span style={{ position: 'absolute', zIndex: 2, top: 16, left: 16, background: '#000', color: '#FFF', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, letterSpacing: .5 }}>FREE</span>
         <div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
           {leadVideo && state !== 'done' ? <video src={leadVideo} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', background: '#000', borderRadius: 12, marginBottom: 12 }} /> : <AppOfferImage kind={entry.kind} size={110} align="left" />}
+          {isProtocolKind(entry.kind) && <div style={{ margin: '12px 0 2px' }}><ProtocolFormatTag /></div>}
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 6px' }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{profile.display_name}</span></span>
           <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 6px' }}>{state === 'done' ? 'You’re in!' : entry.title}</h2>
           <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, lineHeight: 1.45, margin: 0 }}>{state === 'done' ? `${entry.title} runs as a daily routine in the ROUTINE³ app, with reminders, so you keep going.` : entry.description || 'Get the guide and the interactive routine that goes with it.'}</p>
@@ -1024,6 +1028,9 @@ const PAGE_X = 'max(clamp(24px,6vw,84px), calc((100% - 1240px) / 2 + clamp(24px,
 // ROUTINE³ iOS app look (mobile repo: Paywall.tsx, SignUpScreen.tsx, designTokens.ts) for the sign-up and upsell pages.
 const APP = { bg: '#F2F4F7', surface: '#FFFFFF', alt: '#F6F8FA', text: '#111827', muted: '#6B7280', faint: '#9CA3AF', border: '#E5E7EB', green: '#10B981', greenDark: '#047857', greenSoft: '#86EFAC', font: "'Poppins', 'Inter', sans-serif" };
 const appButton: React.CSSProperties = { width: '100%', minHeight: 56, border: 0, borderRadius: 16, background: '#000', color: '#FFF', fontFamily: APP.font, cursor: 'pointer', display: 'grid', placeItems: 'center', padding: '8px 16px', boxSizing: 'border-box' };
+// Format tag for Protocol offers: printable PDF plus the interactive version in the ROUTINE³ app.
+const ProtocolFormatTag = () => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 999, background: APP.surface, border: `1px solid ${APP.border}`, color: APP.text, fontFamily: APP.font, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}><FileText size={13} />PDF + in <RoutineMark size={16} textColor="#111827" hairline="#111827" suffix="" /> app</span>;
+const isProtocolKind = (kind?: string) => kind === 'routine' || kind === 'routine_guidance';
 function AppOfferImage({ kind, size = 96, align = 'center' }: { kind?: string; size?: number; align?: 'center' | 'left' }) {
   const m = align === 'left' ? '0' : '0 auto';
   const art = productArt(kind);
@@ -1344,8 +1351,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [uploadingVideo, setUploadingVideo] = useState('');
   const [upsellDrafts, setUpsellDrafts] = useState<Record<UpsellKind, { title: string; price: string; url: string; delivery: DeliveryFormat[]; audienceValue: string; nextStep: OfferNextStep; billingModel: BillingModel }>>({
     ebook: { title: 'Complete guide', price: '29', url: '', delivery: ['Downloadable PDF'], audienceValue: 'Learn the complete method and apply it at your own pace.', nextStep: 'link', billingModel: 'one_time' },
-    routine: { title: 'Custom Protocol', price: '49', url: '', delivery: ['PDF + Interactive Protocol'], audienceValue: 'A Protocol shaped around them, in print and in the ROUTINE³ app.', nextStep: 'builder', billingModel: 'one_time' },
-    routine_guidance: { title: 'Custom Protocol + call', price: '79', url: '', delivery: ['Interactive Protocol', 'Live online'], audienceValue: 'A Protocol shaped around them, plus a one-to-one call to set it up.', nextStep: 'builder', billingModel: 'one_time' },
+    routine: { title: 'Personalised Protocol', price: '49', url: '', delivery: ['PDF + Interactive Protocol'], audienceValue: 'A Protocol shaped around them, in print and in the ROUTINE³ app.', nextStep: 'builder', billingModel: 'one_time' },
+    routine_guidance: { title: 'Personalised Protocol + call', price: '79', url: '', delivery: ['Interactive Protocol', 'Live online'], audienceValue: 'A Protocol shaped around them, plus a one-to-one call to set it up.', nextStep: 'builder', billingModel: 'one_time' },
     recipe_book: { title: 'Recipe collection', price: '24', url: '', delivery: ['Downloadable PDF'], audienceValue: 'Make a complete collection of practical recipes with confidence.', nextStep: 'builder', billingModel: 'one_time' },
     group_call: { title: 'Personal Protocol + weekly coaching + daily feedback', price: '299', url: '', delivery: ['Interactive Protocol', 'Live online'], audienceValue: 'Your coach sees the Protocol activity you choose to share, reviews progress daily and suggests timely changes, with a private coaching call every week.', nextStep: 'booking', billingModel: 'subscription' },
     one_to_one_call: { title: 'Personalised R3 Protocol + private call', price: '104', url: '', delivery: ['Interactive Protocol', 'Live online'], audienceValue: 'Receive a custom Protocol and one private call to refine it around your needs and agree the next actions.', nextStep: 'booking', billingModel: 'one_time' },
@@ -1543,8 +1550,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const upsellSuggestions: { kind: UpsellKind; label: string; value: string; why: string; art: TagArt }[] = [
     { kind: 'ebook', label: 'Complete guide', value: 'Complete method', why: 'Learn the complete method and apply it at your own pace.', art: offerArt.eBook },
     { kind: 'recipe_book', label: 'Practical recipe collection', value: 'Practical toolkit', why: 'Use a complete collection of practical recipes whenever you need them.', art: offerArt['Recipe book'] },
-    { kind: 'routine', label: 'Custom Protocol', value: 'Custom plan', why: 'A Protocol shaped around them, in print and in the ROUTINE³ app.', art: offerArt['ROUTINE³'] },
-    { kind: 'routine_guidance', label: 'Custom Protocol + call', value: 'Custom plan + call', why: 'A custom Protocol plus a one-to-one call to set it up.', art: offerArt['ROUTINE³'] },
+    { kind: 'routine', label: 'Personalised Protocol', value: 'Personalised plan', why: 'A Protocol shaped around them, in print and in the ROUTINE³ app.', art: offerArt['ROUTINE³'] },
+    { kind: 'routine_guidance', label: 'Personalised Protocol + call', value: 'Personalised plan + call', why: 'A personalised Protocol plus a one-to-one call to set it up.', art: offerArt['ROUTINE³'] },
     { kind: 'festival', label: 'Three-day in-person retreat', value: 'Premium', why: 'Spend three focused days at a country hotel with coaching, practical sessions and accommodation.', art: offerArt.Event },
     { kind: 'group_call', label: 'Personal Protocol + weekly coaching + daily feedback', value: 'Ongoing', why: 'Share selected Protocol activity with your coach for daily feedback, timely adjustments and a private call every week.', art: offerArt['Group call'] },
     { kind: 'one_to_one_call', label: 'Personal Protocol + private call', value: 'Guided', why: 'Refine your custom Protocol in one private coaching call and leave with agreed next actions.', art: offerArt['1:1 call'] },
@@ -1913,6 +1920,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       <button type="button" aria-label="No thanks" onClick={onNo} style={{ position: 'absolute', zIndex: 2, top: 22, right: 22, width: 36, height: 36, border: 0, background: 'transparent', color: APP.text, fontSize: 22, cursor: 'pointer' }}>×</button>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}><div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
         {offer.video ? <video src={offer.video} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 12, background: '#000', marginBottom: 12 }} /> : <AppOfferImage kind={offer.kind} size={110} align="left" />}
+        {isProtocolKind(offer.kind) && <div style={{ margin: '12px 0 2px' }}><ProtocolFormatTag /></div>}
         <h3 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '14px 0 8px' }}>{customerFacingOfferTitle(offer.title)}</h3>
         <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: '0 0 14px' }}>{offer.value}</p>
       </div>
@@ -2515,6 +2523,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
               {/* Wide on desktop: offer on the left, email form in a white panel on the right; stacks on phones. */}
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}><div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
               <AppOfferImage kind={activeFunnelStage.kind} size={110} align="left" />
+              {isProtocolKind(activeFunnelStage.kind) && <div style={{ margin: '12px 0 2px' }}><ProtocolFormatTag /></div>}
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 6px' }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(displayName || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{displayName || 'Your Guardian'}</span></span>
               <h3 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 4px' }}>{customerFacingOfferTitle(activeFunnelStage.title)}</h3>
               <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: 0 }}>{activeFunnelStage.value || 'Enter your email to get it free'}</p>
