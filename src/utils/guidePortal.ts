@@ -388,3 +388,19 @@ export async function submitGuardianReview(token: string, review: { name: string
   if (error) throw error;
   return String(data || '');
 }
+
+// Real payments (platform Stripe account) through the guardian-payments edge function.
+export type PaymentIntentResult = { purchase_id: string; client_secret: string | null; amount_cents: number; currency?: string; status?: 'paid' | 'pending' | 'failed' | 'requires_action'; discount_code?: string | null };
+async function callPayments<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await db().functions.invoke('guardian-payments', { body });
+  if (error) {
+    let message = error.message;
+    try { const detail = await (error as any).context?.json?.(); if (detail?.error) message = detail.error; } catch { /* keep default */ }
+    throw new Error(message || 'Payment failed.');
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as T;
+}
+export const createOfferPayment = (offerId: string, email: string, name?: string) => callPayments<PaymentIntentResult>({ action: 'intent', offer_id: offerId, email, name });
+export const confirmOfferPayment = (purchaseId: string) => callPayments<{ status: PaymentIntentResult['status'] }>({ action: 'confirm', purchase_id: purchaseId });
+export const buyUpsellOneClick = (previousPurchaseId: string, offerId: string) => callPayments<PaymentIntentResult>({ action: 'upsell', previous_purchase_id: previousPurchaseId, offer_id: offerId });

@@ -12,7 +12,7 @@ import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
-  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
+  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
   listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
@@ -778,6 +778,110 @@ function orderFunnelOffers(offers: GuideOffer[], ramp: GuideValueRamp | null): G
 
 const CONSENT_TEXT = 'Send me occasional emails with new guidance and offers. Unsubscribe any time.';
 
+// Real checkout on the public page: first paid offer takes the card with Stripe's Payment Element
+// (saved for later with consent), then each following offer is a one-click upsell on that card.
+const STRIPE_KEY = (import.meta as any).env?.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
+// Stripe.js must load from js.stripe.com (Stripe's requirement), so no npm dependency is needed.
+let stripeScript: Promise<any> | null = null;
+function loadStripeJs(key: string): Promise<any> {
+  stripeScript ??= new Promise((resolve, reject) => {
+    if ((window as any).Stripe) return resolve((window as any).Stripe);
+    const tag = document.createElement('script');
+    tag.src = 'https://js.stripe.com/v3/'; tag.async = true;
+    tag.onload = () => resolve((window as any).Stripe); tag.onerror = () => { stripeScript = null; reject(new Error('Could not load payments.')); };
+    document.head.appendChild(tag);
+  });
+  return stripeScript.then((Stripe) => Stripe(key));
+}
+function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: GuideOffer; upsells: GuideOffer[]; profile: GuideProfile; accent: string; onClose: () => void }) {
+  const [stage, setStage] = useState<'details' | 'card' | 'paying' | 'paid' | 'upsell' | 'done'>('details');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [purchaseId, setPurchaseId] = useState('');
+  const [bought, setBought] = useState<string[]>([offer.title]);
+  const [upsellIndex, setUpsellIndex] = useState(0);
+  const [seconds, setSeconds] = useState(600);
+  const stripeRef = useRef<any>(null);
+  const elementsRef = useRef<any>(null);
+  const mountRef = useRef<HTMLDivElement>(null);
+  const money = (cents: number, currency = offer.currency || 'GBP') => formatMoney(cents / 100, currency);
+  const upsell = upsells[upsellIndex];
+  useEffect(() => { if (stage !== 'upsell' || seconds <= 0) return; const t = window.setInterval(() => setSeconds((v) => Math.max(0, v - 1)), 1000); return () => window.clearInterval(t); }, [stage, seconds]);
+  async function start(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setMessage('');
+    try {
+      const stripe = await loadStripeJs(STRIPE_KEY!);
+      if (!stripe) throw new Error('Could not load payments.');
+      const intent = await createOfferPayment(offer.id, email, name);
+      setPurchaseId(intent.purchase_id);
+      stripeRef.current = stripe;
+      elementsRef.current = stripe.elements({ clientSecret: intent.client_secret!, appearance: { theme: 'stripe', variables: { colorPrimary: accent, borderRadius: '2px', fontFamily: 'Inter, system-ui, sans-serif' } } });
+      setStage('card');
+      window.requestAnimationFrame(() => { const el = elementsRef.current.create('payment', { layout: 'tabs' }); el.mount(mountRef.current!); });
+    } catch (err: any) { setMessage(err?.message || 'Could not start checkout.'); }
+    finally { setBusy(false); }
+  }
+  async function pay(e: React.FormEvent) {
+    e.preventDefault(); setStage('paying'); setMessage('');
+    const { error, paymentIntent } = await stripeRef.current.confirmPayment({ elements: elementsRef.current, redirect: 'if_required', confirmParams: { return_url: window.location.href, receipt_email: email } });
+    if (error) { setMessage(error.message || 'Payment failed.'); setStage('card'); return; }
+    if (paymentIntent?.status === 'succeeded') { await confirmOfferPayment(purchaseId).catch(() => null); setSeconds(600); setStage(upsells.length ? 'upsell' : 'done'); }
+    else { setMessage('Payment is processing. We will email you when it completes.'); setStage('done'); }
+  }
+  async function acceptUpsell() {
+    if (!upsell) return; setBusy(true); setMessage('');
+    try {
+      let result = await buyUpsellOneClick(purchaseId, upsell.id);
+      if (result.status === 'requires_action' && result.client_secret) {
+        const { error } = await stripeRef.current.handleNextAction({ clientSecret: result.client_secret });
+        if (error) throw new Error(error.message);
+        result = { ...result, status: (await confirmOfferPayment(result.purchase_id)).status };
+      }
+      if (result.status !== 'paid') throw new Error('Your card was not charged. Please try again.');
+      setBought((current) => [...current, upsell.title]); nextUpsell();
+    } catch (err: any) { setMessage(err?.message || 'Could not add this to your order.'); }
+    finally { setBusy(false); }
+  }
+  const nextUpsell = () => { if (upsellIndex + 1 < upsells.length) { setUpsellIndex(upsellIndex + 1); setSeconds(600); } else setStage('done'); };
+  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 46, border: '1px solid #11120F', borderRadius: 2, padding: '0 14px', fontFamily: 'inherit', fontSize: 14, background: '#FFF', color: '#11120F', outline: 'none' };
+  const solid: React.CSSProperties = { minHeight: 48, border: `1px solid ${accent}`, borderRadius: 2, background: accent, color: readableText(accent), padding: '0 20px', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' };
+  const code = `${(profile.display_name.split(' ')[0] || 'Guardian').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10)}30`;
+  return <div role="dialog" aria-modal="true" aria-label="Checkout" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(17,18,15,.55)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 560, background: '#F7F5EF', color: '#11120F', borderRadius: 5, padding: 'clamp(20px,4vw,34px)', boxShadow: '0 24px 60px rgba(0,0,0,.3)' }}>
+      <button type="button" aria-label="Close" onClick={onClose} style={{ position: 'absolute', top: 10, right: 14, border: 0, background: 'none', fontSize: 22, cursor: 'pointer', color: '#11120F' }}>×</button>
+      {stage === 'upsell' && upsell ? <>
+        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#11120F', color: '#F2EFE7', padding: '8px 12px', marginBottom: 16, fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}><Clock size={14} /> {seconds ? `Time-limited · 30% off · ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}` : 'Offer ended · full price'}</div>
+        <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Thank you · add this to your order</span>
+        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 36, lineHeight: 1, margin: '10px 0' }}>{upsell.title}</h2>
+        <p style={{ color: '#66645F', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px' }}>{upsell.description || 'The next step in your journey.'}</p>
+        <div style={{ display: 'inline-flex' }}>{seconds > 0 && <span style={{ border: `1px dashed ${accent}`, borderRight: 0, padding: '0 12px', display: 'grid', alignContent: 'center', color: accent, fontSize: 11, fontWeight: 800, letterSpacing: '.1em' }}>{code}</span>}<button type="button" disabled={busy} onClick={acceptUpsell} style={solid}>{busy ? 'Adding…' : `Add to my order · ${money(seconds ? Math.round(upsell.price_cents * (1 - COUPON_RATE)) : upsell.price_cents, upsell.currency)}`} <ArrowRight size={13} /></button></div>
+        <span style={{ display: 'block', color: '#66645F', fontSize: 10, marginTop: 8 }}>One click: charged to the card you just used.</span>
+        <button type="button" onClick={nextUpsell} style={{ marginTop: 10, border: 0, background: 'none', padding: 0, color: '#55564F', fontSize: 11, textDecoration: 'underline', cursor: 'pointer' }}>No thanks</button>
+      </> : stage === 'done' ? <>
+        <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Order confirmed</span>
+        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 40, lineHeight: 1, margin: '10px 0' }}>You’re all set.</h2>
+        <p style={{ color: '#66645F', fontSize: 13, lineHeight: 1.6 }}>{message || `A receipt is on its way to ${email}.`}</p>
+        <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 13, lineHeight: 1.8 }}>{bought.map((t) => <li key={t}>{t}</li>)}</ul>
+        <button type="button" onClick={onClose} style={solid}>Close</button>
+      </> : <>
+        <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Secure checkout · {money(offer.price_cents)}</span>
+        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 36, lineHeight: 1, margin: '10px 0 16px' }}>{offer.title}</h2>
+        {stage === 'details' ? <form onSubmit={start} style={{ display: 'grid', gap: 10 }}>
+          <input required placeholder="First name" aria-label="First name" value={name} onChange={(e) => setName(e.target.value)} style={field} />
+          <input required type="email" placeholder="you@email.com" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={field} />
+          <button disabled={busy} style={{ ...solid, width: 'fit-content' }}>{busy ? 'Loading…' : 'Continue to payment'} <ArrowRight size={13} /></button>
+        </form> : <form onSubmit={pay} style={{ display: 'grid', gap: 12 }}>
+          <div ref={mountRef} />
+          <span style={{ color: '#66645F', fontSize: 10, lineHeight: 1.5 }}>Your card is saved securely by Stripe so you can add follow-on offers in one click. Remove it any time by contacting {profile.display_name}.</span>
+          <button disabled={stage === 'paying'} style={{ ...solid, width: 'fit-content' }}>{stage === 'paying' ? 'Paying…' : `Pay ${money(offer.price_cents)}`} <ArrowRight size={13} /></button>
+        </form>}
+      </>}
+      {message && stage !== 'done' && <p role="alert" style={{ color: '#8A3D31', fontSize: 12, margin: '10px 0 0' }}>{message}</p>}
+    </div>
+  </div>;
+}
 function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = [] }: { reviews?: GuardianReview[]; profile: GuideProfile; offers: GuideOffer[]; ramp: GuideValueRamp | null; accent: string; headingFont: string }) {
   const ordered = orderFunnelOffers(offers, ramp);
   const entry = ordered.find((offer) => offer.access_model === 'free') || null;
@@ -785,6 +889,11 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   const support = ordered.find((offer) => SUPPORT_KINDS.includes(offer.kind)) || null;
   const [form, setForm] = useState({ name: '', email: '', goal: '', consent: false });
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+  const [checkoutOffer, setCheckoutOffer] = useState<GuideOffer | null>(null);
+  // Paid offers without their own booking link are sold here; with no Stripe key we fall back to the link.
+  const sellsHere = (offer: GuideOffer) => Boolean(STRIPE_KEY) && offer.access_model === 'paid' && offer.price_cents > 0 && !offer.booking_url;
+  const openOffer = (offer: GuideOffer) => (event: React.MouseEvent) => { if (sellsHere(offer)) { event.preventDefault(); setCheckoutOffer(offer); } };
+  const paidAfter = (offer: GuideOffer) => ordered.slice(ordered.indexOf(offer) + 1).filter(sellsHere);
   const price = (offer: GuideOffer) => offer.access_model === 'free' ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Enquire';
   const offerHref = (offer: GuideOffer) => offer.booking_url || offer.affiliate_url || '#start';
   async function optIn(e: React.FormEvent) {
@@ -804,6 +913,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   // Pitch videos saved by the builder in social_links.offer_videos ('free' = lead magnet).
   const leadVideo = (() => { try { return (JSON.parse(String((profile.social_links as Record<string, unknown> | null)?.offer_videos || '{}')) as Record<string, string>).free || ''; } catch { return ''; } })();
   return <>
+    {checkoutOffer && <OfferCheckout offer={checkoutOffer} upsells={paidAfter(checkoutOffer)} profile={profile} accent={accent} onClose={() => setCheckoutOffer(null)} />}
     {steps.length > 0 && <section id="offers" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)' }}>
       <span style={eyebrow}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
       <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(44px,7vw,82px)', lineHeight: .95, margin: '18px 0 36px' }}>Your path, step by step.</h2>
@@ -812,7 +922,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
           <span style={eyebrow}>{String(index + 1).padStart(2, '0')} · {index === 0 && offer.access_model === 'free' ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Personal support' : 'Go deeper'} · {price(offer)}</span>
           <strong style={{ fontFamily: headingFont, fontSize: 32, lineHeight: 1.05, fontWeight: 300, margin: '18px 0 10px' }}>{offer.title}</strong>
           <span style={{ color: '#66645F', fontSize: 13, lineHeight: 1.6, marginBottom: 22 }}>{offer.description || 'The next step in your journey.'}</span>
-          <a href={index === 0 && offer.access_model === 'free' ? '#start' : offerHref(offer)} style={{ ...solid, marginTop: 'auto', width: 'fit-content', ...(index ? { background: 'transparent', color: '#11120F' } : {}) }}>{index === 0 && offer.access_model === 'free' ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Apply / book a call' : 'See what is included'} <ArrowRight size={13} /></a>
+          <a href={index === 0 && offer.access_model === 'free' ? '#start' : offerHref(offer)} onClick={openOffer(offer)} style={{ ...solid, marginTop: 'auto', width: 'fit-content', ...(index ? { background: 'transparent', color: '#11120F' } : {}) }}>{index === 0 && offer.access_model === 'free' ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Apply / book a call' : 'See what is included'} <ArrowRight size={13} /></a>
         </li>)}
       </ol>
     </section>}
@@ -833,7 +943,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
             <span style={{ ...eyebrow, color: accent }}>Ready to go further? · {price(nextPaid)}</span>
             <strong style={{ display: 'block', fontFamily: headingFont, fontWeight: 300, fontSize: 28, lineHeight: 1.05, margin: '12px 0 8px' }}>{nextPaid.title}</strong>
             <p style={{ color: 'rgba(17,18,15,.72)', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px' }}>{nextPaid.description || 'The complete programme, step by step.'}</p>
-            <a href={offerHref(nextPaid)} style={{ ...solid, background: 'transparent', color: '#11120F', borderColor: '#11120F' }}>See what is included <ArrowRight size={13} /></a>
+            <a href={offerHref(nextPaid)} onClick={openOffer(nextPaid)} style={{ ...solid, background: 'transparent', color: '#11120F', borderColor: '#11120F' }}>See what is included <ArrowRight size={13} /></a>
           </div>}
         </div> : <form onSubmit={optIn} style={{ display: 'grid', gap: 12 }}>
           <input required placeholder="First name" aria-label="First name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={field} />
