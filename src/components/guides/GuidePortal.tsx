@@ -794,7 +794,7 @@ function loadStripeJs(key: string): Promise<any> {
   });
   return stripeScript.then((Stripe) => Stripe(key));
 }
-function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: GuideOffer; upsells: GuideOffer[]; profile: GuideProfile; accent: string; onClose: () => void }) {
+function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [] }: { offer: GuideOffer; upsells: GuideOffer[]; profile: GuideProfile; accent: string; onClose: () => void; reviews?: GuardianReview[] }) {
   const [stage, setStage] = useState<'details' | 'card' | 'paying' | 'paid' | 'upsell' | 'done'>('details');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -874,6 +874,7 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
             <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Adding…' : `Add to my order · ${money(upsellPrice, upsell.currency)}`}</button>
           </div>
         </div>
+      {reviews.length > 0 && <div style={{ flex: '1 1 calc(100% - 32px)', minWidth: 0, textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
       </div> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
         <span style={{ width: 56, height: 56, margin: '0 auto 14px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={26} /></span>
         <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, margin: '0 0 4px' }}>You’re all set!</h2>
@@ -932,7 +933,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   // Pitch videos saved by the builder in social_links.offer_videos ('free' = lead magnet).
   const leadVideo = (() => { try { return (JSON.parse(String((profile.social_links as Record<string, unknown> | null)?.offer_videos || '{}')) as Record<string, string>).free || ''; } catch { return ''; } })();
   return <>
-    {checkoutOffer && <OfferCheckout offer={checkoutOffer} upsells={paidAfter(checkoutOffer)} profile={profile} accent={accent} onClose={() => setCheckoutOffer(null)} />}
+    {checkoutOffer && <OfferCheckout offer={checkoutOffer} upsells={paidAfter(checkoutOffer)} profile={profile} accent={accent} reviews={reviews} onClose={() => setCheckoutOffer(null)} />}
     {steps.length > 0 && <section id="offers" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)' }}>
       <span style={eyebrow}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
       <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(44px,7vw,82px)', lineHeight: .95, margin: '18px 0 36px' }}>Your path, step by step.</h2>
@@ -1935,6 +1936,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}>{amount ? `Add to my order · ${formatMoney(total, currency)}` : 'Add to my plan'}</button>
       </div>
       </div></div>
+      <div style={{ textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={guardianReviews.length ? guardianReviews : SAMPLE_REVIEWS} sample={!guardianReviews.length} accent={APP.greenDark} /></div>
     </div>;
   };
   useEffect(() => {
