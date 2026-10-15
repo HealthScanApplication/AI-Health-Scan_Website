@@ -416,3 +416,40 @@ export async function getFreeOfferDownload(offerId: string, email: string): Prom
   if (!(data as any)?.url) throw new Error((data as any)?.error || 'Could not prepare the download.');
   return (data as any).url as string;
 }
+
+// ---- Guardian site review (guardian-review edge function) and admin lists ----
+async function callReview<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await db().functions.invoke('guardian-review', { body });
+  if (error) {
+    let message = error.message;
+    try { const detail = await (error as any).context?.json?.(); if (detail?.error) message = detail.error; } catch { /* keep default */ }
+    throw new Error(message || 'Review request failed.');
+  }
+  return data as T;
+}
+export type ReviewEmailResult = { sent: boolean; reason: string | null };
+export const requestGuardianReview = () => callReview<{ status: string; email: ReviewEmailResult }>({ action: 'request' });
+export const decideGuardianSite = (userId: string, status: 'approved' | 'paused', note?: string) => callReview<{ status: string; email: ReviewEmailResult }>({ action: 'decide', user_id: userId, status, note });
+
+export type AdminGuideProfile = GuideProfile & { review_requested_at?: string | null; reviewed_at?: string | null; updated_at?: string | null };
+export async function listAllGuideProfiles(): Promise<AdminGuideProfile[]> {
+  const { data, error } = await db().from('guide_profiles').select('*').order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as AdminGuideProfile[];
+}
+export type GuardianSuggestionRow = GuardianSuggestion & { id: string; status: 'new' | 'contacted' | 'invited' | 'dismissed'; created_at: string };
+export async function listGuardianSuggestions(): Promise<GuardianSuggestionRow[]> {
+  const { data, error } = await db().from('guardian_suggestions').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuardianSuggestionRow[];
+}
+export async function setGuardianSuggestionStatus(id: string, status: GuardianSuggestionRow['status']): Promise<void> {
+  const { error } = await db().from('guardian_suggestions').update({ status }).eq('id', id);
+  if (error) throw error;
+}
+/** Published offers from approved Guardians, for the directory's offerings section. */
+export async function listPublicGuardianOffers(): Promise<GuideOffer[]> {
+  const { data, error } = await db().from('guide_offers').select('id,guide_id,kind,title,description,price_cents,currency,access_model,booking_url,affiliate_url,file_path,status').eq('status', 'published').order('price_cents', { ascending: true }).limit(60);
+  if (error) throw error;
+  return (data || []) as GuideOffer[];
+}

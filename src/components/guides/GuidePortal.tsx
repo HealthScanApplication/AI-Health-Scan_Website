@@ -3,7 +3,7 @@ import {
   ArrowRight, ChevronRight, FileText, HeartPulse, LogOut,
   Mail, Package, Plus, Salad, Sparkles, Users, Globe2, Loader2,
   Upload, Check, Instagram, Youtube, Link2, AtSign, Route, CalendarDays, Download,
-  MoreHorizontal, FolderOpen, Trash2, ExternalLink, Hammer, PencilRuler, Blocks, LayoutDashboard, Play, Clock } from 'lucide-react';
+  MoreHorizontal, FolderOpen, Trash2, ExternalLink, Hammer, PencilRuler, Blocks, LayoutDashboard, Play, Clock, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
@@ -12,7 +12,7 @@ import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
-  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
+  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, requestGuardianReview, decideGuardianSite, listAllGuideProfiles, listGuardianSuggestions, setGuardianSuggestionStatus, listPublicGuardianOffers, type AdminGuideProfile, type GuardianSuggestionRow, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
   listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
@@ -64,7 +64,7 @@ function ExpertiseTags({ tags, color = '#667245', compact = false }: { tags: str
   </div>;
 }
 
-type Tab = 'home' | 'profile' | 'library' | 'leads' | 'value_ramps' | 'offer_builder' | 'recipes' | 'protocols';
+type Tab = 'home' | 'profile' | 'library' | 'leads' | 'value_ramps' | 'offer_builder' | 'recipes' | 'protocols' | 'admin';
 type FreeOfferKind = 'ebook' | 'one_to_one_call' | 'group_call' | 'recipe_book' | 'routine' | 'in_person';
 type UpsellKind = 'ebook' | 'routine' | 'routine_guidance' | 'recipe_book' | 'group_call' | 'one_to_one_call' | 'in_person' | 'festival';
 type DeliveryFormat = 'Downloadable PDF' | 'Interactive Protocol' | 'PDF + Interactive Protocol' | 'Live online' | 'In person' | 'Event';
@@ -673,10 +673,13 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
   }, [authMode]);
   const [guardians, setGuardians] = useState<GuideProfile[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
+  const [directoryOffers, setDirectoryOffers] = useState<GuideOffer[]>([]);
   const [activeType, setActiveType] = useState('All');
   useEffect(() => {
     listPublicGuideProfiles().then(setGuardians).catch(() => setGuardians([])).finally(() => setDirectoryLoading(false));
+    listPublicGuardianOffers().then(setDirectoryOffers).catch(() => setDirectoryOffers([]));
   }, []);
+  const [offerFilter, setOfferFilter] = useState<'all' | 'free' | 'paid'>('all');
   const availableTypes = ['All', ...guardianDirectoryTypes.map((type) => type.label)];
   const visibleGuardians = activeType === 'All' ? guardians : guardians.filter((guardian) => directoryTypesFor(guardian).includes(activeType));
   const guardianCta = isSignedIn ? '/guardians/workspace' : '#guardian-apply';
@@ -758,6 +761,24 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
             {suggesting && <SuggestGuardianModal type={suggesting} onClose={() => setSuggesting(null)} />}
           </div>
         </section>
+        {/* Inverted section: every Guardian's published offers. Free ones lead into that Guardian's sign-up funnel. */}
+        {(() => {
+          const byId = new Map(guardians.map((g) => [g.user_id, g]));
+          const shown = directoryOffers.filter((offer) => byId.has(offer.guide_id) && (offerFilter === 'all' || offer.access_model === offerFilter) && (activeType === 'All' || directoryTypesFor(byId.get(offer.guide_id)!).includes(activeType)));
+          if (!directoryOffers.some((offer) => byId.has(offer.guide_id))) return null;
+          return <section id="guardian-offers" style={{ padding: 'clamp(70px,10vw,130px) clamp(20px,6vw,90px)', background: black, color: ink }}>
+            <div style={{ maxWidth: 1320, margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 24, flexWrap: 'wrap', marginBottom: 26 }}>
+                <div><span style={{ color: acid, fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' }}>From the Guardians</span><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(46px,7vw,92px)', lineHeight: .95, margin: '14px 0 0' }}>Start with their offers.</h2></div>
+                <div aria-label="Filter offers" style={{ display: 'flex', gap: 7 }}>{(['all', 'free', 'paid'] as const).map((value) => <button type="button" key={value} onClick={() => setOfferFilter(value)} aria-pressed={offerFilter === value} style={{ height: 34, padding: '0 14px', border: `1px solid ${offerFilter === value ? ink : line}`, background: offerFilter === value ? ink : 'transparent', color: offerFilter === value ? black : ink, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{value === 'all' ? 'All' : value === 'free' ? 'Free' : 'Paid'}</button>)}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,300px),1fr))', gap: 18 }}>
+                {shown.map((offer) => { const g = byId.get(offer.guide_id)!; const free = offer.access_model === 'free'; return <ProductCard key={offer.id} kind={offer.kind} eyebrow={(g.specialties || []).slice(0, 2).join(' · ') || 'Guardian'} title={customerFacingOfferTitle(offer.title)} copy={(offer.description || '').split(' Delivery:')[0] || undefined} price={free ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Paid'} name={g.display_name} avatarUrl={g.avatar_url} accent="#667245" cta={free ? 'Get it free' : 'View offer'} href={`/guardians/${encodeURIComponent(g.slug)}${free ? '#start' : '#offers'}`} />; })}
+              </div>
+              {!shown.length && <p style={{ color: muted }}>No offers match this filter yet.</p>}
+            </div>
+          </section>;
+        })()}
         {!isSignedIn && <section id="guardian-apply" style={{ padding: 'clamp(70px,10vw,130px) clamp(20px,6vw,90px)', background: black }}><div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,360px),1fr))', gap: 'clamp(34px,7vw,100px)', alignItems: 'center' }}><div><span style={{ color: acid, fontSize: 10, fontWeight: 700, letterSpacing: '.15em' }}>BECOME A GUARDIAN</span><h2 style={{ fontFamily: serif, fontSize: 'clamp(48px,7vw,86px)', fontWeight: 300, lineHeight: .92, margin: '16px 0' }}>Build your place in the network.</h2><p style={{ color: muted, lineHeight: 1.65, maxWidth: 540 }}>Use your existing ROUTINE³ account or create one to build your Guardian profile and first Protocol.</p></div><AuthPanel bare /></div></section>}
       </main>
     </div>
@@ -1873,6 +1894,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       const recipeTitle = recipeBuilderKind ? upsellDrafts[recipeBuilderKind].title : leadMagnetTitle.trim() || suggestedFreeOffer.title;
       if (wantsRecipes && !existingRecipes.some((recipe) => recipe.title === recipeTitle)) await createGuideRecipe(userId, { title: recipeBuilderKind ? upsellDrafts[recipeBuilderKind].title : leadMagnetTitle.trim() || suggestedFreeOffer.title, description: recipeBuilderKind ? upsellDrafts[recipeBuilderKind].audienceValue : freeAudienceValue.trim() || 'Recipe collection draft', meal_slot: 'any' });
       if (wantsRoutine && !onboardingProtocol) await findOrCreateProtocol(accessToken, { user_id: userId, name: protocolBuilderKind ? upsellDrafts[protocolBuilderKind].title : leadMagnetTitle.trim() || suggestedFreeOffer.title, description: `${protocolBuilderKind ? upsellDrafts[protocolBuilderKind].audienceValue : freeAudienceValue.trim()} ${protocolContext}`.trim(), target_gender: audience.length === 1 && (audience[0] === 'Women' || audience[0] === 'Men') ? audience[0] : 'Everyone', total_days: 3 });
+      // New and unpublished sites go to the admin for a check before they appear publicly.
+      if (profile.status !== 'approved') await requestGuardianReview().catch(() => null);
       window.history.pushState({}, '', `/guardians/${profile.slug}/value-ramp/${valueRampSlug}`);
       onDone(profile);
     } catch (e: any) { setError(e.message?.includes('guide_profiles') ? 'Guardian database is not installed yet. Apply the portal migration first.' : e.message); }
@@ -3042,10 +3065,62 @@ function ProtocolAIBar({ accessToken, protocolId, guideId, onUpdated }: { access
   </form>;
 }
 
+// Admin: review Guardian sites (publish / unpublish, with an email to the Guardian) and triage suggestions.
+function GuardianAdminPanel() {
+  const [profiles, setProfiles] = useState<AdminGuideProfile[]>([]);
+  const [suggestions, setSuggestions] = useState<GuardianSuggestionRow[]>([]);
+  const [busyId, setBusyId] = useState('');
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const load = () => { listAllGuideProfiles().then(setProfiles).catch((e) => setError(e.message)); listGuardianSuggestions().then(setSuggestions).catch((e) => setError(e.message)); };
+  useEffect(load, []);
+  async function decide(profile: AdminGuideProfile, status: 'approved' | 'paused') {
+    const note = status === 'paused' ? window.prompt(`Optional note to ${profile.display_name} (sent by email):`) || '' : '';
+    setBusyId(profile.user_id); setNotice(''); setError('');
+    try {
+      const result = await decideGuardianSite(profile.user_id, status, note);
+      setNotice(`${profile.display_name} ${status === 'approved' ? 'published' : 'unpublished'}${result.email.sent ? ' · email sent' : ` · email not sent (${result.email.reason || 'unknown'})`}.`);
+      load();
+    } catch (e: any) { setError(e.message); }
+    finally { setBusyId(''); }
+  }
+  const chip = (status: string) => <span style={{ padding: '3px 8px', border: `1px solid ${status === 'approved' ? acid : status === 'submitted' ? '#C88A66' : line}`, color: status === 'approved' ? acid : status === 'submitted' ? '#C88A66' : muted, fontSize: 8, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{status === 'approved' ? 'Live' : status === 'submitted' ? 'Waiting for review' : status === 'paused' ? 'Unpublished' : 'Draft'}</span>;
+  const ordered = [...profiles].sort((a, b) => Number(b.status === 'submitted') - Number(a.status === 'submitted'));
+  const date = (v?: string | null) => v ? new Date(v).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
+  const small: React.CSSProperties = { ...btn, minHeight: 34, height: 34, fontSize: 9, padding: '0 12px' };
+  return <>
+    <div style={{ ...label, color: acid }}>Guardian admin</div>
+    <h1 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(40px,5vw,64px)', lineHeight: .95, margin: '15px 0 18px' }}>Review Guardian sites.</h1>
+    {notice && <p style={{ color: acid, fontSize: 12 }}>{notice}</p>}
+    {error && <p role="alert" style={{ color: '#F0A7A7', fontSize: 12 }}>{error}</p>}
+    <section style={{ border: `1px solid ${line}`, marginBottom: 26 }}>
+      <div style={{ padding: '12px 14px', borderBottom: `1px solid ${line}`, ...label, marginBottom: 0 }}>Sites · {profiles.filter((p) => p.status === 'submitted').length} waiting</div>
+      {ordered.map((p) => <div key={p.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 14px', borderBottom: `1px solid ${line}` }}>
+        <span style={{ flex: '1 1 220px', minWidth: 0 }}><strong style={{ display: 'block', color: ink, fontSize: 13 }}>{p.display_name}</strong><span style={{ color: muted, fontSize: 10 }}>{p.contact_email || 'no email'}{p.review_requested_at ? ` · asked ${date(p.review_requested_at)}` : ''}{p.reviewed_at ? ` · reviewed ${date(p.reviewed_at)}` : ''}</span></span>
+        {chip(p.status)}
+        <a href={`/guardians/${encodeURIComponent(p.slug)}`} target="_blank" rel="noopener noreferrer" style={{ ...small, background: 'transparent', color: ink, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>View site</a>
+        {p.status !== 'approved' && <button type="button" disabled={busyId === p.user_id} onClick={() => decide(p, 'approved')} style={small}>Publish</button>}
+        {p.status === 'approved' && <button type="button" disabled={busyId === p.user_id} onClick={() => decide(p, 'paused')} style={{ ...small, background: 'transparent', color: ink }}>Unpublish</button>}
+      </div>)}
+      {!profiles.length && <p style={{ color: muted, fontSize: 11, padding: 14, margin: 0 }}>No Guardian sites yet.</p>}
+    </section>
+    <section style={{ border: `1px solid ${line}` }}>
+      <div style={{ padding: '12px 14px', borderBottom: `1px solid ${line}`, ...label, marginBottom: 0 }}>Suggested Guardians · {suggestions.filter((x) => x.status === 'new').length} new</div>
+      {suggestions.map((x) => <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 14px', borderBottom: `1px solid ${line}` }}>
+        <span style={{ flex: '1 1 260px', minWidth: 0 }}><strong style={{ display: 'block', color: ink, fontSize: 13 }}>{x.name} <span style={{ color: muted, fontWeight: 500 }}>· {x.guardian_type}</span></strong><span style={{ color: muted, fontSize: 10 }}>{[x.instagram, x.tiktok, x.youtube, x.website].filter(Boolean).join(' · ')}{x.suggester_email ? ` · from ${x.suggester_email}` : ''} · {date(x.created_at)}</span>{x.note && <span style={{ display: 'block', color: ink, fontSize: 11, marginTop: 4 }}>{x.note}</span>}</span>
+        <select aria-label={`Status for ${x.name}`} value={x.status} onChange={async (e) => { const status = e.target.value as GuardianSuggestionRow['status']; await setGuardianSuggestionStatus(x.id, status).catch((err) => setError(err.message)); setSuggestions((cur) => cur.map((row) => row.id === x.id ? { ...row, status } : row)); }} style={{ ...input, width: 140, height: 34, minHeight: 34, fontSize: 11 }}>{['new', 'contacted', 'invited', 'dismissed'].map((v) => <option key={v} value={v}>{v}</option>)}</select>
+      </div>)}
+      {!suggestions.length && <p style={{ color: muted, fontSize: 11, padding: 14, margin: 0 }}>No suggestions yet.</p>}
+    </section>
+  </>;
+}
+
 function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (p: GuideProfile) => void }) {
   const { user, accessToken, signOut } = useAuth();
   // Deep links from the public Guardians nav, e.g. /guardians/workspace?tab=protocols
-  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); const tabs: Tab[] = ['home', 'profile', 'library', 'leads', 'value_ramps', 'offer_builder', 'recipes', 'protocols']; return tabs.includes(wanted as Tab) ? wanted as Tab : 'home'; });
+  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); const tabs: Tab[] = ['home', 'profile', 'library', 'leads', 'value_ramps', 'offer_builder', 'recipes', 'protocols', 'admin']; return tabs.includes(wanted as Tab) ? wanted as Tab : 'home'; });
+  const isAdminUser = ['true', '1', 'yes', true].includes((user?.app_metadata as any)?.is_admin) || (user?.app_metadata as any)?.role === 'admin';
+  const navItems = isAdminUser ? [...nav, { id: 'admin' as Tab, label: 'Admin', Icon: ShieldCheck as typeof Users }] : nav;
   const [leads, setLeads] = useState<GuideLead[]>([]);
   const [offers, setOffers] = useState<GuideOffer[]>([]);
   const [recipes, setRecipes] = useState<GuideRecipe[]>([]);
@@ -3097,8 +3172,9 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
       </div>
     </header>
     <div style={{ display: 'grid', gridTemplateColumns: '210px minmax(0,1fr)', minHeight: 'calc(100vh - 63px)' }}>
-      <aside style={{ borderRight: `1px solid ${line}`, padding: '25px 14px' }}><a href="/guardians/workspace" style={{ display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 12px', marginBottom: 10, borderBottom: `1px solid ${line}`, color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>← Dashboard</a>{nav.map(({ id, label: n, Icon }) => <button key={id} onClick={() => { setTab(id); setProtocolId(null); setRecipeId(null); }} style={{ width: '100%', height: 42, border: 0, background: tab === id ? '#1C1E19' : 'transparent', color: tab === id ? ink : muted, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', cursor: 'pointer', fontFamily: sans, fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}><Icon size={14} />{n}</button>)}</aside>
+      <aside style={{ borderRight: `1px solid ${line}`, padding: '25px 14px' }}><a href="/guardians/workspace" style={{ display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 12px', marginBottom: 10, borderBottom: `1px solid ${line}`, color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>← Dashboard</a>{navItems.map(({ id, label: n, Icon }) => <button key={id} onClick={() => { setTab(id); setProtocolId(null); setRecipeId(null); }} style={{ width: '100%', height: 42, border: 0, background: tab === id ? '#1C1E19' : 'transparent', color: tab === id ? ink : muted, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', cursor: 'pointer', fontFamily: sans, fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}><Icon size={14} />{n}</button>)}</aside>
       <main style={{ padding: 'clamp(26px,5vw,68px)', overflow: 'hidden' }}>
+        {tab === 'admin' && isAdminUser && <GuardianAdminPanel />}
         {tab === 'home' && <><div style={{ ...label, color: acid }}>Guardian workspace</div><h1 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(44px,6vw,76px)', lineHeight: .95, margin: '15px 0 18px' }}>Build what people follow.</h1><p style={{ color: muted, maxWidth: 650, lineHeight: 1.6 }}>Create reusable offers, then arrange them into as many audience-specific offer paths as you need.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', borderTop: `1px solid ${line}`, marginTop: 55 }}>{metric.map((m) => <div key={m.l} style={{ borderRight: `1px solid ${line}`, padding: '25px 18px 25px 0' }}><div style={{ fontFamily: serif, fontSize: 42 }}>{m.n}</div><div style={{ ...label, margin: '7px 0 0' }}>{m.l}</div></div>)}</div><div style={{ marginTop: 48, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 }}>{nav.slice(1,5).map(({ id, label: title }) => <button key={id} onClick={() => setTab(id)} style={{ border: `1px solid ${line}`, background: panel, color: ink, minHeight: 210, padding: 22, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}><span><img src={guidePlates[id]} alt="" style={{ width: 86, height: 86, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.75)', opacity: .82 }} /><span style={{ display: 'block', fontFamily: serif, fontSize: 25, fontWeight: 300, marginTop: 12 }}>{title}</span></span><ChevronRight size={17} color={muted} /></button>)}</div></>}
         {tab === 'profile' && <>
           <h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 350 }}>Your profile</h1>
