@@ -949,10 +949,14 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   return <>
     {checkoutOffer && <OfferCheckout offer={checkoutOffer} upsells={paidAfter(checkoutOffer)} profile={profile} accent={accent} reviews={reviews} videos={offerVideos} onClose={() => setCheckoutOffer(null)} />}
     {steps.length > 0 && <section id="offers" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)' }}>
-      <span style={eyebrow}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
-      <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(44px,7vw,82px)', lineHeight: .95, margin: '18px 0 36px' }}>Your path, step by step.</h2>
+      {/* App-style heading (Poppins, like the ROUTINE³ paywall): green label, bold title, muted subtitle. */}
+      <div style={{ fontFamily: APP.font, textAlign: 'center', margin: '0 auto 28px', maxWidth: 640 }}>
+        <span style={{ display: 'block', color: APP.greenDark, fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
+        <h2 style={{ fontFamily: APP.font, color: APP.text, fontSize: 'clamp(28px,4vw,36px)', fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.8, margin: '0 0 8px' }}>Your path, step by step</h2>
+        <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, margin: 0 }}>Start free, then go deeper when you’re ready.</p>
+      </div>
       {/* Same app-style offer cards as the hero, one per step of the path. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,300px),1fr))', gap: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),360px))', justifyContent: 'center', gap: 18 }}>
         {steps.map((offer, index) => { const free = index === 0 && offer.access_model === 'free'; return <ProductCard key={offer.id} kind={offer.kind} eyebrow={`Step ${index + 1} · ${free ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Personal support' : 'Go deeper'}`} title={customerFacingOfferTitle(offer.title)} copy={offer.description || 'The next step in your journey.'} price={price(offer)} name={profile.display_name} avatarUrl={profile.avatar_url} accent={accent} cta={free ? 'Get it free' : sellsHere(offer) ? 'Get it now' : 'See what is included'} href={free ? '#start' : offerHref(offer)} onClick={free ? () => document.getElementById('start')?.scrollIntoView({ behavior: 'smooth' }) : sellsHere(offer) ? () => setCheckoutOffer(offer) : undefined} />; })}
       </div>
     </section>}
