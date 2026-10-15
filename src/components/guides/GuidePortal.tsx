@@ -951,14 +951,10 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
     {steps.length > 0 && <section id="offers" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)' }}>
       <span style={eyebrow}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
       <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(44px,7vw,82px)', lineHeight: .95, margin: '18px 0 36px' }}>Your path, step by step.</h2>
-      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', borderTop: '1px solid #11120F' }}>
-        {steps.map((offer, index) => <li key={offer.id} style={{ padding: '24px 22px 26px 0', borderRight: index < steps.length - 1 ? '1px solid rgba(17,18,15,.16)' : 'none', paddingLeft: index ? 22 : 0, display: 'flex', flexDirection: 'column' }}>
-          <span style={eyebrow}>{String(index + 1).padStart(2, '0')} · {index === 0 && offer.access_model === 'free' ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Personal support' : 'Go deeper'} · {price(offer)}</span>
-          <strong style={{ fontFamily: headingFont, fontSize: 32, lineHeight: 1.05, fontWeight: 300, margin: '18px 0 10px' }}>{offer.title}</strong>
-          <span style={{ color: '#66645F', fontSize: 13, lineHeight: 1.6, marginBottom: 22 }}>{offer.description || 'The next step in your journey.'}</span>
-          <a href={index === 0 && offer.access_model === 'free' ? '#start' : offerHref(offer)} onClick={openOffer(offer)} style={{ ...solid, marginTop: 'auto', width: 'fit-content', ...(index ? { background: 'transparent', color: '#11120F' } : {}) }}>{index === 0 && offer.access_model === 'free' ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Apply / book a call' : 'See what is included'} <ArrowRight size={13} /></a>
-        </li>)}
-      </ol>
+      {/* Same app-style offer cards as the hero, one per step of the path. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,300px),1fr))', gap: 18 }}>
+        {steps.map((offer, index) => { const free = index === 0 && offer.access_model === 'free'; return <ProductCard key={offer.id} kind={offer.kind} eyebrow={`Step ${index + 1} · ${free ? 'Start free' : SUPPORT_KINDS.includes(offer.kind) ? 'Personal support' : 'Go deeper'}`} title={customerFacingOfferTitle(offer.title)} copy={offer.description || 'The next step in your journey.'} price={price(offer)} name={profile.display_name} avatarUrl={profile.avatar_url} accent={accent} cta={free ? 'Get it free' : sellsHere(offer) ? 'Get it now' : 'See what is included'} href={free ? '#start' : offerHref(offer)} onClick={free ? () => document.getElementById('start')?.scrollIntoView({ behavior: 'smooth' }) : sellsHere(offer) ? () => setCheckoutOffer(offer) : undefined} />; })}
+      </div>
     </section>}
     {entry && <section id="start" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}` }}>
       {/* Same wide ROUTINE³ app-style card as the builder's sign-up preview: offer left, form in a white panel right. */}
@@ -1029,17 +1025,25 @@ function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accen
     const x = (event.clientX - b.left) / b.width; const y = (event.clientY - b.top) / b.height;
     setTilt({ x: (.5 - y) * 8, y: (x - .5) * 10, gx: x * 100, gy: y * 100, on: true });
   };
-  return <div onPointerMove={move} onPointerLeave={() => setTilt({ x: 0, y: 0, gx: 50, gy: 50, on: false })} style={{ border: `1px solid ${tilt.on ? accent : 'rgba(17,18,15,.16)'}`, borderRadius: 5, background: 'rgba(255,255,255,.95)', boxShadow: tilt.on ? `0 18px 44px rgba(17,18,15,.16), 0 0 0 1px ${accent}, 0 0 28px ${accent}55` : '0 10px 28px rgba(17,18,15,.09)', overflow: 'hidden', position: 'relative', textAlign: 'left', color: '#11120F', transform: `perspective(900px) rotateX(${tilt.x.toFixed(2)}deg) rotateY(${tilt.y.toFixed(2)}deg)${tilt.on ? ' translateY(-2px)' : ''}`, transition: tilt.on ? 'box-shadow 180ms ease, border-color 180ms ease' : 'transform 260ms ease, box-shadow 220ms ease, border-color 220ms ease', willChange: 'transform' }}>
-    <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none', opacity: tilt.on ? 1 : 0, transition: 'opacity 200ms ease', background: `radial-gradient(260px circle at ${tilt.gx}% ${tilt.gy}%, rgba(255,255,255,.55), ${accent}1f 40%, transparent 70%)`, mixBlendMode: 'soft-light' }} />
-    {price && <span style={{ position: 'absolute', top: 10, right: 10, background: '#11120F', color: '#FFF', padding: '6px 10px', fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{price}</span>}
-    {art && <div style={{ height: 112, display: 'grid', placeItems: 'end center', paddingBottom: 10, borderBottom: '1px solid rgba(17,18,15,.12)', background: 'rgba(17,18,15,.03)' }}>{kind === 'routine' ? <img src="/images/guides/generated/r3-protocol-card.png" alt="" style={{ width: 80, height: 80, objectFit: 'contain' }} /> : <span aria-hidden="true" style={{ width: 72 * art.cellAspect, height: 72, backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${(art.index % art.cols) * 100 / Math.max(1, art.cols - 1)}% ${Math.floor(art.index / art.cols) * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.95) invert(.88)' }} />}</div>}
-    <div style={{ padding: '16px 18px 18px' }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid rgba(17,18,15,.22)', display: 'grid', placeItems: 'center', fontSize: 10 }}>{(name || 'G')[0]}</span>}<span style={{ color: '#55564F', fontSize: 8, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>By {name}</span></span>
-      {eyebrow && <span style={{ display: 'block', color: accent, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 6 }}>{eyebrow}</span>}
-      <strong style={{ display: 'block', fontSize: 17, lineHeight: 1.3 }}>{title}</strong>
-      {copy && <span style={{ display: 'block', color: '#66645F', fontSize: 12, lineHeight: 1.55, marginTop: 6 }}>{copy}</span>}
-      <span aria-label={`${stars} out of 5 for value`} style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 9 }}><span aria-hidden="true" style={{ fontSize: 12, letterSpacing: 1 }}>{Array.from({ length: 5 }, (_, i) => <span key={i} style={{ color: i < stars ? accent : 'rgba(17,18,15,.22)' }}>{i < stars ? '★' : '☆'}</span>)}</span><span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>Value</span></span>
-      <a href={href || '#'} onClick={onClick ? (event) => { event.preventDefault(); onClick(); } : undefined} style={{ marginTop: 14, width: 'fit-content', minHeight: 38, padding: '0 14px', borderRadius: 3, background: accent, color: readableText(accent), textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{cta} <ArrowRight size={13} /></a>
+  // App-style offer card (matches the sign-up/upsell pages): image, format tag, Guardian, title, value, stars, black CTA.
+  return <div onPointerMove={move} onPointerLeave={() => setTilt({ x: 0, y: 0, gx: 50, gy: 50, on: false })} style={{ position: 'relative', overflow: 'hidden', textAlign: 'left', fontFamily: APP.font, color: APP.text, background: APP.bg, border: `1px solid ${tilt.on ? APP.green : APP.border}`, borderRadius: 20, boxShadow: tilt.on ? '0 22px 50px rgba(17,24,39,.2)' : '0 14px 36px rgba(17,24,39,.12)', transform: `perspective(900px) rotateX(${tilt.x.toFixed(2)}deg) rotateY(${tilt.y.toFixed(2)}deg)${tilt.on ? ' translateY(-2px)' : ''}`, transition: tilt.on ? 'box-shadow 180ms ease, border-color 180ms ease' : 'transform 260ms ease, box-shadow 220ms ease, border-color 220ms ease', willChange: 'transform' }}>
+    <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none', opacity: tilt.on ? 1 : 0, transition: 'opacity 200ms ease', background: `radial-gradient(260px circle at ${tilt.gx}% ${tilt.gy}%, rgba(255,255,255,.55), transparent 70%)`, mixBlendMode: 'soft-light' }} />
+    {price && <span style={{ position: 'absolute', zIndex: 2, top: 14, left: 14, background: '#000', color: '#FFF', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase' }}>{price}</span>}
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center', padding: '44px 18px 6px' }}>
+      <AppOfferImage kind={kind} size={84} align="left" />
+      <div style={{ minWidth: 0, display: 'grid', gap: 8 }}>
+        {isProtocolKind(kind) && <ProtocolFormatTag />}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 22, height: 22, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 600 }}>{(name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 12, fontWeight: 500 }}>{name}</span></span>
+      </div>
+    </div>
+    <div style={{ padding: '10px 18px 0' }}>
+      {eyebrow && <span style={{ display: 'block', color: APP.greenDark, fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', marginBottom: 4 }}>{eyebrow}</span>}
+      <strong style={{ display: 'block', fontSize: 20, fontWeight: 600, lineHeight: 1.25, letterSpacing: -0.3 }}>{title}</strong>
+      {copy && <span style={{ display: 'block', color: APP.muted, fontSize: 13, fontWeight: 500, lineHeight: 1.5, marginTop: 6 }}>{copy}</span>}
+      <span aria-label={`${stars} out of 5 for value`} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}><span aria-hidden="true" style={{ fontSize: 13, letterSpacing: 1 }}>{Array.from({ length: 5 }, (_, i) => <span key={i} style={{ color: i < stars ? APP.greenDark : APP.border }}>★</span>)}</span><span style={{ color: APP.muted, fontSize: 11, fontWeight: 600 }}>Value</span></span>
+    </div>
+    <div style={{ margin: 14, padding: 12, background: APP.surface, borderRadius: 14, boxShadow: '0 2px 8px rgba(17,24,39,.06)' }}>
+      <a href={href || '#'} onClick={onClick ? (event) => { event.preventDefault(); onClick(); } : undefined} style={{ ...appButton, minHeight: 50, borderRadius: 12, textDecoration: 'none', fontSize: 15, fontWeight: 600 }}>{cta === 'View' ? (price === 'Free' ? 'Get it free' : 'View offer') : cta}</a>
     </div>
   </div>;
 }
