@@ -478,6 +478,24 @@ app.post('/make-server-ed0fe4c2/guides/import-profile', async (c) => {
   }
 })
 
+const PROTOCOL_ITEM_RULES = `Item rules (strict):
+- Every item must be something the person can tick off at a specific time: give "time" (HH:MM) or an "anchor" ("wake", "bedtime", "before_meal", "after_meal") with "offset_minutes". Never "all day".
+- Action titles are an imperative verb + noun, with a measurable amount when it fits: "Walk 20 minutes", "Run 5 km", "Practise yoga 30 minutes". Never vague ("Practice light exercise", "Be active", "Self-care").
+- Meal and food items are titled with the dish name only, no verb: "Vegetable soup", "Boiled potatoes", "Tofu scramble".
+- Sleep is exactly two items: "End Sleep" (wake, first) and "Start Sleep" (bedtime, last). Put any other sleep advice (darkness, cool room, screens) in Start Sleep's notes and its "tips"/"donts".
+- Do and don't guidance is never a step of its own: attach it to the step it governs as "tips" (do) and "donts" (don't), or, when it applies to the whole day, return it as an item with "kind":"rule" and its entries in "tips"/"donts".`
+
+/** Real catalog names so the model picks titles we can link. */
+async function catalogNameHints(): Promise<string> {
+  const [activities, recipes] = await Promise.all([
+    supabase.from('catalog_activities').select('name').not('name', 'is', null).limit(80),
+    supabase.from('catalog_recipes').select('name_common').not('name_common', 'is', null).order('health_score', { ascending: false, nullsFirst: false }).limit(80),
+  ])
+  const a = (activities.data || []).map((r: any) => r.name).filter(Boolean).join(', ')
+  const r = (recipes.data || []).map((x: any) => x.name_common).filter(Boolean).join(', ')
+  return `${a ? `Prefer these activities so items can be linked: ${a}.` : ''}\n${r ? `Prefer these recipes for meals: ${r}.` : ''}`
+}
+
 app.post('/make-server-ed0fe4c2/guides/build-protocol', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
@@ -490,6 +508,7 @@ app.post('/make-server-ed0fe4c2/guides/build-protocol', async (c) => {
     if (protocolError || !protocol) return c.json({ error: 'Protocol not found' }, 404)
     const openaiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiKey) return c.json({ error: 'AI protocol builder is not configured' }, 501)
+    const hints = await catalogNameHints().catch(() => '')
     const prompt = `You help a qualified wellness Guardian draft a conservative, practical lifestyle protocol for later human review.
 Selected client profile and offer: ${protocol.description || 'Not provided'}
 Protocol name: ${protocol.name}
@@ -498,9 +517,12 @@ Duration: ${protocol.total_days || 3} days
 Guardian request: ${message.trim().slice(0, 2000)}
 
 Return JSON only with this exact shape:
-{"summary":"short draft rationale and safety note","steps":[{"title":"clear action","time":"HH:MM or null","category":"consume|do|sleep|supplement","notes":"brief instructions, cautions, and adaptation notes","day_number":1,"duration_minutes":10}]}
+{"summary":"short draft rationale and safety note","steps":[{"title":"Walk 20 minutes","time":"HH:MM or null","anchor":"wake|bedtime|before_meal|after_meal|null","offset_minutes":0,"category":"consume|do|sleep|supplement","kind":"action|rule","notes":"brief instructions, cautions, and adaptation notes","day_number":1,"duration_minutes":10,"tips":[],"donts":[]}]}
 
-Create 5-12 achievable steps. Write every title as a short verb + noun action of 2-4 words, like "Go cycling", "Eat breakfast", "Take magnesium", "Get morning daylight"; put timing and duration in "time" and "duration_minutes", never in the title. Use category "sleep" for exactly two steps: one wake step (the first step of the day) and one bedtime step (the last). Do not create separate steps for sleep-environment or sleep-hygiene advice such as darkness, room temperature, screens or noise; put that advice as 2-5 short imperative phrases in a "tips" array on the bedtime step only, for example "tips":["Keep the room dark","Keep the bedroom cool"]. Personalise to the selected life stage (for example premenopause, perimenopause, pregnancy) when supplied. Do not diagnose, promise treatment, prescribe medication, or provide high-risk supplement dosing. Prefer food, sleep, movement, stress regulation and tracking. Flag symptoms or circumstances that require a licensed clinician. Keep every step editable and suitable for professional review.`
+Create 5-12 achievable steps.
+${PROTOCOL_ITEM_RULES}
+${hints}
+Personalise to the selected life stage (for example premenopause, perimenopause, pregnancy) when supplied. Do not diagnose, promise treatment, prescribe medication, or provide high-risk supplement dosing. Prefer food, sleep, movement, stress regulation and tracking. Flag symptoms or circumstances that require a licensed clinician. Keep every step editable and suitable for professional review.`
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
@@ -518,6 +540,11 @@ Create 5-12 achievable steps. Write every title as a short verb + noun action of
       notes: String(step.notes || '').slice(0, 1200),
       day_number: Math.max(1, Math.min(Number(protocol.total_days || 3), Number(step.day_number || 1))),
       duration_minutes: step.duration_minutes == null ? null : Math.max(1, Math.min(240, Number(step.duration_minutes))),
+      anchor: ['wake', 'bedtime', 'before_meal', 'after_meal'].includes(step.anchor) ? step.anchor : null,
+      offset_minutes: Number.isFinite(Number(step.offset_minutes)) ? Math.max(-720, Math.min(720, Number(step.offset_minutes))) : 0,
+      kind: step.kind === 'rule' ? 'rule' : 'action',
+      tips: Array.isArray(step.tips) ? step.tips.map((t: unknown) => String(t).slice(0, 80)).slice(0, 12) : [],
+      donts: Array.isArray(step.donts) ? step.donts.map((t: unknown) => String(t).slice(0, 80)).slice(0, 12) : [],
     })) : []
     if (!steps.length) return c.json({ error: 'AI returned no usable protocol steps' }, 502)
     return c.json({ summary: String(draft.summary || 'AI-generated draft for Guardian review.').slice(0, 1200), steps })
@@ -613,6 +640,7 @@ app.post('/make-server-ed0fe4c2/guides/plan-event-protocol', async (c) => {
     if (!protocol) return c.json({ error: 'Protocol not found' }, 404)
     const openaiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiKey) return c.json({ error: 'AI protocol builder is not configured' }, 501)
+    const hints = await catalogNameHints().catch(() => '')
     const prompt = `A wellness Guardian pasted instructions they give clients. Turn them into a reviewable daily Protocol.
 ${hasEvent ? `The instructions are anchored to an event on ${eventDate || 'an unknown date'}${eventTime ? ` at ${eventTime}` : ''}. Use day offsets relative to the event: 0 = event day, -7 = seven days before, 1 = the day after. "48 hours before" = start_offset -2, end_offset -1. "2 weeks before" = -14..-1. "1-2 days after" = 1..2. Phase-wide rules last until the day before the event (end_offset -1).` : 'There is no event: build a normal daily routine; use start_offset 0 and end_offset 0 for every item.'}
 
@@ -620,12 +648,14 @@ Pasted text (already cleaned of greetings/signatures):
 """${text.slice(0, 12000)}"""
 
 Return JSON only:
-{"summary":"1-2 sentences","event_title":"Ceremony","event_time":"HH:MM or null","cutoff_time":"HH:MM or null (last food on the day)","items":[{"title":"short verb + noun, 2-5 words","group":"sleep|hygiene|beauty|wellness|fitness|supplements|meal|work|home|tasks","time":"HH:MM or null","duration_minutes":null,"notes":"brief guidance","start_offset":-7,"end_offset":-1,"dos":[],"donts":[],"subtasks":[],"link_kind":"food|activity|null","link_query":"one or two plain words to search a recipe/ingredient/activity catalog, e.g. rice, vegetable soup, meditation"}]}
+{"summary":"1-2 sentences","event_title":"Ceremony","event_time":"HH:MM or null","cutoff_time":"HH:MM or null (last food on the day)","rules":[{"title":"Avoid tyramine foods","group":"meal|wellness|supplements","dos":[],"donts":[],"start_offset":-7,"end_offset":-1}],"items":[{"title":"Walk 20 minutes (actions) or dish name (meals)","kind":"action","group":"sleep|hygiene|beauty|wellness|fitness|supplements|meal|work|home|tasks","time":"HH:MM or null","anchor":"wake|bedtime|before_meal|after_meal|null","offset_minutes":0,"duration_minutes":null,"notes":"brief guidance","start_offset":-7,"end_offset":-1,"dos":[],"donts":[],"subtasks":[],"link_kind":"food|activity|null","link_query":"one or two plain words to search a recipe/ingredient/activity catalog, e.g. rice, vegetable soup, meditation"}]}
 
 Rules:
 - Every actionable instruction becomes an item. Drop pleasantries and logistics that are not actions.
-- Exactly two "sleep" items covering the whole window: "Wake up" (first, ~07:00) and "Go to bed" (last, ~22:00).
-- Avoid lists ("no pork, alcohol, salt…", tyramine foods, caffeine, alcohol) become ONE rule item per theme in group "meal" (or "wellness" for non-food), with the forbidden things as short entries in "donts" and allowed alternatives in "dos". Never leave an avoid list as loose notes.
+- Exactly two "sleep" items covering the whole window: "End Sleep" (first, ~07:00) and "Start Sleep" (last, ~22:00).
+- Avoid lists ("no pork, alcohol, salt…", tyramine foods, caffeine, abstinence, substances) go in the top-level "rules" list, ONE entry per theme with its own date window, forbidden things in "donts" and allowed alternatives in "dos". Never as items, never as loose notes.
+${PROTOCOL_ITEM_RULES}
+${hints}
 - Allowed foods become meal items (breakfast ~08:00, lunch ~12:30, dinner ~18:30) for each diet window, each with link_kind "food" and link_query the food (rice, potato, boiled egg, vegetable soup, polenta, salad, fruit…).
 - Practices (meditation, yoga, breathwork, walking, journaling) become items with link_kind "activity".
 - A packing / "what to bring" list becomes ONE item in group "tasks" the day before the event (offset -1) with the things as "subtasks".

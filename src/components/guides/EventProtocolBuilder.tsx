@@ -106,8 +106,12 @@ export function EventProtocolBuilder({ accessToken, protocolId, initialText, onC
               <span style={{ color: acid, fontSize: 11, fontWeight: 700, letterSpacing: '.06em' }}>{range}</span>
               {phase.key === 'day' && plan.cutoffTime && <span style={{ color: warn, fontSize: 11 }}>Nothing to eat after {plan.cutoffTime}</span>}
             </div>
+            {items.some((it) => it.kind === 'rule') && <div style={{ marginTop: 12 }}>
+              <div style={{ color: muted, fontSize: 9, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase' }}>Rules for these days</div>
+              {items.filter((it) => it.kind === 'rule').map((it) => <Row key={it.id} it={it} plan={plan} onToggle={toggle} />)}
+            </div>}
             {PARTS.map((part) => {
-              const inPart = items.filter((it) => dayPart(it.time) === part.key);
+              const inPart = items.filter((it) => it.kind !== 'rule' && dayPart(it.time) === part.key);
               if (!inPart.length) return null;
               const wake = inPart.filter((it) => it.group === 'sleep' && /wake/i.test(it.title));
               const bed = inPart.filter((it) => it.group === 'sleep' && !/wake/i.test(it.title));
@@ -140,7 +144,7 @@ function Row({ it, plan, onToggle }: { it: PlanItem; plan: EventPlan; onToggle: 
     : it.link ? <span style={{ border: `1px solid ${warn}`, color: warn, fontSize: 9, padding: '2px 6px', whiteSpace: 'nowrap' }}>Unmatched · “{it.link.query}”</span> : null;
   return <div style={{ display: 'grid', gridTemplateColumns: '22px 52px minmax(0,1fr)', gap: 8, alignItems: 'start', padding: '7px 0', opacity: it.include ? 1 : .45 }}>
     <input type="checkbox" aria-label={`Include ${it.title}`} checked={it.include} onChange={() => onToggle(it.id)} style={{ accentColor: acid, marginTop: 3 }} />
-    <span style={{ fontSize: 12, color: muted, fontVariantNumeric: 'tabular-nums' }}>{it.time || 'All day'}</span>
+    <span style={{ fontSize: 12, color: muted, fontVariantNumeric: 'tabular-nums' }}>{it.kind === 'rule' ? 'Rule' : it.time}</span>
     <div style={{ minWidth: 0 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {it.match?.image && <img src={it.match.image} alt="" style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: 2 }} />}
@@ -148,6 +152,7 @@ function Row({ it, plan, onToggle }: { it: PlanItem; plan: EventPlan; onToggle: 
         {it.durationMinutes ? <span style={{ fontSize: 11, color: muted }}>{it.durationMinutes} min</span> : null}
         {badge}
         {dates && <span style={{ fontSize: 10, color: muted }}>{dates}</span>}
+        {(it.issues || []).map((issue) => <span key={issue.code + issue.message} title={issue.message} style={{ fontSize: 9, color: issue.code === 'renamed' || issue.code === 'moved_to_rules' ? muted : warn }}>· {issue.message}</span>)}
       </div>
       {(it.dos.length > 0 || it.donts.length > 0 || it.subtasks.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
         {it.dos.map((x) => <span key={`d${x}`} style={{ fontSize: 10, color: acid, border: `1px solid ${line}`, padding: '1px 6px' }}>✓ {x}</span>)}

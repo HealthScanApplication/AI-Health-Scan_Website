@@ -17,6 +17,7 @@
  *  - a packing list is ACTION children = sub-tasks under the parent.
  */
 import { projectId, publicAnonKey } from './supabase/info';
+import { enforceProtocolRules, isGenericTitle, type RuleIssue } from './protocolRules';
 import { createProtocolItem, searchCatalog, type AdminProtocolItem, type CatalogHit, type CatalogKind } from './protocolAdmin';
 
 export type SmartGroup = 'hygiene' | 'beauty' | 'wellness' | 'fitness' | 'supplements' | 'meal' | 'work' | 'home' | 'tasks';
@@ -43,6 +44,17 @@ export interface PlanItem {
   link: { kind: 'food' | 'activity'; query: string } | null;
   match: PlanMatch | null;
   include: boolean;
+  /** 'rule' = top-level dated rule rows (Rules & Avoidances tray), no time or done state. */
+  kind?: 'action' | 'rule';
+  anchor?: 'wake' | 'bedtime' | 'before_meal' | 'after_meal' | null;
+  offsetMinutes?: number | null;
+  issues?: RuleIssue[];
+}
+
+/** Run the shared item rules (protocolRules.ts) over a plan; windows are the event-relative day ranges. */
+export function applyItemRules(items: PlanItem[]): PlanItem[] {
+  return enforceProtocolRules(items.map((it) => ({ ...it, windowKey: `${it.startOffset}|${it.endOffset}` })))
+    .map(({ windowKey: _w, ...it }) => ({ ...it, time: it.kind === 'rule' ? null : it.time }) as PlanItem);
 }
 export interface EventPlan {
   summary: string;
@@ -315,6 +327,8 @@ export function localEventPlan(cleaned: string, eventTime: string | null, hasEve
   add({ title: 'Go to bed', group: 'sleep', time: '22:00', notes: 'Wind down early.', dos: ['Keep the room dark', 'Put screens away an hour before'] }, span);
 
   for (const it of items) { it.dos = Array.from(new Set(it.dos)); it.donts = Array.from(new Set(it.donts)); it.subtasks = Array.from(new Set(it.subtasks)); }
+  const ruled = applyItemRules(items);
+  items.splice(0, items.length, ...ruled);
   const phases = buildPhases(items, hasEvent, det.title);
   return {
     summary: hasEvent ? `${items.length} suggested steps laid out around the ${det.title.toLowerCase()}, from the pasted text.` : `${items.length} suggested daily steps from the pasted text.`,
@@ -361,8 +375,16 @@ function normaliseAIPlan(data: any, hasEvent: boolean): Omit<EventPlan, 'eventDa
     const start = Math.round(Number(r.start_offset ?? 0)), end = Math.max(start, Math.round(Number(r.end_offset ?? start)));
     const group = r.group === 'sleep' || SMART_GROUPS.includes(r.group) ? r.group : 'wellness';
     const lk = r.link_kind === 'food' || r.link_kind === 'activity' ? { kind: r.link_kind, query: String(r.link_query || r.title).slice(0, 40) } : null;
-    return { id: `a${i}`, title: String(r.title || `Step ${i + 1}`).slice(0, 80), group, time: time(r.time), durationMinutes: r.duration_minutes ? Math.min(240, Number(r.duration_minutes)) : null, notes: String(r.notes || '').slice(0, 600), startOffset: hasEvent ? start : 0, endOffset: hasEvent ? end : 0, phase: hasEvent ? phaseFor(start, end) : 'daily', dos: list(r.dos), donts: list(r.donts), subtasks: list(r.subtasks), link: lk as PlanItem['link'], match: null, include: true };
+    const anchor = ['wake', 'bedtime', 'before_meal', 'after_meal'].includes(r.anchor) ? r.anchor : null;
+    return { id: `a${i}`, kind: r.kind === 'rule' ? 'rule' : 'action', anchor, offsetMinutes: Number(r.offset_minutes) || 0, title: String(r.title || `Step ${i + 1}`).slice(0, 80), group, time: time(r.time), durationMinutes: r.duration_minutes ? Math.min(240, Number(r.duration_minutes)) : null, notes: String(r.notes || '').slice(0, 600), startOffset: hasEvent ? start : 0, endOffset: hasEvent ? end : 0, phase: hasEvent ? phaseFor(start, end) : 'daily', dos: list(r.dos || r.tips), donts: list(r.donts), subtasks: list(r.subtasks), link: lk as PlanItem['link'], match: null, include: true };
   });
+  // Top-level rules for a day / week / phase ("rules":[{title,dos,donts,start_offset,end_offset}]).
+  for (const [j, r] of (Array.isArray(data?.rules) ? data.rules : []).slice(0, 20).entries()) {
+    const start = Math.round(Number(r.start_offset ?? 0)), end = Math.max(start, Math.round(Number(r.end_offset ?? start)));
+    items.push({ id: `r${j}`, kind: 'rule', title: String(r.title || 'Rules').slice(0, 80), group: SMART_GROUPS.includes(r.group) ? r.group : 'wellness', time: null, durationMinutes: null, notes: '', startOffset: hasEvent ? start : 0, endOffset: hasEvent ? end : 0, phase: hasEvent ? phaseFor(start, end) : 'daily', dos: list(r.dos || r.tips), donts: list(r.donts), subtasks: [], link: null, match: null, include: true });
+  }
+  const ruled = applyItemRules(items);
+  items.splice(0, items.length, ...ruled);
   const title = String(data?.event_title || 'Event').slice(0, 30);
   return { summary: String(data?.summary || '').slice(0, 600), hasEvent, eventTitle: title, eventTime: time(data?.event_time), cutoffTime: time(data?.cutoff_time), phases: buildPhases(items, hasEvent, title), items, source: 'ai' };
 }
@@ -401,7 +423,9 @@ export async function linkPlanItems(accessToken: string, plan: EventPlan, onProg
     if (!cache.has(key)) cache.set(key, lookup(it.link.kind, it.link.query));
     const match = await cache.get(key)!;
     onProgress?.(++done, targets.length);
-    return { ...it, match };
+    // A linked meal takes the recipe name only when the Guardian's title was blank or generic.
+    const title = match && it.link.kind === 'food' && isGenericTitle(it.title, it.link.query) ? match.name : it.title;
+    return { ...it, match, title };
   }));
   return { ...plan, items };
 }
@@ -423,6 +447,21 @@ export async function applyEventPlan(accessToken: string, protocolId: string, pl
     : { recurrence_type: 'daily', recurrence_start_date: null, recurrence_end_date: null };
   let added = 0, children = 0;
   for (const [index, it] of chosen.entries()) {
+    if (it.kind === 'rule') {
+      // Top-level dated rules: the app lists them in "Rules & Avoidances", grouped by scope.
+      const rows = [...it.dos.map((name) => ({ name, kind: 'rule_do' })), ...it.donts.map((name) => ({ name, kind: 'rule_dont' }))];
+      if (!rows.length) rows.push({ name: it.title, kind: 'rule_do' });
+      for (const [k, row] of rows.entries()) {
+        await createProtocolItem(accessToken, {
+          protocol_id: protocolId, display_name: row.name, kind: row.kind, scope: it.group === 'meal' ? 'consume' : it.group === 'supplements' ? 'supplement' : 'outside',
+          item_type: it.group === 'meal' ? 'consume' : 'activity', scheduled_time: null, duration_minutes: null, group_name: null, day_number: 1,
+          sort_order: startSort + index + 1 + k, parent_protocol_item_id: null, has_children: false, category: CATEGORY[it.group], subtype: SUBTYPE[it.group],
+          hidden: false, enabled: true, notes: k === 0 ? [it.title, it.notes].filter(Boolean).join(' — ') : '', ...window(it),
+        } as Partial<AdminProtocolItem>);
+        children++;
+      }
+      continue;
+    }
     const m = it.match;
     const link: Partial<AdminProtocolItem> = m ? { [m.kind === 'recipe' ? 'catalog_recipe_id' : m.kind === 'ingredient' ? 'catalog_ingredient_id' : 'catalog_activity_id']: m.id } : {};
     const item_type = m?.kind === 'recipe' ? 'recipe' : it.group === 'meal' ? 'consume' : it.group === 'supplements' ? 'supplement' : 'activity';

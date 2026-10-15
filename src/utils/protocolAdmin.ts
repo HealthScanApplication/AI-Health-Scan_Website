@@ -12,6 +12,7 @@
  * environment (staging | production) via ../utils/supabase/info.
  */
 import { projectId, publicAnonKey } from './supabase/info';
+import { enforceProtocolRules, isWakeTitle, END_SLEEP, START_SLEEP, type Anchor, type RuleIssue } from './protocolRules';
 import {
   recipeMatchesSlot, recipeMealBucket, slotNameToBucket,
   descriptiveMealSlot, slotDescriptors, parsePrepMinutes, type SlotDescriptors,
@@ -104,7 +105,18 @@ export interface AdminProtocolItem {
 export interface AIProtocolDraft {
   summary: string;
   /** `tips` on the bedtime step become rule_do children of it (the app's do-checklist). */
-  steps: { title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null; tips?: string[] }[];
+  steps: {
+    title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null;
+    /** rule_do children (the app's do-checklist in the item card). */
+    tips?: string[];
+    /** rule_dont children. */
+    donts?: string[];
+    /** Anchor instead of a clock time; resolved by enforceProtocolRules. */
+    anchor?: Anchor | null; offset_minutes?: number | null;
+    /** 'rule' = top-level do/don't rows for that day (Rules & Avoidances), no time. */
+    kind?: 'action' | 'rule';
+    issues?: RuleIssue[];
+  }[];
 }
 
 function starterProtocolDraft(message: string): AIProtocolDraft {
@@ -133,24 +145,46 @@ function starterProtocolDraft(message: string): AIProtocolDraft {
 }
 
 type DraftStep = AIProtocolDraft['steps'][number];
-const WAKE_TITLE = /^(wake|get up|rise|end sleep)\b/i;
 /**
- * Sleep is a pair of anchors (wake, bedtime), not a list of steps — exactly as the app models it.
- * Any other sleep-category step ("Sleep in complete darkness", "Cool the bedroom") becomes a tip
- * on the bedtime step; the caller saves tips as rule_do children of bedtime, which the app shows
- * as the do-checklist inside the bedtime card (mobile timeline/subTaskRows.ts, "contextual rules").
+ * Runs the shared item rules (utils/protocolRules.ts) over an AI draft. Sleep becomes the app's two
+ * anchors, "End Sleep" and "Start Sleep"; other sleep advice and any do/don't guidance becomes rule
+ * children of the step it governs (tips = rule_do, donts = rule_dont), which the app shows as the
+ * do-checklist inside the card (mobile timeline/subTaskRows.ts, "contextual rules"). Meals lose
+ * their verb, vague practices become concrete, and every step gets a time.
+ * (Name kept: callers already import it.)
  */
 export function foldSleepSteps(steps: DraftStep[]): DraftStep[] {
-  const sleep = steps.filter((step) => step.category === 'sleep');
-  const minutes = (step: DraftStep) => { const [h, m] = (step.time || '').split(':').map(Number); return Number.isFinite(h) ? h * 60 + (m || 0) : -1; };
-  const wake = sleep.find((step) => WAKE_TITLE.test(step.title)) || null;
-  const rest = sleep.filter((step) => step !== wake);
-  if (!rest.length) return steps;
-  const bedtime = [...rest].sort((a, b) => minutes(b) - minutes(a))[0];
-  const extraTips = rest.filter((step) => step !== bedtime).map((step) => step.title);
-  const foldedBedtime: DraftStep = { ...bedtime, tips: [...(bedtime.tips || []), ...extraTips] };
-  const kept = steps.filter((step) => step.category !== 'sleep');
-  return [...(wake ? [wake] : []), ...kept, foldedBedtime];
+  const ruled = enforceProtocolRules(steps.map((step) => ({
+    ...step, group: step.category === 'supplement' ? 'supplements' : step.category, dos: step.tips || [], donts: step.donts || [],
+    anchor: step.anchor || null, offsetMinutes: step.offset_minutes ?? null, durationMinutes: step.duration_minutes, windowKey: String(step.day_number || 1),
+  })));
+  const order = (step: DraftStep) => step.title === END_SLEEP ? -1 : step.title === START_SLEEP ? 1 : 0;
+  return ruled.map(({ group: _g, dos, donts, durationMinutes, offsetMinutes: _o, windowKey: _w, link: _l, ...step }) => ({
+    ...step, tips: dos, donts, duration_minutes: durationMinutes ?? null,
+  } as DraftStep)).sort((a, b) => order(a) - order(b));
+}
+
+/** Saves a ruled draft step: the action (or top-level rule rows) plus its rule_do / rule_dont children. */
+export async function saveDraftStep(accessToken: string, protocolId: string, step: DraftStep, sortOrder: number, parentId?: string): Promise<AdminProtocolItem | null> {
+  const subtype = step.category === 'sleep' ? 'sleep' : step.category === 'consume' ? 'meal' : step.category === 'supplement' ? 'supplement' : 'wellness';
+  const base = { protocol_id: protocolId, scope: null, group_name: null, day_number: step.day_number || 1, category: step.category, subtype, hidden: false, enabled: true, recurrence_type: 'daily' };
+  const itemType = step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity';
+  let parent: AdminProtocolItem | null = null;
+  if (step.kind === 'rule') {
+    // Top-level rules for that day: the app lists them under Rules & Avoidances, grouped by scope.
+    const rows = [...(step.tips || []).map((name) => ['rule_do', name]), ...(step.donts || []).map((name) => ['rule_dont', name])];
+    if (!rows.length) rows.push(['rule_do', step.title]);
+    for (const [k, [kind, name]] of rows.entries()) await createProtocolItem(accessToken, { ...base, display_name: name, kind, item_type: itemType, scope: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'outside', scheduled_time: null, duration_minutes: null, sort_order: sortOrder + k, parent_protocol_item_id: null, has_children: false, notes: k === 0 ? [step.title, step.notes].filter(Boolean).join(' — ') : '' } as any);
+    return null;
+  }
+  const hasKids = Boolean(step.tips?.length || step.donts?.length);
+  if (!parentId) {
+    parent = await createProtocolItem(accessToken, { ...base, display_name: step.title, kind: 'action', item_type: itemType, scheduled_time: step.time ? `${step.time}:00` : null, duration_minutes: step.duration_minutes, sort_order: sortOrder, parent_protocol_item_id: null, has_children: hasKids, notes: step.notes } as any);
+    parentId = parent.id;
+  }
+  const kids = [...(step.tips || []).map((name) => ['rule_do', name]), ...(step.donts || []).map((name) => ['rule_dont', name])];
+  for (const [k, [kind, name]] of kids.entries()) await createProtocolItem(accessToken, { ...base, display_name: name, kind, item_type: itemType, scheduled_time: null, duration_minutes: null, sort_order: k + 1, parent_protocol_item_id: parentId, has_children: false, notes: '' } as any);
+  return parent;
 }
 
 export async function buildProtocolWithAI(accessToken: string, protocolId: string, message: string): Promise<AIProtocolDraft> {
@@ -189,35 +223,28 @@ export async function updateProtocolWithAI(
   const steps = foldSleepSteps(draft.steps || []);
   const key = (t: string) => t.trim().toLowerCase();
   const byTitle = new Map(tops.map((it) => [key(it.display_name || ''), it]));
+  // Sleep anchors match by role, so "Wake up" → "End Sleep" is a rename, not hide + add.
+  const sleepTops = tops.filter((it) => it.category === 'sleep');
+  const wakeItem = sleepTops.find((it) => isWakeTitle(it.display_name || '')) || null;
+  const bedItem = sleepTops.filter((it) => it !== wakeItem).sort((a, b) => (b.scheduled_time || '').localeCompare(a.scheduled_time || ''))[0] || null;
   const kept = new Set<string>();
   let updated = 0, added = 0;
   for (const [index, step] of steps.entries()) {
-    const match = byTitle.get(key(step.title));
+    const match = byTitle.get(key(step.title)) || (step.title === END_SLEEP ? wakeItem : step.title === START_SLEEP ? bedItem : null) || undefined;
     const time = step.time ? `${step.time}:00` : null;
-    let parentId: string;
+    if (step.kind === 'rule') { await saveDraftStep(accessToken, protocolId, step, tops.length + index + 1); added++; continue; }
     if (match) {
       kept.add(match.id);
-      parentId = match.id;
-      if ((match.scheduled_time || null) !== time || (match.notes || '') !== (step.notes || '') || (match.duration_minutes ?? null) !== (step.duration_minutes ?? null)) {
-        await updateProtocolItem(accessToken, match.id, { scheduled_time: time, notes: step.notes, duration_minutes: step.duration_minutes });
+      if ((match.display_name || '') !== step.title || (match.scheduled_time || null) !== time || (match.notes || '') !== (step.notes || '') || (match.duration_minutes ?? null) !== (step.duration_minutes ?? null)) {
+        await updateProtocolItem(accessToken, match.id, { display_name: step.title, scheduled_time: time, notes: step.notes, duration_minutes: step.duration_minutes });
         updated++;
       }
+      const existingKids = new Set(items.filter((it) => it.parent_protocol_item_id === match.id).map((it) => key(it.display_name || '')));
+      const fresh = { ...step, tips: (step.tips || []).filter((t) => !existingKids.has(key(t))), donts: (step.donts || []).filter((t) => !existingKids.has(key(t))) };
+      if (fresh.tips.length || fresh.donts.length) await saveDraftStep(accessToken, protocolId, fresh, 1, match.id);
     } else {
-      const created = await createProtocolItem(accessToken, {
-        protocol_id: protocolId, display_name: step.title, kind: 'action', scope: null,
-        item_type: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity',
-        scheduled_time: time, duration_minutes: step.duration_minutes, group_name: null, day_number: step.day_number || 1,
-        sort_order: tops.length + index + 1, parent_protocol_item_id: null, has_children: Boolean(step.tips?.length),
-        category: step.category, subtype: step.category === 'sleep' ? 'sleep' : step.category === 'consume' ? 'meal' : step.category === 'supplement' ? 'supplement' : 'wellness',
-        hidden: false, enabled: true, notes: step.notes, recurrence_type: 'daily',
-      } as any);
-      parentId = created.id;
+      await saveDraftStep(accessToken, protocolId, step, tops.length + index + 1);
       added++;
-    }
-    const existingTips = new Set(items.filter((it) => it.parent_protocol_item_id === parentId).map((it) => key(it.display_name || '')));
-    for (const tip of step.tips || []) {
-      if (existingTips.has(key(tip))) continue;
-      await createProtocolItem(accessToken, { protocol_id: protocolId, display_name: tip, kind: 'rule_do', item_type: 'activity', scope: null, scheduled_time: null, duration_minutes: null, group_name: null, day_number: step.day_number || 1, sort_order: 1, parent_protocol_item_id: parentId, has_children: false, category: 'sleep', subtype: 'sleep', hidden: false, enabled: true, notes: '', recurrence_type: 'daily' } as any);
     }
   }
   const dropped = tops.filter((it) => !kept.has(it.id));
