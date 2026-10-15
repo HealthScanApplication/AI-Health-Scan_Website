@@ -268,12 +268,12 @@ export interface Review { steps: Record<string, CheckedStep>; notes: ReviewNote[
 const SUBJECTS: { tag: string; rule: RegExp; item: RegExp }[] = [
   { tag: 'sugar', rule: /sugar|sweet/i, item: /sugar|honey|syrup|cake|cookie|biscuit|candy|chocolate|dessert|brownie|jam|caramel/i },
   { tag: 'caffeine', rule: /caffeine|coffee/i, item: /coffee|espresso|latte|cappuccino|\btea\b|matcha|cola|energy drink/i },
-  { tag: 'alcohol', rule: /alcohol|wine|beer/i, item: /wine|beer|cocktail|spirit|liqueur|gin|vodka|rum/i },
-  { tag: 'meat', rule: /\bmeat|red meat|pork|beef/i, item: /beef|pork|lamb|bacon|ham|sausage|chicken|turkey|veal|mince|steak|faggot/i },
+  { tag: 'alcohol', rule: /alcohol|wine|beer/i, item: /\b(wine|beer|cocktails?|spirits|liqueur|gin|vodka|rum|whisky|cider)\b/i },
+  { tag: 'meat', rule: /\bmeat|red meat|pork|beef/i, item: /\b(beef|pork|lamb|bacon|ham|sausages?|chicken|turkey|veal|mince|steak|faggots?|liver|salami|chorizo)\b/i },
   { tag: 'dairy', rule: /dairy|milk|cheese/i, item: /milk|cheese|yog(h)?urt|cream|butter|paneer|kefir/i },
   { tag: 'gluten', rule: /gluten|wheat|bread/i, item: /bread|baguette|pasta|wheat|couscous|bulgur|pizza|wrap|bagel|cake/i },
   { tag: 'fried food', rule: /fried|deep[- ]fr/i, item: /fried|nugget|chips|fries|tempura|crispy/i },
-  { tag: 'processed food', rule: /processed|ultra[- ]processed|fast food/i, item: /nugget|sausage|bacon|ham|crisps|instant/i },
+  { tag: 'processed food', rule: /processed|ultra[- ]processed|fast food/i, item: /\b(nuggets?|sausages?|bacon|ham|crisps|instant)\b/i },
 ];
 const DAYS_RE: [RegExp, number][] = [[/\bmon(day)?s?\b/i, 1], [/\btue(s(day)?)?s?\b/i, 2], [/\bwed(nesday)?s?\b/i, 3], [/\bthu(rs(day)?)?s?\b/i, 4], [/\bfri(day)?s?\b/i, 5], [/\bsat(urday)?s?\b/i, 6], [/\bsun(day)?s?\b/i, 7]];
 
@@ -281,6 +281,12 @@ const DAYS_RE: [RegExp, number][] = [[/\bmon(day)?s?\b/i, 1], [/\btue(s(day)?)?s
 export function findConflicts(rules: { text: string; scope: string; isDont: boolean }[], items: { title: string; where: string; day?: number; kind: 'meal' | 'session' | 'item' }[]): Conflict[] {
   const out: Conflict[] = [];
   for (const rule of rules) {
+    // Any other don't: its own words against item names ("Avoid treadmill" vs "Treadmill Walk").
+    const known = SUBJECTS.some((x) => x.rule.test(rule.text));
+    if (rule.isDont && !known) {
+      const words = rule.text.toLowerCase().replace(/^(avoid|no|skip|don'?t|do not|cut out|cut|limit|reduce)\s+/, '').split(/[^a-z]+/).filter((w) => w.length >= 4 && !/^(after|before|during|with|from|than|more|less|every|food|foods)$/.test(w));
+      for (const it of items) if (words.some((w) => new RegExp(`\\b${w}`, 'i').test(it.title))) out.push({ rule: `Avoid ${rule.text.replace(/^avoid\s+/i, '').replace(/^./, (c) => c.toLowerCase())}`, item: it.title, where: it.where, reason: `${it.title} matches “${rule.text}” (${rule.scope})` });
+    }
     if (rule.isDont) for (const subject of SUBJECTS) {
       if (!subject.rule.test(rule.text)) continue;
       for (const it of items) if (subject.item.test(it.title)) out.push({ rule: `Avoid ${rule.text.replace(/^avoid\s+/i, '').replace(/^./, (c) => c.toLowerCase())}`, item: it.title, where: it.where, reason: `${it.title} may contain ${subject.tag} (${rule.scope})` });
@@ -295,7 +301,7 @@ export function findConflicts(rules: { text: string; scope: string; isDont: bool
 
 const ruleRows = (list: RuleList, scope: string) => [...list.dos.map((text) => ({ text, scope, isDont: false })), ...list.donts.map((text) => ({ text, scope, isDont: true }))];
 const notesOf = (steps: CheckedStep[], where: (s: CheckedStep) => string): ReviewNote[] =>
-  steps.flatMap((s) => (s.issues || []).map((i: RuleIssue) => ({ where: where(s), message: i.code === 'renamed' ? `${i.message} → “${s.title}”` : i.message })));
+  steps.flatMap((s) => (s.issues || []).map((i: RuleIssue) => ({ where: where(s), message: i.code === 'renamed' || i.code === 'vague' ? `${i.message} → “${s.title}”` : i.message })));
 
 /** Every diet meal through the shared checker: dish name, a time, rule children; plus flagged contradictions. */
 export function reviewDiet(cfg: DietConfig): Review {
@@ -478,6 +484,7 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
       for (const [k, v] of Object.entries(it)) if (!COPY_SKIP.has(k)) copy[k] = v;
       const created = await createProtocolItem(accessToken, {
         ...copy, protocol_id: protocol.id,
+        ...(role ? { display_name: role === 'wake' ? END_SLEEP : START_SLEEP } : {}), // shared sleep names
         parent_protocol_item_id: it.parent_protocol_item_id ? idMap.get(it.parent_protocol_item_id) || null : null,
         sort_order: order++, // unique per protocol (idx_protocol_items_no_dupes includes sort_order)
       } as Partial<AdminProtocolItem>);

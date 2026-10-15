@@ -74,7 +74,7 @@ function TimingField({ value, onChange, compact }: { value: Timing; onChange: (t
 }
 
 /** Shared-checker notes + flagged contradictions, shown before anything is saved. Conflicts are never auto-resolved. */
-function ReviewPanel({ notes, conflicts, onSave, onClose, busy, saveLabel }: { notes: ReviewNote[]; conflicts: Conflict[]; onSave?: () => void; onClose?: () => void; busy?: boolean; saveLabel?: string }) {
+function ReviewPanel({ notes, conflicts, onSave, onClose, busy, saveLabel, notesTitle = 'The shared Protocol rules will adjust these on save:' }: { notes: ReviewNote[]; conflicts: Conflict[]; onSave?: () => void; onClose?: () => void; busy?: boolean; saveLabel?: string; notesTitle?: string }) {
   return <div style={{ ...card, margin: '0 0 14px', borderColor: conflicts.length ? warn : line }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
       <span style={{ ...label, margin: 0, color: conflicts.length ? warn : acid }}>Review · {conflicts.length} conflict{conflicts.length === 1 ? '' : 's'} · {notes.length} rule note{notes.length === 1 ? '' : 's'}</span>
@@ -86,7 +86,7 @@ function ReviewPanel({ notes, conflicts, onSave, onClose, busy, saveLabel }: { n
       {conflicts.length > 12 && <div style={{ color: muted, fontSize: 11, marginTop: 4 }}>+{conflicts.length - 12} more</div>}
     </div>}
     {notes.length > 0 && <div style={{ marginBottom: 10 }}>
-      <div style={{ color: muted, fontSize: 11, marginBottom: 3 }}>The shared Protocol rules will adjust these on save:</div>
+      <div style={{ color: muted, fontSize: 11, marginBottom: 3 }}>{notesTitle}</div>
       {notes.slice(0, 10).map((n, i) => <div key={i} style={{ fontSize: 11, color: muted }}>{n.where}: {n.message}</div>)}
       {notes.length > 10 && <div style={{ color: muted, fontSize: 11 }}>+{notes.length - 10} more</div>}
     </div>}
@@ -345,6 +345,7 @@ export function CombineProtocols({ accessToken, ownerId, protocols, leads, onSav
   const groups: [string, AdminProtocol[]][] = [
     ['Diets', protocols.filter((p) => kindOf(p) === 'diet')],
     ['Fitness routines', protocols.filter((p) => kindOf(p) === 'fitness')],
+    ['Personal Protocols', protocols.filter((p) => kindOf(p) === 'personal')],
     ['Other protocols', protocols.filter((p) => !kindOf(p))],
   ];
   const name = person.trim() || leads.find((l) => l.id === leadId)?.name || '';
@@ -365,13 +366,13 @@ export function CombineProtocols({ accessToken, ownerId, protocols, leads, onSav
     </div>
     {groups.map(([title, list]) => list.length ? <div key={title} style={{ marginBottom: 12 }}>
       <span style={label}>{title}</span>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{list.map((p) => { const on = chosen.includes(p.id); return <button key={p.id} type="button" onClick={() => setChosen(on ? chosen.filter((x) => x !== p.id) : [...chosen, p.id])} style={chip(on)}>{p.name}{on && counts[p.id] != null ? ` · ${counts[p.id]} steps` : ''}</button>; })}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{list.map((p) => { const on = chosen.includes(p.id); return <button key={p.id} type="button" onClick={() => setChosen((current) => current.includes(p.id) ? current.filter((x) => x !== p.id) : [...current, p.id])} style={chip(on)}>{p.name}{on && counts[p.id] != null ? ` · ${counts[p.id]} steps` : ''}</button>; })}</div>
     </div> : null)}
     {clashes && (clashes.length ? <div style={{ color: warn, fontSize: 12, margin: '8px 0 12px' }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 700 }}><AlertTriangle size={13} /> {clashes.length} time clash{clashes.length > 1 ? 'es' : ''}. You can fix them in the editor after combining.</div>
       {clashes.slice(0, 6).map((c) => <div key={`${c.day}${c.time}`} style={{ marginTop: 3 }}>{c.day} {c.time}: {c.names.join(' / ')}</div>)}
     </div> : <p style={{ color: acid, fontSize: 12 }}>No time clashes between the chosen protocols.</p>)}
-    {combinedReview && chosen.length > 1 && <ReviewPanel notes={combinedReview.notes} conflicts={combinedReview.conflicts} />}
+    {combinedReview && chosen.length > 1 && <ReviewPanel notes={combinedReview.notes} conflicts={combinedReview.conflicts} notesTitle="Flagged by the shared Protocol rules (steps are copied as they are; sleep items take the shared names):" />}
     <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
       <button type="button" style={btn} disabled={busy || !name || chosen.length < 2} onClick={create}>Create {name ? `${name}’s` : 'personal'} Protocol</button>
       <Status busy={busy} message={message || (chosen.length < 2 ? 'Choose at least two protocols.' : 'Steps are copied as they are; one Start Sleep / End Sleep pair is kept or added. Conflicts stay flagged for you to decide.')} />
