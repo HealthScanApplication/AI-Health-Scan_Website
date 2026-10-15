@@ -112,6 +112,31 @@ interface UserPreferences {
   detailedReports: boolean;
 }
 
+
+const R3_PROFILE_CSS = `
+.r3-profile{background:#F2EFE7!important;color:#16140F;padding-top:110px!important}
+.r3-profile h1{font-family:"Fraunces",Georgia,serif!important;font-weight:300!important;font-size:clamp(40px,6vw,64px)!important;letter-spacing:-.03em!important;line-height:1!important;margin-bottom:14px!important}
+.r3-profile h2,.r3-profile h3{font-family:"Fraunces",Georgia,serif!important;font-weight:400!important;letter-spacing:-.01em;color:#16140F!important}
+.r3-profile .bg-white,.r3-profile [class*="bg-white/"]{background:#FFFFFF!important;border:1px solid #16140F!important;border-radius:2px!important;box-shadow:none!important}
+.r3-profile [class*="rounded"]{border-radius:2px!important}
+.r3-profile .rounded-full{border-radius:999px!important}
+.r3-profile [class*="shadow"]{box-shadow:none!important}
+.r3-profile [class*="bg-green-"],.r3-profile [class*="bg-emerald-"],.r3-profile [class*="bg-teal-"],.r3-profile [class*="from-green"],.r3-profile [class*="from-emerald"],.r3-profile [class*="from-teal"]{background:transparent!important;background-image:none!important}
+.r3-profile [class*="border-green-"],.r3-profile [class*="border-emerald-"],.r3-profile [class*="border-teal-"]{border-color:rgba(22,20,15,.35)!important}
+.r3-profile [class*="text-green-"],.r3-profile [class*="text-emerald-"],.r3-profile [class*="text-teal-"]{color:#16140F!important}
+.r3-profile [class*="bg-red-1"],.r3-profile [class*="bg-purple-1"],.r3-profile [class*="bg-yellow-1"],.r3-profile [class*="bg-blue-1"],.r3-profile [class*="bg-indigo-1"]{background:transparent!important;border:1px solid rgba(22,20,15,.3)!important}
+.r3-profile [class*="text-red-"],.r3-profile [class*="text-purple-"],.r3-profile [class*="text-yellow-"],.r3-profile [class*="text-blue-"],.r3-profile [class*="text-indigo-"]{color:#16140F!important}
+.r3-profile label{font-family:"Archivo","Inter",sans-serif!important;font-size:10px!important;font-weight:600!important;letter-spacing:.14em!important;text-transform:uppercase!important;color:#5E5A50!important}
+.r3-profile input:not([type=checkbox]):not([type=radio]),.r3-profile textarea,.r3-profile [role=combobox]{background:#FFFFFF!important;border:1px solid rgba(22,20,15,.35)!important;border-radius:2px!important;box-shadow:none!important}
+.r3-profile button{font-family:"Archivo","Inter",sans-serif!important;font-size:11px!important;font-weight:600!important;letter-spacing:.12em!important;text-transform:uppercase!important}
+.r3-profile button[class*="bg-green"],.r3-profile button[class*="bg-emerald"],.r3-profile button[type=submit]{background:#16140F!important;color:#FFFFFF!important;border:1px solid #16140F!important;border-radius:2px!important}
+.r3-profile button[class*="bg-green"] *,.r3-profile button[class*="bg-emerald"] *,.r3-profile button[type=submit] *{color:#FFFFFF!important}
+.r3-profile button[class*="border"]:not([class*="bg-green"]){border-color:#16140F!important;background:transparent!important;color:#16140F!important}
+.r3-profile svg{color:#16140F}
+.r3-profile [class*="bg-gradient"]{background-image:none!important}
+.r3-profile [role=progressbar]>div{background:#16140F!important}
+`;
+
 export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: ProfilePageProps) {
   const { user: authUser } = useAuth();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -676,7 +701,9 @@ export function ProfilePage({ user, onNavigateToSettings, onNavigateToHome }: Pr
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4 lg:p-6">
+    <div className="r3-profile r3-lockup min-h-screen p-4 lg:p-6">
+      {/* Editorial restyle (paper, ink hairlines, Fraunces + Archivo) as scoped CSS: index.css is prebuilt. */}
+      <style>{R3_PROFILE_CSS}</style>
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center mb-8">

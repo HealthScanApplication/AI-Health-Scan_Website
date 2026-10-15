@@ -15,7 +15,8 @@ import {
   Shield,
   MoreHorizontal,
   X,
-  Share2
+  Share2,
+  Compass
 } from 'lucide-react';
 import { isAdminUser, getAdminUserInfo } from '../utils/adminUtils';
 import { oura, ouraButton } from '../config/ouraTheme';
@@ -31,7 +32,7 @@ import { PageType } from '../types/app';
 
 // ROUTINE³ lockup — a square, single-bordered box joining the wordmark to the BETA tag,
 // same joined-seam treatment as the email/Subscribe container.
-function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#16140F' }: { size?: number; textColor?: string; hairline?: string }) {
+export function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#16140F', suffix = 'Beta' }: { size?: number; textColor?: string; hairline?: string; suffix?: string }) {
   return (
     <div
       style={{
@@ -49,11 +50,11 @@ function RoutineMark({ size = 28, textColor = '#16140F', hairline = '#16140F' }:
           ROUTINE³
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', borderLeft: `1px solid ${hairline}`, transition: 'border-color 350ms ease' }}>
+      {suffix && <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', borderLeft: `1px solid ${hairline}`, transition: 'border-color 350ms ease' }}>
         <span style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: textColor, whiteSpace: 'nowrap', transition: 'color 350ms ease' }}>
-          Beta
+          {suffix}
         </span>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -341,6 +342,8 @@ export function Header({
   const overHero = currentPage === 'home' && atTop;
   // Dark, elegant editorial text everywhere (readable on the light frosted blur).
   const navText = oura.body;
+  // Shared cell for the joined header lockups (Sign in | Subscribe, Dashboard | Sign out).
+  const lockupCell: React.CSSProperties = { height: 32, padding: '0 14px', border: 0, background: 'transparent', color: navText, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 350ms ease, border-color 350ms ease' };
   const navStrong = '#16140F';
   const navHover = oura.forest;
   const capsule = overHero
@@ -414,7 +417,7 @@ export function Header({
                 <span style={{ fontSize: 14 }}>FAQ</span>
               </button>
               <a
-                href="/guides"
+                href="/guardians"
                 className="px-4 py-2"
                 style={{ fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.13em', color: navText, textDecoration: 'none', whiteSpace: 'nowrap', transition: 'color 300ms cubic-bezier(0.4,0,0.2,1)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = navHover; }}
@@ -476,10 +479,20 @@ export function Header({
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-56 r3-menu">
+                    {/* Hairline, uppercase menu to match the header lockups (scoped CSS: index.css is prebuilt). */}
+                    <style>{`.r3-menu{background:#FFFFFF!important;border:1px solid #16140F!important;border-radius:2px!important;padding:0!important;box-shadow:0 14px 34px rgba(22,20,15,.14)!important}.r3-menu [role=menuitem]{border-radius:0!important;padding:11px 14px!important;font-family:"Archivo","Inter",sans-serif!important;font-size:11px!important;font-weight:600!important;letter-spacing:.12em!important;text-transform:uppercase!important;color:#16140F!important}.r3-menu [role=menuitem]+[role=menuitem]{border-top:1px solid rgba(22,20,15,.12)}.r3-menu [role=menuitem]:focus,.r3-menu [role=menuitem]:hover{background:#F2EFE7!important}.r3-menu [role=separator]{margin:0!important;background:#16140F!important}.r3-menu svg{color:#16140F!important}`}</style>
+                    <DropdownMenuItem onClick={handleReferralModal}>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      <span>Refer a friend</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleNavClick(onNavigateToProfile)}>
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { window.location.href = '/guardians/workspace'; }}>
+                      <Compass className="mr-2 h-4 w-4" />
+                      <span>Guardian</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleNavClick(onNavigateToSettings)}>
                       <Settings className="mr-2 h-4 w-4" />
@@ -493,7 +506,7 @@ export function Header({
                           className="text-red-700 focus:text-red-700 focus:bg-red-50"
                         >
                           <Shield className="mr-2 h-4 w-4" />
-                          <span>Admin Panel</span>
+                          <span>Admin</span>
                           <span className="ml-auto text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">
                             {adminInfo.level?.toUpperCase() || 'ADMIN'}
                           </span>
@@ -508,31 +521,17 @@ export function Header({
                   </DropdownMenuContent>
                   </DropdownMenu>
                   
-                  {/* Refer Friends — unified outlined CTA */}
-                  <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleReferralModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 16px', ...ctaWhite }}>
-                      <Share2 className="w-4 h-4" />
-                      Refer
-                    </button>
+                  {/* Signed in: Dashboard | Sign out, same joined lockup as Sign in | Subscribe */}
+                  <div className="r3-lockup" style={{ display: 'flex', border: `1px solid ${navText}`, borderRadius: 2, transition: 'border-color 350ms ease' }}>
+                    <button onClick={() => handleNavClick(onNavigateToProfile)} style={lockupCell}>Dashboard</button>
+                    <button onClick={handleSignOut} style={{ ...lockupCell, borderLeft: `1px solid ${navText}` }}>Sign out</button>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center space-x-3">
-                  <Button
-                    variant="ghost"
-                    onClick={handleSignIn}
-                    className="font-medium"
-                    style={{ color: navText, transition: 'color 350ms ease' }}
-                  >
-                    Sign In
-                  </Button>
-
-                  {/* Subscribe — unified outlined CTA */}
-                  <div className={isShaking ? 'animate-button-shake' : ''}>
-                    <button onClick={handleWaitlistModal} className="ed-cta" style={{ fontSize: 11, height: 38, padding: '0 18px', background: 'transparent', color: navText, borderColor: 'rgba(22,20,15,0.5)' }}>
-                      Subscribe
-                    </button>
-                  </div>
+                // Sign in + Subscribe share one hairline box, same joined-seam treatment as the logo lockup.
+                <div className={`r3-lockup ${isShaking ? 'animate-button-shake' : ''}`} style={{ display: 'flex', border: `1px solid ${navText}`, borderRadius: 2, transition: 'border-color 350ms ease' }}>
+                  <button onClick={handleSignIn} style={lockupCell}>Sign in</button>
+                  <button onClick={handleWaitlistModal} style={{ ...lockupCell, borderLeft: `1px solid ${navText}` }}>Subscribe</button>
                 </div>
               )}
             </div>
@@ -580,7 +579,7 @@ export function Header({
                       FAQ
                     </button>
                     <a
-                      href="/guides"
+                      href="/guardians"
                       className="block w-full text-left px-3 py-3 rounded-lg font-medium transition-colors"
                       style={{ color: oura.body, textDecoration: 'none' }}
                     >
@@ -658,21 +657,13 @@ export function Header({
                       <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: oura.muted, fontWeight: 600 }}>
                         Get Started
                       </h3>
-                      <div className="space-y-3">
-                        <button
-                          onClick={handleSignIn}
-                          className="block w-full text-center px-3 py-3 font-medium transition-colors"
-                          style={{ color: oura.ink, background: 'transparent', border: `1px solid ${oura.hairline}`, borderRadius: 999 }}
-                        >
-                          Sign In
+                      <div className={isShaking ? 'animate-button-shake' : ''} style={{ display: 'flex', border: `1px solid ${oura.ink}`, borderRadius: 2 }}>
+                        <button onClick={handleSignIn} style={{ flex: 1, height: 46, border: 0, background: 'transparent', color: oura.ink, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer' }}>
+                          Sign in
                         </button>
-
-                        {/* Mobile Subscribe — unified outlined CTA */}
-                        <div className={`w-full ${isShaking ? 'animate-button-shake' : ''}`}>
-                          <button onClick={handleWaitlistModal} className="ed-cta" style={{ width: '100%' }}>
-                            Subscribe
-                          </button>
-                        </div>
+                        <button onClick={handleWaitlistModal} style={{ flex: 1, height: 46, border: 0, borderLeft: `1px solid ${oura.ink}`, background: 'transparent', color: oura.ink, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer' }}>
+                          Subscribe
+                        </button>
                       </div>
                     </div>
                   </>

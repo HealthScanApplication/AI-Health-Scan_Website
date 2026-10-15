@@ -38,6 +38,10 @@ export interface AdminProtocol {
   start_time: string | null;
   sort_order: number | null;
   updated_at?: string | null;
+  profile_role?: 'self' | 'partner' | 'child' | null;
+  profile_name?: string | null;
+  profile_image_url?: string | null;
+  schedule_basis?: 'calendar' | 'menstrual_cycle' | 'lunar_cycle' | null;
 }
 
 export interface AdminProtocolItem {
@@ -99,7 +103,54 @@ export interface AdminProtocolItem {
 
 export interface AIProtocolDraft {
   summary: string;
-  steps: { title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null }[];
+  /** `tips` on the bedtime step become rule_do children of it (the app's do-checklist). */
+  steps: { title: string; time: string | null; category: string; notes: string; day_number: number; duration_minutes: number | null; tips?: string[] }[];
+}
+
+function starterProtocolDraft(message: string): AIProtocolDraft {
+  const sleepFocused = /sleep|insomnia|bedtime|menopause/i.test(message);
+  const safety = 'Adjust to individual ability and stop if symptoms worsen. Seek clinical advice for persistent, severe, or concerning symptoms.';
+  // Titles are short verb + noun actions; timing lives in time/duration. Sleep is the wake and
+  // bedtime pair only, with sleep-environment advice as bullets in the bedtime notes.
+  const steps = sleepFocused ? [
+    { title: 'Wake up', time: '07:00', category: 'sleep', notes: `Keep the wake time consistent throughout the week, including after a disrupted night. ${safety}`, duration_minutes: null },
+    { title: 'Get morning daylight', time: '07:30', category: 'do', notes: 'Spend time outdoors or near bright natural light soon after waking. Use an accessible alternative when outdoor conditions are unsuitable.', duration_minutes: 20 },
+    { title: 'Go walking', time: '12:30', category: 'do', notes: 'Walk, do mobility work, or another appropriate activity at a conversational effort. Adapt duration and intensity to current capacity.', duration_minutes: 20 },
+    { title: 'Stop caffeine', time: '14:00', category: 'consume', notes: 'Choose caffeine-free drinks after this point. Earlier timing may suit people who are particularly sensitive to caffeine.', duration_minutes: null },
+    { title: 'Wind down', time: '21:30', category: 'do', notes: 'Use a repeatable low-stimulation routine such as reading, gentle breathing, or relaxation. Avoid activities that increase alertness.', duration_minutes: 30 },
+    { title: 'Go to bed', time: '22:30', category: 'sleep', notes: `Begin the sleep opportunity at a consistent time. ${safety}`, duration_minutes: null, tips: ['Keep the room dark', 'Keep the bedroom cool', 'Prepare comfortable bedding'] },
+  ] : [
+    { title: 'Set an intention', time: '08:00', category: 'do', notes: `Choose one realistic action that supports the selected goal. ${safety}`, duration_minutes: 5 },
+    { title: 'Go walking', time: '10:00', category: 'do', notes: 'Choose an accessible activity and adapt the duration and intensity to current capacity.', duration_minutes: 20 },
+    { title: 'Eat a balanced lunch', time: '12:30', category: 'consume', notes: 'Use familiar foods and account for allergies, intolerances, cultural preferences, and clinical advice.', duration_minutes: null },
+    { title: 'Take a recovery pause', time: '15:30', category: 'do', notes: 'Pause for breathing, stretching, hydration, or another low-risk recovery practice.', duration_minutes: 10 },
+    { title: 'Review progress', time: '20:30', category: 'do', notes: `Record what was completed and any symptoms or barriers. ${safety}`, duration_minutes: 5 },
+  ];
+  return {
+    summary: 'The live AI route was unavailable, so ROUTINE³ created a conservative starter draft from the selected profile. Review and personalise every step before publishing.',
+    steps: steps.map((step) => ({ ...step, day_number: 1 })),
+  };
+}
+
+type DraftStep = AIProtocolDraft['steps'][number];
+const WAKE_TITLE = /^(wake|get up|rise|end sleep)\b/i;
+/**
+ * Sleep is a pair of anchors (wake, bedtime), not a list of steps — exactly as the app models it.
+ * Any other sleep-category step ("Sleep in complete darkness", "Cool the bedroom") becomes a tip
+ * on the bedtime step; the caller saves tips as rule_do children of bedtime, which the app shows
+ * as the do-checklist inside the bedtime card (mobile timeline/subTaskRows.ts, "contextual rules").
+ */
+export function foldSleepSteps(steps: DraftStep[]): DraftStep[] {
+  const sleep = steps.filter((step) => step.category === 'sleep');
+  const minutes = (step: DraftStep) => { const [h, m] = (step.time || '').split(':').map(Number); return Number.isFinite(h) ? h * 60 + (m || 0) : -1; };
+  const wake = sleep.find((step) => WAKE_TITLE.test(step.title)) || null;
+  const rest = sleep.filter((step) => step !== wake);
+  if (!rest.length) return steps;
+  const bedtime = [...rest].sort((a, b) => minutes(b) - minutes(a))[0];
+  const extraTips = rest.filter((step) => step !== bedtime).map((step) => step.title);
+  const foldedBedtime: DraftStep = { ...bedtime, tips: [...(bedtime.tips || []), ...extraTips] };
+  const kept = steps.filter((step) => step.category !== 'sleep');
+  return [...(wake ? [wake] : []), ...kept, foldedBedtime];
 }
 
 export async function buildProtocolWithAI(accessToken: string, protocolId: string, message: string): Promise<AIProtocolDraft> {
@@ -108,13 +159,79 @@ export async function buildProtocolWithAI(accessToken: string, protocolId: strin
     headers: headers(accessToken),
     body: JSON.stringify({ protocolId, message }),
   });
+  if (res.status === 404) {
+    const detail = await res.clone().json().catch(() => null) as { error?: string; message?: string } | null;
+    const reason = `${detail?.error || ''} ${detail?.message || ''}`;
+    if (!/protocol not found/i.test(reason)) return starterProtocolDraft(message);
+  }
   return handle(res, 'Build protocol with AI');
 }
 
+/**
+ * Revise an existing protocol from a plain-language instruction. The AI gets the current steps
+ * and returns the complete revised list; steps are matched by title and updated in place, new
+ * ones are added, and dropped ones are HIDDEN (never deleted) so nothing is lost.
+ */
+export async function updateProtocolWithAI(
+  accessToken: string,
+  protocolId: string,
+  instruction: string,
+  items: AdminProtocolItem[],
+  sources = '',
+): Promise<{ summary: string; updated: number; added: number; hidden: number }> {
+  const tops = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id && !it.hidden);
+  const current = tops.map((it) => `- ${it.display_name} | ${it.scheduled_time?.slice(0, 5) || 'no time'} | ${it.category || 'do'} | ${(it.notes || '').replace(/\s+/g, ' ').slice(0, 160)}`).join('\n');
+  const message = `Revise this existing Protocol. Return the COMPLETE revised list of steps: keep every step that should stay with exactly the same title, change only what the instruction asks.\n\nInstruction: ${instruction.trim()}\n\nCurrent steps (title | time | category | notes):\n${current || '(none yet)'}${sources ? `\n\nReference material:\n${sources}` : ''}`;
+  const res = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-ed0fe4c2/guides/build-protocol`, {
+    method: 'POST', headers: headers(accessToken), body: JSON.stringify({ protocolId, message }),
+  });
+  const draft = await handle(res, 'Update protocol with AI') as AIProtocolDraft;
+  const steps = foldSleepSteps(draft.steps || []);
+  const key = (t: string) => t.trim().toLowerCase();
+  const byTitle = new Map(tops.map((it) => [key(it.display_name || ''), it]));
+  const kept = new Set<string>();
+  let updated = 0, added = 0;
+  for (const [index, step] of steps.entries()) {
+    const match = byTitle.get(key(step.title));
+    const time = step.time ? `${step.time}:00` : null;
+    let parentId: string;
+    if (match) {
+      kept.add(match.id);
+      parentId = match.id;
+      if ((match.scheduled_time || null) !== time || (match.notes || '') !== (step.notes || '') || (match.duration_minutes ?? null) !== (step.duration_minutes ?? null)) {
+        await updateProtocolItem(accessToken, match.id, { scheduled_time: time, notes: step.notes, duration_minutes: step.duration_minutes });
+        updated++;
+      }
+    } else {
+      const created = await createProtocolItem(accessToken, {
+        protocol_id: protocolId, display_name: step.title, kind: 'action', scope: null,
+        item_type: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity',
+        scheduled_time: time, duration_minutes: step.duration_minutes, group_name: null, day_number: step.day_number || 1,
+        sort_order: tops.length + index + 1, parent_protocol_item_id: null, has_children: Boolean(step.tips?.length),
+        category: step.category, subtype: step.category === 'sleep' ? 'sleep' : step.category === 'consume' ? 'meal' : step.category === 'supplement' ? 'supplement' : 'wellness',
+        hidden: false, enabled: true, notes: step.notes, recurrence_type: 'daily',
+      } as any);
+      parentId = created.id;
+      added++;
+    }
+    const existingTips = new Set(items.filter((it) => it.parent_protocol_item_id === parentId).map((it) => key(it.display_name || '')));
+    for (const tip of step.tips || []) {
+      if (existingTips.has(key(tip))) continue;
+      await createProtocolItem(accessToken, { protocol_id: protocolId, display_name: tip, kind: 'rule_do', item_type: 'activity', scope: null, scheduled_time: null, duration_minutes: null, group_name: null, day_number: step.day_number || 1, sort_order: 1, parent_protocol_item_id: parentId, has_children: false, category: 'sleep', subtype: 'sleep', hidden: false, enabled: true, notes: '', recurrence_type: 'daily' } as any);
+    }
+  }
+  const dropped = tops.filter((it) => !kept.has(it.id));
+  for (const it of dropped) await updateProtocolItem(accessToken, it.id, { hidden: true });
+  return { summary: draft.summary || '', updated, added, hidden: dropped.length };
+}
+
 const PROTOCOL_COLS =
-  'id,user_id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at';
+  'id,user_id,name,description,category,type,target_gender,creator,source,image_url,health_score,total_days,is_suggested,is_active,is_public,start_time,sort_order,updated_at,profile_role,profile_name,profile_image_url,schedule_basis';
+let legacyProtocolColumns = false;
+const LEGACY_PROTOCOL_COLS = PROTOCOL_COLS.split(',').filter((column) => !['profile_role', 'profile_name', 'profile_image_url', 'schedule_basis'].includes(column)).join(',');
 const ITEM_COLS =
   'id,protocol_id,display_name,item_type,kind,scope,scheduled_time,duration_minutes,group_name,day_number,sort_order,parent_protocol_item_id,has_children,category,subtype,hidden,enabled,notes,media_image_url,media_audio_url,amount,amount_unit,frequency_override,catalog_recipe_id,catalog_product_id,catalog_activity_id,catalog_ingredient_id,supplement_id,recurrence_type,recurrence_days_of_week,recurrence_interval_days,recurrence_interval_unit,recurrence_start_date,recurrence_end_date,scheduled_date,notifications_enabled,notification_lead_minutes,sets,reps,reps_display,weight_value,weight_unit,weight_display,rest_seconds,work_seconds,rounds,intensity,distance_value,distance_unit,load_type,intensity_variants,selected_intensity,filter';
+const LEGACY_ITEM_COLS = ITEM_COLS.split(',').filter((column) => !column.startsWith('media_')).join(',');
 
 function headers(accessToken: string, extra: Record<string, string> = {}) {
   return {
@@ -146,12 +263,33 @@ function first<T>(rows: T | T[]): T {
 
 /** All protocols, suggested ones first, then by sort order / name. */
 export async function listProtocols(accessToken: string, ownerId?: string | null): Promise<AdminProtocol[]> {
-  const url =
-    `${rest()}/protocols?select=${PROTOCOL_COLS}` +
-    (ownerId ? `&user_id=eq.${encodeURIComponent(ownerId)}` : '') +
+  const suffix =
+    // An owner's list hides archived (is_active = false) protocols, e.g. retired duplicates.
+    (ownerId ? `&user_id=eq.${encodeURIComponent(ownerId)}&is_active=not.is.false` : '') +
     `&order=is_suggested.desc.nullslast,sort_order.asc.nullslast,name.asc`;
-  const res = await fetch(url, { headers: headers(accessToken) });
+  // Environments without the profile columns (Staging's protocols is a view) answer 42703; remember that so we stop retrying.
+  let res = await fetch(`${rest()}/protocols?select=${legacyProtocolColumns ? LEGACY_PROTOCOL_COLS : PROTOCOL_COLS}${suffix}`, { headers: headers(accessToken) });
+  if (!res.ok && !legacyProtocolColumns) {
+    const failure = await res.clone().json().catch(() => null) as { code?: string; message?: string } | null;
+    if (failure?.code === '42703') { legacyProtocolColumns = true; res = await fetch(`${rest()}/protocols?select=${LEGACY_PROTOCOL_COLS}${suffix}`, { headers: headers(accessToken) }); }
+  }
   return (await handle(res, 'List protocols')) || [];
+}
+
+const protocolNameKey = (name: string) => name.replace(/^R3\s+Protocol\s*>\s*/i, '').trim().toLowerCase();
+
+/**
+ * Reuse the owner's active protocol with the same name (ignoring an "R3 Protocol >" prefix and
+ * case) instead of creating another. The Guardian builder keeps its working protocol only in
+ * memory, so every reload + "Build Protocol" or publish used to mint a duplicate.
+ */
+export async function findOrCreateProtocol(
+  accessToken: string,
+  protocol: Partial<AdminProtocol> & { name: string; user_id: string },
+): Promise<AdminProtocol> {
+  const existing = await listProtocols(accessToken, protocol.user_id).catch(() => [] as AdminProtocol[]);
+  const match = existing.find((row) => protocolNameKey(row.name || '') === protocolNameKey(protocol.name));
+  return match || createProtocol(accessToken, protocol);
 }
 
 export async function createProtocol(
@@ -175,11 +313,19 @@ export async function listProtocolItems(
   accessToken: string,
   protocolId: string,
 ): Promise<AdminProtocolItem[]> {
-  const url =
-    `${rest()}/protocol_items?protocol_id=eq.${protocolId}&select=${ITEM_COLS}` +
-    `&order=scheduled_time.asc.nullslast,sort_order.asc.nullslast`;
-  const res = await fetch(url, { headers: headers(accessToken) });
-  return (await handle(res, 'List protocol steps')) || [];
+  const request = (columns: string) => fetch(
+    `${rest()}/protocol_items?protocol_id=eq.${protocolId}&select=${columns}` +
+    `&order=scheduled_time.asc.nullslast,sort_order.asc.nullslast`,
+    { headers: headers(accessToken) },
+  );
+  let res = await request(ITEM_COLS);
+  if (!res.ok) {
+    const failure = await res.clone().json().catch(() => null) as { code?: string; message?: string } | null;
+    const missingMediaColumn = failure?.code === '42703' && /protocol_items\.media_(image|audio)_url/.test(failure.message || '');
+    if (missingMediaColumn) res = await request(LEGACY_ITEM_COLS);
+  }
+  const items = ((await handle(res, 'List protocol steps')) || []) as Partial<AdminProtocolItem>[];
+  return items.map((item) => ({ ...item, media_image_url: item.media_image_url ?? null, media_audio_url: item.media_audio_url ?? null } as AdminProtocolItem));
 }
 
 export async function updateProtocol(
@@ -235,7 +381,8 @@ interface CatCfg { table: string; fk: keyof AdminProtocolItem; nameCols: string[
 // Only columns that actually exist on each table (a bad column 400s the whole select).
 export const CATALOG_CFG: Record<CatalogKind, CatCfg> = {
   recipe: { table: 'catalog_recipes', fk: 'catalog_recipe_id', nameCols: ['name_common'], imgCols: ['image_url', 'image_primary_url', 'images'], extraCols: ['meal_slot', 'health_score', 'tags', 'dietary_info', 'prep_time', 'is_group', 'type'] },
-  ingredient: { table: 'catalog_ingredients', fk: 'catalog_ingredient_id', nameCols: ['name_common', 'name'], imgCols: ['image_url', 'image_primary_url', 'images'] },
+  // catalog_ingredients has no `name` column (Staging): asking for it 400s every ingredient search.
+  ingredient: { table: 'catalog_ingredients', fk: 'catalog_ingredient_id', nameCols: ['name_common'], imgCols: ['image_url', 'image_primary_url', 'images'] },
   product: { table: 'catalog_products', fk: 'catalog_product_id', nameCols: ['name_common', 'name_brand', 'market_name', 'name'], imgCols: ['image_url', 'image_primary_url', 'image', 'images'], buyCols: ['price_usd', 'affiliate_link_amazon', 'affiliate_link_shopify', 'purchase_url', 'affiliate_url'] },
   activity: { table: 'catalog_activities', fk: 'catalog_activity_id', nameCols: ['name'], imgCols: ['image_url', 'image_primary_url', 'primary_image_url'] },
   supplement: { table: 'hs_supplements', fk: 'supplement_id', nameCols: ['name'], imgCols: ['image_url'] },

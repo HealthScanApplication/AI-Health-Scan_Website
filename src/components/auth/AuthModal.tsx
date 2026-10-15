@@ -13,6 +13,31 @@ import { toast } from 'sonner';
 import { Loader2, Mail, Lock, User, AlertTriangle, Eye, EyeOff, Shield, Heart, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/alert';
 
+
+const R3_AUTH_CSS = `
+.r3-auth{width:calc(100% - 32px)!important;max-width:460px!important;max-height:calc(100dvh - 32px)!important;overflow-y:auto!important;position:fixed!important;inset:0!important;margin:auto!important;height:fit-content!important;transform:none!important;translate:none!important;background:#11120F!important;color:#F5F2EA!important;border:1px solid rgba(245,242,234,.28)!important;border-radius:0!important;box-shadow:0 30px 80px rgba(0,0,0,.45)!important;font-family:"EuclidCircularA","DM Sans","Helvetica Neue",Arial,sans-serif}
+.r3-auth>button[class*="absolute"]{color:#F5F2EA!important;opacity:.8}
+.r3-auth-head{padding:clamp(24px,4vw,44px) clamp(24px,4vw,44px) 0!important;text-align:left!important}
+.r3-auth-eyebrow{color:#C7D8A3;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+.r3-auth-title{margin:12px 0 10px!important;font-family:"CanelaText","Canela Text",Georgia,serif!important;font-size:clamp(34px,5vw,48px)!important;font-weight:300!important;line-height:1!important;letter-spacing:-.04em!important;color:#F5F2EA!important}
+.r3-auth-desc{color:#B8B6AF!important;font-size:14px!important;line-height:1.6!important}
+.r3-auth .p-6{padding-left:clamp(24px,4vw,44px)!important;padding-right:clamp(24px,4vw,44px)!important;padding-bottom:clamp(24px,4vw,40px)!important}
+.r3-auth label{color:#B8B6AF!important;font-size:10px!important;font-weight:700!important;letter-spacing:.14em!important;text-transform:uppercase!important}
+.r3-auth input:not([type=checkbox]){background:#0B0C0A!important;border:1px solid rgba(245,242,234,.3)!important;border-radius:2px!important;color:#F5F2EA!important;box-shadow:none!important}
+.r3-auth input:not([type=checkbox]):focus,.r3-auth input:not([type=checkbox]):focus-visible{border-color:#F5F2EA!important;outline:none!important;box-shadow:0 0 0 1px #F5F2EA!important;--tw-ring-color:transparent!important}
+.r3-auth input::placeholder{color:rgba(245,242,234,.35)!important}
+.r3-auth [role=tablist]{background:transparent!important;border:1px solid rgba(245,242,234,.4)!important;border-radius:2px!important;padding:0!important;height:40px!important}
+.r3-auth [role=tab]{border-radius:0!important;background:transparent!important;color:#B8B6AF!important;font-size:11px!important;font-weight:700!important;letter-spacing:.14em!important;text-transform:uppercase!important;box-shadow:none!important;height:100%!important}
+.r3-auth [role=tab]+[role=tab]{border-left:1px solid rgba(245,242,234,.4)!important}
+.r3-auth [role=tab][data-state=active]{background:#F5F2EA!important;color:#11120F!important}
+.r3-auth button[type=submit]{background:#F5F2EA!important;color:#11120F!important;border:1px solid #F5F2EA!important;border-radius:2px!important;font-size:11px!important;font-weight:700!important;letter-spacing:.14em!important;text-transform:uppercase!important}
+.r3-auth button[type=submit]:hover{background:#FFFFFF!important}
+.r3-auth .text-green-600,.r3-auth .text-green-700,.r3-auth a{color:#C7D8A3!important}
+.r3-auth .text-gray-900,.r3-auth .text-gray-700,.r3-auth .text-gray-600,.r3-auth .text-sm{color:#D8D5CC}
+.r3-auth [role=alert]{background:rgba(245,242,234,.06)!important;border-color:rgba(245,242,234,.25)!important;color:#F5F2EA!important}
+.r3-auth [role=alert] *{color:#F5F2EA!important}
+`;
+
 interface AuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -566,18 +591,17 @@ export function AuthModal({ open, onOpenChange, defaultTab = 'login', prefillEma
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="modal-fullscreen-8px sm:max-w-[425px] p-0 bg-white/95 backdrop-blur-sm border-gray-200/50">
-        <DialogHeader className="p-6 pb-0">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-              <Heart className="h-4 w-4 text-white" />
-            </div>
-            <DialogTitle className="text-xl font-semibold text-gray-900">
-              ROUTINE³
-            </DialogTitle>
-          </div>
-          <DialogDescription className="text-gray-600">
-            Join ROUTINE³ to access revolutionary AI-powered health scanning technology
+      <DialogContent className="r3-auth modal-fullscreen-8px sm:max-w-[460px] p-0">
+        {/* Same look as the Guardian sign-in modal (dark panel, serif headline, hairline controls).
+            Scoped CSS because index.css is prebuilt and new Tailwind classes would not exist. */}
+        <style>{R3_AUTH_CSS}</style>
+        <DialogHeader className="r3-auth-head">
+          <div className="r3-auth-eyebrow">{showPasswordReset ? 'Reset password' : activeTab === 'login' ? 'Sign in' : 'Create your account'}</div>
+          <DialogTitle className="r3-auth-title">
+            {showPasswordReset ? 'Let’s get you back in.' : activeTab === 'login' ? 'Welcome back.' : 'Join ROUTINE³.'}
+          </DialogTitle>
+          <DialogDescription className="r3-auth-desc">
+            {activeTab === 'login' ? 'Your routines, scans and progress are waiting.' : 'Build a routine for any goal: health, beauty or fitness.'}
           </DialogDescription>
         </DialogHeader>
 

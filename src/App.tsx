@@ -12,7 +12,6 @@ import { PageRenderer } from "./components/PageRenderer";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { EmailConfirmationBanner } from "./components/EmailConfirmationBanner";
-import { ReferralInvitationBanner } from "./components/ReferralInvitationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ThemeManager } from "./components/ThemeManager";
 import { Toaster } from "./components/ui/sonner";
@@ -575,13 +574,6 @@ function AppContent() {
 
       {/* Footer */}
       {!isGuidePortal && <Footer />}
-
-      {/* Referral Invitation Banner */}
-      {!isGuidePortal && <ReferralInvitationBanner
-        hasReferral={hasReferral}
-        isActive={isActive}
-        referralCode={referralCode}
-      />}
 
       {/* Theme Manager Quick Access (Admin Only) */}
       {isAdmin && !showThemeManager && (

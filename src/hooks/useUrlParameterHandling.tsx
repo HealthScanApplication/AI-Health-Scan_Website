@@ -17,7 +17,10 @@ export function useUrlParameterHandling({ setCurrentPage }: UseUrlParameterHandl
     const path = window.location.pathname.replace(/\/+$/, '');
     if (path === '/admin') {
       setCurrentPage('admin');
-    } else if (path === '/guides' || path === '/guide' || path.startsWith('/guides/')) {
+    } else if (path === '/guardians' || path.startsWith('/guardians/') || path === '/guides' || path === '/guide' || path.startsWith('/guides/')) {
+      if (path === '/guides' || path === '/guide' || path.startsWith('/guides/')) {
+        window.history.replaceState({}, document.title, path.replace(/^\/(?:guides|guide)/, '/guardians') || '/guardians');
+      }
       setCurrentPage('guides');
     }
   }, [setCurrentPage]);

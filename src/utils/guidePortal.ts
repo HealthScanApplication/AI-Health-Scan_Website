@@ -36,7 +36,7 @@ export interface GuideOffer {
   title: string;
   description: string | null;
   price_cents: number;
-  currency: 'GBP' | 'EUR' | 'USD';
+  currency: string;
   affiliate_url: string | null;
   access_model: 'free' | 'paid';
   file_path: string | null;
@@ -53,6 +53,58 @@ export interface GuideRecipe {
   ingredients: unknown[];
   instructions: unknown[];
   status: 'draft' | 'submitted' | 'published';
+}
+
+export interface GuideValueRamp {
+  id: string;
+  guide_id: string;
+  name: string;
+  slug: string;
+  audience: string;
+  problem: string;
+  offer_ids: string[];
+  status: 'draft' | 'published';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GuideBrand {
+  id?: string;
+  guide_id: string;
+  name: string;
+  kind: 'personal' | 'business';
+  logo_url: string | null;
+  contact_email: string;
+  whatsapp_phone: string;
+  website_url: string;
+  social_links: Record<string, string>;
+  language: string;
+  pricing_region: string;
+  currency: string;
+  is_primary: boolean;
+}
+
+export type GuideLibraryKind = 'pdf' | 'url' | 'transcript';
+
+export interface GuideLibraryFolder {
+  id: string;
+  guide_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GuideLibraryItem {
+  id: string;
+  guide_id: string;
+  folder_id: string | null;
+  kind: GuideLibraryKind;
+  title: string;
+  source_url: string | null;
+  file_path: string | null;
+  transcript: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ImportedGuideProfile {
@@ -119,6 +171,33 @@ export async function getGuideProfileBySlug(slug: string): Promise<GuideProfile 
   return data as GuideProfile | null;
 }
 
+export async function listPublicGuideProfiles(): Promise<GuideProfile[]> {
+  const { data, error } = await db().from('guide_profiles')
+    .select('user_id,slug,display_name,headline,bio,avatar_url,contact_email,whatsapp_phone,social_links,specialties,status,commission_percent,onboarding_step')
+    .eq('status', 'approved')
+    .order('display_name', { ascending: true });
+  if (error) throw error;
+  return (data || []) as GuideProfile[];
+}
+
+export interface GuardianSuggestion {
+  guardian_type: string;
+  name: string;
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  website?: string;
+  note?: string;
+  suggester_email?: string;
+}
+
+/** Public "suggest a Guardian" submission (anon insert-only, see guardian_suggestions migration). */
+export async function submitGuardianSuggestion(suggestion: GuardianSuggestion): Promise<void> {
+  const clean = Object.fromEntries(Object.entries(suggestion).map(([key, value]) => [key, typeof value === 'string' ? value.trim() || null : value]));
+  const { error } = await db().from('guardian_suggestions').insert(clean);
+  if (error) throw error;
+}
+
 export async function saveGuideProfile(profile: Partial<GuideProfile> & { user_id: string }): Promise<GuideProfile> {
   const { data, error } = await db().from('guide_profiles').upsert(profile, { onConflict: 'user_id' }).select().single();
   if (error) throw error;
@@ -137,16 +216,91 @@ export async function createGuideLead(guideId: string, lead: Pick<GuideLead, 'na
   return data as GuideLead;
 }
 
+/** Public opt-in from a Guardian mini-site. Insert-only: visitors cannot read leads back. */
+export async function submitGuardianOptIn(guideId: string, lead: { name: string; email: string; goal: string | null; marketingConsent: boolean; consentText: string; sourceOfferId?: string | null; valueRampId?: string | null }): Promise<void> {
+  const { error } = await db().from('guide_leads').insert({
+    guide_id: guideId,
+    name: lead.name.trim(),
+    email: lead.email.trim().toLowerCase(),
+    goal: lead.goal,
+    marketing_consent: lead.marketingConsent,
+    consent_text: lead.marketingConsent ? lead.consentText : null,
+    consent_at: lead.marketingConsent ? new Date().toISOString() : null,
+    source_offer_id: lead.sourceOfferId || null,
+    value_ramp_id: lead.valueRampId || null,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Whose routine is each protocol? The app creates a personal "Your Routine" per family profile
+ * (user_active_protocol.profile_id → family_profiles; null profile = the account's main user).
+ * Returns protocol id → that person's name and avatar, so routines can be labelled by owner.
+ */
+export async function listRoutineOwners(userId: string, mainName: string, mainAvatar?: string | null): Promise<Map<string, { name: string; avatarUrl: string | null; relation: string | null }>> {
+  const owners = new Map<string, { name: string; avatarUrl: string | null; relation: string | null }>();
+  // Avatars saved by the app can be device paths (file:///var/mobile/...); only web URLs load here.
+  const webUrl = (url?: string | null) => (url && /^https?:\/\//i.test(url) ? url : null);
+  const [{ data: active }, { data: profiles }] = await Promise.all([
+    db().from('user_active_protocol').select('protocol_id,profile_id').eq('user_id', userId),
+    db().from('family_profiles').select('id,name,avatar_url,is_main_user,relation').eq('owner_id', userId),
+  ]);
+  const byId = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
+  const main = (profiles || []).find((profile: any) => profile.is_main_user);
+  for (const row of (active || []) as { protocol_id: string; profile_id: string | null }[]) {
+    const profile: any = row.profile_id ? byId.get(row.profile_id) : main;
+    owners.set(row.protocol_id, { name: profile?.name || mainName, avatarUrl: webUrl(profile?.avatar_url) || (row.profile_id ? null : webUrl(mainAvatar)), relation: row.profile_id ? (profile?.is_main_user ? 'self' : profile?.relation || 'family') : 'self' });
+  }
+  return owners;
+}
+
 export async function listGuideOffers(userId: string): Promise<GuideOffer[]> {
   const { data, error } = await db().from('guide_offers').select('*').eq('guide_id', userId).order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []) as GuideOffer[];
 }
 
-export async function createGuideOffer(guideId: string, offer: Pick<GuideOffer, 'kind' | 'title' | 'description' | 'price_cents' | 'affiliate_url' | 'access_model' | 'file_path' | 'booking_url'> & Partial<Pick<GuideOffer, 'currency'>>): Promise<GuideOffer> {
+export async function createGuideOffer(guideId: string, offer: Pick<GuideOffer, 'kind' | 'title' | 'description' | 'price_cents' | 'affiliate_url' | 'access_model' | 'file_path' | 'booking_url'> & Partial<Pick<GuideOffer, 'currency' | 'status'>>): Promise<GuideOffer> {
   const { data, error } = await db().from('guide_offers').insert({ guide_id: guideId, ...offer }).select().single();
   if (error) throw error;
   return data as GuideOffer;
+}
+
+type GuideOfferInput = Pick<GuideOffer, 'kind' | 'title' | 'description' | 'price_cents' | 'affiliate_url' | 'access_model' | 'file_path' | 'booking_url'> & Partial<Pick<GuideOffer, 'currency' | 'status'>>;
+
+/** Update the given offer when an id is passed, otherwise create it. Lets republishing reuse offers. */
+export async function upsertGuideOffer(guideId: string, offer: GuideOfferInput, existingId?: string | null): Promise<GuideOffer> {
+  if (!existingId) return createGuideOffer(guideId, offer);
+  const { data, error } = await db().from('guide_offers').update(offer).eq('id', existingId).eq('guide_id', guideId).select().single();
+  if (error) throw error;
+  return data as GuideOffer;
+}
+
+/** Create or update an offer path by slug, with its offers in funnel order. */
+export async function upsertGuideValueRamp(guideId: string, ramp: Pick<GuideValueRamp, 'name' | 'slug' | 'audience' | 'problem' | 'offer_ids' | 'status'>): Promise<GuideValueRamp> {
+  const { data, error } = await db().from('guide_value_ramps').upsert({ guide_id: guideId, ...ramp }, { onConflict: 'guide_id,slug' }).select().single();
+  if (error) throw error;
+  return data as GuideValueRamp;
+}
+
+export async function listGuideValueRamps(userId: string): Promise<GuideValueRamp[]> {
+  const { data, error } = await db().from('guide_value_ramps').select('*').eq('guide_id', userId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuideValueRamp[];
+}
+
+export async function createGuideValueRamp(guideId: string, ramp: Pick<GuideValueRamp, 'name' | 'slug' | 'audience' | 'problem'>): Promise<GuideValueRamp> {
+  const { data, error } = await db().from('guide_value_ramps').insert({ guide_id: guideId, ...ramp }).select().single();
+  if (error) throw error;
+  return data as GuideValueRamp;
+}
+
+export async function replaceGuideBrands(guideId: string, brands: Omit<GuideBrand, 'id' | 'guide_id'>[]): Promise<GuideBrand[]> {
+  const { error: deleteError } = await db().from('guide_brands').delete().eq('guide_id', guideId);
+  if (deleteError) throw deleteError;
+  const { data, error } = await db().from('guide_brands').insert(brands.map((brand) => ({ ...brand, guide_id: guideId }))).select();
+  if (error) throw error;
+  return (data || []) as GuideBrand[];
 }
 
 export async function listGuideRecipes(userId: string): Promise<GuideRecipe[]> {
@@ -165,4 +319,146 @@ export async function updateGuideRecipe(id: string, recipe: Partial<Pick<GuideRe
   const { data, error } = await db().from('guide_recipes').update(recipe).eq('id', id).select().single();
   if (error) throw error;
   return data as GuideRecipe;
+}
+
+export async function listGuideLibraryFolders(guideId: string): Promise<GuideLibraryFolder[]> {
+  const { data, error } = await db().from('guide_library_folders').select('*').eq('guide_id', guideId).order('name');
+  if (error) throw error;
+  return (data || []) as GuideLibraryFolder[];
+}
+
+export async function createGuideLibraryFolder(guideId: string, name: string): Promise<GuideLibraryFolder> {
+  const { data, error } = await db().from('guide_library_folders').insert({ guide_id: guideId, name }).select().single();
+  if (error) throw error;
+  return data as GuideLibraryFolder;
+}
+
+export async function listGuideLibraryItems(guideId: string): Promise<GuideLibraryItem[]> {
+  const { data, error } = await db().from('guide_library_items').select('*').eq('guide_id', guideId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuideLibraryItem[];
+}
+
+export async function createGuideLibraryItem(guideId: string, item: Pick<GuideLibraryItem, 'folder_id' | 'kind' | 'title' | 'source_url' | 'file_path' | 'transcript'>): Promise<GuideLibraryItem> {
+  const { data, error } = await db().from('guide_library_items').insert({ guide_id: guideId, ...item }).select().single();
+  if (error) throw error;
+  return data as GuideLibraryItem;
+}
+
+export async function deleteGuideLibraryItem(id: string): Promise<void> {
+  const { error } = await db().from('guide_library_items').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getGuideFileDownloadUrl(path: string): Promise<string> {
+  const { data, error } = await db().storage.from('guide-files').createSignedUrl(path, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export type GuardianReview = { id: string; guide_id: string; reviewer_name: string; rating: number; body: string; status: 'published' | 'hidden'; created_at: string };
+export type GuardianReviewRequest = { token: string; guide_id: string; customer_email: string | null; customer_name: string | null; discount_code: string; used_at: string | null; created_at: string };
+
+export async function listGuardianReviews(guideId: string): Promise<GuardianReview[]> {
+  const { data, error } = await db().from('guardian_reviews').select('*').eq('guide_id', guideId).order('created_at', { ascending: false }).limit(40);
+  if (error) throw error;
+  return (data || []) as GuardianReview[];
+}
+
+export async function setGuardianReviewStatus(id: string, status: GuardianReview['status']): Promise<void> {
+  const { error } = await db().from('guardian_reviews').update({ status }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function listGuardianReviewRequests(guideId: string): Promise<GuardianReviewRequest[]> {
+  const { data, error } = await db().from('guardian_review_requests').select('*').eq('guide_id', guideId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuardianReviewRequest[];
+}
+
+export async function createGuardianReviewRequest(guideId: string, request: { customer_email?: string; customer_name?: string; discount_code: string }): Promise<GuardianReviewRequest> {
+  const { data, error } = await db().from('guardian_review_requests').insert({ guide_id: guideId, customer_email: request.customer_email?.trim() || null, customer_name: request.customer_name?.trim() || null, discount_code: request.discount_code }).select().single();
+  if (error) throw error;
+  return data as GuardianReviewRequest;
+}
+
+/** Submits a review through a one-time link; resolves to the thank-you discount code. */
+export async function submitGuardianReview(token: string, review: { name: string; rating: number; body: string }): Promise<string> {
+  const { data, error } = await db().rpc('submit_guardian_review', { p_token: token, p_name: review.name, p_rating: review.rating, p_body: review.body });
+  if (error) throw error;
+  return String(data || '');
+}
+
+// Real payments (platform Stripe account) through the guardian-payments edge function.
+export type PaymentIntentResult = { purchase_id: string; client_secret: string | null; amount_cents: number; currency?: string; status?: 'paid' | 'pending' | 'failed' | 'requires_action'; discount_code?: string | null };
+async function callPayments<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await db().functions.invoke('guardian-payments', { body });
+  if (error) {
+    let message = error.message;
+    try { const detail = await (error as any).context?.json?.(); if (detail?.error) message = detail.error; } catch { /* keep default */ }
+    throw new Error(message || 'Payment failed.');
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as T;
+}
+export const createOfferPayment = (offerId: string, email: string, name?: string) => callPayments<PaymentIntentResult>({ action: 'intent', offer_id: offerId, email, name });
+export const confirmOfferPayment = (purchaseId: string) => callPayments<{ status: PaymentIntentResult['status'] }>({ action: 'confirm', purchase_id: purchaseId });
+export const buyUpsellOneClick = (previousPurchaseId: string, offerId: string) => callPayments<PaymentIntentResult>({ action: 'upsell', previous_purchase_id: previousPurchaseId, offer_id: offerId });
+
+/** Short-lived download link for a free offer's uploaded file, after the visitor has opted in. */
+export async function getFreeOfferDownload(offerId: string, email: string): Promise<string> {
+  const { data, error } = await db().functions.invoke('guardian-files', { body: { offer_id: offerId, email } });
+  if (error) {
+    let message = 'Could not prepare the download.';
+    try { const detail = await (error as any).context?.json?.(); if (detail?.error) message = detail.error; } catch { /* keep default */ }
+    throw new Error(message);
+  }
+  if (!(data as any)?.url) throw new Error((data as any)?.error || 'Could not prepare the download.');
+  return (data as any).url as string;
+}
+
+// ---- Guardian site review (guardian-review edge function) and admin lists ----
+async function callReview<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await db().functions.invoke('guardian-review', { body });
+  if (error) {
+    let message = error.message;
+    try { const detail = await (error as any).context?.json?.(); if (detail?.error) message = detail.error; } catch { /* keep default */ }
+    throw new Error(message || 'Review request failed.');
+  }
+  return data as T;
+}
+export type ReviewEmailResult = { sent: boolean; reason: string | null };
+export const requestGuardianReview = () => callReview<{ status: string; email: ReviewEmailResult }>({ action: 'request' });
+export const decideGuardianSite = (userId: string, status: 'approved' | 'paused', note?: string) => callReview<{ status: string; email: ReviewEmailResult }>({ action: 'decide', user_id: userId, status, note });
+
+export type AdminGuideProfile = GuideProfile & { review_requested_at?: string | null; reviewed_at?: string | null; updated_at?: string | null };
+export async function listAllGuideProfiles(): Promise<AdminGuideProfile[]> {
+  const { data, error } = await db().from('guide_profiles').select('*').order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as AdminGuideProfile[];
+}
+export type GuardianSuggestionRow = GuardianSuggestion & { id: string; status: 'new' | 'contacted' | 'invited' | 'dismissed'; created_at: string };
+export async function listGuardianSuggestions(): Promise<GuardianSuggestionRow[]> {
+  const { data, error } = await db().from('guardian_suggestions').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuardianSuggestionRow[];
+}
+export async function setGuardianSuggestionStatus(id: string, status: GuardianSuggestionRow['status']): Promise<void> {
+  const { error } = await db().from('guardian_suggestions').update({ status }).eq('id', id);
+  if (error) throw error;
+}
+/** Published offers from approved Guardians, for the directory's offerings section. */
+export async function listPublicGuardianOffers(): Promise<GuideOffer[]> {
+  const { data, error } = await db().from('guide_offers').select('id,guide_id,kind,title,description,price_cents,currency,access_model,booking_url,affiliate_url,file_path,status').eq('status', 'published').order('price_cents', { ascending: true }).limit(60);
+  if (error) throw error;
+  return (data || []) as GuideOffer[];
+}
+
+/** Average rating + count of published reviews per Guardian (for offer cards). */
+export async function listReviewSummaries(): Promise<Record<string, { rating: number; reviewCount: number }>> {
+  const { data, error } = await db().from('guardian_reviews').select('guide_id,rating').eq('status', 'published').limit(2000);
+  if (error) throw error;
+  const out: Record<string, { rating: number; reviewCount: number }> = {};
+  (data || []).forEach((row: any) => { const cur = out[row.guide_id] || { rating: 0, reviewCount: 0 }; cur.rating = (cur.rating * cur.reviewCount + row.rating) / (cur.reviewCount + 1); cur.reviewCount += 1; out[row.guide_id] = cur; });
+  return out;
 }

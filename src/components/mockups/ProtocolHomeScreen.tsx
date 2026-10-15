@@ -14,7 +14,7 @@
  */
 import { useState } from "react";
 import {
-  User, ChartNoAxesCombined, ShoppingBasket, ListChecks, Plus, Repeat, Check,
+  User, ChartNoAxesCombined, ShoppingBasket, ListChecks, Plus, Repeat, Check, Sparkles,
   Timer, Apple, Ellipsis, SlidersHorizontal, RefreshCw, Sun,
 } from "lucide-react";
 import {
@@ -147,6 +147,45 @@ function buildBands(list: HomeItem[]): Band[] {
   return bands;
 }
 
+
+/* ───────── smart lists (mirrors mobile timeline/smartGroups.ts) ─────────
+   A group is a function of (time-of-day phase, subtype): "Morning Hygiene",
+   "Evening Meal". Sleep anchors stay their own unprefixed "Sleep" group. */
+type SmartCategory = "hygiene" | "wellness" | "fitness" | "supplements" | "meal" | "work" | "home" | "tasks";
+const SMART_ORDER: SmartCategory[] = ["hygiene", "wellness", "fitness", "supplements", "meal", "work", "home", "tasks"];
+const SMART_TITLE: Record<SmartCategory, string> = { hygiene: "Hygiene", wellness: "Wellness", fitness: "Fitness", supplements: "Supplements", meal: "Meal", work: "Work", home: "Home", tasks: "Tasks" };
+const SUBTYPE_TO_SMART: Record<string, SmartCategory> = { hygiene: "hygiene", wellness: "wellness", reflection: "wellness", finance: "home", planning: "tasks", work: "work", home: "home", tasks: "tasks", exercise: "fitness", supplement: "supplements", meal: "meal", beverage: "meal", drink: "meal", snack: "meal" };
+const SMART_CATEGORY_FALLBACK: Record<string, SmartCategory> = { supplement: "supplements", supplements: "supplements", consume: "meal", do: "wellness" };
+const SMART_TYPE_FALLBACK: Record<string, SmartCategory> = { supplement: "supplements", consume: "meal", recipe: "meal", product: "supplements", activity: "wellness", rule: "wellness" };
+function smartCategoryFor(it: HomeItem): SmartCategory {
+  const sub = (it.subtype || "").toLowerCase().trim();
+  if (SUBTYPE_TO_SMART[sub]) return SUBTYPE_TO_SMART[sub];
+  const cat = (it.category || "").toLowerCase().trim();
+  if (SMART_CATEGORY_FALLBACK[cat]) return SMART_CATEGORY_FALLBACK[cat];
+  const type = (it.item_type || "").toLowerCase().trim();
+  return SMART_TYPE_FALLBACK[type] || "wellness";
+}
+const SMART_TINT: Record<SmartCategory, CatKey> = { hygiene: "do", wellness: "do", fitness: "do", supplements: "supplements", meal: "consume", work: "do", home: "do", tasks: "do" };
+function buildSmartBands(list: HomeItem[], tod: string): Band[] {
+  const bands: Band[] = [];
+  const sleepItems = list.filter((it) => categorizeFull(it) === "sleep");
+  const rest = list.filter((it) => categorizeFull(it) !== "sleep");
+  const byCat = new Map<SmartCategory, HomeItem[]>();
+  for (const it of rest) { const c = smartCategoryFor(it); byCat.set(c, [...(byCat.get(c) || []), it]); }
+  const sortItems = (xs: HomeItem[]) => [...xs].sort((a, b) => orderKey(a) - orderKey(b));
+  for (const it of sortItems(sleepItems)) bands.push({ cat: "sleep", slot: null, firstMin: parseHM(it.time)?.mins ?? null, order: orderKey(it), time: it.time, label: "SLEEP", items: [it] });
+  for (const c of SMART_ORDER) {
+    const items = byCat.get(c);
+    if (!items?.length) continue;
+    const sorted = sortItems(items);
+    bands.push({ cat: SMART_TINT[c], slot: "smart", firstMin: parseHM(sorted[0].time)?.mins ?? null, order: orderKey(sorted[0]), time: sorted[0].time, label: `${tod} ${SMART_TITLE[c]}`.toUpperCase(), items: sorted });
+  }
+  // Wake leads the morning; every other sleep band (bedtime, "Sleep in complete darkness") closes
+  // the day. Smart groups sit between, in category order.
+  const rank = (b: Band) => b.cat === "sleep" ? (b.items.some(isWake) ? -1 : 1000) : SMART_ORDER.indexOf(b.label.split(" ").pop()!.toLowerCase() as SmartCategory);
+  return bands.sort((a, b) => rank(a) - rank(b));
+}
+
 /* ───────── date helpers for header + week strip ───────── */
 const WD = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const WD_FULL = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
@@ -172,7 +211,13 @@ export function ProtocolHomeScreen({
   showDetails: showDetailsProp = true,
   theme = "light",
   profileName = "John Ferreira",
+  grouping = "smart",
+  dayMarks,
 }: {
+  /** Per-date marks under the week strip, as the app draws them (cycle) plus an optional moon glyph. */
+  dayMarks?: (date: Date) => { cycle?: "period" | "fertile" | "ovulation" | null; moon?: string | null };
+  /** 'smart' groups by phase + category like the mobile smart lists. */
+  grouping?: "time" | "smart";
   protocolName: string;
   items: HomeItem[];
   date?: Date;
@@ -214,8 +259,9 @@ export function ProtocolHomeScreen({
   const byTod: Record<Tod, HomeItem[]> = { Morning: [], Afternoon: [], Evening: [] };
   for (const it of allItems) byTod[todForItem(it, wakeHour)].push(it);
   const sections = todOrder
-    .map((tod) => ({ tod, bands: buildBands(byTod[tod]) }))
-    .filter((s) => s.bands.length);
+    .map((tod) => ({ tod, bands: grouping === "smart" ? buildSmartBands(byTod[tod], tod) : buildBands(byTod[tod]) }))
+    // All three day parts always show; an empty one gets an "Add" slot (as in the app).
+    ;
 
   // The current mobile strip begins on the selected day, keeping the selected
   // circle on the shared avatar/timeline axis (Tue→Mon in the reference).
@@ -245,15 +291,11 @@ export function ProtocolHomeScreen({
         <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>7:20 pm</span>
       </div>
 
-      {/* scrollable app canvas */}
-      <div className="phone-scroll" style={{ flex: 1, overflowY: "auto", margin: `0 ${MT.screenCardInset}px`, borderRadius: "22px 22px 0 0", background: ui.surface, padding: "13px 0 108px", display: "flex", flexDirection: "column", position: "relative" }}>
-        {/* One day spine, matching mobile. Per-row colour segments paint over
-            this base rail, but section and group gaps can no longer break it. */}
-        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.railWidth / 2, top: 78, bottom: 0, width: MT.railWidth, background: dark ? "#5D5D63" : "#9CA3AF", opacity: 0.62, zIndex: 0 }} />
-        {/* Selected day -> End Sleep bridge. Mobile paints this as a full sleep
-            column, not a hairline: both side edges continue from the bottom of
-            the selected date ring into the square top of the wake capsule. */}
-        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.nodeWidth / 2, top: 105, height: 160, width: MT.nodeWidth, background: `linear-gradient(180deg, ${purple} 0%, #965BD2 54%, #A96EAE 100%)`, borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", opacity: 0.96, zIndex: 0 }} />
+      {/* Fixed profile/calendar header with an independently scrolling timeline. */}
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", margin: `0 ${MT.screenCardInset}px`, borderRadius: "22px 22px 0 0", background: ui.surface, display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "relative", zIndex: 10, flexShrink: 0, paddingTop: 13, background: ui.surface, boxShadow: dark ? "0 5px 12px rgba(0,0,0,0.2)" : "0 5px 12px rgba(15,23,42,0.06)" }}>
+        {/* The selected-day column terminates at the fixed day header. */}
+        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.nodeWidth / 2, top: 85, bottom: 0, width: MT.nodeWidth, background: `linear-gradient(180deg, ${purple} 0%, #965BD2 54%, #A96EAE 100%)`, borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", opacity: 0.96, zIndex: 0 }} />
         {/* HEADER */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44, padding: `0 ${MT.headerPadX}px`, marginBottom: 6, gap: 8, flexShrink: 0, position: "relative", zIndex: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: MT.headerLeadPad, flexShrink: 1, minWidth: 0 }}>
@@ -289,12 +331,27 @@ export function ProtocolHomeScreen({
                 <span style={{ width: 32, height: 32, borderRadius: 16, background: circleBg, border: isSelected ? `3px solid ${purple}` : `2px solid ${ui.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: filled ? (dark ? "#111827" : "#FFFFFF") : ui.text, fontVariantNumeric: "tabular-nums" }}>{d.getDate()}</span>
                 </span>
+                {dayMarks && (() => { const m = dayMarks(d); return (
+                  // Mark row (mobile CycleDayMark): period bar, fertile dots, ovulation sparkle; moon glyph beside.
+                  <span style={{ height: 10, marginTop: 3, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                    {m.cycle === "period" && <span style={{ width: 16, height: 2.5, borderRadius: 2, background: "#F87171" }} />}
+                    {m.cycle === "fertile" && <span style={{ width: 16, display: "inline-flex", justifyContent: "space-between" }}>{[0, 1, 2].map((k) => <span key={k} style={{ width: 3, height: 3, borderRadius: 2, background: "#14B8A6" }} />)}</span>}
+                    {m.cycle === "ovulation" && <Sparkles size={10} color="#14B8A6" strokeWidth={2} />}
+                    {m.moon && <span style={{ fontSize: 9, lineHeight: 1 }}>{m.moon}</span>}
+                  </span>
+                ); })()}
               </div>
             );
           })}
         </div>
 
         <div style={{ margin: `0 15px 10px ${MT.rowContentX}px`, borderRadius: 18, background: ui.dayPill, color: ui.dayPillText, padding: "10px 14px", fontSize: 10.5, fontWeight: 700, letterSpacing: 1.2, textAlign: "center", flexShrink: 0, position: "relative", zIndex: 1 }}>{headerDate} · TODAY</div>
+        </div>
+
+        <div className="phone-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 0 108px", position: "relative" }}>
+        {/* One day spine, matching mobile. Per-row colour segments paint over
+            this base rail, but section and group gaps can no longer break it. */}
+        <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.railWidth / 2, top: 0, bottom: 0, width: MT.railWidth, background: dark ? "#5D5D63" : "#9CA3AF", opacity: 0.62, zIndex: 0 }} />
 
         {/* SECTIONS */}
         {sections.length === 0 && (
@@ -306,6 +363,13 @@ export function ProtocolHomeScreen({
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: "#374151", textTransform: "uppercase" }}>{tod}</span>
             </div>
 
+            {bands.every((band) => band.cat === "sleep") && (
+              <div style={{ position: "relative", padding: `0 16px 10px ${MT.rowContentX}px` }}>
+                <div style={{ minHeight: 48, border: `1.5px dashed ${ui.faint}`, borderRadius: dark ? 12 : MT.groupRadius, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: ui.muted, fontSize: 12, fontWeight: 600 }}>
+                  <Plus size={13} strokeWidth={2} /> Add to {tod.toLowerCase()}
+                </div>
+              </div>
+            )}
             {bands.map((band, bi) => {
               const tint = CATEGORY_TINTS[band.cat];
               const GroupIcon = tint.Icon;
@@ -342,23 +406,33 @@ export function ProtocolHomeScreen({
                         const mobileTint = bandTint;
                         const sleepExtra = sleepWin.durationLabel && isWake(it) ? `${sleepWin.durationLabel} sleep`
                           : sleepWin.durationLabel && isBed(it) ? `${sleepWin.durationLabel} until wake` : null;
-                        const sub = [fmtTime(it.time), sleepExtra, it.duration_minutes ? `${it.duration_minutes} min` : null].filter(Boolean).join(" · ");
+                        // Titles are verb + noun ("Go cycling"), so the line under them reads on: "at 7:30am for 20 min".
+                        // Sleep anchors keep the mobile "7:00am · 8h 30m sleep" form.
+                        const sub = isWake(it) || isBed(it)
+                          ? [fmtTime(it.time), sleepExtra].filter(Boolean).join(" · ")
+                          : [it.time ? `at ${fmtTime(it.time)}` : null, it.duration_minutes ? `for ${it.duration_minutes} min` : null].filter(Boolean).join(" ");
                         const nodeH = isWake(it) || isBed(it) ? 66 : Math.max(34, Math.min(48, 34 + ((it.duration_minutes || 0) / 15) * 3));
                         const hasDetail = showDetails && (!!it.description || !!it.children?.length);
                         return (
                           <div key={ii} style={{ position: "relative", minHeight: Math.max(48, nodeH) }}>
                             {/* Media capsule shares the lane axis; time stays in the card metadata. */}
                             <span style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.railWidth / 2, top: 0, bottom: ii === band.items.length - 1 ? -12 : -6, width: MT.railWidth, background: isDone ? completedFg : ui.muted, opacity: 0.75 }} />
+                            {/* Day → wake bridge: continues the selected-day column from the fixed header down
+                                into the wake capsule. Extends upward and is clipped by the scrolling timeline,
+                                so it meets the header column exactly and scrolls with the day like mobile. */}
+                            {/* Bedtime mirrors wake: the night column continues below the capsule. */}
+                            {isBed(it) && <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: 2 + nodeH - 1, height: 100, width: MT.nodeWidth, background: `linear-gradient(180deg, ${purple} 0%, #965BD2 100%)`, WebkitMaskImage: "linear-gradient(180deg, #000 35%, transparent)", maskImage: "linear-gradient(180deg, #000 35%, transparent)", borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", zIndex: 1 }} />}
+                            {isWake(it) && <span aria-hidden="true" style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: -2000, height: 2002, width: MT.nodeWidth, background: `linear-gradient(180deg, #A96EAE 0%, #A96EAE calc(100% - 110px), #965BD2 calc(100% - 50px), ${purple} 100%)`, borderLeft: `1.5px solid ${purple}`, borderRight: `1.5px solid ${purple}`, boxSizing: "border-box", zIndex: 1 }} />}
                             <span style={{ position: "absolute", left: MT.axisX - MT.itemOriginX - MT.nodeWidth / 2, top: 2, width: MT.nodeWidth, height: nodeH, borderRadius: isWake(it) ? `0 0 ${MT.nodeWidth / 2}px ${MT.nodeWidth / 2}px` : isBed(it) ? `${MT.nodeWidth / 2}px ${MT.nodeWidth / 2}px 0 0` : MT.nodeWidth / 2, overflow: "hidden", background: isWake(it) || isBed(it) ? purple : (isDone ? completedFg : ui.card), border: `1.5px solid ${isWake(it) || isBed(it) ? purple : (isDone ? completedFg : ui.muted)}`, borderTopWidth: isWake(it) ? 0 : 1.5, display: "inline-flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
                               {it.image_url && !/recipe_water-|openfoodfacts/i.test(it.image_url)
                                 ? <img src={it.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: isDone ? "none" : "grayscale(1)", opacity: isDone ? 1 : 0.72 }} />
                                 : isWake(it) ? <Sun size={16} strokeWidth={1.8} color="#FFFFFF" />
                                   : <ItemIcon size={15} strokeWidth={1.8} color={isDone ? "#FFFFFF" : "#9CA3AF"} />}
                             </span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: dark ? 10 : MT.itemRadius, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.display_name}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, minHeight: isWake(it) || isBed(it) ? 54 : 48, background: ui.card, borderRadius: dark ? 10 : MT.itemRadius, padding: "8px 9px 8px 11px", boxShadow: dark ? "none" : "0 1px 2px rgba(17,24,39,0.04)" }}>
+                            <div style={{ flex: "1 1 0", minWidth: 0, overflow: "hidden" }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 5, minWidth: 0, overflow: "hidden" }}>
+                                <span title={it.display_name} style={{ flex: "1 1 0", minWidth: 0, fontSize: 13, fontWeight: 600, lineHeight: 1.25, color: isDone ? ui.muted : ui.text, textDecoration: isDone ? "line-through" : "none", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "break-word" }}>{it.display_name}</span>
                                 {it.repeat && <Repeat size={10} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />}
                               </div>
                               {sub && <div style={{ fontSize: 10, fontWeight: 400, color: isDone ? "#C4C4C0" : "#9CA3AF", textDecoration: isDone ? "line-through" : "none", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
@@ -393,6 +467,7 @@ export function ProtocolHomeScreen({
           </div>
         ))}
 
+        </div>
       </div>
 
       {/* floating TAB BAR */}

@@ -12,9 +12,12 @@
  * Recipe details are fetched from the current environment via PostgREST.
  */
 import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
 import { projectId, publicAnonKey } from './supabase/info';
 
 export interface PdfProtocol {
+  /** When set, page one carries a QR code that opens this protocol in the app (universal link). */
+  id?: string | null;
   name: string;
   description?: string | null;
   creator?: string | null;
@@ -32,11 +35,33 @@ export interface PdfItem {
   hidden?: boolean | null;
   parent_protocol_item_id?: string | null;
   catalog_recipe_id?: string | null;
+  category?: string | null;
+  subtype?: string | null;
+  item_type?: string | null;
 }
 interface Recipe {
   id: string; name_common: string; description?: string | null;
   servings?: number | null; prep_time?: string | null; cook_time?: string | null;
   instructions?: any; ingredients: { name: string; amount?: string; optional?: boolean }[];
+}
+
+/* Smart grouping, as in the app (mobile timeline/smartGroups.ts): part of day, then category. */
+type PdfGroup = 'Hygiene' | 'Beauty' | 'Wellness' | 'Fitness' | 'Supplements' | 'Meal' | 'Work' | 'Home' | 'Tasks';
+const PDF_GROUP_ORDER: PdfGroup[] = ['Hygiene', 'Beauty', 'Wellness', 'Fitness', 'Supplements', 'Meal', 'Work', 'Home', 'Tasks'];
+const PDF_SUBTYPE_GROUP: Record<string, PdfGroup> = { hygiene: 'Hygiene', wellness: 'Wellness', reflection: 'Wellness', beauty: 'Beauty', skin: 'Beauty', skincare: 'Beauty', exercise: 'Fitness', fitness: 'Fitness', supplement: 'Supplements', meal: 'Meal', beverage: 'Meal', drink: 'Meal', snack: 'Meal', work: 'Work', home: 'Home', finance: 'Home', tasks: 'Tasks', planning: 'Tasks' };
+function pdfGroupOf(it: PdfItem): PdfGroup {
+  const sub = (it.subtype || '').toLowerCase();
+  if (PDF_SUBTYPE_GROUP[sub]) return PDF_SUBTYPE_GROUP[sub];
+  const cat = (it.category || '').toLowerCase();
+  if (cat === 'supplement' || it.item_type === 'supplement' || it.item_type === 'product') return 'Supplements';
+  if (cat === 'consume' || it.item_type === 'consume' || it.item_type === 'recipe') return 'Meal';
+  return 'Wellness';
+}
+const isSleepItem = (it: PdfItem) => (it.category || '').toLowerCase() === 'sleep' || (it.subtype || '').toLowerCase() === 'sleep';
+const isWakeItem = (it: PdfItem) => /^(wake|get up|rise|end\s*sleep)\b/i.test((it.display_name || '').trim());
+function mealLabel(time?: string | null): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(time || ''); const mins = m ? +m[1] * 60 + +m[2] : 12 * 60;
+  return mins < 11 * 60 ? 'Breakfast' : mins < 15 * 60 ? 'Lunch' : mins < 17 * 60 + 30 ? 'Snack' : 'Dinner';
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -117,6 +142,38 @@ export async function buildProtocolPdf(opts: { accessToken: string; protocol: Pd
   }
   const minutesOf = (t?: string | null) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : 1e9; };
   const behaviours = [...tops].sort((a, b) => minutesOf(a.scheduled_time) - minutesOf(b.scheduled_time));
+  // Part of day → (wake first) → smart groups → (bedtime last), each step numbered in that order.
+  type TrackerRow = { kind: 'part'; label: string } | { kind: 'group'; label: string } | { kind: 'item'; item: PdfItem; n: number };
+  const sleepTops = behaviours.filter(isSleepItem);
+  const wake = sleepTops.find(isWakeItem) || (sleepTops.length > 1 ? sleepTops[0] : null);
+  const bedtimes = sleepTops.filter((it) => it !== wake);
+  const partOf = (it: PdfItem) => { const t = minutesOf(it.scheduled_time); return t < 12 * 60 || t === 1e9 ? 'Morning' : t < 17 * 60 ? 'Afternoon' : 'Evening'; };
+  const rows: TrackerRow[] = [];
+  const ordered: PdfItem[] = [];
+  const pushItem = (item: PdfItem) => { ordered.push(item); rows.push({ kind: 'item', item, n: ordered.length }); };
+  for (const part of ['Morning', 'Afternoon', 'Evening'] as const) {
+    const inPart = behaviours.filter((it) => !isSleepItem(it) && partOf(it) === part);
+    const hasWake = part === 'Morning' && wake;
+    const hasBed = part === 'Evening' && bedtimes.length;
+    if (!inPart.length && !hasWake && !hasBed) continue;
+    rows.push({ kind: 'part', label: part });
+    if (hasWake) { rows.push({ kind: 'group', label: 'Sleep' }); pushItem(wake!); }
+    for (const group of PDF_GROUP_ORDER) {
+      const list = inPart.filter((it) => pdfGroupOf(it) === group);
+      if (!list.length) continue;
+      rows.push({ kind: 'group', label: group });
+      list.forEach(pushItem);
+    }
+    if (hasBed) { rows.push({ kind: 'group', label: 'Sleep' }); bedtimes.forEach(pushItem); }
+  }
+  // Meals and drinks read as "Breakfast – <recipe>" / "Drink – <name>".
+  const itemLabel = (it: PdfItem) => {
+    const rec = it.catalog_recipe_id ? recipeById.get(it.catalog_recipe_id) : null;
+    const sub = (it.subtype || '').toLowerCase();
+    if (sub === 'beverage' || sub === 'drink') return `Drink – ${rec?.name_common || it.display_name || 'Drink'}`;
+    if (rec) return `${mealLabel(it.scheduled_time)} – ${rec.name_common}`;
+    return it.display_name || 'Step';
+  };
   const dos = items.filter((i) => i.kind === 'rule_do' && !i.parent_protocol_item_id).map((i) => i.display_name || '');
   const donts = items.filter((i) => i.kind === 'rule_dont' && !i.parent_protocol_item_id).map((i) => i.display_name || '');
   const recipeIds = [...new Set(items.map((i) => i.catalog_recipe_id).filter(Boolean) as string[])];
@@ -132,8 +189,48 @@ export async function buildProtocolPdf(opts: { accessToken: string; protocol: Pd
   const heading = (t: string, size = 12) => { ensure(10); doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.text(t, M, y); y += size * 0.5; doc.setLineWidth(0.4); doc.line(M, y, M + W, y); y += 5; };
 
   // ── 1. Header ──
+  // Brand lockup (top left): the site header's boxed "ROUTINE³ | PROTOCOL" mark, drawn as vectors.
+  {
+    const h = 7, pad = 2.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+    const word = 'ROUTINE³';
+    const wordW = doc.getTextWidth(word) + doc.getStringUnitWidth(word) * 0.2;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+    const tagW = doc.getTextWidth('PROTOCOL');
+    const total = pad + wordW + pad + pad + tagW + pad;
+    doc.setLineWidth(0.3); doc.setDrawColor(0);
+    doc.rect(M, y - 2, total, h);
+    doc.line(M + pad + wordW + pad, y - 2, M + pad + wordW + pad, y - 2 + h);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(word, M + pad, y + 2.6, { charSpace: 0.2 });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('PROTOCOL', M + pad + wordW + pad + pad, y + 2.4);
+    y += h + 4;
+  }
+  // QR (top right) → routine3.com/protocol/<id>, which the app claims as a universal link.
+  // Apple-style: round dots for data modules, rounded-square finder "eyes". Still a standard QR.
+  const QR = 26;
+  if (protocol.id) {
+    const code = QRCode.create(`https://routine3.com/protocol/${protocol.id}`, { errorCorrectionLevel: 'M' });
+    const n = code.modules.size;
+    const cell = QR / n;
+    const x0 = PW - M - QR, y0 = M - 2;
+    const inFinder = (r: number, c: number) => (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+    doc.setFillColor(0);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      if (inFinder(r, c) || !code.modules.get(r, c)) continue;
+      doc.circle(x0 + (c + 0.5) * cell, y0 + (r + 0.5) * cell, cell * 0.42, 'F');
+    }
+    for (const [fr, fc] of [[0, 0], [0, n - 7], [n - 7, 0]]) {
+      const fx = x0 + fc * cell, fy = y0 + fr * cell;
+      doc.setLineWidth(cell); doc.setDrawColor(0);
+      doc.roundedRect(fx + cell / 2, fy + cell / 2, cell * 6, cell * 6, cell * 1.6, cell * 1.6, 'S');
+      doc.roundedRect(fx + cell * 2, fy + cell * 2, cell * 3, cell * 3, cell * 0.9, cell * 0.9, 'F');
+    }
+    doc.setLineWidth(0.3);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+    doc.text('Scan to open in the ROUTINE³ app', PW - M - QR / 2, M + QR + 1.5, { align: 'center' });
+  }
   doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-  const titleLines = doc.splitTextToSize(protocol.name || 'Protocol', W);
+  const titleLines = doc.splitTextToSize(protocol.name || 'Protocol', protocol.id ? W - QR - 6 : W);
   doc.text(titleLines, M, y + 5); y += 5 + titleLines.length * 8;
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
   const meta = ['Weekly tracker', protocol.creator ? `by ${protocol.creator}` : '', protocol.health_score ? `${protocol.health_score}/100` : ''].filter(Boolean).join('   ·   ');
@@ -169,15 +266,27 @@ export async function buildProtocolPdf(opts: { accessToken: string; protocol: Pd
   };
   drawGridHeader();
   doc.setFontSize(8.5);
-  behaviours.forEach((b, idx) => {
-    const label = `${idx + 1}. ${b.display_name || 'Step'}`;
+  rows.forEach((row) => {
+    if (row.kind !== 'item') {
+      // Part-of-day bar (filled) or indented group label, spanning the whole table.
+      const h = row.kind === 'part' ? 7 : 6;
+      if (y + h + 9 > PH - M) { doc.addPage(); y = M; drawGridHeader(); }
+      if (row.kind === 'part') { doc.setFillColor(0); doc.rect(M, y, W, h, 'F'); doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text(row.label.toUpperCase(), M + 2, y + 4.8, { charSpace: 0.6 }); doc.setTextColor(0); }
+      else { doc.setFillColor(240); doc.rect(M, y, W, h, 'FD'); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text(row.label.toUpperCase(), M + 5, y + 4.2, { charSpace: 0.4 }); }
+      doc.setFontSize(8.5);
+      y += h;
+      return;
+    }
+    const b = row.item;
+    const indent = 9;
+    const label = `${row.n}. ${itemLabel(b)}`;
     const time = fmtTime(b.scheduled_time);
-    const labelLines = doc.splitTextToSize(label, labelW - 4);
+    const labelLines = doc.splitTextToSize(label, labelW - 4 - indent);
     const rowH = Math.max(9, labelLines.length * 3.6 + 3.5);
     if (y + rowH > PH - M) { doc.addPage(); y = M; drawGridHeader(); doc.setFontSize(8.5); }
     // label cell
     doc.rect(M, y, labelW, rowH, 'S');
-    doc.setFont('helvetica', 'normal'); doc.text(labelLines, M + 2, y + 4);
+    doc.setFont('helvetica', 'normal'); doc.text(labelLines, M + 2 + indent, y + 4);
     if (time) { doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.text(time, M + labelW - 2, y + rowH - 2, { align: 'right' }); doc.setFontSize(8.5); }
     // day tick boxes
     const box = 4.5;
@@ -188,24 +297,27 @@ export async function buildProtocolPdf(opts: { accessToken: string; protocol: Pd
     y += rowH;
   });
   if (!behaviours.length) { doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.text('No timed steps to track.', M, y + 4); y += 8; }
-  y += 4;
+  y += 10;
 
   // ── 3. How to do it ──
   heading('How to do it', 13);
   doc.setFontSize(9.5);
-  behaviours.forEach((b, idx) => {
+  rows.forEach((row) => {
+    if (row.kind === 'part') { ensure(9); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.text(row.label.toUpperCase(), M, y + 1, { charSpace: 0.6 }); doc.setFontSize(9.5); y += 6; return; }
+    if (row.kind === 'group') { ensure(7); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text(row.label.toUpperCase(), M + 4, y, { charSpace: 0.4 }); doc.setFontSize(9.5); y += 4.6; return; }
+    const b = row.item;
     const kids = childrenByParent.get(b.id) || [];
     const rec = b.catalog_recipe_id ? recipeById.get(b.catalog_recipe_id) : null;
-    const head = `${idx + 1}. ${b.display_name || 'Step'}${fmtTime(b.scheduled_time) ? `  (${fmtTime(b.scheduled_time)})` : ''}`;
-    const headLines = doc.splitTextToSize(head, W);
+    const head = `${row.n}. ${itemLabel(b)}${fmtTime(b.scheduled_time) ? `  (${fmtTime(b.scheduled_time)})` : ''}`;
+    const headLines = doc.splitTextToSize(head, W - 8);
     ensure(headLines.length * 5 + 2);
-    doc.setFont('helvetica', 'bold'); doc.text(headLines, M, y); y += headLines.length * 5;
+    doc.setFont('helvetica', 'bold'); doc.text(headLines, M + 8, y); y += headLines.length * 5;
     doc.setFont('helvetica', 'normal');
     for (const k of kids) {
-      const kl = doc.splitTextToSize(`•  ${k}`, W - 6); ensure(kl.length * 4.4 + 1);
-      doc.text(kl, M + 4, y); y += kl.length * 4.4;
+      const kl = doc.splitTextToSize(`•  ${k}`, W - 14); ensure(kl.length * 4.4 + 1);
+      doc.text(kl, M + 12, y); y += kl.length * 4.4;
     }
-    if (rec) { ensure(5); doc.setFont('helvetica', 'italic'); doc.text(`»  Recipe: ${rec.name_common} (see Recipes at the end)`, M + 4, y); doc.setFont('helvetica', 'normal'); y += 5; }
+    if (rec) { ensure(5); doc.setFont('helvetica', 'italic'); doc.text(`»  Recipe: ${rec.name_common} (see Recipes at the end)`, M + 12, y); doc.setFont('helvetica', 'normal'); y += 5; }
     y += 2;
   });
 
