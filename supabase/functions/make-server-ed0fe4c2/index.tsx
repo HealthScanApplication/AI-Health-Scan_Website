@@ -526,6 +526,79 @@ Create 5-12 achievable steps. Write every title as a short verb + noun action of
   }
 })
 
+// Guardian AI recipe builder: drafts 1+ recipes from a brief, dish/handwritten-recipe photos and
+// source URLs. Only the draft comes from the model; the client matches each ingredient to
+// catalog_ingredients and calculates nutrition from database values.
+app.post('/make-server-ed0fe4c2/guides/build-recipes', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    if (!accessToken) return c.json({ error: 'Sign in before building recipes' }, 401)
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+    if (authError || !user) return c.json({ error: 'Invalid session' }, 401)
+    const { message, count, mealSlot, sourceUrls, imageUrls } = await c.req.json()
+    if (typeof message !== 'string' || !message.trim()) return c.json({ error: 'Describe the recipes you want' }, 400)
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) return c.json({ error: 'AI recipe builder is not configured' }, 501)
+    const recipeCount = Math.max(1, Math.min(8, Number(count) || 1))
+    const urls = (Array.isArray(sourceUrls) ? sourceUrls : []).filter((u: unknown) => typeof u === 'string' && /^https?:\/\//.test(u)).slice(0, 3)
+    const images = (Array.isArray(imageUrls) ? imageUrls : []).filter((u: unknown) => typeof u === 'string' && /^https:\/\//.test(u)).slice(0, 4)
+    const sources = (await Promise.all(urls.map(async (url: string) => {
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 ROUTINE3 recipe builder' }, signal: AbortSignal.timeout(8000) })
+        const html = await res.text()
+        const text = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+        return `Source ${url}:\n${text.slice(0, 6000)}`
+      } catch { return '' }
+    }))).filter(Boolean).join('\n\n')
+    const prompt = `You help a qualified wellness Guardian draft recipes for a recipe book, for later human review.
+Guardian request: ${message.trim().slice(0, 3000)}
+Number of recipes: ${recipeCount}
+Preferred meal slot: ${mealSlot || 'choose per recipe'}
+${images.length ? 'Photos are attached: they may show finished dishes or handwritten/printed recipes. Transcribe handwritten recipes faithfully; for dish photos, recreate a realistic recipe.' : ''}
+${sources ? `Reference material:\n${sources}` : ''}
+
+Return JSON only with this exact shape:
+{"summary":"one or two sentences","recipes":[{"title":"short appetising name","description":"1-2 sentences on what it is and who it helps","meal_slot":"breakfast|lunch|dinner|snack|drink|dessert","servings":2,"prep_time":10,"cook_time":15,"ingredients":[{"name":"rolled oats","search":"oats","amount":80,"unit":"g","grams":80,"preparation":"optional, e.g. finely chopped"}],"instructions":["Step one as a full sentence."]}]}
+
+Rules: use whole, minimally processed foods. Every ingredient needs a real quantity: prefer unit "g" for solids and "ml" for liquids; use "tsp", "tbsp", "cup", "piece" or "pinch" only when natural, and ALWAYS give "grams" as your best weight estimate of that amount. "name" is a single plain food (no brands, no quantities); "search" is the simplest generic food name for a nutrition database lookup (e.g. "spinach", "olive oil", "egg"). prep_time and cook_time are minutes (0 if none). 3-8 clear method steps. Do not make medical claims.`
+    const content: any[] = [{ type: 'text', text: prompt }, ...images.map((url: string) => ({ type: 'image_url', image_url: { url } }))]
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: images.length ? 'gpt-4o' : 'gpt-4o-mini', response_format: { type: 'json_object' }, temperature: 0.4, messages: [{ role: 'user', content }] }),
+    })
+    const aiPayload = await aiResponse.json()
+    if (!aiResponse.ok) return c.json({ error: aiPayload?.error?.message || 'AI recipe generation failed' }, 502)
+    const raw = aiPayload?.choices?.[0]?.message?.content
+    if (!raw) return c.json({ error: 'AI returned no recipes' }, 502)
+    const draft = JSON.parse(raw)
+    const slots = ['breakfast', 'lunch', 'dinner', 'snack', 'drink', 'dessert']
+    const units = ['g', 'ml', 'tsp', 'tbsp', 'cup', 'piece', 'pinch']
+    const minutes = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.min(600, Math.round(n)) : null }
+    const recipes = (Array.isArray(draft.recipes) ? draft.recipes : []).slice(0, recipeCount).map((r: any) => ({
+      title: String(r.title || 'Untitled recipe').slice(0, 120),
+      description: String(r.description || '').slice(0, 600),
+      meal_slot: slots.includes(r.meal_slot) ? r.meal_slot : (slots.includes(mealSlot) ? mealSlot : 'lunch'),
+      servings: Math.max(1, Math.min(24, Math.round(Number(r.servings) || 2))),
+      prep_time: minutes(r.prep_time),
+      cook_time: minutes(r.cook_time),
+      ingredients: (Array.isArray(r.ingredients) ? r.ingredients : []).slice(0, 25).map((i: any) => ({
+        name: String(i.name || '').slice(0, 80),
+        search: String(i.search || i.name || '').slice(0, 60),
+        amount: Math.max(0, Number(i.amount) || 0),
+        unit: units.includes(String(i.unit).toLowerCase()) ? String(i.unit).toLowerCase() : 'g',
+        grams: Math.max(0, Number(i.grams) || 0),
+        preparation: i.preparation ? String(i.preparation).slice(0, 80) : undefined,
+      })).filter((i: any) => i.name),
+      instructions: (Array.isArray(r.instructions) ? r.instructions : []).slice(0, 12).map((s: any) => String(s).slice(0, 500)),
+    })).filter((r: any) => r.ingredients.length)
+    if (!recipes.length) return c.json({ error: 'AI returned no usable recipes' }, 502)
+    return c.json({ summary: String(draft.summary || '').slice(0, 600), recipes })
+  } catch (error: any) {
+    return c.json({ error: error?.message || 'Could not build recipes' }, 400)
+  }
+})
+
 app.get('/make-server-ed0fe4c2/', (c) => {
   return c.json({ 
     success: true,

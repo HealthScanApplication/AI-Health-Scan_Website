@@ -8,13 +8,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
 import { ContentStudio } from './ContentStudio';
+import { buildRecipePdf } from '../../utils/recipePdf';
+import { PhoneFrame } from '../mockups/PhoneFrame';
+import { buildRecipesWithAI, computeNutrition, gramsFor, searchCatalogIngredients, KEY_MICROS, UNITS, type CatalogIngredient, type MacroKey, type RecipeDraft, type RecipeIngredient } from '../../utils/guideRecipeAI';
 import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, requestGuardianReview, decideGuardianSite, listAllGuideProfiles, listGuardianSuggestions, setGuardianSuggestionStatus, listPublicGuardianOffers, listReviewSummaries, type AdminGuideProfile, type GuardianSuggestionRow, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
-  listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
+  listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, saveGuideRecipeDraft, listPersonalProtocolPeople, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
   type GuideValueRamp, type ImportedGuideProfile,
 } from '../../utils/guidePortal';
@@ -775,7 +778,7 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
                 <div aria-label="Filter offers" style={{ display: 'flex', gap: 7 }}>{(['all', 'free', 'paid'] as const).map((value) => <button type="button" key={value} onClick={() => setOfferFilter(value)} aria-pressed={offerFilter === value} style={{ height: 34, padding: '0 14px', border: `1px solid ${offerFilter === value ? ink : line}`, background: offerFilter === value ? ink : 'transparent', color: offerFilter === value ? black : ink, fontFamily: sans, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{value === 'all' ? 'All' : value === 'free' ? 'Free' : 'Paid'}</button>)}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,300px),1fr))', gap: 18 }}>
-                {shown.map((offer) => { const g = byId.get(offer.guide_id)!; const free = offer.access_model === 'free'; return <ProductCard key={offer.id} {...(reviewSummaries[offer.guide_id] || {})} audience={audienceLabel(g.social_links?.audience_details)} kind={offer.kind} eyebrow={(g.specialties || []).slice(0, 2).join(' · ') || 'Guardian'} title={customerFacingOfferTitle(offer.title)} copy={(offer.description || '').split(' Delivery:')[0] || undefined} price={free ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Paid'} name={g.display_name} avatarUrl={g.avatar_url} accent="#667245" cta={free ? 'Get it free' : 'View offer'} href={`/guardians/${encodeURIComponent(g.slug)}${free ? '#start' : '#offers'}`} />; })}
+                {shown.map((offer) => { const g = byId.get(offer.guide_id)!; const free = offer.access_model === 'free'; return <ProductCard key={offer.id} {...(reviewSummaries[offer.guide_id] || {})} kind={offer.kind} eyebrow={audienceLabel(g.social_links?.audience_details) || 'Everyone'} title={customerFacingOfferTitle(offer.title)} copy={(offer.description || '').split(' Delivery:')[0] || undefined} price={free ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Paid'} name={g.display_name} avatarUrl={g.avatar_url} accent="#667245" cta={free ? 'Get it free' : 'View offer'} href={`/guardians/${encodeURIComponent(g.slug)}${free ? '#start' : '#offers'}`} />; })}
               </div>
               {!shown.length && <p style={{ color: muted }}>No offers match this filter yet.</p>}
             </div>
@@ -1041,7 +1044,7 @@ const productArt = (kind?: string): TagArt | undefined => kind ? (offerTypeArt a
 // Light version of the dashboard offer card (art, author, title, value stars, price) for the public site and funnel.
 // Review stats for offer cards: average + count of published reviews, or nothing when there are none.
 const reviewStats = (reviews: GuardianReview[]) => { const live = reviews.filter((r) => r.status === 'published'); return live.length ? { rating: live.reduce((sum, r) => sum + r.rating, 0) / live.length, reviewCount: live.length } : {}; };
-function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accent, cta = 'View', href, onClick, rating, reviewCount = 0, audience }: { audience?: string; rating?: number; reviewCount?: number; kind?: string; eyebrow?: string; title: string; copy?: string; price?: string; name: string; avatarUrl?: string | null; accent: string; cta?: string; href?: string; onClick?: () => void }) {
+function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accent, cta = 'View', href, onClick, rating, reviewCount = 0, audience, imageUrl }: { imageUrl?: string | null; audience?: string; rating?: number; reviewCount?: number; kind?: string; eyebrow?: string; title: string; copy?: string; price?: string; name: string; avatarUrl?: string | null; accent: string; cta?: string; href?: string; onClick?: () => void }) {
   const art = productArt(kind);
   const stars = kind && kind in offerValueScores ? offerValueScores[kind as UpsellKind] : 2;
   // Self-contained tilt + cursor glow so it works on the public page too (no parent handler there).
@@ -1053,7 +1056,7 @@ function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accen
     setTilt({ x: (.5 - y) * 8, y: (x - .5) * 10, gx: x * 100, gy: y * 100, on: true });
   };
   // App-style offer card (matches the sign-up/upsell pages): image, format tag, Guardian, title, value, stars, black CTA.
-  return <div onPointerMove={move} onPointerLeave={() => setTilt({ x: 0, y: 0, gx: 50, gy: 50, on: false })} style={{ position: 'relative', overflow: 'hidden', textAlign: 'left', fontFamily: APP.font, color: APP.text, background: APP.bg, border: `1px solid ${tilt.on ? APP.green : APP.border}`, borderRadius: 20, boxShadow: tilt.on ? '0 22px 50px rgba(17,24,39,.2)' : '0 14px 36px rgba(17,24,39,.12)', transform: `perspective(900px) rotateX(${tilt.x.toFixed(2)}deg) rotateY(${tilt.y.toFixed(2)}deg)${tilt.on ? ' translateY(-2px)' : ''}`, transition: tilt.on ? 'box-shadow 180ms ease, border-color 180ms ease' : 'transform 260ms ease, box-shadow 220ms ease, border-color 220ms ease', willChange: 'transform' }}>
+  return <div onPointerMove={move} onPointerLeave={() => setTilt({ x: 0, y: 0, gx: 50, gy: 50, on: false })} style={{ position: 'relative', overflow: 'hidden', textAlign: 'left', fontFamily: APP.font, color: APP.text, background: APP.bg, border: `1px solid ${tilt.on ? APP.green : APP.border}`, borderRadius: 20, boxShadow: tilt.on ? '0 22px 50px rgba(17,24,39,.2)' : '0 14px 36px rgba(17,24,39,.12)', transform: `perspective(900px) rotateX(${tilt.x.toFixed(2)}deg) rotateY(${tilt.y.toFixed(2)}deg)${tilt.on ? ' translateY(-2px)' : ''}`, transition: tilt.on ? 'box-shadow 180ms ease, border-color 180ms ease' : 'transform 260ms ease, box-shadow 220ms ease, border-color 220ms ease', willChange: 'transform', display: 'flex', flexDirection: 'column' }}>
     <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none', opacity: tilt.on ? 1 : 0, transition: 'opacity 200ms ease', background: `radial-gradient(260px circle at ${tilt.gx}% ${tilt.gy}%, rgba(255,255,255,.55), transparent 70%)`, mixBlendMode: 'soft-light' }} />
     {price && <span style={{ position: 'absolute', zIndex: 2, top: 14, left: 14, background: '#000', color: '#FFF', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase' }}>{price}</span>}
     {/* Format and audience tags sit in the top-right corner, opposite the price badge. */}
@@ -1062,18 +1065,16 @@ function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accen
       {audience && <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 999, background: APP.surface, border: `1px solid ${APP.border}`, color: APP.text, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{audience}</span>}
     </div>
     <div style={{ display: 'flex', gap: 16, alignItems: 'center', padding: `${audience ? 76 : 50}px 18px 6px` }}>
-      <AppOfferImage kind={kind} size={84} align="left" />
-      <div style={{ minWidth: 0, display: 'grid', gap: 8 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 22, height: 22, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 600 }}>{(name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 12, fontWeight: 500 }}>{name}</span></span>
-      </div>
+      {imageUrl ? <img src={imageUrl} alt="" loading="lazy" style={{ width: 84, height: 84, borderRadius: 16, objectFit: 'cover', display: 'block' }} /> : <AppOfferImage kind={kind} size={84} align="left" />}
     </div>
     <div style={{ padding: '10px 18px 0' }}>
       {eyebrow && <span style={{ display: 'block', color: APP.greenDark, fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', marginBottom: 4 }}>{eyebrow}</span>}
       <strong style={{ display: 'block', fontSize: 20, fontWeight: 600, lineHeight: 1.25, letterSpacing: -0.3 }}>{title}</strong>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 6 }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 22, height: 22, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 600 }}>{(name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 12, fontWeight: 500 }}>{name}</span></span>
       {copy && <span style={{ display: 'block', color: APP.muted, fontSize: 13, fontWeight: 500, lineHeight: 1.5, marginTop: 6 }}>{copy}</span>}
       {reviewCount > 0 && rating ? <span aria-label={`Rated ${rating.toFixed(1)} out of 5 from ${reviewCount} review${reviewCount === 1 ? '' : 's'}`} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}><span aria-hidden="true" style={{ fontSize: 13, letterSpacing: 1 }}>{Array.from({ length: 5 }, (_, i) => <span key={i} style={{ color: i < Math.round(rating) ? APP.greenDark : APP.border }}>★</span>)}</span><span style={{ color: APP.text, fontSize: 12, fontWeight: 600 }}>{rating.toFixed(1)}</span><span style={{ color: APP.muted, fontSize: 11, fontWeight: 500 }}>({reviewCount})</span></span> : null}
     </div>
-    <div style={{ margin: 14, padding: 12, background: APP.surface, borderRadius: 14, boxShadow: '0 2px 8px rgba(17,24,39,.06)' }}>
+    <div style={{ marginTop: 'auto', marginRight: 14, marginBottom: 14, marginLeft: 14, paddingTop: 0 }} /><div style={{ margin: '0 14px 14px', padding: 12, background: APP.surface, borderRadius: 14, boxShadow: '0 2px 8px rgba(17,24,39,.06)' }}>
       <a href={href || '#'} onClick={onClick ? (event) => { event.preventDefault(); onClick(); } : undefined} style={{ ...appButton, minHeight: 50, borderRadius: 12, textDecoration: 'none', fontSize: 15, fontWeight: 600 }}>{cta === 'View' ? (price === 'Free' ? 'Get it free' : 'View offer') : cta}</a>
     </div>
   </div>;
@@ -1099,7 +1100,7 @@ const isProtocolKind = (kind?: string) => kind === 'routine' || kind === 'routin
 // Every offer gets a format tag: app-delivered plans are PDF + ROUTINE³, others name their format.
 const APP_PLAN_KINDS = ['routine', 'routine_guidance', 'program', 'journey', 'team_program', 'lead_magnet'];
 const boxTag: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, height: 18, padding: '0 8px', border: '1px solid #111827', borderRadius: 2, fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '0.13em', boxSizing: 'border-box', color: '#111827', textTransform: 'uppercase', whiteSpace: 'nowrap' };
-const OTHER_FORMATS: Record<string, string> = { ebook: 'PDF', recipe_book: 'PDF', one_to_one_call: '1:1 call', group_call: 'Group call', in_person: 'In person', festival: 'Event', product: 'Product' };
+const OTHER_FORMATS: Record<string, string> = { lead: 'Lead', ebook: 'PDF', recipe_book: 'PDF', one_to_one_call: '1:1 call', group_call: 'Group call', in_person: 'In person', festival: 'Event', product: 'Product' };
 function OfferFormatTag({ kind }: { kind?: string }) {
   if (!kind || APP_PLAN_KINDS.includes(kind)) return <ProtocolFormatTag />;
   const name = OTHER_FORMATS[kind] || 'Online';
@@ -1107,6 +1108,14 @@ function OfferFormatTag({ kind }: { kind?: string }) {
 }
 // Audience line from the offer-creation flow (social_links.audience_details), e.g. "Women · 32–55 · Menopause".
 type AudienceDetail = { min?: number; max?: number; stages?: string[] };
+/** "Women · 45–64" from a Protocol's target_gender and the "Age: Adults 45–64." line the builder writes into its description. */
+function protocolAudience(protocol: { target_gender?: string | null; description?: string | null }): string {
+  const d = protocol.description || '';
+  const gender = /Population:\s*([^.]+)\./.exec(d)?.[1]?.trim() || (protocol.target_gender && protocol.target_gender !== 'all' ? protocol.target_gender : '');
+  const age = /Age:\s*(?:Adults\s*)?([^.]+)\./.exec(d)?.[1]?.trim() || '';
+  return [gender && gender.charAt(0).toUpperCase() + gender.slice(1), age].filter(Boolean).join(' · ');
+}
+
 function audienceLabel(details?: Record<string, AudienceDetail> | string | null, groups?: string[]): string {
   let map: Record<string, AudienceDetail> = {};
   if (typeof details === 'string') { try { map = JSON.parse(details); } catch { map = {}; } } else if (details) map = details;
@@ -2825,31 +2834,245 @@ function Empty({ title, copy, action, image }: { title: string; copy: string; ac
   return <div style={{ border: `1px solid ${line}`, padding: 38, textAlign: 'center', background: panel }}>{image && <img src={image} alt="" loading="lazy" style={{ width: 104, height: 104, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.78)', opacity: .85, marginBottom: 14 }} />}<h3 style={{ fontFamily: serif, fontSize: 28, fontWeight: 300, margin: '0 0 8px' }}>{title}</h3><p style={{ color: muted, fontSize: 13, margin: '0 0 20px' }}>{copy}</p>{action}</div>;
 }
 
-function RecipeBuilder({ recipe, onBack, onSaved }: { recipe: GuideRecipe; onBack: () => void; onSaved: (recipe: GuideRecipe) => void }) {
-  const asLines = (items: unknown[]) => items.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
-  const [title, setTitle] = useState(recipe.title);
-  const [description, setDescription] = useState(recipe.description || '');
-  const [mealSlot, setMealSlot] = useState(recipe.meal_slot || 'any');
-  const [ingredients, setIngredients] = useState(asLines(recipe.ingredients || []));
-  const [instructions, setInstructions] = useState(asLines(recipe.instructions || []));
+/** Saved Guardian recipe → editable draft (older recipes stored ingredients/method as plain lines). */
+function recipeToDraft(recipe: GuideRecipe): RecipeDraft {
+  const ingredients = (recipe.ingredients || []).map((item: any): RecipeIngredient => typeof item === 'string'
+    ? { name: item, amount: 0, unit: 'g', grams: 0, ingredient_id: null, catalog_name: null, per100: null }
+    : { name: item.name || '', amount: Number(item.amount) || 0, unit: item.unit || 'g', grams: Number(item.grams) || 0, preparation: item.preparation, ingredient_id: item.ingredient_id ?? null, catalog_name: item.catalog_name ?? null, image_url: item.image_url ?? null, per100: item.per100 ?? null });
+  return { title: recipe.title, description: recipe.description || '', meal_slot: recipe.meal_slot || 'any', servings: recipe.servings || 1, prep_time: recipe.prep_time ?? null, cook_time: recipe.cook_time ?? null, ingredients, instructions: (recipe.instructions || []).map((s: any) => typeof s === 'string' ? s : String(s?.text || '')), image_url: recipe.image_url || null };
+}
+
+function draftToRow(draft: RecipeDraft, bookIds: string[]) {
+  const n = computeNutrition(draft.ingredients, draft.servings);
+  return {
+    title: draft.title.trim(), description: draft.description.trim() || null, meal_slot: draft.meal_slot, image_url: draft.image_url,
+    ingredients: draft.ingredients.filter((i) => i.name.trim()).map(({ name, amount, unit, grams, preparation, ingredient_id, catalog_name, image_url, per100 }) => ({ name, amount, unit, grams, preparation, ingredient_id, catalog_name, image_url, per100 })),
+    instructions: draft.instructions.map((s) => s.trim()).filter(Boolean),
+    servings: draft.servings, prep_time: draft.prep_time, cook_time: draft.cook_time,
+    nutrition_per_serving: { ...n.perServing, serving_size_g: n.servingWeight }, nutrition_total: { ...n.total, total_weight_g: n.totalWeight, matched_ingredients: n.matched, ingredient_count: n.count },
+    offer_ids: bookIds,
+  };
+}
+
+function downloadRecipePdf(recipes: RecipeDraft[], opts: { bookTitle?: string; author?: string } = {}) {
+  const { doc, filename } = buildRecipePdf(recipes, opts);
+  doc.save(filename);
+}
+
+/** The recipe as it appears in the ROUTINE³ app (detail tray) or as the printable PDF, like the Protocol editor's preview. */
+function RecipePreview({ draft }: { draft: RecipeDraft }) {
+  const [mode, setMode] = useState<'app' | 'pdf'>('app');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (mode !== 'pdf') return;
+    let url: string | null = null;
+    const timer = window.setTimeout(() => { try { url = URL.createObjectURL(buildRecipePdf([draft]).doc.output('blob')); setPdfUrl(url); } catch { setPdfUrl(null); } }, 400);
+    return () => { window.clearTimeout(timer); if (url) URL.revokeObjectURL(url); };
+  }, [mode, draft]);
+  const n = computeNutrition(draft.ingredients, draft.servings);
+  const total = (draft.prep_time || 0) + (draft.cook_time || 0);
+  const chip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 10px', borderRadius: 12, background: APP.alt, border: `1px solid ${APP.border}`, fontSize: 11, fontWeight: 500, color: APP.text, textTransform: 'capitalize' };
+  return <div style={{ position: 'sticky', top: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
+    <div role="group" aria-label="Preview" style={{ display: 'inline-flex', border: `1px solid ${line}`, borderRadius: 6, overflow: 'hidden' }}>
+      {(['app', 'pdf'] as const).map((m, i) => <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} style={{ height: 30, padding: '0 16px', border: 0, borderLeft: i ? `1px solid ${line}` : 0, background: mode === m ? ink : 'transparent', color: mode === m ? black : ink, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', cursor: 'pointer' }}>{m === 'app' ? 'APP' : 'PDF'}</button>)}
+    </div>
+    {mode === 'pdf' ? <>
+      <div style={{ width: 290, aspectRatio: '210 / 297', background: '#FFF', border: `1px solid ${line}` }}>{pdfUrl ? <iframe title="Printable recipe PDF" src={`${pdfUrl}#toolbar=0&view=FitH`} style={{ width: '100%', height: '100%', border: 0 }} /> : <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: APP.faint, fontSize: 12 }}>Building PDF…</div>}</div>
+      <button type="button" onClick={() => downloadRecipePdf([draft])} style={{ ...btn, minHeight: 34 }}><FileText size={12} /> Download PDF</button>
+    </> : <PhoneFrame width={290} screenBg={APP.bg}>
+      <div className="phone-scroll" style={{ position: 'absolute', inset: 0, overflowY: 'auto', fontFamily: APP.font, color: APP.text, background: APP.bg }}>
+        <div style={{ height: 190, background: '#E5E7EB', position: 'relative' }}>{draft.image_url && <img src={draft.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</div>
+        <div style={{ position: 'relative', marginTop: -22, background: APP.surface, borderRadius: '22px 22px 0 0', padding: '10px 16px 28px', minHeight: 400 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: APP.border, margin: '0 auto 12px' }} />
+          <div style={{ fontSize: 10, fontWeight: 600, color: APP.greenDark, textTransform: 'uppercase', letterSpacing: '.08em' }}>Recipe</div>
+          <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.2, margin: '2px 0 8px', letterSpacing: -0.3 }}>{draft.title || 'Untitled recipe'}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{draft.meal_slot !== 'any' && <span style={chip}>{draft.meal_slot}</span>}{total > 0 && <span style={chip}>⏱ {total} min</span>}<span style={chip}>{draft.servings} serving{draft.servings === 1 ? '' : 's'}</span></div>
+          {draft.description && <p style={{ fontSize: 12, color: APP.muted, lineHeight: 1.5, margin: '10px 0 0' }}>{draft.description}</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginTop: 14 }}>{([['energy_kcal', 'kcal', ''], ['protein_g', 'Protein', 'g'], ['carbohydrates_g', 'Carbs', 'g'], ['fats_g', 'Fat', 'g']] as Array<[MacroKey, string, string]>).map(([key, name, unit]) => <div key={key} style={{ background: APP.alt, borderRadius: 12, padding: '8px 4px', textAlign: 'center' }}><div style={{ fontSize: 14, fontWeight: 700 }}>{n.perServing[key] != null ? Math.round(n.perServing[key]!) : '–'}{unit}</div><div style={{ fontSize: 9, color: APP.muted }}>{name}</div></div>)}</div>
+          <div style={{ fontSize: 9, color: APP.faint, marginTop: 4, textAlign: 'center' }}>per serving · {n.servingWeight} g</div>
+          <div style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 6px' }}>Ingredients</div>
+          {draft.ingredients.filter((i) => i.name.trim()).map((item, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: `1px solid ${APP.border}` }}>
+            <span style={{ width: 34, height: 34, borderRadius: 8, background: APP.alt, overflow: 'hidden', flexShrink: 0 }}>{item.image_url && <img src={item.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 500, textTransform: 'capitalize' }}>{item.catalog_name || item.name}</span>
+            <span style={{ fontSize: 11, color: APP.muted, whiteSpace: 'nowrap' }}>{+item.amount.toFixed(2)} {item.unit}</span>
+          </div>)}
+          <div style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 6px' }}>Steps</div>
+          {draft.instructions.filter((s) => s.trim()).map((step, i) => <div key={i} style={{ display: 'flex', gap: 10, padding: '6px 0' }}><span style={{ width: 22, height: 22, borderRadius: 11, background: '#000', color: '#FFF', fontSize: 11, fontWeight: 600, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{i + 1}</span><span style={{ fontSize: 12, lineHeight: 1.5 }}>{step}</span></div>)}
+        </div>
+      </div>
+    </PhoneFrame>}
+    <p style={{ fontSize: 10, fontStyle: 'italic', color: muted, margin: 0, textAlign: 'center', maxWidth: 270 }}>{mode === 'app' ? 'Live preview: the recipe as it appears in the ROUTINE³ app.' : 'Printable PDF, one page per recipe.'}</p>
+  </div>;
+}
+
+function NutritionPanel({ draft }: { draft: RecipeDraft }) {
+  const n = computeNutrition(draft.ingredients, draft.servings);
+  const macro: Array<[MacroKey, string, string]> = [['energy_kcal', 'kcal', ''], ['protein_g', 'Protein', 'g'], ['carbohydrates_g', 'Carbs', 'g'], ['fats_g', 'Fat', 'g'], ['fiber_g', 'Fibre', 'g'], ['sugar_g', 'Sugar', 'g']];
+  const micros = KEY_MICROS.filter(([key]) => n.perServing.micros?.[key] != null);
+  const cell = (value: number | undefined, unit: string) => value == null ? '—' : `${value}${unit}`;
+  return <div style={{ border: `1px solid ${line}`, padding: 16, background: '#0D0E0B' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}><div style={{ ...label, color: acid, margin: 0 }}>Nutrition · calculated from the ROUTINE³ database</div><span style={{ color: n.matched === n.count ? acid : '#E8B86A', fontSize: 10 }}>{n.matched} of {n.count} ingredients matched</span></div>
+    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12, fontSize: 12 }}><thead><tr style={{ color: muted, textAlign: 'right' }}><th style={{ textAlign: 'left', fontWeight: 600, padding: '4px 0' }}></th><th style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Per serving ({n.servingWeight} g)</th><th style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Whole recipe ({n.totalWeight} g)</th></tr></thead>
+      <tbody>{macro.map(([key, name, unit]) => <tr key={key} style={{ borderTop: `1px solid ${line}`, textAlign: 'right' }}><td style={{ textAlign: 'left', padding: '6px 0', color: muted }}>{name}</td><td style={{ color: ink, fontWeight: key === 'energy_kcal' ? 700 : 400 }}>{cell(n.perServing[key], unit)}</td><td style={{ color: muted }}>{cell(n.total[key], unit)}</td></tr>)}
+      {micros.length > 0 && <tr style={{ borderTop: `1px solid ${line}` }}><td colSpan={3} style={{ ...label, margin: 0, padding: '12px 0 4px', fontSize: 9, color: n.microMatched === n.matched ? muted : '#E8B86A' }}>Micronutrients · from {n.microMatched} of {n.count} ingredients with micronutrient data</td></tr>}{micros.map(([key, name]) => { const unit = key.split('_').pop() === 'iu' ? ' IU' : ` ${key.split('_').pop()}`; return <tr key={key} style={{ borderTop: `1px solid ${line}`, textAlign: 'right' }}><td style={{ textAlign: 'left', padding: '5px 0', color: muted }}>{name}</td><td>{n.perServing.micros![key]}{unit}</td><td style={{ color: muted }}>{n.total.micros![key]}{unit}</td></tr>; })}</tbody></table>
+    {n.matched < n.count && <p style={{ color: muted, fontSize: 10, margin: '10px 0 0' }}>Unmatched ingredients add no nutrition. Pick a database match for each to complete the totals.</p>}
+  </div>;
+}
+
+function IngredientMatch({ item, onPick }: { item: RecipeIngredient; onPick: (match: CatalogIngredient) => void }) {
+  const [open, setOpen] = useState(false);
+  const [term, setTerm] = useState(item.name);
+  const [results, setResults] = useState<CatalogIngredient[]>([]);
+  useEffect(() => { if (!open) return; const t = setTimeout(() => { searchCatalogIngredients(term, 8).then(setResults).catch(() => setResults([])); }, 250); return () => clearTimeout(t); }, [term, open]);
+  return <div style={{ position: 'relative' }}>
+    <button type="button" onClick={() => setOpen(!open)} title="Change database match" style={{ border: `1px solid ${item.ingredient_id ? line : '#E8B86A'}`, background: 'transparent', color: item.ingredient_id ? acid : '#E8B86A', fontSize: 10, padding: '4px 8px', borderRadius: 3, cursor: 'pointer', maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.catalog_name ? `✓ ${item.catalog_name}` : 'No match · pick one'}</button>
+    {open && <div style={{ position: 'absolute', zIndex: 5, top: 30, right: 0, width: 260, background: panel, border: `1px solid ${line}`, padding: 8, boxShadow: '0 12px 30px rgba(0,0,0,.5)' }}>
+      <input autoFocus style={{ ...input, minHeight: 34 }} value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search ingredients" />
+      <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 6 }}>{results.map((r) => <button key={r.id} type="button" onClick={() => { onPick(r); setOpen(false); }} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', border: 0, background: 'transparent', color: ink, padding: '7px 4px', fontSize: 11, cursor: 'pointer', textAlign: 'left', borderBottom: `1px solid ${line}` }}><span>{r.name_common}</span><span style={{ color: muted }}>{r.per100?.energy_kcal != null ? `${r.per100.energy_kcal} kcal/100g` : 'no data'}</span></button>)}{!results.length && <div style={{ color: muted, fontSize: 11, padding: 6 }}>No ingredients found.</div>}</div>
+    </div>}
+  </div>;
+}
+
+function RecipeDraftEditor({ draft, onChange, onRemove, onSave, saving, savedLabel }: { draft: RecipeDraft; onChange: (draft: RecipeDraft) => void; onRemove: () => void; onSave: () => void; saving: boolean; savedLabel?: string }) {
+  const set = (patch: Partial<RecipeDraft>) => onChange({ ...draft, ...patch });
+  const setItem = (index: number, patch: Partial<RecipeIngredient>) => {
+    const ingredients = draft.ingredients.map((item, i) => {
+      if (i !== index) return item;
+      const next = { ...item, ...patch };
+      if (patch.amount != null || patch.unit != null || patch.per100 !== undefined) next.grams = gramsFor(next.amount, next.unit, next.piece_weight_g ? { piece_weight_g: next.piece_weight_g, piece_label: next.piece_label } : null, item.amount > 0 ? item.grams * (next.amount / item.amount) : item.grams);
+      return next;
+    });
+    set({ ingredients });
+  };
+  const small: React.CSSProperties = { ...input, minHeight: 34, padding: '0 8px', fontSize: 12 };
+  return <article style={{ border: `1px solid ${line}`, background: panel, padding: 22, marginTop: 16, display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <div style={{ flex: '1 1 520px', minWidth: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '120px minmax(0,1fr)', gap: 18 }}>
+      <div style={{ width: 120, height: 120, border: `1px solid ${line}`, background: '#171812', overflow: 'hidden', display: 'grid', placeItems: 'center', color: muted, fontFamily: serif, fontSize: 40 }}>{draft.image_url ? <img src={draft.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : draft.title.charAt(0)}</div>
+      <div><input style={{ ...input, fontFamily: serif, fontSize: 26, minHeight: 50 }} value={draft.title} onChange={(e) => set({ title: e.target.value })} />
+        <textarea style={{ ...input, height: 60, paddingTop: 10, marginTop: 8, fontSize: 12 }} value={draft.description} onChange={(e) => set({ description: e.target.value })} /></div>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 10, marginTop: 14 }}>
+      <div><label style={label}>Meal</label><select style={small} value={draft.meal_slot} onChange={(e) => set({ meal_slot: e.target.value })}>{['breakfast', 'lunch', 'dinner', 'snack', 'drink', 'dessert', 'any'].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
+      <div><label style={label}>Servings</label><input type="number" min={1} style={small} value={draft.servings} onChange={(e) => set({ servings: Math.max(1, Number(e.target.value) || 1) })} /></div>
+      <div><label style={label}>Prep · min</label><input type="number" min={0} style={small} value={draft.prep_time ?? ''} onChange={(e) => set({ prep_time: e.target.value === '' ? null : Number(e.target.value) })} /></div>
+      <div><label style={label}>Cook · min</label><input type="number" min={0} style={small} value={draft.cook_time ?? ''} onChange={(e) => set({ cook_time: e.target.value === '' ? null : Number(e.target.value) })} /></div>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16, marginTop: 18 }}>
+      <div>
+        <label style={label}>Ingredients · amounts matched to the database</label>
+        {draft.ingredients.map((item, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: '62px 78px minmax(0,1fr) auto 22px', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+          <input type="number" min={0} style={small} value={item.amount} onChange={(e) => setItem(index, { amount: Number(e.target.value) || 0 })} />
+          <select style={small} value={item.unit} onChange={(e) => setItem(index, { unit: e.target.value })}>{UNITS.map((u) => <option key={u} value={u}>{u}</option>)}</select>
+          <div style={{ minWidth: 0 }}><input style={small} value={item.name} onChange={(e) => setItem(index, { name: e.target.value })} /><div style={{ color: muted, fontSize: 9, marginTop: 2 }}>{item.grams} g{item.per100?.energy_kcal != null ? ` · ${Math.round(item.per100.energy_kcal * item.grams / 100)} kcal` : ''}{item.preparation ? ` · ${item.preparation}` : ''}</div></div>
+          <IngredientMatch item={item} onPick={(match) => setItem(index, { ingredient_id: match.id, catalog_name: match.name_common, image_url: match.image_url, per100: match.per100, piece_weight_g: match.piece_weight_g, piece_label: match.piece_label })} />
+          <button type="button" aria-label="Remove ingredient" onClick={() => set({ ingredients: draft.ingredients.filter((_, i) => i !== index) })} style={{ border: 0, background: 'transparent', color: muted, cursor: 'pointer' }}>×</button>
+        </div>)}
+        <button type="button" onClick={() => set({ ingredients: [...draft.ingredients, { name: '', amount: 0, unit: 'g', grams: 0, ingredient_id: null, catalog_name: null, per100: null }] })} style={{ ...btn, minHeight: 32, background: 'transparent', color: ink, marginTop: 4 }}><Plus size={12} /> Ingredient</button>
+        <label style={{ ...label, marginTop: 18 }}>Method · one step per line</label>
+        <textarea style={{ ...input, height: 170, paddingTop: 10, lineHeight: 1.55, fontSize: 12 }} value={draft.instructions.join('\n')} onChange={(e) => set({ instructions: e.target.value.split('\n') })} />
+      </div>
+      <NutritionPanel draft={draft} />
+    </div>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+      <button type="button" onClick={onSave} disabled={saving || !draft.title.trim()} style={btn}>{saving ? 'Saving…' : savedLabel ? 'Save changes' : 'Save recipe'}</button>
+      <button type="button" onClick={onRemove} style={{ ...btn, background: 'transparent', color: muted }}>Discard</button>
+      {savedLabel && <span style={{ color: acid, fontSize: 11 }}>{savedLabel}</span>}
+    </div>
+    </div>
+    <RecipePreview draft={draft} />
+  </article>;
+}
+
+function GuardianRecipeAI({ userId, accessToken, offers, recipes, author, onSaved }: { userId: string; accessToken: string; offers: GuideOffer[]; recipes: GuideRecipe[]; author?: string; onSaved: (recipe: GuideRecipe) => void }) {
+  const books = offers.filter((offer) => offer.kind === 'recipe_book');
+  const [brief, setBrief] = useState('');
+  const [count, setCount] = useState(3);
+  const [mealSlot, setMealSlot] = useState('');
+  const [urls, setUrls] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [message, setMessage] = useState('');
+  const [drafts, setDrafts] = useState<Array<RecipeDraft & { key: number; savedId?: string; saving?: boolean; savedLabel?: string }>>([]);
+  const [bookId, setBookId] = useState(books[0]?.id || '');
+  useEffect(() => { if (!bookId && books[0]) setBookId(books[0].id); }, [books.length]);
+
+  async function addPhotos(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true); setMessage('');
+    try { const uploaded = await Promise.all(Array.from(files).slice(0, 4 - photos.length).map((file) => uploadGuideImage(userId, file))); setPhotos([...photos, ...uploaded].slice(0, 4)); }
+    catch (error: any) { setMessage(error?.message || 'Photo upload failed.'); }
+    finally { setUploading(false); }
+  }
+  async function build() {
+    setBuilding(true); setMessage('');
+    try {
+      const result = await buildRecipesWithAI(accessToken, { message: brief, count, mealSlot: mealSlot || undefined, sourceUrls: urls.split(/\s+/).filter((u) => /^https?:\/\//.test(u)), imageUrls: photos });
+      setDrafts([...result.recipes.map((recipe, i) => ({ ...recipe, key: Date.now() + i })), ...drafts]);
+      setMessage(result.summary || `${result.recipes.length} recipe${result.recipes.length === 1 ? '' : 's'} drafted. Review the amounts and database matches, then save.`);
+    } catch (error: any) { setMessage(error?.message || 'Could not build recipes.'); }
+    finally { setBuilding(false); }
+  }
+  async function save(key: number) {
+    const draft = drafts.find((d) => d.key === key); if (!draft) return;
+    const patch = (p: Partial<typeof draft>) => setDrafts((current) => current.map((d) => d.key === key ? { ...d, ...p } : d));
+    patch({ saving: true });
+    try {
+      const { recipe, savedNutrition } = await saveGuideRecipeDraft(userId, draftToRow(draft, bookId ? [bookId] : []), draft.savedId);
+      onSaved(recipe);
+      const book = books.find((b) => b.id === bookId);
+      patch({ saving: false, savedId: recipe.id, savedLabel: savedNutrition ? `Saved${book ? ` to “${book.title}”` : ''}.` : 'Saved. Servings, timings, nutrition and book link need the recipe nutrition migration on this environment.' });
+    } catch (error: any) { patch({ saving: false, savedLabel: error?.message || 'Could not save.' }); }
+  }
+  const unsaved = drafts.filter((d) => !d.savedId);
+  return <section style={{ border: `1px solid ${line}`, padding: 24, marginTop: 28, background: 'linear-gradient(180deg,#14160F,#0D0E0B)' }}>
+    <div style={{ ...label, color: acid }}>AI recipe builder</div>
+    <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 32, margin: '4px 0 6px' }}>Describe the recipes. AI drafts them, the database does the maths.</h2>
+    <p style={{ color: muted, fontSize: 12, lineHeight: 1.55, margin: '0 0 16px', maxWidth: 680 }}>Add photos of dishes or handwritten recipes and links to recipes you like. Every ingredient is matched to the ROUTINE³ ingredient database, and nutrition is calculated from those values.</p>
+    <textarea style={{ ...input, height: 96, paddingTop: 12 }} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. High-protein breakfasts for women in perimenopause, under 15 minutes, no dairy" />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginTop: 10 }}>
+      <div><label style={label}>How many recipes</label><select style={input} value={count} onChange={(e) => setCount(Number(e.target.value))}>{[1, 2, 3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n}</option>)}</select></div>
+      <div><label style={label}>Meal</label><select style={input} value={mealSlot} onChange={(e) => setMealSlot(e.target.value)}><option value="">Mixed</option>{['breakfast', 'lunch', 'dinner', 'snack', 'drink', 'dessert'].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
+      <div><label style={label}>Recipe book</label><select style={input} value={bookId} onChange={(e) => setBookId(e.target.value)}><option value="">Not in a book yet</option>{books.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}</select>{bookId && (() => { const inBook = recipes.filter((r) => r.offer_ids?.includes(bookId)); return <button type="button" disabled={!inBook.length} onClick={() => downloadRecipePdf(inBook.map(recipeToDraft), { bookTitle: books.find((b) => b.id === bookId)?.title, author })} style={{ border: 0, background: 'transparent', color: inBook.length ? acid : muted, fontSize: 10, padding: '6px 0 0', cursor: inBook.length ? 'pointer' : 'default', display: 'inline-flex', alignItems: 'center', gap: 5 }}><FileText size={11} /> {inBook.length ? `Download book PDF · ${inBook.length} recipe${inBook.length === 1 ? '' : 's'}` : 'No recipes in this book yet'}</button>; })()}</div>
+    </div>
+    <label style={{ ...label, marginTop: 12 }}>Source links · optional</label>
+    <input style={input} value={urls} onChange={(e) => setUrls(e.target.value)} placeholder="https://… (space-separated, up to 3)" />
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+      {photos.map((url) => <span key={url} style={{ position: 'relative', width: 56, height: 56, border: `1px solid ${line}` }}><img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" aria-label="Remove photo" onClick={() => setPhotos(photos.filter((p) => p !== url))} style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: 10, border: 0, background: ink, color: black, cursor: 'pointer', fontSize: 11 }}>×</button></span>)}
+      {photos.length < 4 && <label style={{ ...btn, background: 'transparent', color: ink }}>{uploading ? 'Uploading…' : '+ Photos'}<input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} /></label>}
+      <button type="button" onClick={build} disabled={building || uploading || !brief.trim()} style={{ ...btn, marginLeft: 'auto' }}>{building ? 'Building recipes…' : `Build ${count} recipe${count === 1 ? '' : 's'}`}</button>
+    </div>
+    {message && <p style={{ color: muted, fontSize: 12, marginTop: 12 }}>{message}</p>}
+    {unsaved.length > 1 && <button type="button" onClick={() => unsaved.forEach((d) => save(d.key))} style={{ ...btn, marginTop: 10 }}>Save all {unsaved.length}</button>}
+    {drafts.map((draft) => <RecipeDraftEditor key={draft.key} draft={draft} saving={!!draft.saving} savedLabel={draft.savedLabel} onChange={(next) => setDrafts((current) => current.map((d) => d.key === draft.key ? { ...d, ...next } : d))} onRemove={() => setDrafts((current) => current.filter((d) => d.key !== draft.key))} onSave={() => save(draft.key)} />)}
+  </section>;
+}
+
+function RecipeBuilder({ recipe, userId, offers, onBack, onSaved }: { recipe: GuideRecipe; userId: string; offers: GuideOffer[]; onBack: () => void; onSaved: (recipe: GuideRecipe) => void }) {
+  const books = offers.filter((offer) => offer.kind === 'recipe_book');
+  const [draft, setDraft] = useState<RecipeDraft>(() => recipeToDraft(recipe));
+  const [bookIds, setBookIds] = useState<string[]>(recipe.offer_ids || []);
   const [status, setStatus] = useState<GuideRecipe['status']>(recipe.status);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   async function save() {
     setSaving(true); setMessage('');
     try {
-      const saved = await updateGuideRecipe(recipe.id, { title: title.trim(), description: description.trim() || null, meal_slot: mealSlot, ingredients: ingredients.split('\n').map((line) => line.trim()).filter(Boolean), instructions: instructions.split('\n').map((line) => line.trim()).filter(Boolean), status });
-      onSaved(saved); setMessage('Recipe saved to the Guardian database.');
+      const { recipe: saved } = await saveGuideRecipeDraft(userId, { ...draftToRow(draft, bookIds), status }, recipe.id);
+      onSaved(saved); setMessage('Recipe saved.');
     } catch (error: any) { setMessage(error.message || 'Could not save this recipe.'); }
     finally { setSaving(false); }
   }
-  return <div style={{ maxWidth: 820 }}>
+  return <div>
     <button type="button" onClick={onBack} style={{ ...btn, marginBottom: 22, background: 'transparent', color: ink }}>← Recipes</button>
-    <div style={{ ...label, color: acid }}>Recipe builder</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '10px 0 28px' }}>{title || 'Untitled recipe'}</h1>
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(150px,1fr)', gap: 10 }}><div><label style={label}>Recipe name</label><input style={input} value={title} onChange={(event) => setTitle(event.target.value)} /></div><div><label style={label}>Meal</label><select style={input} value={mealSlot} onChange={(event) => setMealSlot(event.target.value)}><option value="any">Any meal</option><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option><option value="drink">Drink</option></select></div></div>
-    <label style={{ ...label, marginTop: 16 }}>What this recipe helps with</label><textarea style={{ ...input, height: 92, paddingTop: 12 }} value={description} onChange={(event) => setDescription(event.target.value)} />
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 12, marginTop: 16 }}><div><label style={label}>Ingredients · one per line</label><textarea style={{ ...input, height: 240, paddingTop: 12, lineHeight: 1.6 }} value={ingredients} onChange={(event) => setIngredients(event.target.value)} placeholder={'2 cups spinach\n1 lemon\n1 tbsp olive oil'} /></div><div><label style={label}>Method · one step per line</label><textarea style={{ ...input, height: 240, paddingTop: 12, lineHeight: 1.6 }} value={instructions} onChange={(event) => setInstructions(event.target.value)} placeholder={'Wash and prepare the ingredients.\nCombine everything in a bowl.\nServe immediately.'} /></div></div>
-    <div style={{ display: 'flex', alignItems: 'end', gap: 10, marginTop: 16, flexWrap: 'wrap' }}><div style={{ minWidth: 180 }}><label style={label}>Status</label><select style={input} value={status} onChange={(event) => setStatus(event.target.value as GuideRecipe['status'])}><option value="draft">Draft</option><option value="submitted">Ready for review</option><option value="published">Published</option></select></div><button type="button" onClick={save} disabled={saving || !title.trim()} style={btn}>{saving ? 'Saving…' : 'Save recipe'}</button>{message && <span style={{ color: message.startsWith('Recipe saved') ? acid : '#F0A7A7', fontSize: 10 }}>{message}</span>}</div>
+    <div style={{ ...label, color: acid }}>Recipe builder</div>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap', marginTop: 10 }}>
+      <div style={{ minWidth: 180 }}><label style={label}>Status</label><select style={input} value={status} onChange={(event) => setStatus(event.target.value as GuideRecipe['status'])}><option value="draft">Draft</option><option value="submitted">Ready for review</option><option value="published">Published</option></select></div>
+      {books.length > 0 && <div><label style={label}>In recipe books</label><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{books.map((book) => { const on = bookIds.includes(book.id); return <button key={book.id} type="button" aria-pressed={on} onClick={() => setBookIds(on ? bookIds.filter((id) => id !== book.id) : [...bookIds, book.id])} style={{ ...btn, minHeight: 36, background: on ? acid : 'transparent', color: on ? black : ink }}>{book.title}</button>; })}</div></div>}
+      {message && <span style={{ color: /saved/i.test(message) ? acid : '#E8B86A', fontSize: 11 }}>{message}</span>}
+    </div>
+    <RecipeDraftEditor draft={draft} onChange={setDraft} onRemove={onBack} onSave={save} saving={saving} savedLabel={message && /saved/i.test(message) ? message : undefined} />
   </div>;
 }
 
@@ -2985,7 +3208,7 @@ const offerBuilderTypes = [
   { kind: 'in_person', title: 'In-person offer', eyebrow: 'Physical', copy: 'Package an appointment, workshop or local experience.', Icon: Globe2 },
 ] as const;
 
-function OfferBuilder({ profile, protocols, offers, librarySources = [], onOpenProtocols, onCreated }: { profile: GuideProfile; protocols: AdminProtocol[]; offers: GuideOffer[]; librarySources?: GuideLibraryItem[]; onOpenProtocols: () => void; onCreated: (offer: GuideOffer) => void }) {
+function OfferBuilder({ profile, protocols, offers, recipes = [], librarySources = [], onOpenProtocols, onCreated }: { profile: GuideProfile; protocols: AdminProtocol[]; offers: GuideOffer[]; recipes?: GuideRecipe[]; librarySources?: GuideLibraryItem[]; onOpenProtocols: () => void; onCreated: (offer: GuideOffer) => void }) {
   const { user } = useAuth();
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -3008,7 +3231,7 @@ function OfferBuilder({ profile, protocols, offers, librarySources = [], onOpenP
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 12, marginTop: 28 }}>{offerBuilderTypes.map(({ kind, title, eyebrow, copy, Icon }) => <button key={kind} type="button" onClick={() => build(kind, title)} disabled={busy === kind} style={{ minHeight: 220, border: `1px solid ${line}`, background: panel, color: ink, padding: 22, textAlign: 'left', cursor: 'pointer', fontFamily: sans, display: 'flex', flexDirection: 'column' }}><span style={{ width: 48, height: 48, border: `1px solid ${line}`, display: 'grid', placeItems: 'center', color: acid }}><Icon size={22} /></span><span style={{ ...label, color: acid, margin: '24px 0 7px' }}>{eyebrow}</span><strong style={{ fontSize: 22 }}>{title}</strong><span style={{ color: muted, fontSize: 12, lineHeight: 1.55, marginTop: 8 }}>{copy}</span><span style={{ marginTop: 'auto', paddingTop: 18, fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{busy === kind ? 'Creating...' : kind === 'routine' ? 'Open R3 builder →' : 'Create offer →'}</span></button>)}</div>
     {message && <p style={{ color: acid, fontSize: 11, marginTop: 16 }}>{message}</p>}
     <section style={{ borderTop: `1px solid ${line}`, marginTop: 38, paddingTop: 24 }}><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 32, margin: 0 }}>R3 outputs</h2><p style={{ color: muted, fontSize: 12 }}>Every R3 Protocol can be edited against the full Routine database, exported as a PDF and delivered through web or iOS.</p><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><a href={APP_STORE_URL} target="_blank" rel="noreferrer" style={{ ...btn, textDecoration: 'none' }}>Open iOS app <ArrowRight size={13} /></a><button type="button" onClick={onOpenProtocols} style={{ ...btn, background: 'transparent', color: ink }}>Manage {protocols.length} Protocols</button><span style={{ ...btn, background: 'transparent', color: muted, cursor: 'default' }}><Download size={13} /> PDF export inside builder</span></div></section>
-    {offers.length > 0 && <section style={{ marginTop: 34 }}><div style={label}>Created offers · {offers.length}</div>{offers.slice(0, 6).map((offer) => <Row key={offer.id} image={offer.access_model === 'free' ? '/images/guides/lead-plate.png' : '/images/guides/offer-plate.png'} title={offer.title} meta={`${offer.kind.replaceAll('_', ' ')} · ${offer.status}`} />)}</section>}
+    {offers.length > 0 && <section style={{ marginTop: 34 }}><div style={label}>Created offers · {offers.length}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18, marginTop: 12 }}>{offers.map((offer) => { const free = offer.access_model === 'free'; return <ProductCard key={offer.id} kind={offer.kind} imageUrl={offer.cover_url || (offer.kind === 'recipe_book' ? recipes.find((r) => r.image_url && r.offer_ids?.includes(offer.id))?.image_url : null)} eyebrow={[audienceLabel(profile.social_links?.audience_details) || 'Everyone', offer.status === 'published' ? 'Published' : 'Draft'].join(' · ')} title={customerFacingOfferTitle(offer.title)} copy={(offer.description || '').split(' Delivery:')[0].slice(0, 120) || undefined} price={free ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Paid'} name={profile.display_name} avatarUrl={profile.avatar_url} accent={acid} cta={profile.slug ? 'View on your site' : 'View offer'} href={profile.slug ? `/guardians/${encodeURIComponent(profile.slug)}#offers` : undefined} />; })}</div></section>}
   </>;
 }
 
@@ -3204,6 +3427,10 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
   const [newEmail, setNewEmail] = useState('');
   const [newGoal, setNewGoal] = useState('');
   const [protocolId, setProtocolId] = useState<string | null>(null);
+  const [protocolView, setProtocolView] = useState<'cards' | 'list'>('cards');
+  const [recipeView, setRecipeView] = useState<'cards' | 'list'>('cards');
+  const [personalPeople, setPersonalPeople] = useState<Map<string, { name: string; imageUrl: string | null }>>(new Map());
+  useEffect(() => { if (user) listPersonalProtocolPeople(user.id).then(setPersonalPeople).catch(() => {}); }, [user?.id, protocols.length]);
   useEffect(() => { setEditorProtocolId(null); }, [protocolId]);
   const [protocolRevision, setProtocolRevision] = useState(0);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
@@ -3273,9 +3500,19 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
           </div>
         </>}
         {tab === 'library' && user && <GuideLibrary guideId={user.id} selectedIds={selectedLibraryIds} onSelectedIds={setSelectedLibraryIds} onUse={(destination, sources) => { setBuilderLibrarySources(sources); setTab(destination === 'protocol' ? 'protocols' : 'offer_builder'); }} />}
-        {tab === 'offer_builder' && <OfferBuilder profile={profile} protocols={protocols} offers={offers} librarySources={builderLibrarySources} onOpenProtocols={() => setTab('protocols')} onCreated={(offer) => setOffers((current) => [offer, ...current])} />}
+        {tab === 'offer_builder' && <OfferBuilder profile={profile} protocols={protocols} offers={offers} recipes={recipes} librarySources={builderLibrarySources} onOpenProtocols={() => setTab('protocols')} onCreated={(offer) => setOffers((current) => [offer, ...current])} />}
         {tab === 'leads' && !protocolId && !recipeId && user && <ReviewsPanel userId={user.id} slug={profile.slug} />}
-        {(['leads','value_ramps','recipes','protocols'] as Tab[]).includes(tab) && !protocolId && !recipeId && <><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 20 }}><div style={{ display: 'flex', alignItems: 'center', gap: 18 }}><img src={guidePlates[tab]} alt="" style={{ width: 74, height: 74, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.74)', opacity: .86 }} /><div><div style={{ ...label, color: acid }}>{tab === 'value_ramps' ? 'Customer journeys' : 'Build'}</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '8px 0 0' }}>{tab === 'value_ramps' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)}</h1></div></div><button onClick={() => setAdding(!adding)} style={btn}><Plus size={14} /> Add {tab === 'value_ramps' ? 'Offer path' : tab === 'protocols' ? 'Protocol' : tab.slice(0,-1)}</button></div>{adding && <div style={{ display: 'grid', gridTemplateColumns: tab === 'leads' ? '1fr 1fr 1.2fr auto' : '1fr 1.4fr auto', gap: 9, margin: '28px 0' }}><input style={input} placeholder={tab === 'leads' ? 'Name' : tab === 'value_ramps' ? 'Ramp name' : 'Title'} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />{tab === 'leads' && <input style={input} type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />}<input style={input} placeholder={tab === 'value_ramps' ? 'Audience problem or goal' : tab === 'leads' ? 'Goal' : 'Short description'} value={newGoal} onChange={(e) => setNewGoal(e.target.value)} /><button onClick={quickAdd} disabled={adding && !newTitle} style={btn}>Create</button></div>}<div style={{ marginTop: 30 }}>{tab === 'leads' && (leads.length ? leads.map((x) => <Row key={x.id} title={x.name} meta={`${x.email} · ${x.goal || 'No goal yet'}`} />) : <Empty image={guidePlates.leads} title="No leads yet" copy="Add a lead or share your public guide page." />)}{tab === 'value_ramps' && (valueRamps.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))', gap: 12 }}>{valueRamps.map((ramp) => <article key={ramp.id} style={{ border: `1px solid ${line}`, background: panel, padding: 22, minHeight: 220, display: 'flex', flexDirection: 'column' }}><Route size={24} color={acid} /><div style={{ ...label, color: acid, marginTop: 24 }}>{ramp.audience} · {ramp.problem}</div><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 29, margin: '4px 0 8px' }}>{ramp.name}</h2><p style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>{ramp.offer_ids.length} reusable offers · {ramp.status}</p><span style={{ marginTop: 'auto', color: ink, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>/guardians/{profile.slug}/value-ramp/{ramp.slug}</span></article>)}</div> : <Empty image={guidePlates.value_ramps} title="Create your first offer path" copy="Choose one audience problem, then arrange reusable offers from a free first win to deeper support." action={<button type="button" onClick={() => setAdding(true)} style={btn}>Create offer path</button>} />)}{tab === 'recipes' && (recipes.length ? recipes.map((x) => <Row key={x.id} title={x.title} meta={`${x.meal_slot || 'Any meal'} · ${x.status}`} action="Open builder" onClick={() => setRecipeId(x.id)} />) : <Empty image={guidePlates.recipes} title="No recipes yet" copy="Create a meal, drink or snack and reuse it in Protocols and offers." />)}{tab === 'protocols' && (protocols.length ? (() => {
+        {(['leads','value_ramps','recipes','protocols'] as Tab[]).includes(tab) && !protocolId && !recipeId && <><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 20 }}><div style={{ display: 'flex', alignItems: 'center', gap: 18 }}><img src={guidePlates[tab]} alt="" style={{ width: 74, height: 74, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.74)', opacity: .86 }} /><div><div style={{ ...label, color: acid }}>{tab === 'value_ramps' ? 'Customer journeys' : 'Build'}</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '8px 0 0' }}>{tab === 'value_ramps' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)}</h1></div></div><button onClick={() => setAdding(!adding)} style={btn}><Plus size={14} /> Add {tab === 'value_ramps' ? 'Offer path' : tab === 'protocols' ? 'Protocol' : tab.slice(0,-1)}</button></div>{adding && <div style={{ display: 'grid', gridTemplateColumns: tab === 'leads' ? '1fr 1fr 1.2fr auto' : '1fr 1.4fr auto', gap: 9, margin: '28px 0' }}><input style={input} placeholder={tab === 'leads' ? 'Name' : tab === 'value_ramps' ? 'Ramp name' : 'Title'} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />{tab === 'leads' && <input style={input} type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />}<input style={input} placeholder={tab === 'value_ramps' ? 'Audience problem or goal' : tab === 'leads' ? 'Goal' : 'Short description'} value={newGoal} onChange={(e) => setNewGoal(e.target.value)} /><button onClick={quickAdd} disabled={adding && !newTitle} style={btn}>Create</button></div>}<div style={{ marginTop: 30 }}>{tab === 'leads' && (leads.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{leads.map((x) => <ProductCard key={x.id} kind="lead" imageUrl="/images/guides/lead-plate.png" eyebrow={[x.stage.charAt(0).toUpperCase() + x.stage.slice(1), new Date(x.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })].join(' · ')} title={x.name} copy={x.goal || 'No goal yet'} name={x.email} accent={acid} cta="Email" href={`mailto:${x.email}`} />)}</div> : <Empty image={guidePlates.leads} title="No leads yet" copy="Add a lead or share your public guide page." />)}{tab === 'value_ramps' && (valueRamps.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))', gap: 12 }}>{valueRamps.map((ramp) => <article key={ramp.id} style={{ border: `1px solid ${line}`, background: panel, padding: 22, minHeight: 220, display: 'flex', flexDirection: 'column' }}><Route size={24} color={acid} /><div style={{ ...label, color: acid, marginTop: 24 }}>{ramp.audience} · {ramp.problem}</div><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 29, margin: '4px 0 8px' }}>{ramp.name}</h2><p style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>{ramp.offer_ids.length} reusable offers · {ramp.status}</p><span style={{ marginTop: 'auto', color: ink, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>/guardians/{profile.slug}/value-ramp/{ramp.slug}</span></article>)}</div> : <Empty image={guidePlates.value_ramps} title="Create your first offer path" copy="Choose one audience problem, then arrange reusable offers from a free first win to deeper support." action={<button type="button" onClick={() => setAdding(true)} style={btn}>Create offer path</button>} />)}{tab === 'recipes' && accessToken && <GuardianRecipeAI userId={user.id} accessToken={accessToken} offers={offers} recipes={recipes} author={profile.display_name} onSaved={(saved) => setRecipes((current) => [saved, ...current.filter((r) => r.id !== saved.id)])} />}{tab === 'recipes' && (recipes.length ? (() => {
+          const kcal = (x: GuideRecipe) => { const v = Number((x.nutrition_per_serving as any)?.energy_kcal); return Number.isFinite(v) && v > 0 ? `${Math.round(v)} kcal` : ''; };
+          const meta = (x: GuideRecipe) => [x.meal_slot && x.meal_slot !== 'any' ? x.meal_slot.charAt(0).toUpperCase() + x.meal_slot.slice(1) : 'Any meal', kcal(x), x.status === 'published' ? 'Published' : x.status === 'submitted' ? 'Ready for review' : 'Draft'].filter(Boolean).join(' · ');
+          const short = (d?: string | null) => { const t = (d || '').replace(/\s+/g, ' ').trim(); return t.length > 110 ? `${t.slice(0, 110).replace(/\s+\S*$/, '')}…` : t || undefined; };
+          return <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 16, margin: '34px 0 14px', flexWrap: 'wrap' }}><div><div style={{ ...label, color: acid, margin: 0 }}>Your recipes</div><p style={{ color: muted, fontSize: 12, margin: '6px 0 0' }}>{recipes.length} recipe{recipes.length === 1 ? '' : 's'} for your recipe books, Protocols and offers.</p></div><div role="group" aria-label="View" style={{ display: 'inline-flex', border: `1px solid ${line}`, borderRadius: 4, overflow: 'hidden' }}>{(['cards', 'list'] as const).map((v, i) => <button key={v} type="button" aria-pressed={recipeView === v} onClick={() => setRecipeView(v)} style={{ height: 32, padding: '0 14px', border: 0, borderLeft: i ? `1px solid ${line}` : 0, background: recipeView === v ? ink : 'transparent', color: recipeView === v ? black : ink, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{v}</button>)}</div></div>
+            {recipeView === 'cards'
+              ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{recipes.map((x) => <ProductCard key={x.id} kind="recipe_book" imageUrl={x.image_url} eyebrow={meta(x)} title={x.title} copy={short(x.description)} name={profile.display_name} avatarUrl={profile.avatar_url} accent={acid} cta="Open builder" onClick={() => setRecipeId(x.id)} />)}</div>
+              : recipes.map((x) => <Row key={x.id} image={x.image_url} title={x.title} meta={meta(x)} action="Open builder" onClick={() => setRecipeId(x.id)} />)}
+          </>;
+        })() : <Empty image={guidePlates.recipes} title="No recipes yet" copy="Create a meal, drink or snack and reuse it in Protocols and offers." />)}{tab === 'protocols' && (protocols.length ? (() => {
             // Family routines (partner, child…) nest under the Guardian's own routine.
             const isFamily = (x: AdminProtocol) => { const r = routineOwners.get(x.id)?.relation; return !!r && r !== 'self'; };
             const family = protocols.filter(isFamily);
@@ -3286,10 +3523,31 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
               rows.push({ x, child: false });
               if (x.id === ownRoutineId) family.forEach((f) => rows.push({ x: f, child: true }));
             }
-            return rows.map(({ x, child }) => { const owner = routineOwners.get(x.id); const row = <Row key={x.id} image={owner?.avatarUrl || x.image_url} title={owner && /^your routine$/i.test(x.name.trim()) ? `${owner.name}’s routine` : x.name} meta={`${owner ? `${child && owner.relation ? `${owner.relation.charAt(0).toUpperCase()}${owner.relation.slice(1)} · ` : ''}Personal routine · ` : ''}${x.total_days || 1} days · ${x.is_public ? 'Published' : 'Draft'} · PDF + app twin`} action="Open R3 builder" onClick={() => setProtocolId(x.id)} />;
-              return child ? <div key={x.id} style={{ marginLeft: 40, paddingLeft: 16, borderLeft: `1px solid ${line}` }}>{row}</div> : row; });
+            // Split: the Guardian's own (and family) routines vs Protocols built for other people.
+            const personal = rows.filter(({ x }) => routineOwners.has(x.id));
+            const others = protocols.filter((x) => !routineOwners.has(x.id));
+            // Personal Protocols are built for one named person; general ones are for an audience or offer.
+            const forPeople = others.filter((x) => personalPeople.has(x.id));
+            const forOthers = others.filter((x) => !personalPeople.has(x.id));
+            const sectionHead = (title: string, copy: string, extra?: React.ReactNode) => <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 16, margin: '34px 0 14px', flexWrap: 'wrap' }}><div><div style={{ ...label, color: acid, margin: 0 }}>{title}</div><p style={{ color: muted, fontSize: 12, margin: '6px 0 0' }}>{copy}</p></div>{extra}</div>;
+            const viewToggle = <div role="group" aria-label="View" style={{ display: 'inline-flex', border: `1px solid ${line}`, borderRadius: 4, overflow: 'hidden' }}>{(['cards', 'list'] as const).map((v, i) => <button key={v} type="button" aria-pressed={protocolView === v} onClick={() => setProtocolView(v)} style={{ height: 32, padding: '0 14px', border: 0, borderLeft: i ? `1px solid ${line}` : 0, background: protocolView === v ? ink : 'transparent', color: protocolView === v ? black : ink, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{v}</button>)}</div>;
+            const meta = (x: AdminProtocol) => `${x.total_days || 1} days · ${x.is_public ? 'Published' : 'Draft'} · PDF + app twin`;
+            const shortCopy = (d?: string | null) => { const t = (d || '').replace(/\s+/g, ' ').trim(); return t.length > 110 ? `${t.slice(0, 110).replace(/\s+\S*$/, '')}…` : t || undefined; };
+            return <>
+              {forPeople.length > 0 && <>{sectionHead('Personal Protocols', `${forPeople.length} Protocol${forPeople.length === 1 ? '' : 's'} built for one person.`, viewToggle)}
+                {protocolView === 'cards'
+                  ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{forPeople.map((x) => { const person = personalPeople.get(x.id)!; return <ProductCard key={x.id} kind="routine" imageUrl={person.imageUrl || x.image_url} eyebrow={['Personal', `${x.total_days || 1} days`, x.is_public ? 'Published' : 'Draft'].join(' · ')} title={x.name.replace(/\s*·\s*Personal Protocol$/i, '') + '’s Protocol'} copy={shortCopy(x.description)} name={person.name} avatarUrl={person.imageUrl} accent={acid} cta="Open R3 builder" onClick={() => setProtocolId(x.id)} />; })}</div>
+                  : forPeople.map((x) => { const person = personalPeople.get(x.id)!; return <Row key={x.id} image={person.imageUrl || x.image_url} title={x.name} meta={`${person.name} · ${meta(x)}`} action="Open R3 builder" onClick={() => setProtocolId(x.id)} />; })}</>}
+              {forOthers.length > 0 && <>{sectionHead('General Protocols', `${forOthers.length} Protocol${forOthers.length === 1 ? '' : 's'} for an audience or offer.`, forPeople.length ? undefined : viewToggle)}
+                {protocolView === 'cards'
+                  ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{forOthers.map((x) => <ProductCard key={x.id} kind="routine" eyebrow={[protocolAudience(x) || 'Everyone', `${x.total_days || 1} days`, x.is_public ? 'Published' : 'Draft'].join(' · ')} title={x.name.replace(/^R3 Protocol\s*>\s*/i, '')} imageUrl={x.image_url} copy={(() => { const d = (x.description || '').replace(/\s+/g, ' ').trim(); return d.length > 110 ? `${d.slice(0, 110).replace(/\s+\S*$/, '')}…` : d || undefined; })()} name={profile.display_name} avatarUrl={profile.avatar_url} accent={acid} cta="Open R3 builder" onClick={() => setProtocolId(x.id)} />)}</div>
+                  : forOthers.map((x) => <Row key={x.id} image={x.image_url} title={x.name} meta={meta(x)} action="Open R3 builder" onClick={() => setProtocolId(x.id)} />)}</>}
+              {personal.length > 0 && sectionHead('Your routines', 'Your own routine and your family’s.')}
+              {personal.map(({ x, child }) => { const owner = routineOwners.get(x.id); const row = <Row key={x.id} image={owner?.avatarUrl || x.image_url} title={owner && /^your routine$/i.test(x.name.trim()) ? `${owner.name}’s routine` : x.name} meta={`${owner ? `${child && owner.relation ? `${owner.relation.charAt(0).toUpperCase()}${owner.relation.slice(1)} · ` : ''}Personal routine · ` : ''}${x.total_days || 1} days · ${x.is_public ? 'Published' : 'Draft'} · PDF + app twin`} action="Open R3 builder" onClick={() => setProtocolId(x.id)} />;
+              return child ? <div key={x.id} style={{ marginLeft: 40, paddingLeft: 16, borderLeft: `1px solid ${line}` }}>{row}</div> : row; })}
+            </>;
           })() : <Empty image={guidePlates.protocols} title="No Protocol drafts yet" copy="Build against the full Routine database with timings, quantities, linked records and PDF export." />)}</div></>}
-        {tab === 'recipes' && recipeId && <RecipeBuilder recipe={recipes.find((recipe) => recipe.id === recipeId)!} onBack={() => setRecipeId(null)} onSaved={(saved) => setRecipes((current) => current.map((recipe) => recipe.id === saved.id ? saved : recipe))} />}
+        {tab === 'recipes' && recipeId && <RecipeBuilder key={recipeId} recipe={recipes.find((recipe) => recipe.id === recipeId)!} userId={user.id} offers={offers} onBack={() => setRecipeId(null)} onSaved={(saved) => setRecipes((current) => current.map((recipe) => recipe.id === saved.id ? saved : recipe))} />}
         {tab === 'protocols' && protocolId && accessToken && user && <div style={{ background: '#F5F4EF', color: '#151515', padding: 18, minHeight: 700 }}><button onClick={() => setProtocolId(null)} style={{ ...btn, marginBottom: 14, background: '#151515', color: '#FFF' }}>← Protocols</button>{protocols.find((protocol) => protocol.id === protocolId) && <GuardianProtocolAI accessToken={accessToken} protocol={protocols.find((protocol) => protocol.id === protocolId)!} ownerId={user.id} initialSourceUrls={builderLibrarySources.filter((source) => source.kind === 'url').map((source) => source.source_url).filter(Boolean).join('\n')} initialSourcePath={builderLibrarySources.find((source) => source.kind === 'pdf')?.file_path || null} initialRequest={builderLibrarySources.length ? `Build a practical Protocol using these Library sources:\n${builderLibrarySources.map((source) => `- ${source.title}${source.kind === 'transcript' ? `: ${source.transcript?.slice(0, 4000)}` : ''}`).join('\n')}` : undefined} onBuilt={() => setProtocolRevision((value) => value + 1)} />}<ProtocolEditor key={`${protocolId}-${protocolRevision}`} accessToken={accessToken} initialProtocolId={editorProtocolId || protocolId} ownerId={user.id} onSelectedChange={setEditorProtocolId} /><div style={{ height: 90 }} />{/* Targets the protocol the editor is SHOWING, not the one first opened (bug: an update once hit Pati's routine). */}<ProtocolAIBar key={editorProtocolId || protocolId} accessToken={accessToken} protocolId={editorProtocolId || protocolId} guideId={user.id} onUpdated={() => setProtocolRevision((value) => value + 1)} /></div>}
       </main>
     </div>
