@@ -486,3 +486,13 @@ export async function listReviewSummaries(): Promise<Record<string, { rating: nu
   (data || []).forEach((row: any) => { const cur = out[row.guide_id] || { rating: 0, reviewCount: 0 }; cur.rating = (cur.rating * cur.reviewCount + row.rating) / (cur.reviewCount + 1); cur.reviewCount += 1; out[row.guide_id] = cur; });
   return out;
 }
+
+/** Protocols built for one named person (builder_kind 'personal'), keyed by protocol id. Empty where the builder columns don't exist yet. */
+export async function listPersonalProtocolPeople(userId: string): Promise<Map<string, { name: string; imageUrl: string | null }>> {
+  const { data, error } = await db().from('protocols').select('id,builder_kind,builder_config').eq('user_id', userId).eq('builder_kind', 'personal');
+  if (error) return new Map();
+  return new Map((data || []).map((row: any) => {
+    const person = row.builder_config?.person || {};
+    return [row.id as string, { name: String(person.name || 'Personal'), imageUrl: person.image_url || person.avatar_url || null }];
+  }));
+}

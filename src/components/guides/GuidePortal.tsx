@@ -17,7 +17,7 @@ import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, requestGuardianReview, decideGuardianSite, listAllGuideProfiles, listGuardianSuggestions, setGuardianSuggestionStatus, listPublicGuardianOffers, listReviewSummaries, type AdminGuideProfile, type GuardianSuggestionRow, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
-  listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, saveGuideRecipeDraft, uploadGuideFile, uploadGuideImage,
+  listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, saveGuideRecipeDraft, listPersonalProtocolPeople, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
   type GuideValueRamp, type ImportedGuideProfile,
 } from '../../utils/guidePortal';
@@ -3429,6 +3429,8 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
   const [protocolId, setProtocolId] = useState<string | null>(null);
   const [protocolView, setProtocolView] = useState<'cards' | 'list'>('cards');
   const [recipeView, setRecipeView] = useState<'cards' | 'list'>('cards');
+  const [personalPeople, setPersonalPeople] = useState<Map<string, { name: string; imageUrl: string | null }>>(new Map());
+  useEffect(() => { if (user) listPersonalProtocolPeople(user.id).then(setPersonalPeople).catch(() => {}); }, [user?.id, protocols.length]);
   useEffect(() => { setEditorProtocolId(null); }, [protocolId]);
   const [protocolRevision, setProtocolRevision] = useState(0);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
@@ -3523,12 +3525,20 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
             }
             // Split: the Guardian's own (and family) routines vs Protocols built for other people.
             const personal = rows.filter(({ x }) => routineOwners.has(x.id));
-            const forOthers = protocols.filter((x) => !routineOwners.has(x.id));
+            const others = protocols.filter((x) => !routineOwners.has(x.id));
+            // Personal Protocols are built for one named person; general ones are for an audience or offer.
+            const forPeople = others.filter((x) => personalPeople.has(x.id));
+            const forOthers = others.filter((x) => !personalPeople.has(x.id));
             const sectionHead = (title: string, copy: string, extra?: React.ReactNode) => <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 16, margin: '34px 0 14px', flexWrap: 'wrap' }}><div><div style={{ ...label, color: acid, margin: 0 }}>{title}</div><p style={{ color: muted, fontSize: 12, margin: '6px 0 0' }}>{copy}</p></div>{extra}</div>;
             const viewToggle = <div role="group" aria-label="View" style={{ display: 'inline-flex', border: `1px solid ${line}`, borderRadius: 4, overflow: 'hidden' }}>{(['cards', 'list'] as const).map((v, i) => <button key={v} type="button" aria-pressed={protocolView === v} onClick={() => setProtocolView(v)} style={{ height: 32, padding: '0 14px', border: 0, borderLeft: i ? `1px solid ${line}` : 0, background: protocolView === v ? ink : 'transparent', color: protocolView === v ? black : ink, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{v}</button>)}</div>;
             const meta = (x: AdminProtocol) => `${x.total_days || 1} days · ${x.is_public ? 'Published' : 'Draft'} · PDF + app twin`;
+            const shortCopy = (d?: string | null) => { const t = (d || '').replace(/\s+/g, ' ').trim(); return t.length > 110 ? `${t.slice(0, 110).replace(/\s+\S*$/, '')}…` : t || undefined; };
             return <>
-              {forOthers.length > 0 && <>{sectionHead('Protocols you build for others', `${forOthers.length} Protocol${forOthers.length === 1 ? '' : 's'} for your clients and offers.`, viewToggle)}
+              {forPeople.length > 0 && <>{sectionHead('Personal Protocols', `${forPeople.length} Protocol${forPeople.length === 1 ? '' : 's'} built for one person.`, viewToggle)}
+                {protocolView === 'cards'
+                  ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{forPeople.map((x) => { const person = personalPeople.get(x.id)!; return <ProductCard key={x.id} kind="routine" imageUrl={person.imageUrl || x.image_url} eyebrow={['Personal', `${x.total_days || 1} days`, x.is_public ? 'Published' : 'Draft'].join(' · ')} title={x.name.replace(/\s*·\s*Personal Protocol$/i, '') + '’s Protocol'} copy={shortCopy(x.description)} name={person.name} avatarUrl={person.imageUrl} accent={acid} cta="Open R3 builder" onClick={() => setProtocolId(x.id)} />; })}</div>
+                  : forPeople.map((x) => { const person = personalPeople.get(x.id)!; return <Row key={x.id} image={person.imageUrl || x.image_url} title={x.name} meta={`${person.name} · ${meta(x)}`} action="Open R3 builder" onClick={() => setProtocolId(x.id)} />; })}</>}
+              {forOthers.length > 0 && <>{sectionHead('General Protocols', `${forOthers.length} Protocol${forOthers.length === 1 ? '' : 's'} for an audience or offer.`, forPeople.length ? undefined : viewToggle)}
                 {protocolView === 'cards'
                   ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{forOthers.map((x) => <ProductCard key={x.id} kind="routine" eyebrow={[protocolAudience(x) || 'Everyone', `${x.total_days || 1} days`, x.is_public ? 'Published' : 'Draft'].join(' · ')} title={x.name.replace(/^R3 Protocol\s*>\s*/i, '')} imageUrl={x.image_url} copy={(() => { const d = (x.description || '').replace(/\s+/g, ' ').trim(); return d.length > 110 ? `${d.slice(0, 110).replace(/\s+\S*$/, '')}…` : d || undefined; })()} name={profile.display_name} avatarUrl={profile.avatar_url} accent={acid} cta="Open R3 builder" onClick={() => setProtocolId(x.id)} />)}</div>
                   : forOthers.map((x) => <Row key={x.id} image={x.image_url} title={x.name} meta={meta(x)} action="Open R3 builder" onClick={() => setProtocolId(x.id)} />)}</>}
