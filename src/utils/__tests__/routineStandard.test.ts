@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { consumeKind, splitMealDrink, parseSetInfo, isCalendarEntry, isRuleLikeTitle, repegTimes, standardiseProtocol, findContradictions, type Row } from '../routineStandard';
-import { enforceProtocolRules, mealTitle } from '../protocolRules';
+import { enforceProtocolRules, mealTitle, ruleGroupFor, ruleRowFields } from '../protocolRules';
 import { localEventPlan, cleanPastedText, detectEvent } from '../eventProtocol';
 
 let n = 0;
@@ -203,14 +203,49 @@ describe('rules', () => {
     const r = row({ display_name: 'Avoid alcohol', subtype: 'wellness', scheduled_time: null });
     expect(changesFor([r]).find((c) => c.item_id === `rule:${r.id}`)?.insert).toMatchObject({ kind: 'rule_dont', parent_ref: undefined });
   });
-  it('checker: meal rules on the first meal of the day, others dated top-level', () => {
+  it('checker: category guidance is a group rule (Drinks / Consume), never pinned to one item', () => {
     const out = enforceProtocolRules([
       { title: 'Oats', group: 'meal', time: '08:00', notes: '', dos: [], donts: [], windowKey: 'd1' },
+      { title: 'Warm water', group: 'meal', time: '07:15', notes: '', dos: [], donts: [], windowKey: 'd1' },
       { title: 'Avoid sugar', group: 'meal', time: null, notes: '', dos: [], donts: [], windowKey: 'd1' },
+      { title: 'Limit caffeine intake', group: 'meal', time: null, notes: '', dos: [], donts: [], windowKey: 'd1' },
       { title: 'Avoid screens', group: 'wellness', time: null, notes: '', dos: [], donts: [], windowKey: 'd1' },
     ]);
-    expect(out.find((s) => s.title === 'Oats')!.donts).toContain('Sugar');
-    expect(out.find((s) => s.title === 'Avoid screens')!.kind).toBe('rule');
+    expect(out.find((s) => s.title === 'Oats')!.donts).toEqual([]);
+    expect(out.find((s) => s.title === 'Warm water')!.donts).toEqual([]);
+    expect(out.find((s) => s.title === 'Avoid sugar')).toMatchObject({ kind: 'rule', ruleGroup: 'consume', time: null });
+    expect(out.find((s) => s.title === 'Limit caffeine intake')).toMatchObject({ kind: 'rule', ruleGroup: 'drinks', time: null });
+    expect(out.find((s) => s.title === 'Avoid screens')).toMatchObject({ kind: 'rule', ruleGroup: 'general' });
+  });
+  it('rule group: drink subjects → Drinks, food → Consume, mixed diet → Consume', () => {
+    expect(ruleGroupFor('Limit caffeine intake')).toBe('drinks');
+    expect(ruleGroupFor('Avoid alcohol')).toBe('drinks');
+    expect(ruleGroupFor('Skip coffee and black tea')).toBe('drinks');
+    expect(ruleGroupFor('No added sugar')).toBe('consume');
+    expect(ruleGroupFor('Avoid tyramine foods')).toBe('consume');
+    expect(ruleGroupFor('Follow the clean diet: no pork, alcohol, salt')).toBe('consume');
+    expect(ruleGroupFor('No supplements on fasting days')).toBe('supplements');
+    expect(ruleGroupFor('Avoid screens')).toBe('general');
+  });
+  it('rule storage: Drinks = scope consume + subtype drink; Consume = scope consume + subtype meal', () => {
+    expect(ruleRowFields('drinks')).toEqual({ scope: 'consume', subtype: 'drink', category: 'consume' });
+    expect(ruleRowFields('consume')).toEqual({ scope: 'consume', subtype: 'meal', category: 'consume' });
+    expect(ruleRowFields('general').scope).toBe('outside');
+  });
+  it('cleanup: "Limit caffeine intake" becomes a top-level Drinks rule, not a child of Warm water', () => {
+    const w = row({ display_name: 'Warm water', category: 'consume', subtype: 'meal', scheduled_time: '07:15:00' });
+    const c = row({ display_name: 'Limit caffeine intake', category: 'consume', subtype: 'meal', scheduled_time: null });
+    const cs = changesFor([w, c]);
+    expect(cs.some((x) => x.item_id === c.id && x.action === 'hide')).toBe(true);
+    expect(cs.find((x) => x.item_id === `rule:${c.id}`)?.insert).toMatchObject({ parent_ref: undefined, kind: 'rule_do', scope: 'consume', subtype: 'drink' });
+    expect(cs.some((x) => x.action === 'insert' && x.insert?.parent_ref === w.id)).toBe(false);
+  });
+  it('cleanup: "Avoid alcohol" is a Drinks dont; "No added sugar" a Consume dont', () => {
+    const a = row({ display_name: 'Avoid alcohol', category: 'consume', subtype: 'meal' });
+    const b = row({ display_name: 'No added sugar', category: 'consume', subtype: 'meal' });
+    const cs = changesFor([a, b]);
+    expect(cs.find((x) => x.item_id === `rule:${a.id}`)?.insert).toMatchObject({ kind: 'rule_dont', subtype: 'drink' });
+    expect(cs.find((x) => x.item_id === `rule:${b.id}`)?.insert).toMatchObject({ kind: 'rule_dont', subtype: 'meal' });
   });
   it('contradictions between Protocols are detected', () => {
     const c = findContradictions(
@@ -261,7 +296,8 @@ describe('paste-text planner (ceremony example)', () => {
     for (const i of plan.items.filter((x) => x.kind !== 'rule')) expect(i.time).toMatch(/^\d\d:\d\d$/);
     // Same date window as the meals → a don't on the first meal; otherwise a dated top-level rule. Never a step.
     const host = plan.items.find((i) => i.donts.includes('Pork'))!;
-    expect(host.kind === 'rule' || (host.group === 'meal' && host.time)).toBeTruthy();
+    expect(host).toMatchObject({ kind: 'rule', ruleGroup: 'consume', time: null });
+    expect(plan.items.find((i) => i.donts.includes('Coffee'))).toMatchObject({ kind: 'rule', ruleGroup: 'drinks' });
     expect(plan.items.some((i) => /^(No|Avoid|Drop)\b/.test(i.title) && i.kind !== 'rule')).toBe(false);
   });
   it('cut-off and packing list', () => {

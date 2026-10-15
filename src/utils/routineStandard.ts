@@ -13,7 +13,7 @@
  * a peg to wake/bedtime lives in `filter.anchor = { to: 'wake'|'bedtime', offset_minutes }` and is resolved to
  * scheduled_time here (mobile reads scheduled_time today; live re-pegging on mobile is a follow-up).
  */
-import { END_SLEEP, START_SLEEP, PLAIN_BEDTIME, isWakeTitle, mealTitle } from './protocolRules';
+import { END_SLEEP, START_SLEEP, PLAIN_BEDTIME, isWakeTitle, mealTitle, ruleGroupFor, ruleRowFields } from './protocolRules';
 
 export type Mode = 'cleanup' | 'new';
 export type SmartList = 'hygiene' | 'drinks' | 'wellness' | 'fitness' | 'supplements' | 'meal' | 'work' | 'home' | 'tasks' | 'sleep';
@@ -21,7 +21,7 @@ export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export interface Row {
   id: string; protocol_id?: string; display_name: string | null; kind?: string | null; category?: string | null; subtype?: string | null;
-  item_type?: string | null; scheduled_time?: string | null; duration_minutes?: number | null; notes?: string | null;
+  item_type?: string | null; scope?: string | null; scheduled_time?: string | null; duration_minutes?: number | null; notes?: string | null;
   parent_protocol_item_id?: string | null; hidden?: boolean | null; sort_order?: number | null; day_number?: number | null;
   recurrence_start_date?: string | null; recurrence_end_date?: string | null;
   sets?: number | null; reps?: number | null; rounds?: number | null; work_seconds?: number | null; rest_seconds?: number | null;
@@ -177,7 +177,10 @@ export function standardiseProtocol(rows: Row[], mode: Mode = 'cleanup'): Change
     if (r.category === 'sleep' || !isRuleLikeTitle(t) || isCalendarEntry(t)) continue;
     const host = /lights|sleep|wind/i.test(t) ? (bed?.id || 'new:bed') : /rule|commit|mindset|override/i.test(t) && workout ? workout.id : null;
     changes.push({ item_id: r.id, action: 'hide', reason: host ? 'Rule, not a step' : 'Rule, not a step: becomes a top-level rule' });
-    changes.push({ item_id: `rule:${r.id}`, action: 'insert', reason: host ? 'Attached to the item it governs' : 'Top-level rule for the day', insert: { parent_ref: host || undefined, display_name: t, kind: /^(avoid|no|don'?t|do not|never|skip)\b/i.test(t) ? 'rule_dont' : 'rule_do', notes: r.notes || '' } });
+    // Category guidance (caffeine, sugar, alcohol…) is a group rule on Drinks / Consume, not on one item.
+    const group = ruleGroupFor(t, smartListOf(r) === 'drinks' ? 'meal' : smartListOf(r) === 'meal' ? 'meal' : smartListOf(r));
+    const groupFields = !host && group !== 'general' ? ruleRowFields(group) : null;
+    changes.push({ item_id: `rule:${r.id}`, action: 'insert', reason: host ? 'Attached to the item it governs' : groupFields ? `Group rule on ${group === 'drinks' ? 'Drinks' : group === 'consume' ? 'Consume' : 'Supplements'} for the day` : 'Top-level rule for the day', insert: { parent_ref: host || undefined, display_name: t, kind: /^(avoid|no|don'?t|do not|never|skip)\b/i.test(t) ? 'rule_dont' : 'rule_do', notes: r.notes || '', ...(groupFields ? { scope: groupFields.scope, subtype: groupFields.subtype, category: groupFields.category } : {}) } });
   }
 
   // Meals and drinks.

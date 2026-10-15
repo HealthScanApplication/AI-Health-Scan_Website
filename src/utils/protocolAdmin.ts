@@ -12,7 +12,7 @@
  * environment (staging | production) via ../utils/supabase/info.
  */
 import { projectId, publicAnonKey } from './supabase/info';
-import { enforceProtocolRules, isWakeTitle, END_SLEEP, START_SLEEP, type Anchor, type RuleIssue } from './protocolRules';
+import { enforceProtocolRules, isWakeTitle, ruleGroupFor, ruleRowFields, END_SLEEP, START_SLEEP, type Anchor, type RuleGroup, type RuleIssue } from './protocolRules';
 import {
   recipeMatchesSlot, recipeMealBucket, slotNameToBucket,
   descriptiveMealSlot, slotDescriptors, parsePrepMinutes, type SlotDescriptors,
@@ -115,6 +115,7 @@ export interface AIProtocolDraft {
     anchor?: Anchor | null; offset_minutes?: number | null;
     /** 'rule' = top-level do/don't rows for that day (Rules & Avoidances), no time. */
     kind?: 'action' | 'rule';
+    ruleGroup?: RuleGroup;
     issues?: RuleIssue[];
   }[];
 }
@@ -174,7 +175,8 @@ export async function saveDraftStep(accessToken: string, protocolId: string, ste
     // Top-level rules for that day: the app lists them under Rules & Avoidances, grouped by scope.
     const rows = [...(step.tips || []).map((name) => ['rule_do', name]), ...(step.donts || []).map((name) => ['rule_dont', name])];
     if (!rows.length) rows.push(['rule_do', step.title]);
-    for (const [k, [kind, name]] of rows.entries()) await createProtocolItem(accessToken, { ...base, display_name: name, kind, item_type: itemType, scope: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'outside', scheduled_time: null, duration_minutes: null, sort_order: sortOrder + k, parent_protocol_item_id: null, has_children: false, notes: k === 0 ? [step.title, step.notes].filter(Boolean).join(' — ') : '' } as any);
+    const groupRule = ruleRowFields(step.ruleGroup || ruleGroupFor(`${step.title} ${rows.map((r) => r[1]).join(' ')}`, step.category === 'consume' ? 'meal' : step.category));
+    for (const [k, [kind, name]] of rows.entries()) await createProtocolItem(accessToken, { ...base, ...groupRule, display_name: name, kind, item_type: groupRule.category === 'consume' ? 'consume' : itemType, scheduled_time: null, duration_minutes: null, sort_order: sortOrder + k, parent_protocol_item_id: null, has_children: false, notes: k === 0 ? [step.title, step.notes].filter(Boolean).join(' — ') : '' } as any);
     return null;
   }
   const hasKids = Boolean(step.tips?.length || step.donts?.length);

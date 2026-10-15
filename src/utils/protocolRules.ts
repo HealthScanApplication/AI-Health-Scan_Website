@@ -64,11 +64,31 @@ export interface RuleStep {
   link?: { kind: 'food' | 'activity'; query: string } | null;
   /** 'rule' = becomes top-level dated rule rows (no time, no done state). */
   kind?: 'action' | 'rule';
+  /** For rules: which list it governs — Drinks, Consume (food), or general. */
+  ruleGroup?: RuleGroup;
   /** Window key: steps only interact (anchors, group checklists) inside the same window. */
   windowKey?: string;
   /** Smart-list parent (has action sub-steps): titled as a group ("Workout 1", "Morning hygiene"); its children are the actions. */
   isParent?: boolean;
   issues?: RuleIssue[];
+}
+export type RuleGroup = 'drinks' | 'consume' | 'supplements' | 'general';
+const DRINK_SUBJECT = /\b(caffeine|coffee|espresso|tea|matcha|alcohol|wine|beer|spirits|soda|fizzy|soft drinks?|juice|energy drinks?|drinks?|water)\b/i;
+const FOOD_SUBJECT = /\b(food|foods|sugar|salt|sodium|meat|pork|dairy|gluten|wheat|soy|cheese|fried|processed|snacks?|carbs?|bread|diet|meals?|eat|eating|tyramine|spicy|pickled|canned|vinegar|chocolate)\b/i;
+/** Which smart list a category rule belongs to. Drink subjects (caffeine, alcohol, tea…) → Drinks; food → Consume. */
+export function ruleGroupFor(text: string, group?: string): RuleGroup {
+  if (group === 'supplements' || /\bsupplements?\b/i.test(text)) return 'supplements';
+  const drink = DRINK_SUBJECT.test(text), food = FOOD_SUBJECT.test(text);
+  if (drink && !food) return 'drinks';
+  if (food) return 'consume';
+  return group === 'meal' || group === 'consume' ? 'consume' : 'general';
+}
+/** Storage for a group-level rule: top-level rule row, scope + subtype name the list it governs. */
+export function ruleRowFields(group: RuleGroup): { scope: string; subtype: string | null; category: string } {
+  if (group === 'drinks') return { scope: 'consume', subtype: 'drink', category: 'consume' };
+  if (group === 'consume') return { scope: 'consume', subtype: 'meal', category: 'consume' };
+  if (group === 'supplements') return { scope: 'supplement', subtype: 'supplement', category: 'supplement' };
+  return { scope: 'outside', subtype: null, category: 'do' };
 }
 const isMeal = (s: RuleStep) => s.group === 'meal' || s.group === 'consume';
 
@@ -123,16 +143,11 @@ export function enforceProtocolRules<T extends RuleStep>(steps: T[]): T[] {
   for (const s of [...out]) {
     if (s.kind === 'rule' || s.group === 'sleep' || !isRuleTitle(s.title)) continue;
     const list = { dos: s.dos, donts: s.donts.length || s.dos.length ? s.donts : [s.title.replace(/^(avoid|no|skip|don'?t|do not)\s+/i, '').replace(/^./, (c) => c.toUpperCase())] };
-    // Meal checklists attach to the window's first meal; other guidance is a dated top-level rule.
-    const host = isMeal(s) && out.find((h) => h !== s && h.kind !== 'rule' && h.group === s.group && (h.windowKey || '') === (s.windowKey || '') && !isRuleTitle(h.title) && h.group !== 'sleep'
-      && (mins(h.time) ?? 9999) <= Math.min(...out.filter((x) => x !== s && x.group === s.group && (x.windowKey || '') === (s.windowKey || '') && !isRuleTitle(x.title)).map((x) => mins(x.time) ?? 9999)));
-    if (host) {
-      host.dos.push(...list.dos); host.donts.push(...list.donts);
-      note(host, 'moved_to_rules', `Checklist from “${s.title}”`);
-      out = out.filter((x) => x !== s);
-    } else {
-      s.kind = 'rule'; s.dos = list.dos; s.donts = list.donts; s.time = null;
-    }
+    // Guidance about a category of food or drink ("Limit caffeine", "No added sugar", "Avoid alcohol") is a
+    // group-level rule on the Drinks or Consume list for its window, never pinned to one item. Other guidance is
+    // a dated top-level rule too. (The app lists top-level rules in "Rules & Avoidances", grouped by scope.)
+    s.kind = 'rule'; s.dos = list.dos; s.donts = list.donts; s.time = null;
+    s.ruleGroup = ruleGroupFor(`${s.title} ${[...list.dos, ...list.donts].join(' ')}`, s.group);
   }
 
   // 1. Every action gets a time: anchor → clock time, else a group default (flagged).

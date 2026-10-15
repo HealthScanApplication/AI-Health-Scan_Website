@@ -17,7 +17,7 @@
  *  - a packing list is ACTION children = sub-tasks under the parent.
  */
 import { projectId, publicAnonKey } from './supabase/info';
-import { enforceProtocolRules, isGenericTitle, type RuleIssue } from './protocolRules';
+import { enforceProtocolRules, isGenericTitle, ruleGroupFor, ruleRowFields, type RuleGroup, type RuleIssue } from './protocolRules';
 import { createProtocolItem, searchCatalog, type AdminProtocolItem, type CatalogHit, type CatalogKind } from './protocolAdmin';
 
 export type SmartGroup = 'hygiene' | 'beauty' | 'wellness' | 'fitness' | 'supplements' | 'meal' | 'work' | 'home' | 'tasks';
@@ -46,6 +46,8 @@ export interface PlanItem {
   include: boolean;
   /** 'rule' = top-level dated rule rows (Rules & Avoidances tray), no time or done state. */
   kind?: 'action' | 'rule';
+  /** For rules: the list it governs (Drinks / Consume / Supplements / general). */
+  ruleGroup?: RuleGroup;
   anchor?: 'wake' | 'bedtime' | 'before_meal' | 'after_meal' | null;
   offsetMinutes?: number | null;
   issues?: RuleIssue[];
@@ -451,11 +453,13 @@ export async function applyEventPlan(accessToken: string, protocolId: string, pl
       // Top-level dated rules: the app lists them in "Rules & Avoidances", grouped by scope.
       const rows = [...it.dos.map((name) => ({ name, kind: 'rule_do' })), ...it.donts.map((name) => ({ name, kind: 'rule_dont' }))];
       if (!rows.length) rows.push({ name: it.title, kind: 'rule_do' });
+      // Group-level rule: Drinks / Consume / Supplements list for these dates (scope + subtype), never one item.
+      const groupRule = ruleRowFields(it.ruleGroup || ruleGroupFor(`${it.title} ${[...it.dos, ...it.donts].join(' ')}`, it.group));
       for (const [k, row] of rows.entries()) {
         await createProtocolItem(accessToken, {
-          protocol_id: protocolId, display_name: row.name, kind: row.kind, scope: it.group === 'meal' ? 'consume' : it.group === 'supplements' ? 'supplement' : 'outside',
-          item_type: it.group === 'meal' ? 'consume' : 'activity', scheduled_time: null, duration_minutes: null, group_name: null, day_number: 1,
-          sort_order: startSort + index + 1 + k, parent_protocol_item_id: null, has_children: false, category: CATEGORY[it.group], subtype: SUBTYPE[it.group],
+          protocol_id: protocolId, display_name: row.name, kind: row.kind, ...groupRule,
+          item_type: groupRule.category === 'consume' ? 'consume' : 'activity', scheduled_time: null, duration_minutes: null, group_name: null, day_number: 1,
+          sort_order: startSort + index + 1 + k, parent_protocol_item_id: null, has_children: false,
           hidden: false, enabled: true, notes: k === 0 ? [it.title, it.notes].filter(Boolean).join(' — ') : '', ...window(it),
         } as Partial<AdminProtocolItem>);
         children++;

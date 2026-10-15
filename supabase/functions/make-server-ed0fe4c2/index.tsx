@@ -483,7 +483,7 @@ const PROTOCOL_ITEM_RULES = `Item rules (strict):
 - Action titles are an imperative verb + noun, with a measurable amount when it fits: "Walk 20 minutes", "Run 5 km", "Practise yoga 30 minutes". Never vague ("Practice light exercise", "Be active", "Self-care").
 - Meal and food items are titled with the dish name only, no verb: "Vegetable soup", "Boiled potatoes", "Tofu scramble".
 - Sleep is exactly two items: "End Sleep" (wake, first) and "Start Sleep" (bedtime, last). Put any other sleep advice (darkness, cool room, screens) in Start Sleep's notes and its "tips"/"donts".
-- Do and don't guidance is never a step of its own: attach it to the step it governs as "tips" (do) and "donts" (don't), or, when it applies to the whole day, return it as an item with "kind":"rule" and its entries in "tips"/"donts".`
+- Do and don't guidance is never a step of its own. Guidance about one step goes on that step as "tips" (do) and "donts" (don't). Guidance about a whole category of food or drink ("Limit caffeine", "No added sugar", "Avoid alcohol") is a group rule: return it as an item with "kind":"rule", "category":"consume", title naming the rule, entries in "tips"/"donts", never attached to a single meal or drink. Other whole-day guidance is also "kind":"rule".`
 
 /** Real catalog names so the model picks titles we can link. */
 async function catalogNameHints(): Promise<string> {
