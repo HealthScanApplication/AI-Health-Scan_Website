@@ -903,7 +903,7 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [],
     </div>
   </div>;
 }
-function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = [] }: { reviews?: GuardianReview[]; profile: GuideProfile; offers: GuideOffer[]; ramp: GuideValueRamp | null; accent: string; headingFont: string }) {
+function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = [], headlineStyle = 'editorial' }: { headlineStyle?: HeadlineStyle; reviews?: GuardianReview[]; profile: GuideProfile; offers: GuideOffer[]; ramp: GuideValueRamp | null; accent: string; headingFont: string }) {
   const ordered = orderFunnelOffers(offers, ramp);
   const entry = ordered.find((offer) => offer.access_model === 'free') || null;
   const nextPaid = ordered.find((offer) => offer.access_model === 'paid' && !SUPPORT_KINDS.includes(offer.kind)) || null;
@@ -952,7 +952,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
       {/* App-style heading (Poppins, like the ROUTINE³ paywall): green label, bold title, muted subtitle. */}
       <div style={{ fontFamily: APP.font, textAlign: 'center', margin: '0 auto 28px', maxWidth: 640 }}>
         <span style={{ display: 'block', color: APP.greenDark, fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
-        <h2 style={{ fontFamily: APP.font, color: APP.text, fontSize: 'clamp(28px,4vw,36px)', fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.8, margin: '0 0 8px' }}>Your path, step by step</h2>
+        <h2 style={{ ...HEADLINE_STYLES[headlineStyle].section, margin: '0 0 8px' }}>Your path, step by step{headlineStyle === 'editorial' ? '.' : ''}</h2>
         <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, margin: 0 }}>Start free, then go deeper when you’re ready.</p>
       </div>
       {/* Same app-style offer cards as the hero, one per step of the path. */}
@@ -1055,6 +1055,14 @@ function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accen
 /** Guardian profile hero, shared by the published mini-site and the builder preview so both are identical. */
 // Public page gutter: lines every section up with the hero's 1240px inner container.
 const PAGE_X = 'max(clamp(24px,6vw,84px), calc((100% - 1240px) / 2 + clamp(24px,6vw,84px)))';
+// Three headline styles a Guardian can pick for their site (saved as social_links.theme_headline_style).
+type HeadlineStyle = 'editorial' | 'app' | 'statement';
+const HEADLINE_STYLES: Record<HeadlineStyle, { label: string; hero: React.CSSProperties; section: React.CSSProperties; stripStop?: boolean }> = {
+  editorial: { label: 'Editorial serif', hero: { fontFamily: serif, fontWeight: 300, fontSize: 'clamp(46px,7cqw,96px)', lineHeight: .95, letterSpacing: '-.035em', color: '#11120F' }, section: { fontFamily: serif, fontWeight: 300, fontSize: 'clamp(36px,5vw,58px)', lineHeight: 1, letterSpacing: '-.02em', color: '#11120F' } },
+  app: { label: 'App bold', stripStop: true, hero: { fontFamily: "'Poppins', 'Inter', sans-serif", fontWeight: 700, fontSize: 'clamp(36px,5.2cqw,60px)', lineHeight: 1.08, letterSpacing: '-.03em', color: '#111827' }, section: { fontFamily: "'Poppins', 'Inter', sans-serif", fontWeight: 700, fontSize: 'clamp(28px,4vw,36px)', lineHeight: 1.2, letterSpacing: -0.8, color: '#111827' } },
+  statement: { label: 'Statement caps', stripStop: true, hero: { fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 700, fontSize: 'clamp(34px,5cqw,64px)', lineHeight: 1, letterSpacing: '.02em', textTransform: 'uppercase', color: '#11120F' }, section: { fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 700, fontSize: 'clamp(24px,3.4vw,34px)', lineHeight: 1.1, letterSpacing: '.04em', textTransform: 'uppercase', color: '#11120F' } },
+};
+const headlineStyleOf = (value?: string | null): HeadlineStyle => value === 'app' || value === 'statement' ? value : 'editorial';
 // ROUTINE³ iOS app look (mobile repo: Paywall.tsx, SignUpScreen.tsx, designTokens.ts) for the sign-up and upsell pages.
 const APP = { bg: '#F2F4F7', surface: '#FFFFFF', alt: '#F6F8FA', text: '#111827', muted: '#6B7280', faint: '#9CA3AF', border: '#E5E7EB', green: '#10B981', greenDark: '#047857', greenSoft: '#86EFAC', font: "'Poppins', 'Inter', sans-serif" };
 const appButton: React.CSSProperties = { width: '100%', minHeight: 56, border: 0, borderRadius: 16, background: '#000', color: '#FFF', fontFamily: APP.font, cursor: 'pointer', display: 'grid', placeItems: 'center', padding: '8px 16px', boxSizing: 'border-box' };
@@ -1160,7 +1168,7 @@ function ReviewsPanel({ userId, slug }: { userId: string; slug: string }) {
     {reviews.length > 0 && <div style={{ display: 'grid', gap: 6, marginTop: 14 }}><span style={label}>Received</span>{reviews.map((r) => <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${line}`, paddingTop: 8, fontSize: 11, opacity: r.status === 'hidden' ? .5 : 1 }}><span style={{ color: acid }}>{'★'.repeat(r.rating)}</span><span style={{ flex: 1, color: ink }}>{r.body} <span style={{ color: muted }}>· {r.reviewer_name}</span></span><button type="button" onClick={() => toggle(r)} style={small}>{r.status === 'published' ? 'Hide' : 'Show'}</button></div>)}</div>}
   </section>;
 }
-function GuardianSiteHero({ name, avatarUrl, specialties, headline, tags, bio, accent, headingFont, background, backgroundIsVideo = false, greyscale = false, cards }: { name: string; avatarUrl?: string | null; specialties: string[]; headline: string; tags: string[]; bio: string; accent: string; headingFont: string; background?: string | null; backgroundIsVideo?: boolean; greyscale?: boolean; cards: SiteHeroCard[] }) {
+function GuardianSiteHero({ name, avatarUrl, specialties, headline, tags, bio, accent, headingFont, background, backgroundIsVideo = false, greyscale = false, cards, headlineStyle = 'editorial' }: { headlineStyle?: HeadlineStyle; name: string; avatarUrl?: string | null; specialties: string[]; headline: string; tags: string[]; bio: string; accent: string; headingFont: string; background?: string | null; backgroundIsVideo?: boolean; greyscale?: boolean; cards: SiteHeroCard[] }) {
   return <section style={{ position: 'relative', overflow: 'hidden', minHeight: 'min(720px,calc(100vh - 64px))', display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', alignItems: 'center', backgroundImage: background && !backgroundIsVideo ? `linear-gradient(rgba(242,239,231,.66),rgba(242,239,231,.66)),url(${background})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: greyscale ? 'luminosity' : 'normal', color: '#11120F' }}>
     {background && backgroundIsVideo && <><video src={background} autoPlay muted loop playsInline aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: greyscale ? 'grayscale(1)' : 'none' }} /><span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(242,239,231,.66)' }} /></>}
     <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 1240, margin: '0 auto', boxSizing: 'border-box', padding: 'clamp(40px,7cqw,96px) clamp(24px,6cqw,84px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),1fr))', gap: 'clamp(28px,5cqw,72px)', alignItems: 'center' }}>
@@ -1169,8 +1177,8 @@ function GuardianSiteHero({ name, avatarUrl, specialties, headline, tags, bio, a
           {avatarUrl ? <img src={avatarUrl} alt={name} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', filter: greyscale ? 'grayscale(1)' : 'none' }} /> : <span style={{ width: 56, height: 56, borderRadius: '50%', background: '#D7D4CC', display: 'grid', placeItems: 'center', fontFamily: headingFont, fontSize: 24 }}>{(name || 'G').charAt(0)}</span>}
           <span style={{ fontFamily: APP.font }}><strong style={{ display: 'block', fontSize: 15, fontWeight: 600, color: APP.text }}>{name || 'Your name'}</strong><span style={{ display: 'block', marginTop: 2, fontSize: 12, fontWeight: 600, color: APP.greenDark }}>{specialties.slice(0, 3).join(' · ') || 'Personal guidance'}</span></span>
         </div>
-        {/* App-style headline (Poppins bold, like the ROUTINE³ paywall title). */}
-        <h1 style={{ fontFamily: APP.font, color: APP.text, fontWeight: 700, fontSize: 'clamp(36px,5.2cqw,60px)', lineHeight: 1.08, letterSpacing: '-.03em', margin: '0 0 16px' }}>{(headline || name).replace(/\.$/, '')}</h1>
+        {/* Headline in the Guardian's chosen style (editorial serif, app bold or statement caps). */}
+        <h1 style={{ ...HEADLINE_STYLES[headlineStyle].hero, margin: '0 0 16px' }}>{HEADLINE_STYLES[headlineStyle].stripStop ? (headline || name).replace(/\.$/, '') : (headline || name)}</h1>
         <ExpertiseTags tags={tags} color={accent} />
         <p style={{ fontFamily: APP.font, color: APP.muted, fontSize: 16, fontWeight: 500, lineHeight: 1.55, maxWidth: 560, margin: 0 }}>{bio}</p>
       </div>
@@ -1217,6 +1225,7 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
   const publicLanguage = languageOptions.find((language) => language.name === socials.language)?.code || 'en';
   const publicBackgroundIsVideo = socials.theme_background_type === 'video' || /\.(mp4|webm)(?:\?|$)/i.test(socials.theme_background || '');
   const publicGreyscale = socials.theme_image_treatment === 'greyscale';
+  const publicHeadlineStyle = headlineStyleOf(socials.theme_headline_style);
   const publicHeaderStyle: HeaderStyle = socials.theme_header_style === 'hidden' ? 'hidden' : 'white';
   const publicHeaderBackground = '#FFFFFF';
   const publicHeaderText = '#11120F';
@@ -1235,10 +1244,10 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
     </header>}
     <main>
       {/* Shared with the builder preview, so what Guardians build is what they publish. */}
-      <GuardianSiteHero name={profile.display_name} avatarUrl={profile.avatar_url} specialties={profile.specialties} headline={profile.headline || profile.display_name} tags={publicExpertiseTags} bio={profile.bio} accent={publicAccent} headingFont={publicHeadingFont} background={socials.theme_background} backgroundIsVideo={publicBackgroundIsVideo} greyscale={publicGreyscale}
+      <GuardianSiteHero headlineStyle={publicHeadlineStyle} name={profile.display_name} avatarUrl={profile.avatar_url} specialties={profile.specialties} headline={profile.headline || profile.display_name} tags={publicExpertiseTags} bio={profile.bio} accent={publicAccent} headingFont={publicHeadingFont} background={socials.theme_background} backgroundIsVideo={publicBackgroundIsVideo} greyscale={publicGreyscale}
         cards={valueRamps.filter((ramp) => ramp.status === 'published').length ? valueRamps.filter((ramp) => ramp.status === 'published').map((ramp) => ({ key: ramp.id, eyebrow: [ramp.audience, ramp.problem].filter(Boolean).join(' · '), title: customerFacingOfferTitle(offers.find((offer) => offer.id === ramp.offer_ids[0])?.title || ramp.name), copy: offers.find((offer) => offer.id === ramp.offer_ids[0])?.description || '', kind: offers.find((offer) => offer.id === ramp.offer_ids[0])?.kind, price: offers.find((offer) => offer.id === ramp.offer_ids[0])?.access_model === 'free' ? 'Free' : undefined, href: '#offers' })) : freeOffers.slice(0, 1).map((offer) => ({ key: offer.id, eyebrow: profile.specialties.slice(0, 2).join(' · '), title: customerFacingOfferTitle(offer.title), copy: offer.description || '', kind: offer.kind, price: 'Free', href: '#start' }))} />
       {reviewToken && <ReviewForm token={reviewToken} guardianName={profile.display_name} accent={publicAccent} />}
-      <GuardianFunnel reviews={reviews.filter((r) => r.status === 'published')} profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
+      <GuardianFunnel headlineStyle={publicHeadlineStyle} reviews={reviews.filter((r) => r.status === 'published')} profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
     </main>
   </div>;
 }
@@ -1299,6 +1308,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [funnelPurchases, setFunnelPurchases] = useState<string[]>([]);
   const [leadCaptureValue, setLeadCaptureValue] = useState('');
   const [headerStyle, setHeaderStyle] = useState<HeaderStyle>('white');
+  const [headlineStyle, setHeadlineStyle] = useState<HeadlineStyle>('editorial');
   const [pricingRegion, setPricingRegion] = useState(defaultPricingRegion().region);
   const [currency, setCurrency] = useState<CurrencyCode>(defaultPricingRegion().currency);
   const [offerGoal, setOfferGoal] = useState<GuardianOfferGoal>('basic');
@@ -1316,6 +1326,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       if (links.theme_background) setBackgroundUrl(links.theme_background);
       if (links.theme_background_type === 'image' || links.theme_background_type === 'video') setBackgroundType(links.theme_background_type);
       if (links.theme_image_treatment === 'color' || links.theme_image_treatment === 'greyscale') setImageTreatment(links.theme_image_treatment);
+      setHeadlineStyle(headlineStyleOf(links.theme_headline_style));
       if (links.theme_header_style === 'white' || links.theme_header_style === 'hidden') setHeaderStyle(links.theme_header_style as HeaderStyle);
       if (links.theme_page_color) setPageColor(links.theme_page_color);
       if (links.theme_accent_color) setAccentColor(links.theme_accent_color);
@@ -1791,7 +1802,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       const audienceText = audience.join(', ').toLowerCase();
       const headline = generatedHeadline;
       const bio = intro.trim() || `I help ${audienceText} with ${chosen.join(', ').toLowerCase()} through ${format.join(', ').toLowerCase()}.`;
-      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), offer_videos: JSON.stringify(offerVideos), roles: roles.join(','), audience_details: JSON.stringify(Object.fromEntries(audience.filter((g) => audienceDetails[g]).map((g) => [g, audienceDetails[g]]))), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: savedStatus === 'approved' ? 'approved' : 'submitted', onboarding_step: 5 });
+      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), offer_videos: JSON.stringify(offerVideos), roles: roles.join(','), audience_details: JSON.stringify(Object.fromEntries(audience.filter((g) => audienceDetails[g]).map((g) => [g, audienceDetails[g]]))), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_headline_style: headlineStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: savedStatus === 'approved' ? 'approved' : 'submitted', onboarding_step: 5 });
       const selectedBrand = currentBrandDraft();
       const brandsToSave = brandProfiles.map((brand) => brand.localId === activeBrandId ? selectedBrand : brand);
       await replaceGuideBrands(userId, brandsToSave.map(({ localId, ...brand }) => ({ ...brand, is_primary: localId === activeBrandId })));
@@ -2477,6 +2488,13 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             <button type="button" onClick={() => setSiteStyleStage(1)} style={btn}>Continue <ArrowRight size={14} /></button>
             </>}
             {siteStyleStage === 1 && <>
+            <label style={label}>Headline style</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 7, marginBottom: 16 }}>
+              {(Object.keys(HEADLINE_STYLES) as HeadlineStyle[]).map((value) => { const active = headlineStyle === value; const look = HEADLINE_STYLES[value]; return <button className="guardian-card" type="button" key={value} onClick={() => setHeadlineStyle(value)} aria-pressed={active} style={{ minWidth: 0, minHeight: 64, padding: '8px 9px', border: `1px solid ${active ? acid : line}`, background: active ? '#20251B' : 'transparent', color: ink, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ display: 'block', fontFamily: look.hero.fontFamily, fontWeight: look.hero.fontWeight, textTransform: look.hero.textTransform, letterSpacing: value === 'statement' ? '.04em' : '-.02em', fontSize: 20, lineHeight: 1, color: ink }}>Aa</span>
+                <strong style={{ display: 'block', marginTop: 6, fontFamily: sans, fontSize: 8 }}>{look.label}</strong>
+              </button>; })}
+            </div>
             <label style={label}>Header and navigation</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7, marginBottom: 16 }}>
               {([['white', 'White header'], ['hidden', 'No header']] as const).map(([value, text]) => { const active = headerStyle === value; return <button className="guardian-card" type="button" key={value} onClick={() => setHeaderStyle(value)} aria-pressed={active} style={{ minWidth: 0, minHeight: 54, padding: 7, border: `1px solid ${active ? acid : line}`, background: 'transparent', color: ink, cursor: 'pointer', fontFamily: sans, textAlign: 'left' }}>
@@ -2528,7 +2546,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           </div>
           <div id="profile-site-preview" className="g-sticky" style={{ scrollMarginTop: 20 }}><span style={{ ...label, display: 'block', color: acid, marginBottom: 7 }}>Profile site preview <span style={{ color: muted }}>· shows every published offer path</span></span><PreviewFrame device={previewDevice}><div style={{ flex: '1 0 auto', background: pageColor, fontFamily: sans }}>
             {headerStyle !== 'hidden' && <GuardianSiteHeader brandName={brandName.trim()} path={`routine3.com/${displayName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-') || 'your-name'}`} />}
-            <GuardianSiteHero name={displayName} avatarUrl={avatarUrl} specialties={chosen} headline={generatedHeadline} tags={expertiseTags} bio={intro || `A practical ${chosen.slice(0, 2).join(' and ').toLowerCase() || 'guidance'} path shaped for ${audience.join(' and ').toLowerCase()}.`} accent={accentColor} headingFont={serif} background={effectiveBackground} backgroundIsVideo={backgroundType === 'video'} greyscale={imageTreatment === 'greyscale'}
+            <GuardianSiteHero headlineStyle={headlineStyle} name={displayName} avatarUrl={avatarUrl} specialties={chosen} headline={generatedHeadline} tags={expertiseTags} bio={intro || `A practical ${chosen.slice(0, 2).join(' and ').toLowerCase() || 'guidance'} path shaped for ${audience.join(' and ').toLowerCase()}.`} accent={accentColor} headingFont={serif} background={effectiveBackground} backgroundIsVideo={backgroundType === 'video'} greyscale={imageTreatment === 'greyscale'}
               cards={[{ key: 'first', eyebrow: `${rampTargetAudience} · ${rampTargetProblem}`, title: customerFacingOfferTitle(leadMagnetTitle || suggestedFreeOffer.title), copy: freeAudienceValue, kind: freeOfferType, price: 'Free', onClick: () => document.getElementById('value-ramp-funnel-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }]} />
           </div></PreviewFrame></div>
           </div>
