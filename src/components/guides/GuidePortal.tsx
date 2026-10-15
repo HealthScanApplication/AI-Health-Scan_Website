@@ -1367,6 +1367,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [brandName, setBrandName] = useState('');
   const [storyTemplate, setStoryTemplate] = useState<StoryTemplateId>('editorial');
   const [siteStyleStage, setSiteStyleStage] = useState(0);
+  const [offerEditStage, setOfferEditStage] = useState(0);
   const [pageColor, setPageColor] = useState('#F2EFE7');
   const [accentColor, setAccentColor] = useState('#667245');
   const [imageTreatment, setImageTreatment] = useState<'color' | 'greyscale'>('color');
@@ -2628,6 +2629,39 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         <FunnelStage number="02" eyebrow="Site 02 · First offer path" title={`${rampTargetAudience} · ${rampTargetProblem} → ${customerFacingOfferTitle(leadMagnetTitle || 'your first offer')}`} copy="Audience, problem, solution: the page a visitor lands on, from the free offer through to the next one." last>
         <div id="value-ramp-funnel-preview" style={{ scrollMarginTop: 20, border: `1px solid ${line}`, background: panel, padding: 16, marginBottom: 24 }}>
           <div className="g-split"><div>
+          {/* Same pattern as "Style your page": edit what the offer pages say, who they're for, media and upsells. */}
+          <label style={{ ...label, color: ink }}>Edit your offer</label>
+          <div role="tablist" aria-label="Offer page steps" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', border: `1px solid ${line}`, marginBottom: 16 }}>
+            {['Offer', 'Audience', 'Media', 'Upsells'].map((title, index) => <button type="button" role="tab" aria-selected={offerEditStage === index} key={title} onClick={() => { setOfferEditStage(index); if (index === 3 && funnelStages.length > 1) { setFunnelUnlockedStage(funnelStages.length - 1); setFunnelPreviewStage(1); setFunnelPageState('offer'); } else { setFunnelPreviewStage(0); setFunnelPageState('checkout'); } }} style={{ minHeight: 44, border: 0, borderLeft: index ? `1px solid ${line}` : 0, background: offerEditStage === index ? ink : 'transparent', color: offerEditStage === index ? black : index < offerEditStage ? acid : muted, fontFamily: sans, fontSize: 8, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}>{String(index + 1).padStart(2, '0')} · {title}</button>)}
+          </div>
+          {offerEditStage === 0 && <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
+            <div><label style={label}>Free offer name <span style={{ color: muted }}>· the big title on the sign-up page</span></label><input style={input} value={leadMagnetTitle} onChange={(e) => setLeadMagnetTitle(e.target.value)} placeholder="Name your free offer" /></div>
+            <div><label style={label}>Value line <span style={{ color: muted }}>· what changes for them</span></label><textarea style={{ ...input, minHeight: 70, height: 70, paddingTop: 12, resize: 'vertical' }} value={freeAudienceValue} onChange={(e) => setFreeAudienceValue(e.target.value)} placeholder="Sleep through the night again in 7 days" /></div>
+            <span style={{ color: muted, fontSize: 9 }}>Format: {isProtocolKind(freeOfferType) || APP_PLAN_KINDS.includes(freeOfferType) ? 'PDF + ROUTINE³ app' : OTHER_FORMATS[freeOfferType] || 'Online'} · change it in step 04 · Offers.</span>
+          </div>}
+          {offerEditStage === 1 && <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
+            <div className="g-split" style={{ gap: 8 }}>
+              <div><label style={label}>Who it's for</label><select style={input} value={rampTargetAudience} onChange={(e) => setRampAudience(e.target.value)}>{rampAudienceOptions.map((g) => <option key={g} value={g}>{g === 'Busy families' ? 'Families' : g}</option>)}</select></div>
+              <div><label style={label}>Problem it solves</label><select style={input} value={rampTargetProblem} onChange={(e) => setRampProblem(e.target.value)}>{(rampProblemOptions.length ? rampProblemOptions : [rampTargetProblem]).map((x) => <option key={x} value={x}>{x}</option>)}</select></div>
+            </div>
+            {audienceDetails[rampTargetAudience] && agePanel(rampTargetAudience)}
+            <span style={{ color: muted, fontSize: 9 }}>Shown on the cards as <strong style={{ color: ink }}>{audienceLabel(audienceDetails, [rampTargetAudience]) || rampTargetAudience}</strong>. Add more audiences in step 03 · Audience.</span>
+          </div>}
+          {offerEditStage === 2 && <div style={{ display: 'grid', gap: 12, marginBottom: 18 }}>
+            <div><label style={label}>Free offer · pitch video <span style={{ color: muted }}>· plays on the sign-up page</span></label>{offerVideoField('free')}</div>
+            {orderedUpsells.map((kind) => <div key={kind}><label style={label}>{customerFacingOfferTitle(upsellDrafts[kind].title)} · pitch video <span style={{ color: muted }}>· plays above the limited offer</span></label>{offerVideoField(kind)}</div>)}
+          </div>}
+          {offerEditStage === 3 && <div style={{ display: 'grid', gap: 14, marginBottom: 18 }}>
+            {!orderedUpsells.length && <span style={{ color: muted, fontSize: 10 }}>No paid offers yet. Add one in step 04 · Offers.</span>}
+            {orderedUpsells.map((kind, index) => <div key={kind} style={{ border: `1px solid ${line}`, padding: 12, display: 'grid', gap: 8 }}>
+              <span style={{ ...label, color: acid, marginBottom: 0 }}>Upsell {index + 1}{offerAccess[kind] === 'free' ? ' · free' : ''}</span>
+              <div className="g-split" style={{ gap: 8 }}>
+                <div><label style={label}>Name</label><input style={input} value={upsellDrafts[kind].title} onChange={(e) => updateUpsell(kind, { title: e.target.value })} /></div>
+                {offerAccess[kind] !== 'free' && <div><label style={label}>Price · {currency} <span style={{ color: muted }}>· 30% off in the timer</span></label><input style={input} inputMode="decimal" value={upsellDrafts[kind].price} onChange={(e) => updateUpsell(kind, { price: e.target.value.replace(/[^0-9.]/g, '') })} /></div>}
+              </div>
+              <div><label style={label}>Value line</label><textarea style={{ ...input, minHeight: 60, height: 60, paddingTop: 10, resize: 'vertical' }} value={upsellDrafts[kind].audienceValue} onChange={(e) => updateUpsell(kind, { audienceValue: e.target.value })} /></div>
+            </div>)}
+          </div>}
           <label style={{ ...label, color: acid }}>Offer funnel preview <span style={{ color: muted }}>· test purchase and access</span></label>
           <div aria-label="Customer journey stages" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', border: `1px solid ${line}`, margin: '10px 0 14px' }}>
             {/* Every part of the flow, free and paid, is clickable so the Guardian can jump straight to it. */}
