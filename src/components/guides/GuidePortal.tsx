@@ -853,8 +853,9 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [] 
   const upsellPrice = upsell ? (seconds ? Math.round(upsell.price_cents * (1 - COUPON_RATE)) : upsell.price_cents) : 0;
   return <div role="dialog" aria-modal="true" aria-label="Checkout" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(17,24,39,.55)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
     <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: stage === 'upsell' ? 880 : 440, background: APP.bg, color: APP.text, fontFamily: APP.font, borderRadius: 24, overflow: 'hidden', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.3)' }}>
-      <button type="button" aria-label="Close" onClick={stage === 'upsell' ? nextUpsell : onClose} style={{ position: 'absolute', top: stage === 'upsell' ? 22 : 14, right: stage === 'upsell' ? 22 : 14, width: 36, height: 36, border: 0, background: 'transparent', fontSize: 22, cursor: 'pointer', color: APP.text, zIndex: 2 }}>×</button>
+      <button type="button" aria-label="Close" onClick={stage === 'upsell' ? nextUpsell : onClose} style={{ position: 'absolute', top: stage === 'upsell' ? 58 : 14, right: stage === 'upsell' ? 22 : 14, width: 36, height: 36, border: 0, background: 'transparent', fontSize: 22, cursor: 'pointer', color: APP.text, zIndex: 2 }}>×</button>
       {stage === 'upsell' && upsell ? <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}>
+        <div style={{ flex: '1 1 100%', background: seconds ? APP.greenSoft : APP.alt, color: '#000', padding: '10px 48px 10px 16px', fontSize: 12, fontWeight: 700, letterSpacing: .5, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><Clock size={14} strokeWidth={2.4} />{seconds ? <>30% off · ends in {String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')} · code {code} applied</> : 'Offer ended'}</div>
         {/* Wide like the builder's upsell: offer on the left, price on top and CTA pinned to the bottom of the right panel. */}
         <div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
           <AppOfferImage kind={upsell.kind} size={110} align="left" />
@@ -864,14 +865,13 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [] 
         </div>
         <div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, alignSelf: 'stretch', justifyContent: 'center', padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)' }}>
-            <div style={{ background: APP.greenSoft, color: '#000', padding: '8px 0', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}><Clock size={12} />{seconds ? `30% off · ends in ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}` : 'Offer ended · full price'}</div>
             <div style={{ padding: '14px 16px 16px' }}>
               {seconds > 0 && <div style={{ color: APP.faint, fontSize: 13, textDecoration: 'line-through' }}>{money(upsell.price_cents, upsell.currency)}</div>}
               <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{money(upsellPrice, upsell.currency)}</div>
             </div>
           </div>
           <div>
-            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Adding…' : `Add to my order · ${money(upsellPrice, upsell.currency)}`}</button>
+            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Locking in…' : 'Lock it in'}</button>
           </div>
         </div>
       {reviews.length > 0 && <div style={{ flex: '1 1 calc(100% - 32px)', minWidth: 0, textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
@@ -1917,7 +1917,9 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
     const total = live ? Math.round(amount * (1 - COUPON_RATE) * 100) / 100 : amount;
     const benefits = (offer.meta.split(' · ').slice(1).join(' · ') || 'Personal plan').split(/ \+ |, /).filter(Boolean).slice(0, 4);
     return <div style={{ width: '100%', maxWidth: 880, margin: '0 auto', background: APP.bg, borderRadius: 24, overflow: 'hidden', fontFamily: APP.font, color: APP.text, textAlign: 'center', boxShadow: '0 20px 50px rgba(17,24,39,.18)', position: 'relative' }}>
-      <button type="button" aria-label="No thanks" onClick={onNo} style={{ position: 'absolute', zIndex: 2, top: 22, right: 22, width: 36, height: 36, border: 0, background: 'transparent', color: APP.text, fontSize: 22, cursor: 'pointer' }}>×</button>
+      {/* Urgency banner across the whole card: discount, countdown and the code already applied. */}
+      <div style={{ background: live ? APP.greenSoft : APP.alt, color: '#000', padding: '10px 16px', fontSize: 12, fontWeight: 700, letterSpacing: .5, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><Clock size={14} strokeWidth={2.4} />{live ? <>30% off · ends in {String(Math.floor(funnelTimerSeconds / 60)).padStart(2, '0')}:{String(funnelTimerSeconds % 60).padStart(2, '0')} · code {couponCode} applied</> : 'Offer ended'}</div>
+      <button type="button" aria-label="No thanks" onClick={onNo} style={{ position: 'absolute', zIndex: 2, top: 58, right: 22, width: 36, height: 36, border: 0, background: 'transparent', color: APP.text, fontSize: 22, cursor: 'pointer' }}>×</button>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}><div style={{ flex: '1 1 340px', minWidth: 0, padding: '56px 28px 28px', display: 'grid', alignContent: 'start', justifyItems: 'start', textAlign: 'left' }}>
         {offer.video ? <video src={offer.video} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 12, background: '#000', marginBottom: 12 }} /> : <AppOfferImage kind={offer.kind} size={110} align="left" />}
         {isProtocolKind(offer.kind) && <div style={{ margin: '12px 0 2px' }}><ProtocolFormatTag /></div>}
@@ -1926,14 +1928,13 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       </div>
       <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignSelf: 'stretch', gap: 14, margin: 16, padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)' }}>
         <div style={{ position: 'relative', background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)', textAlign: 'center' }}>
-          <div style={{ background: APP.greenSoft, color: '#000', padding: '8px 0', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase' }}>{live ? `30% off · ends in ${String(Math.floor(funnelTimerSeconds / 60)).padStart(2, '0')}:${String(funnelTimerSeconds % 60).padStart(2, '0')}` : 'One-time offer'}</div>
           <div style={{ padding: '14px 16px 16px' }}>
             {live && amount > 0 && <div style={{ color: APP.faint, fontSize: 13, textDecoration: 'line-through' }}>{formatMoney(amount, currency)}</div>}
             <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{amount ? formatMoney(total, currency) : 'Free'}</div>
           </div>
         </div>
       <div>
-        <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}>{amount ? `Add to my order · ${formatMoney(total, currency)}` : 'Add to my plan'}</button>
+        <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}>Lock it in</button>
       </div>
       </div></div>
       <div style={{ textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={guardianReviews.length ? guardianReviews : SAMPLE_REVIEWS} sample={!guardianReviews.length} accent={APP.greenDark} /></div>
