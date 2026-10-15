@@ -804,7 +804,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   // Pitch videos saved by the builder in social_links.offer_videos ('free' = lead magnet).
   const leadVideo = (() => { try { return (JSON.parse(String((profile.social_links as Record<string, unknown> | null)?.offer_videos || '{}')) as Record<string, string>).free || ''; } catch { return ''; } })();
   return <>
-    {steps.length > 0 && <section id="offers" style={{ padding: 'clamp(60px,9vw,120px) clamp(24px,8vw,110px)', borderTop: '1px solid rgba(17,18,15,.2)' }}>
+    {steps.length > 0 && <section id="offers" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)' }}>
       <span style={eyebrow}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
       <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(44px,7vw,82px)', lineHeight: .95, margin: '18px 0 36px' }}>Your path, step by step.</h2>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', borderTop: '1px solid #11120F' }}>
@@ -816,9 +816,9 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
         </li>)}
       </ol>
     </section>}
-    {reviews.length > 0 && <section style={{ padding: '0 clamp(24px,8vw,110px) clamp(48px,7vw,90px)' }}><ReviewRail reviews={reviews} accent={accent} /></section>}
-    {entry && <section id="start" style={{ padding: 'clamp(60px,9vw,120px) clamp(24px,8vw,110px)', background: '#11120F', color: '#F5F2EA' }}>
-      <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(32px,6vw,90px)', alignItems: 'center' }}>
+    {reviews.length > 0 && <section style={{ padding: `0 ${PAGE_X} clamp(48px,7vw,90px)` }}><ReviewRail reviews={reviews} accent={accent} /></section>}
+    {entry && <section id="start" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, background: '#11120F', color: '#F5F2EA' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(32px,6vw,90px)', alignItems: 'center' }}>
         <div>
           <span style={{ ...eyebrow, color: '#C7D08E' }}>Free · {entry.title}</span>
           <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(40px,6vw,72px)', lineHeight: .95, margin: '18px 0' }}>{state === 'done' ? 'You are in.' : 'Start today, free.'}</h2>
@@ -850,7 +850,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
         </form>}
       </div>
     </section>}
-    <footer style={{ padding: '28px clamp(24px,8vw,110px)', borderTop: '1px solid rgba(17,18,15,.2)', color: '#66645F', fontSize: 11, lineHeight: 1.6 }}>
+    <footer style={{ padding: `28px ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)', color: '#66645F', fontSize: 11, lineHeight: 1.6 }}>
       {profile.display_name} shares general wellbeing guidance, not medical advice. Speak to your GP or doctor before changing medication, diet or exercise, and about any health concern. Individual results vary.
     </footer>
   </>;
@@ -886,6 +886,8 @@ function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accen
 }
 
 /** Guardian profile hero, shared by the published mini-site and the builder preview so both are identical. */
+// Public page gutter: lines every section up with the hero's 1240px inner container.
+const PAGE_X = 'max(clamp(24px,6vw,84px), calc((100% - 1240px) / 2 + clamp(24px,6vw,84px)))';
 const SAMPLE_REVIEWS: GuardianReview[] = [
   { id: 's1', guide_id: '', reviewer_name: 'Sample · Claire', rating: 5, body: 'Sleeping through the night for the first time in months. Simple steps I could actually keep.', status: 'published', created_at: '' },
   { id: 's2', guide_id: '', reviewer_name: 'Sample · Amira', rating: 5, body: 'Clear, kind and practical. The daily routine in the app kept me on track.', status: 'published', created_at: '' },
@@ -897,13 +899,15 @@ function ReviewRail({ reviews, accent, title = 'What people say', sample = false
   const average = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
   return <section aria-label="Reviews" style={{ width: '100%', minWidth: 0 }}>
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}><span style={{ color: accent, fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{title}</span><span style={{ color: '#55564F', fontSize: 11 }}><span style={{ color: accent }}>★</span> {average.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? '' : 's'}{sample ? ' · sample' : ''}</span></div>
-    <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x mandatory' }}>
-      {reviews.map((r) => <figure key={r.id} style={{ flex: '0 0 min(78%,250px)', margin: 0, scrollSnapAlign: 'start', border: '1px solid rgba(17,18,15,.16)', background: 'rgba(255,255,255,.75)', borderRadius: 4, padding: '12px 14px', display: 'grid', gap: 8, alignContent: 'start' }}>
+    {/* Slow auto-scroll: the list is doubled so the loop is seamless; pauses on hover, static for reduced motion. */}
+    <style>{`@keyframes review-marquee{to{transform:translateX(-50%)}}.review-rail{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}.review-track{display:flex;width:max-content;animation:review-marquee var(--rail-duration) linear infinite}.review-rail:hover .review-track{animation-play-state:paused}@media (prefers-reduced-motion:reduce){.review-rail{overflow-x:auto}.review-track{animation:none}}`}</style>
+    <div className="review-rail" style={{ paddingBottom: 6 }}><div className="review-track" style={{ ['--rail-duration' as string]: `${Math.max(30, reviews.length * 12)}s` } as React.CSSProperties}>
+      {[...reviews, ...reviews].map((r, index) => <figure key={`${r.id}-${index}`} aria-hidden={index >= reviews.length || undefined} style={{ flex: '0 0 250px', marginRight: 10, marginTop: 0, marginBottom: 0, marginLeft: 0, border: '1px solid rgba(17,18,15,.16)', background: 'rgba(255,255,255,.75)', borderRadius: 4, padding: '12px 14px', display: 'grid', gap: 8, alignContent: 'start' }}>
         <span aria-label={`${r.rating} out of 5 stars`} style={{ fontSize: 12, letterSpacing: 1 }}>{Array.from({ length: 5 }, (_, i) => <span key={i} style={{ color: i < r.rating ? accent : 'rgba(17,18,15,.2)' }}>★</span>)}</span>
         <blockquote style={{ margin: 0, color: '#2B2C27', fontSize: 12, lineHeight: 1.55 }}>{r.body}</blockquote>
         <figcaption style={{ color: '#55564F', fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{r.reviewer_name}</figcaption>
       </figure>)}
-    </div>
+    </div></div>
   </section>;
 }
 // Opened from a one-time review link (?review=<token>): star rating + text, then reveals the thank-you code.
@@ -920,7 +924,7 @@ function ReviewForm({ token, guardianName, accent }: { token: string; guardianNa
     catch (err: any) { setMessage(err?.message || 'Could not send your review.'); setState('error'); }
   }
   const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', border: '1px solid #11120F', borderRadius: 2, padding: '10px 12px', fontFamily: 'inherit', fontSize: 14, background: '#FFF', color: '#11120F', outline: 'none' };
-  return <section id="review" style={{ padding: 'clamp(40px,7vw,90px) clamp(24px,8vw,110px)', borderBottom: '1px solid rgba(17,18,15,.2)' }}>
+  return <section id="review" style={{ padding: `clamp(40px,7vw,90px) ${PAGE_X}`, borderBottom: '1px solid rgba(17,18,15,.2)' }}>
     <div style={{ maxWidth: 560 }}>
       <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Share your experience</span>
       {state === 'done' ? <>
