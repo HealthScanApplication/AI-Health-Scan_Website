@@ -1167,14 +1167,15 @@ function GuardianSiteHero({ name, avatarUrl, specialties, headline, tags, bio, a
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
           {avatarUrl ? <img src={avatarUrl} alt={name} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', filter: greyscale ? 'grayscale(1)' : 'none' }} /> : <span style={{ width: 56, height: 56, borderRadius: '50%', background: '#D7D4CC', display: 'grid', placeItems: 'center', fontFamily: headingFont, fontSize: 24 }}>{(name || 'G').charAt(0)}</span>}
-          <span><strong style={{ display: 'block', fontSize: 15 }}>{name || 'Your name'}</strong><span style={{ display: 'block', marginTop: 4, fontSize: 12, color: '#6B6963' }}>{specialties.slice(0, 3).join(' · ') || 'Personal guidance'}</span></span>
+          <span style={{ fontFamily: APP.font }}><strong style={{ display: 'block', fontSize: 15, fontWeight: 600, color: APP.text }}>{name || 'Your name'}</strong><span style={{ display: 'block', marginTop: 2, fontSize: 12, fontWeight: 600, color: APP.greenDark }}>{specialties.slice(0, 3).join(' · ') || 'Personal guidance'}</span></span>
         </div>
-        <h1 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(46px,7cqw,96px)', lineHeight: .95, letterSpacing: '-.035em', margin: '0 0 18px' }}>{headline || name}</h1>
+        {/* App-style headline (Poppins bold, like the ROUTINE³ paywall title). */}
+        <h1 style={{ fontFamily: APP.font, color: APP.text, fontWeight: 700, fontSize: 'clamp(36px,5.2cqw,60px)', lineHeight: 1.08, letterSpacing: '-.03em', margin: '0 0 16px' }}>{(headline || name).replace(/\.$/, '')}</h1>
         <ExpertiseTags tags={tags} color={accent} />
-        <p style={{ color: '#66645F', fontSize: 15, lineHeight: 1.65, maxWidth: 560, margin: 0 }}>{bio}</p>
+        <p style={{ fontFamily: APP.font, color: APP.muted, fontSize: 16, fontWeight: 500, lineHeight: 1.55, maxWidth: 560, margin: 0 }}>{bio}</p>
       </div>
       <div style={{ display: 'grid', gap: 12 }}>
-        <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Explore my offers</span>
+        <span style={{ fontFamily: APP.font, color: APP.greenDark, fontSize: 15, fontWeight: 600 }}>Explore my offers</span>
         {cards.map((card) => <ProductCard key={card.key} kind={card.kind} eyebrow={card.eyebrow} title={card.title} copy={card.copy} price={card.price} name={name} avatarUrl={avatarUrl} accent={accent} href={card.href} onClick={card.onClick} />)}
       </div>
     </div>
