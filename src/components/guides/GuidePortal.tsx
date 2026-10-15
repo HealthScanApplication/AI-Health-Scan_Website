@@ -240,6 +240,12 @@ const specialtyGroups = {
   Soul: ['Human Design', 'Astrology', 'Tarot', 'Numerology', 'Meditation', 'Spiritual practice', 'Reiki', 'Energy work', 'Sound healing', 'Purpose', 'Journaling', 'Rituals', 'Life transitions', 'Breathwork'],
 } as const;
 type GuideRealm = keyof typeof specialtyGroups;
+// Practitioner roles offered under each selected expertise card.
+const specialtyRoles: Record<string, string[]> = {
+  Nutrition: ['Nutritionist', 'Dietitian', 'Herbalist', 'Naturopath', 'Health coach'], Fitness: ['Personal trainer', 'Strength coach', 'Running coach', 'Pilates instructor'], Wellness: ['Wellness coach', 'Naturopath', 'Herbalist', 'Holistic practitioner'], Yoga: ['Yoga teacher', 'Yoga therapist'], 'Somatic work': ['Somatic practitioner', 'Bodyworker', 'Massage therapist'], Sleep: ['Sleep coach', 'Sleep consultant'], Skin: ['Esthetician', 'Skin therapist', 'Dermatology nurse'], 'Gut health': ['Gut health coach', 'Nutritionist', 'Naturopath'], 'Family health': ['Doula', 'Midwife', 'Parenting coach', 'Family nutritionist'], Longevity: ['Longevity coach', 'Functional medicine practitioner'], Breathwork: ['Breathwork facilitator', 'Breath coach'],
+  Psychology: ['Psychologist', 'Therapist', 'Counsellor'], Stress: ['Stress coach', 'Therapist'], Focus: ['Performance coach', 'ADHD coach'], Habits: ['Habit coach', 'Health coach'], Confidence: ['Confidence coach', 'Life coach'], Relationships: ['Relationship coach', 'Couples therapist'], 'Emotional wellbeing': ['Counsellor', 'Wellbeing coach'], Mindfulness: ['Mindfulness teacher', 'MBSR instructor'], Coaching: ['Life coach', 'Executive coach', 'Health coach'],
+  'Human Design': ['Human Design reader'], Astrology: ['Astrologer'], Tarot: ['Tarot reader'], Numerology: ['Numerologist'], Meditation: ['Meditation teacher'], 'Spiritual practice': ['Spiritual guide', 'Minister'], Reiki: ['Reiki practitioner', 'Reiki master'], 'Energy work': ['Energy healer'], 'Sound healing': ['Sound healer'], Purpose: ['Purpose coach'], Journaling: ['Journaling guide'], Rituals: ['Ritual guide', 'Celebrant'], 'Life transitions': ['Transition coach', 'Death doula'],
+};
 
 const realmImages: Record<GuideRealm, string> = {
   Body: '/images/guides/body-realm.png',
@@ -947,6 +953,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [bookingProvider, setBookingProvider] = useState<BookingProvider>('ROUTINE³ Booking');
   const [bookingUrl, setBookingUrl] = useState('');
   const [chosen, setChosen] = useState<string[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
   const [realm, setRealm] = useState<GuideRealm>('Body');
   const [audience, setAudience] = useState<string[]>(['Everyone']);
   // Per-gender targeting: age range plus (for women) life stages. Saved with the profile on publish.
@@ -1007,6 +1014,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       if (links.brand_name) setBrandName(links.brand_name);
       if (links.logo_url) setLogoUrl(links.logo_url);
       if (links.expertise_tags) setExpertiseTags(parseExpertiseTags(links.expertise_tags));
+      if (links.roles) setRoles(String(links.roles).split(',').filter(Boolean));
     }).catch(() => {});
   }, [userId]);
   // Existing items shown under each step ("In your workspace").
@@ -1451,7 +1459,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       const audienceText = audience.join(', ').toLowerCase();
       const headline = generatedHeadline;
       const bio = intro.trim() || `I help ${audienceText} with ${chosen.join(', ').toLowerCase()} through ${format.join(', ').toLowerCase()}.`;
-      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), audience_details: JSON.stringify(Object.fromEntries(audience.filter((g) => audienceDetails[g]).map((g) => [g, audienceDetails[g]]))), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: savedStatus === 'approved' ? 'approved' : 'submitted', onboarding_step: 5 });
+      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), roles: roles.join(','), audience_details: JSON.stringify(Object.fromEntries(audience.filter((g) => audienceDetails[g]).map((g) => [g, audienceDetails[g]]))), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: savedStatus === 'approved' ? 'approved' : 'submitted', onboarding_step: 5 });
       const selectedBrand = currentBrandDraft();
       const brandsToSave = brandProfiles.map((brand) => brand.localId === activeBrandId ? selectedBrand : brand);
       await replaceGuideBrands(userId, brandsToSave.map(({ localId, ...brand }) => ({ ...brand, is_primary: localId === activeBrandId })));
@@ -1803,7 +1811,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           })}
         </div>
         <div role="tabpanel" style={{ ...CHOICE_GRID, alignContent: 'flex-start' }}>
-          {specialtyGroups[realm].map((s) => <TagChoice key={s} text={s} description={specialtyHelp[s]} active={chosen.includes(s)} art={specialtyArt[realm][s]} onClick={() => setChosen((v) => v.includes(s) ? v.filter((x) => x !== s) : [...v, s])} />)}
+          {specialtyGroups[realm].map((s) => <div key={s} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={s} description={specialtyHelp[s]} active={chosen.includes(s)} art={specialtyArt[realm][s]} onClick={() => setChosen((v) => v.includes(s) ? v.filter((x) => x !== s) : [...v, s])} />{chosen.includes(s) && specialtyRoles[s] && <div style={{ border: `1px solid ${line}`, borderTop: 0, background: 'rgba(245,242,234,.04)', padding: '10px 12px 12px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><span style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', marginRight: 2 }}>Your role</span>{specialtyRoles[s].map((r) => { const on = roles.includes(r); return <button key={r} type="button" aria-pressed={on} onClick={() => setRoles((v) => on ? v.filter((x) => x !== r) : [...v, r])} style={{ height: 26, padding: '0 10px', border: `1px solid ${on ? acid : line}`, background: on ? '#20251B' : 'transparent', color: on ? acid : ink, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{r}</button>; })}</div>}</div>)}
         </div>
         {chosen.length > 0 && <div style={{ color: muted, fontSize: 10, lineHeight: 1.5, marginTop: 8 }}>Selected: {chosen.join(' · ')}</div>}
       </div>}
