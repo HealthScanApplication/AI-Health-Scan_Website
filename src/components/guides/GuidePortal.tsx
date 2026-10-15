@@ -3,12 +3,13 @@ import {
   ArrowRight, ChevronRight, FileText, HeartPulse, LogOut,
   Mail, Package, Plus, Salad, Sparkles, Users, Globe2, Loader2,
   Upload, Check, Instagram, Youtube, Link2, AtSign, Route, CalendarDays, Download,
-  MoreHorizontal, FolderOpen, Trash2, ExternalLink, Hammer, PencilRuler, Blocks, LayoutDashboard, Play, Clock, ShieldCheck, Utensils, Dumbbell, Combine } from 'lucide-react';
+  MoreHorizontal, FolderOpen, Trash2, ExternalLink, Hammer, PencilRuler, Blocks, LayoutDashboard, Play, Clock, ShieldCheck, Utensils, Dumbbell, Combine, Clapperboard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
 import { ContentStudio } from './ContentStudio';
 import { CombineProtocols, DietBuilder, FitnessBuilder } from './GuardianBuilders';
+import { ContentBuilder } from './ContentBuilder';
 import { buildRecipePdf } from '../../utils/recipePdf';
 import { PhoneFrame } from '../mockups/PhoneFrame';
 import { buildRecipesWithAI, computeNutrition, gramsFor, searchCatalogIngredients, KEY_MICROS, UNITS, type CatalogIngredient, type MacroKey, type RecipeDraft, type RecipeIngredient } from '../../utils/guideRecipeAI';
@@ -69,7 +70,7 @@ function ExpertiseTags({ tags, color = '#667245', compact = false }: { tags: str
   </div>;
 }
 
-type Tab = 'home' | 'profile' | 'library' | 'leads' | 'value_ramps' | 'offer_builder' | 'recipes' | 'diet' | 'fitness' | 'protocols' | 'admin';
+type Tab = 'home' | 'profile' | 'library' | 'leads' | 'value_ramps' | 'offer_builder' | 'recipes' | 'diet' | 'fitness' | 'content' | 'protocols' | 'admin';
 type FreeOfferKind = 'ebook' | 'one_to_one_call' | 'group_call' | 'recipe_book' | 'routine' | 'in_person';
 type UpsellKind = 'ebook' | 'routine' | 'routine_guidance' | 'recipe_book' | 'group_call' | 'one_to_one_call' | 'in_person' | 'festival';
 type DeliveryFormat = 'Downloadable PDF' | 'Interactive Protocol' | 'PDF + Interactive Protocol' | 'Live online' | 'In person' | 'Event';
@@ -338,6 +339,7 @@ const nav: { id: Tab; label: string; Icon: typeof Users }[] = [
   { id: 'recipes', label: 'Recipes', Icon: Salad },
   { id: 'diet', label: 'Diet', Icon: Utensils },
   { id: 'fitness', label: 'Fitness', Icon: Dumbbell },
+  { id: 'content', label: 'Content', Icon: Clapperboard },
   { id: 'protocols', label: 'Protocols', Icon: HeartPulse },
   { id: 'profile', label: 'Profile', Icon: FileText },
 ];
@@ -698,9 +700,6 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
     <div style={{ minHeight: '100vh', background: black, color: ink, fontFamily: sans }}>
       <header style={{ position: 'absolute', zIndex: 10, inset: '0 0 auto', height: 70, borderBottom: '1px solid rgba(255,255,255,.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(20px,5vw,72px)', background: 'rgba(9,10,8,.32)', backdropFilter: 'blur(12px)' }}>
         <Brand />
-        <nav aria-label="Guardian builders" className="guardian-builders" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'stretch', border: `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}`, borderRadius: 2 }}>
-          {([['Protocol builder', 'protocols', Hammer], ['Offer builder', 'offer_builder', PencilRuler], ['Site builder', 'profile', Blocks]] as const).map(([text, tab, Icon], index) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} onClick={(e) => { if (!isSignedIn) { e.preventDefault(); setAuthMode('login'); } }} title={isSignedIn ? text : `${text} · sign in to use`} style={{ height: 32, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, padding: '0 14px', borderLeft: index ? `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}` : 0, color: ink, opacity: isSignedIn ? 1 : .45, textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
-        </nav>
         {/* Joined hairline lockup, matching the main site header. */}
         <div style={{ display: 'flex', border: `1px solid ${ink}`, borderRadius: 2 }}>
           {isSignedIn
@@ -708,6 +707,12 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
             : <><a href="#guardian-apply" onClick={(e) => { e.preventDefault(); setAuthMode('login'); }} style={{ height: 32, padding: '0 14px', border: 0, background: 'transparent', color: ink, textDecoration: 'none', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>Sign in</a></>}
         </div>
       </header>
+      {/* Builder links: their own bar under the header so all six fit; joined hairline lockup, scrolls sideways when narrow. */}
+      <div className="guardian-builders-bar" style={{ position: 'absolute', zIndex: 10, top: 70, left: 0, right: 0, display: 'flex', overflowX: 'auto', padding: '10px 16px', scrollbarWidth: 'none' }}>
+        <nav aria-label="Guardian builders" className="guardian-builders" style={{ margin: '0 auto', flex: 'none', display: 'flex', alignItems: 'stretch', border: `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}`, borderRadius: 2, background: 'rgba(9,10,8,.32)', backdropFilter: 'blur(12px)' }}>
+          {([['Protocol builder', 'protocols', Hammer], ['Diet planner', 'diet', Utensils], ['Fitness planner', 'fitness', Dumbbell], ['Offer builder', 'offer_builder', PencilRuler], ['Content builder', 'content', Clapperboard], ['Site builder', 'profile', Blocks]] as const).map(([text, tab, Icon], index) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} onClick={(e) => { if (!isSignedIn) { e.preventDefault(); setAuthMode('login'); } }} title={isSignedIn ? text : `${text} · sign in to use`} style={{ height: 32, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, padding: '0 14px', borderLeft: index ? `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}` : 0, color: ink, opacity: isSignedIn ? 1 : .45, textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
+        </nav>
+      </div>
       {authMode && <div role="dialog" aria-modal="true" aria-label={authMode === 'login' ? 'Sign in' : 'Sign up'} onClick={() => setAuthMode(null)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(9,10,8,.72)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
         <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 460, background: black }}>
           <button type="button" aria-label="Close" onClick={() => setAuthMode(null)} style={{ position: 'absolute', top: 10, right: 12, zIndex: 2, border: 0, background: 'none', color: ink, fontSize: 22, lineHeight: 1, cursor: 'pointer' }}>×</button>
@@ -3394,7 +3399,7 @@ function GuardianAdminPanel() {
 function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (p: GuideProfile) => void }) {
   const { user, accessToken, signOut } = useAuth();
   // Deep links from the public Guardians nav, e.g. /guardians/workspace?tab=protocols
-  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); const tabs: Tab[] = ['home', 'profile', 'library', 'leads', 'value_ramps', 'offer_builder', 'recipes', 'diet', 'fitness', 'protocols', 'admin']; return tabs.includes(wanted as Tab) ? wanted as Tab : 'home'; });
+  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); const tabs: Tab[] = ['home', 'profile', 'library', 'leads', 'value_ramps', 'offer_builder', 'recipes', 'diet', 'fitness', 'content', 'protocols', 'admin']; return tabs.includes(wanted as Tab) ? wanted as Tab : 'home'; });
   const isAdminUser = ['true', '1', 'yes', true].includes((user?.app_metadata as any)?.is_admin) || (user?.app_metadata as any)?.role === 'admin';
   const navItems = isAdminUser ? [...nav, { id: 'admin' as Tab, label: 'Admin', Icon: ShieldCheck as typeof Users }] : nav;
   const [leads, setLeads] = useState<GuideLead[]>([]);
@@ -3533,6 +3538,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
               return child ? <div key={x.id} style={{ marginLeft: 40, paddingLeft: 16, borderLeft: `1px solid ${line}` }}>{row}</div> : row; })}
             </>;
           })() : <Empty image={guidePlates.protocols} title="No Protocol drafts yet" copy="Build against the full Routine database with timings, quantities, linked records and PDF export." />)}</div></>}
+        {tab === 'content' && <ContentBuilder profile={profile} offers={offers} protocols={protocols} recipes={recipes} />}
         {tab === 'diet' && accessToken && user && <DietBuilder accessToken={accessToken} ownerId={user.id} protocols={protocols} recipes={recipes} onSaved={(saved) => setProtocols((current) => [saved, ...current.filter((p) => p.id !== saved.id)])} onOpen={(id) => { setTab('protocols'); setProtocolId(id); }} />}
         {tab === 'fitness' && accessToken && user && <FitnessBuilder accessToken={accessToken} ownerId={user.id} protocols={protocols} onSaved={(saved) => setProtocols((current) => [saved, ...current.filter((p) => p.id !== saved.id)])} onOpen={(id) => { setTab('protocols'); setProtocolId(id); }} />}
         {tab === 'recipes' && recipeId && <RecipeBuilder key={recipeId} recipe={recipes.find((recipe) => recipe.id === recipeId)!} userId={user.id} offers={offers} onBack={() => setRecipeId(null)} onSaved={(saved) => setRecipes((current) => current.map((recipe) => recipe.id === saved.id ? saved : recipe))} />}
@@ -3554,7 +3560,7 @@ function Row({ title, meta, action, onClick, image }: { title: string; meta: str
 
 // Scopes Guardian styling; globals.css exempts `.guardian-ui button` from the forced 16px button size.
 export function GuidePortal() {
-  return <div className="guardian-ui"><style>{`@media (max-width: 900px){.guardian-ui .guardian-builders{display:none !important}}.g-split{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:20px;align-items:start}.g-split>.g-sticky{position:sticky;top:16px}@media (max-width: 960px){.g-split{grid-template-columns:minmax(0,1fr)}.g-split>.g-sticky{position:static}}`}</style><GuidePortalRoutes /></div>;
+  return <div className="guardian-ui"><style>{`.guardian-builders-bar::-webkit-scrollbar{display:none}.g-split{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:20px;align-items:start}.g-split>.g-sticky{position:sticky;top:16px}@media (max-width: 960px){.g-split{grid-template-columns:minmax(0,1fr)}.g-split>.g-sticky{position:static}}`}</style><GuidePortalRoutes /></div>;
 }
 
 function GuidePortalRoutes() {

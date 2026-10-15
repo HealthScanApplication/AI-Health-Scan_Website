@@ -118,7 +118,7 @@ async function drawPost(canvas: HTMLCanvasElement, fmt: (typeof FORMATS)[number]
   }
 }
 
-export function ContentStudio({ creator, audience, problem, offers, siteUrl }: { creator: string; audience: string; problem: string; offers: StudioOffer[]; siteUrl: string }) {
+export function ContentStudio({ creator, audience, problem, offers, siteUrl, heading = 'Create posts for this offer path' }: { creator: string; audience: string; problem: string; offers: StudioOffer[]; siteUrl: string; heading?: string }) {
   // Template fonts load from Google Fonts; redraw once they are registered, or the first frame uses a fallback.
   const [fontsReady, setFontsReady] = useState(0);
   useEffect(() => {
@@ -163,7 +163,7 @@ export function ContentStudio({ creator, audience, problem, offers, siteUrl }: {
   const lab: React.CSSProperties = { display: 'block', color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', margin: '0 0 5px' };
   return <section aria-label="Content studio" style={{ borderTop: `1px solid ${line}`, padding: 20 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-      <span><span style={{ ...lab, color: acid, marginBottom: 6 }}>Content</span><strong style={{ color: ink, fontSize: 20, fontWeight: 400, fontFamily: '"CanelaText", Georgia, serif' }}>Create posts for this offer path</strong></span>
+      <span><span style={{ ...lab, color: acid, marginBottom: 6 }}>Content</span><strong style={{ color: ink, fontSize: 20, fontWeight: 400, fontFamily: '"CanelaText", Georgia, serif' }}>{heading}</strong></span>
       <a href={FIGMA_TEMPLATE} target="_blank" rel="noopener noreferrer" style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>Figma template <ExternalLink size={12} /></a>
     </div>
     {/* The brief every post is built from. */}
