@@ -870,7 +870,7 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [],
             <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: -0.8 }}>{money(upsellPrice, upsell.currency)}</span>
           </div>
           <div>
-            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Locking in…' : 'Lock it in'}</button>
+            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Adding…' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Clock size={18} strokeWidth={2.4} />{seconds ? <>Get limited offer · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{`${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`}</span></> : 'Get it now'}</span>}</button>
           </div>
         </div>
       {reviews.length > 0 && <div style={{ flex: '1 1 calc(100% - 32px)', minWidth: 0, textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
@@ -1974,7 +1974,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: -0.8 }}>{amount ? formatMoney(total, currency) : 'Free'}</span>
           </div>
       <div>
-        <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}>Lock it in</button>
+        <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Clock size={18} strokeWidth={2.4} />{live ? <>Get limited offer · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{`${String(Math.floor(funnelTimerSeconds / 60)).padStart(2, '0')}:${String(funnelTimerSeconds % 60).padStart(2, '0')}`}</span></> : 'Get it now'}</span></button>
       </div>
       </div></div>
       <div style={{ textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={guardianReviews.length ? guardianReviews : SAMPLE_REVIEWS} sample={!guardianReviews.length} accent={APP.greenDark} /></div>
