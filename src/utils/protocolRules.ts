@@ -20,7 +20,7 @@ export interface RuleIssue { code: 'no_time' | 'vague' | 'not_verb' | 'renamed' 
 export const END_SLEEP = 'End Sleep';
 export const START_SLEEP = 'Start Sleep';
 const WAKE_RE = /^(wake|end[\s-]?sleep|rise|get[\s-]?up|morning[\s-]?wake)\b/i;
-const PLAIN_BEDTIME = /^(start[\s-]?sleep|bed(time)?|go to (bed|sleep)|sleep|lights[\s-]?out|time for bed)$/i;
+export const PLAIN_BEDTIME = /^(start[\s-]?sleep|bed(time)?|go to (bed|sleep)|sleep|lights[\s-]?out|time for bed)$/i;
 export const isWakeTitle = (t: string) => WAKE_RE.test(t.trim());
 
 const MEAL_VERB = /^(eat|have|enjoy|drink|cook|prepare|make|sip|take)\s+(a |an |some |your )?/i;
