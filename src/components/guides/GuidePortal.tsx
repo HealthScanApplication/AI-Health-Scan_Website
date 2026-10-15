@@ -951,8 +951,16 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [audience, setAudience] = useState<string[]>(['Everyone']);
   // Per-gender targeting: age range plus (for women) life stages. Saved with the profile on publish.
   const [audienceDetails, setAudienceDetails] = useState<Record<string, { min: number; max: number; stages: string[] }>>({
-    Everyone: { min: 18, max: 80, stages: [] }, Women: { min: 18, max: 80, stages: [] }, Men: { min: 18, max: 80, stages: [] }, Children: { min: 4, max: 12, stages: [] },
+    Everyone: { min: 18, max: 80, stages: [] }, Women: { min: 18, max: 80, stages: [] }, Men: { min: 18, max: 80, stages: [] }, Children: { min: 4, max: 12, stages: [] }, Athletes: { min: 16, max: 45, stages: [] }, 'Busy families': { min: 0, max: 80, stages: [] },
   });
+  // Chips under each audience card (Women's life stages, Men's, children's stages, athletes' focus, family mix).
+  const AUDIENCE_CHIPS: Record<string, { label: string; options: string[] }> = {
+    Women: { label: 'Life stage', options: ['Pregnancy', 'Postpartum', 'Premenopause', 'Perimenopause', 'Menopause', 'Postmenopause'] },
+    Men: { label: 'Life stage', options: ['Fatherhood', 'Midlife', 'Andropause', 'Healthy ageing'] },
+    Children: { label: 'Stage', options: ['Infancy', 'Toddler', 'Early childhood', 'Middle childhood', 'Puberty', 'Adolescence'] },
+    Athletes: { label: 'Focus', options: ['Endurance', 'Strength', 'Team sport', 'Recovery', 'Competition'] },
+    'Busy families': { label: 'Family mix', options: ['Young kids', 'Teens', 'Multi-generational'] },
+  };
   const describeAudience = (group: string) => { const d = audienceDetails[group]; return d ? `${group} ${d.min}–${d.max}${d.stages.length ? ` · ${d.stages.join(', ')}` : ''}` : group; };
   const [format, setFormat] = useState<string[]>(['Protocol (Physical + Interactive)']);
   const [intro, setIntro] = useState('');
@@ -1206,9 +1214,9 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       </div>
       <span style={{ color: ink, fontSize: 13, fontWeight: 600, minWidth: 44, textAlign: 'right' }}>{d.min}–{d.max}{d.max >= 90 && g !== 'Children' ? '+' : ''}</span>
     </div>
-    {g === 'Women' && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-      <span style={{ flexBasis: '100%', color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>Life stage</span>
-      {['Pregnancy', 'Postpartum', 'Premenopause', 'Perimenopause', 'Menopause', 'Postmenopause'].map((stage) => { const on = d.stages.includes(stage); return <button type="button" key={stage} aria-pressed={on} onClick={() => { const stages = on ? d.stages.filter((x) => x !== stage) : [...d.stages, stage]; set({ stages }); if (!on) setRoutineLifeStage(stage); }} style={{ height: 26, padding: '0 9px', border: `1px solid ${on ? acid : line}`, borderRadius: 2, background: on ? '#20251B' : 'transparent', color: on ? acid : ink, fontFamily: sans, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{stage}</button>; })}
+    {AUDIENCE_CHIPS[g] && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+      <span style={{ flexBasis: '100%', color: muted, fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>{AUDIENCE_CHIPS[g].label}</span>
+      {AUDIENCE_CHIPS[g].options.map((stage) => { const on = d.stages.includes(stage); return <button type="button" key={stage} aria-pressed={on} onClick={() => { const stages = on ? d.stages.filter((x) => x !== stage) : [...d.stages, stage]; set({ stages }); if (!on && (g === 'Women' || g === 'Men')) setRoutineLifeStage(stage); }} style={{ height: 26, padding: '0 9px', border: `1px solid ${on ? acid : line}`, borderRadius: 2, background: on ? '#20251B' : 'transparent', color: on ? acid : ink, fontFamily: sans, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{stage}</button>; })}
     </div>}
   </div>; };
   const audienceProblems = Array.from(new Set(audience.flatMap((group) => audienceProblemsByGroup[group] || [])));
@@ -1786,10 +1794,10 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         {audienceSetupStage > 0 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.map(describeAudience).join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(0)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
         {audienceSetupStage === 0 && <div>
           <style>{`.age-range{position:relative;height:22px}.age-range input[type=range]{position:absolute;inset:0;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}.age-range input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:${ink};border:2px solid ${black};cursor:pointer}.age-range input[type=range]::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:${ink};border:2px solid ${black};cursor:pointer}`}</style>
-          <label style={label}>Who do you help? <span style={{ color: acid }}>· start with gender</span></label>
-          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{['Everyone', 'Women', 'Men'].map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && agePanel(x)}</div>)}</div>
-          <label style={{ ...label, marginTop: 18 }}>Other groups <span style={{ color: muted }}>· optional</span></label>
-          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{audiences.filter((x) => !['Everyone', 'Women', 'Men'].includes(x)).map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && audienceDetails[x] && agePanel(x)}</div>)}</div>
+          <label style={label}>Who do you help?</label>
+          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{['Everyone', 'Busy families'].map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x === 'Busy families' ? 'Families' : x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && agePanel(x)}</div>)}</div>
+          <label style={{ ...label, marginTop: 18 }}>Individuals <span style={{ color: muted }}>· age range and stage for each</span></label>
+          <div style={{ ...CHOICE_GRID, alignItems: 'start' }}>{['Women', 'Men', 'Children', 'Athletes'].map((x) => <div key={x} style={{ display: 'grid', alignContent: 'start' }}><TagChoice text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />{audience.includes(x) && audienceDetails[x] && agePanel(x)}</div>)}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 14 }}><button type="button" onClick={() => setStep(2)} style={{ ...btn, background: 'transparent', color: ink }}>← Back</button><button type="button" disabled={!audience.length} onClick={() => setAudienceSetupStage(1)} style={btn}>Continue <ArrowRight size={14} /></button></div>
         </div>}
         {audienceSetupStage > 1 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Problems by audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.map((group) => `${group}: ${(audienceProblemsByGroup[group] || []).join(', ')}`).join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(1)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
