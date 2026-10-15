@@ -379,7 +379,8 @@ interface CatCfg { table: string; fk: keyof AdminProtocolItem; nameCols: string[
 // Only columns that actually exist on each table (a bad column 400s the whole select).
 export const CATALOG_CFG: Record<CatalogKind, CatCfg> = {
   recipe: { table: 'catalog_recipes', fk: 'catalog_recipe_id', nameCols: ['name_common'], imgCols: ['image_url', 'image_primary_url', 'images'], extraCols: ['meal_slot', 'health_score', 'tags', 'dietary_info', 'prep_time', 'is_group', 'type'] },
-  ingredient: { table: 'catalog_ingredients', fk: 'catalog_ingredient_id', nameCols: ['name_common', 'name'], imgCols: ['image_url', 'image_primary_url', 'images'] },
+  // catalog_ingredients has no `name` column (Staging): asking for it 400s every ingredient search.
+  ingredient: { table: 'catalog_ingredients', fk: 'catalog_ingredient_id', nameCols: ['name_common'], imgCols: ['image_url', 'image_primary_url', 'images'] },
   product: { table: 'catalog_products', fk: 'catalog_product_id', nameCols: ['name_common', 'name_brand', 'market_name', 'name'], imgCols: ['image_url', 'image_primary_url', 'image', 'images'], buyCols: ['price_usd', 'affiliate_link_amazon', 'affiliate_link_shopify', 'purchase_url', 'affiliate_url'] },
   activity: { table: 'catalog_activities', fk: 'catalog_activity_id', nameCols: ['name'], imgCols: ['image_url', 'image_primary_url', 'primary_image_url'] },
   supplement: { table: 'hs_supplements', fk: 'supplement_id', nameCols: ['name'], imgCols: ['image_url'] },

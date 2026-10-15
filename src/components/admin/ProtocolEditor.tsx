@@ -383,13 +383,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ── main editor ── */
-export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtocolId, ownerId }: {
+export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtocolId, ownerId, onSelectedChange }: {
   accessToken: string;
   onOpenCatalogRecord?: (kind: CatalogKind, id: string) => void;
   /** deep-open a protocol (e.g. clicking a Protocol cell in the Kits master table) */
   initialProtocolId?: string | null;
   /** Restricts a guide workspace to protocols owned by that authenticated user. */
   ownerId?: string | null;
+  /** Reports the protocol currently shown, so tools outside the editor (the AI bar) act on the same one. */
+  onSelectedChange?: (id: string | null) => void;
 }) {
   const [protocols, setProtocols] = useState<AdminProtocol[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -400,6 +402,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [fType, setFType] = useState('');
   const [fNoCover, setFNoCover] = useState(false); // show only protocols missing a cover image
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => { onSelectedChange?.(selectedId); }, [selectedId]);
   // deep-open wins over the "first row" default; list-load keeps it (see setSelectedId((cur) => …))
   useEffect(() => { if (initialProtocolId) setSelectedId(initialProtocolId); }, [initialProtocolId]);
 
@@ -447,7 +450,8 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [linkerItemId, setLinkerItemId] = useState<string | null>(null);
   const [linkKind, setLinkKind] = useState<CatalogKind>('recipe');
   const [linkQuery, setLinkQuery] = useState('');
-  const [linkResults, setLinkResults] = useState<CatalogHit[]>([]);
+  const [linkResults, setLinkResults] = useState<(CatalogHit & { hitKind?: CatalogKind })[]>([]);
+  const searchSeq = useRef(0);
   const [linkBusy, setLinkBusy] = useState(false);
   const [viewRec, setViewRec] = useState<(CatalogHit & { kind: CatalogKind; itemId: string }) | null>(null);
   // record manager (edit / merge / delete) inside the lightbox
@@ -534,7 +538,10 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
 
   const dirty = useMemo(() => {
     if (!selected) return false;
-    return PROTO_FIELDS.some((f) => (form as any)[f] !== (selected as any)[f]);
+    // Empty, missing and default values are the same "nothing" (staging lacks some columns,
+    // so a missing field must not count as an unsaved edit and trigger a false discard prompt).
+    const norm = (f: string, v: any) => (v === undefined || v === null || v === '' || (f === 'schedule_basis' && v === 'calendar') ? null : v);
+    return PROTO_FIELDS.some((f) => norm(f, (form as any)[f]) !== norm(f, (selected as any)[f]));
   }, [form, selected]);
   // switching protocols with unsaved form edits silently discarded them — guard it
   function selectProtocol(id: string) {
@@ -1134,10 +1141,24 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
     return it && it.category === 'consume' ? descriptiveMealSlot(it.group_name) : null;
   }
   async function runSearch(kind: CatalogKind, q: string, it?: AdminProtocolItem) {
+    // Only the latest search may write results (the opening browse used to land after a typed query).
+    const seq = ++searchSeq.current;
     const item = it || items.find((x) => x.id === linkerItemId);
     const slot = kind === 'recipe' ? itemMealSlot(item) : null;
     setLinkBusy(true);
-    try { setLinkResults(await searchCatalog(accessToken, kind, q, (kind === 'activity' || kind === 'recipe') && !q.trim() && !slot ? 24 : slot && !q.trim() ? 6 : 10, slot ?? undefined)); }
+    const limit = (kind === 'activity' || kind === 'recipe') && !q.trim() && !slot ? 24 : slot && !q.trim() ? 6 : 10;
+    // A food step is a meal: it can be a recipe OR a plain ingredient (e.g. a banana as a snack),
+    // so food searches cover both catalogues and each hit remembers which one it came from.
+    const isFood = !!item && (item.category === 'consume' || item.item_type === 'consume' || item.item_type === 'recipe');
+    try {
+      if (isFood && (kind === 'recipe' || kind === 'ingredient')) {
+        const [recipes, ingredients] = await Promise.all([
+          searchCatalog(accessToken, 'recipe', q, limit, slot ?? undefined).catch(() => []),
+          q.trim() ? searchCatalog(accessToken, 'ingredient', q, 8).catch(() => []) : Promise.resolve([] as CatalogHit[]),
+        ]);
+        if (seq === searchSeq.current) setLinkResults([...ingredients.map((h) => ({ ...h, hitKind: 'ingredient' as CatalogKind })), ...recipes.map((h) => ({ ...h, hitKind: 'recipe' as CatalogKind }))]);
+      } else { const hits = await searchCatalog(accessToken, kind, q, limit, slot ?? undefined); if (seq === searchSeq.current) setLinkResults(hits); }
+    }
     catch { setLinkResults([]); }
     finally { setLinkBusy(false); }
   }
@@ -1355,7 +1376,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
             <button onClick={() => unlinkItem(it)} title="Unlink" style={{ ...linkBtnStyle, color: C.danger }}><X size={13} /></button>
           </div>
         ) : (
-          <button onClick={() => openLinker(it)} style={{ ...linkBtnStyle, color: C.accent }}><Link2 size={12} /> Link {defaultKind(it) === 'recipe' ? 'meal' : defaultKind(it)}…</button>
+          <button onClick={() => openLinker(it)} style={{ ...linkBtnStyle, color: C.accent }}><Link2 size={12} /> Link {defaultKind(it) === 'recipe' ? 'recipe or ingredient' : defaultKind(it)}…</button>
         )}
         {open && (
           <div style={{ marginTop: 6, padding: 8, border: '1px solid ' + C.hair, borderRadius: 8, background: C.paper }}>
@@ -1363,7 +1384,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
               <IconSelect value={linkKind} options={LINK_OPTS} width={132}
                 onChange={(k) => { setLinkKind(k as CatalogKind); runSearch(k as CatalogKind, linkQuery, it); }} />
               <input value={linkQuery} onChange={(e) => { setLinkQuery(e.target.value); runSearch(linkKind, e.target.value, it); }}
-                placeholder={slot && linkKind === 'recipe' ? `Suggest ${slot} recipes — or type to search…` : linkKind === 'activity' ? 'Search activities, e.g. run, yoga, walk…' : linkKind === 'recipe' ? 'Search meals, e.g. porridge, salad…' : 'Search catalog…'} style={{ ...inputStyle, flex: 1 }} />
+                placeholder={slot && linkKind === 'recipe' ? `Suggest ${slot} recipes — or type to search…` : linkKind === 'activity' ? 'Search activities, e.g. run, yoga, walk…' : linkKind === 'recipe' || linkKind === 'ingredient' ? 'Search recipes or ingredients, e.g. porridge, banana…' : 'Search catalog…'} style={{ ...inputStyle, flex: 1 }} />
               <button onClick={() => setLinkerItemId(null)} style={{ ...linkBtnStyle }}>close</button>
             </div>
             {suggesting && (
@@ -1378,10 +1399,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
                 {linkResults.map((h) => (
-                  <button key={h.id} onClick={() => linkItemTo(it, linkKind, h)}
+                  <button key={`${h.hitKind || linkKind}-${h.id}`} onClick={() => linkItemTo(it, h.hitKind || linkKind, h)}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid ' + C.hair, borderRadius: 6, background: C.paper, cursor: 'pointer', textAlign: 'left' }}>
                     {thumb(h.image)}
                     <span style={{ fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.35 }}>{h.name}</span>
+                    {h.hitKind && <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: C.sub, border: '1px solid ' + C.hair, borderRadius: 999, padding: '1px 7px' }}>{h.hitKind === 'recipe' ? 'Recipe' : 'Ingredient'}</span>}
                     {h.healthScore != null && (
                       <span title="Health score" style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.good, background: C.goodBg, border: '1px solid ' + C.goodBorder, borderRadius: 999, padding: '1px 6px' }}>{h.healthScore}</span>
                     )}
