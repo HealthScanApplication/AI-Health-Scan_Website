@@ -12,7 +12,7 @@ import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
-  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, submitGuardianSuggestion, submitGuardianOptIn,
+  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
   listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
@@ -778,7 +778,7 @@ function orderFunnelOffers(offers: GuideOffer[], ramp: GuideValueRamp | null): G
 
 const CONSENT_TEXT = 'Send me occasional emails with new guidance and offers. Unsubscribe any time.';
 
-function GuardianFunnel({ profile, offers, ramp, accent, headingFont }: { profile: GuideProfile; offers: GuideOffer[]; ramp: GuideValueRamp | null; accent: string; headingFont: string }) {
+function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = [] }: { reviews?: GuardianReview[]; profile: GuideProfile; offers: GuideOffer[]; ramp: GuideValueRamp | null; accent: string; headingFont: string }) {
   const ordered = orderFunnelOffers(offers, ramp);
   const entry = ordered.find((offer) => offer.access_model === 'free') || null;
   const nextPaid = ordered.find((offer) => offer.access_model === 'paid' && !SUPPORT_KINDS.includes(offer.kind)) || null;
@@ -816,6 +816,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont }: { profil
         </li>)}
       </ol>
     </section>}
+    {reviews.length > 0 && <section style={{ padding: '0 clamp(24px,8vw,110px) clamp(48px,7vw,90px)' }}><ReviewRail reviews={reviews} accent={accent} /></section>}
     {entry && <section id="start" style={{ padding: 'clamp(60px,9vw,120px) clamp(24px,8vw,110px)', background: '#11120F', color: '#F5F2EA' }}>
       <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(32px,6vw,90px)', alignItems: 'center' }}>
         <div>
@@ -885,6 +886,96 @@ function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accen
 }
 
 /** Guardian profile hero, shared by the published mini-site and the builder preview so both are identical. */
+const SAMPLE_REVIEWS: GuardianReview[] = [
+  { id: 's1', guide_id: '', reviewer_name: 'Sample · Claire', rating: 5, body: 'Sleeping through the night for the first time in months. Simple steps I could actually keep.', status: 'published', created_at: '' },
+  { id: 's2', guide_id: '', reviewer_name: 'Sample · Amira', rating: 5, body: 'Clear, kind and practical. The daily routine in the app kept me on track.', status: 'published', created_at: '' },
+  { id: 's3', guide_id: '', reviewer_name: 'Sample · Jo', rating: 4, body: 'Felt calmer by day three. Loved the printable plan.', status: 'published', created_at: '' },
+];
+// Horizontal rail of review cards with stars. `sample` marks preview-only placeholder reviews.
+function ReviewRail({ reviews, accent, title = 'What people say', sample = false }: { reviews: GuardianReview[]; accent: string; title?: string; sample?: boolean }) {
+  if (!reviews.length) return null;
+  const average = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+  return <section aria-label="Reviews" style={{ width: '100%', minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}><span style={{ color: accent, fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{title}</span><span style={{ color: '#55564F', fontSize: 11 }}><span style={{ color: accent }}>★</span> {average.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? '' : 's'}{sample ? ' · sample' : ''}</span></div>
+    <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x mandatory' }}>
+      {reviews.map((r) => <figure key={r.id} style={{ flex: '0 0 min(78%,250px)', margin: 0, scrollSnapAlign: 'start', border: '1px solid rgba(17,18,15,.16)', background: 'rgba(255,255,255,.75)', borderRadius: 4, padding: '12px 14px', display: 'grid', gap: 8, alignContent: 'start' }}>
+        <span aria-label={`${r.rating} out of 5 stars`} style={{ fontSize: 12, letterSpacing: 1 }}>{Array.from({ length: 5 }, (_, i) => <span key={i} style={{ color: i < r.rating ? accent : 'rgba(17,18,15,.2)' }}>★</span>)}</span>
+        <blockquote style={{ margin: 0, color: '#2B2C27', fontSize: 12, lineHeight: 1.55 }}>{r.body}</blockquote>
+        <figcaption style={{ color: '#55564F', fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{r.reviewer_name}</figcaption>
+      </figure>)}
+    </div>
+  </section>;
+}
+// Opened from a one-time review link (?review=<token>): star rating + text, then reveals the thank-you code.
+function ReviewForm({ token, guardianName, accent }: { token: string; guardianName: string; accent: string }) {
+  const [rating, setRating] = useState(5);
+  const [name, setName] = useState('');
+  const [body, setBody] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+  const [code, setCode] = useState('');
+  const [message, setMessage] = useState('');
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setState('sending'); setMessage('');
+    try { setCode(await submitGuardianReview(token, { name, rating, body })); setState('done'); }
+    catch (err: any) { setMessage(err?.message || 'Could not send your review.'); setState('error'); }
+  }
+  const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', border: '1px solid #11120F', borderRadius: 2, padding: '10px 12px', fontFamily: 'inherit', fontSize: 14, background: '#FFF', color: '#11120F', outline: 'none' };
+  return <section id="review" style={{ padding: 'clamp(40px,7vw,90px) clamp(24px,8vw,110px)', borderBottom: '1px solid rgba(17,18,15,.2)' }}>
+    <div style={{ maxWidth: 560 }}>
+      <span style={{ color: accent, fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>Share your experience</span>
+      {state === 'done' ? <>
+        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(36px,5vw,56px)', lineHeight: 1, margin: '14px 0 12px' }}>Thank you.</h2>
+        <p style={{ color: '#66645F', fontSize: 14, lineHeight: 1.6, margin: '0 0 14px' }}>Your review helps others find {guardianName}. Here is your thank-you code for your next offer:</p>
+        <button type="button" onClick={() => navigator.clipboard?.writeText(code).catch(() => {})} style={{ border: `1px dashed ${accent}`, background: '#FFF', padding: '12px 16px', fontSize: 22, fontWeight: 700, letterSpacing: '.1em', cursor: 'pointer', color: '#11120F' }}>{code}</button>
+      </> : <form onSubmit={submit} style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+        <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(36px,5vw,56px)', lineHeight: 1, margin: '0 0 4px' }}>How was your time with {guardianName}?</h2>
+        <div role="radiogroup" aria-label="Rating" style={{ display: 'flex', gap: 4 }}>{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} star${n === 1 ? '' : 's'}`} onClick={() => setRating(n)} style={{ border: 0, background: 'none', padding: 2, fontSize: 30, lineHeight: 1, cursor: 'pointer', color: n <= rating ? accent : 'rgba(17,18,15,.2)' }}>★</button>)}</div>
+        <input required maxLength={80} placeholder="Your first name" aria-label="Your first name" value={name} onChange={(e) => setName(e.target.value)} style={field} />
+        <textarea required minLength={3} maxLength={1200} placeholder="What changed for you?" aria-label="Your review" value={body} onChange={(e) => setBody(e.target.value)} style={{ ...field, minHeight: 110, resize: 'vertical' }} />
+        {state === 'error' && <p role="alert" style={{ color: '#8A3D31', fontSize: 12, margin: 0 }}>{message}</p>}
+        <button disabled={state === 'sending'} style={{ height: 46, width: 'fit-content', padding: '0 20px', border: '1px solid #11120F', borderRadius: 2, background: '#11120F', color: '#FFF', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{state === 'sending' ? 'Sending…' : 'Send review and get my code'}</button>
+      </form>}
+    </div>
+  </section>;
+}
+// Guardian side: create one-time review links (with a thank-you code) and moderate reviews.
+function ReviewsPanel({ userId, slug }: { userId: string; slug: string }) {
+  const [reviews, setReviews] = useState<GuardianReview[]>([]);
+  const [requests, setRequests] = useState<GuardianReviewRequest[]>([]);
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState('');
+  useEffect(() => { listGuardianReviews(userId).then(setReviews).catch(() => {}); listGuardianReviewRequests(userId).then(setRequests).catch(() => {}); }, [userId]);
+  const linkFor = (token: string) => `${window.location.origin}/guardians/${encodeURIComponent(slug)}?review=${token}`;
+  async function create() {
+    setBusy(true); setError('');
+    try {
+      const code = `THANKS${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      const request = await createGuardianReviewRequest(userId, { customer_email: email, customer_name: name, discount_code: code });
+      setRequests((current) => [request, ...current]); setEmail(''); setName('');
+    } catch (e: any) { setError(e?.message || 'Could not create a review link.'); }
+    finally { setBusy(false); }
+  }
+  const copy = (token: string) => { navigator.clipboard?.writeText(linkFor(token)).catch(() => {}); setCopied(token); window.setTimeout(() => setCopied(''), 1500); };
+  const toggle = async (review: GuardianReview) => { const status = review.status === 'published' ? 'hidden' : 'published'; await setGuardianReviewStatus(review.id, status).catch(() => {}); setReviews((current) => current.map((r) => r.id === review.id ? { ...r, status } : r)); };
+  const small: React.CSSProperties = { ...btn, minHeight: 34, height: 34, fontSize: 9, background: 'transparent', color: ink };
+  return <section style={{ border: `1px solid ${line}`, background: panel, padding: 16, marginBottom: 22 }}>
+    <label style={{ ...label, color: ink }}>Reviews <span style={{ color: acid }}>· ask buyers for a review, thank them with a discount code</span></label>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+      <input style={{ ...input, flex: '1 1 180px' }} value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name (optional)" />
+      <input style={{ ...input, flex: '1 1 220px' }} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Customer email (optional)" />
+      <button type="button" onClick={create} disabled={busy} style={btn}>{busy ? 'Creating…' : 'Create review link'}</button>
+    </div>
+    {error && <p role="alert" style={{ color: '#F0A7A7', fontSize: 11, margin: '8px 0 0' }}>{error}</p>}
+    {requests.length > 0 && <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>{requests.slice(0, 8).map((r) => <div key={r.token} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', borderTop: `1px solid ${line}`, paddingTop: 8, fontSize: 11 }}>
+      <span style={{ flex: '1 1 200px', color: ink }}>{r.customer_name || r.customer_email || 'Customer'} <span style={{ color: muted }}>· code {r.discount_code} · {r.used_at ? 'reviewed' : 'waiting'}</span></span>
+      {!r.used_at && <><button type="button" onClick={() => copy(r.token)} style={small}>{copied === r.token ? 'Copied' : 'Copy link'}</button>{r.customer_email && <a href={`mailto:${r.customer_email}?subject=${encodeURIComponent('Could you share a quick review?')}&body=${encodeURIComponent(`Hi ${r.customer_name || ''},\n\nThank you for working with me. Would you share a short review? It takes a minute, and you will get a thank-you discount code (${r.discount_code}) for your next offer.\n\n${linkFor(r.token)}`)}`} style={{ ...small, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Email it</a>}</>}
+    </div>)}</div>}
+    {reviews.length > 0 && <div style={{ display: 'grid', gap: 6, marginTop: 14 }}><span style={label}>Received</span>{reviews.map((r) => <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${line}`, paddingTop: 8, fontSize: 11, opacity: r.status === 'hidden' ? .5 : 1 }}><span style={{ color: acid }}>{'★'.repeat(r.rating)}</span><span style={{ flex: 1, color: ink }}>{r.body} <span style={{ color: muted }}>· {r.reviewer_name}</span></span><button type="button" onClick={() => toggle(r)} style={small}>{r.status === 'published' ? 'Hide' : 'Show'}</button></div>)}</div>}
+  </section>;
+}
 function GuardianSiteHero({ name, avatarUrl, specialties, headline, tags, bio, accent, headingFont, background, backgroundIsVideo = false, greyscale = false, cards }: { name: string; avatarUrl?: string | null; specialties: string[]; headline: string; tags: string[]; bio: string; accent: string; headingFont: string; background?: string | null; backgroundIsVideo?: boolean; greyscale?: boolean; cards: SiteHeroCard[] }) {
   return <section style={{ position: 'relative', overflow: 'hidden', minHeight: 'min(720px,calc(100vh - 64px))', display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', alignItems: 'center', backgroundImage: background && !backgroundIsVideo ? `linear-gradient(rgba(242,239,231,.66),rgba(242,239,231,.66)),url(${background})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: greyscale ? 'luminosity' : 'normal', color: '#11120F' }}>
     {background && backgroundIsVideo && <><video src={background} autoPlay muted loop playsInline aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: greyscale ? 'grayscale(1)' : 'none' }} /><span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(242,239,231,.66)' }} /></>}
@@ -915,6 +1006,8 @@ function GuardianSiteHeader({ brandName, path, right }: { brandName?: string; pa
 }
 
 function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boolean }) {
+  const [reviews, setReviews] = useState<GuardianReview[]>([]);
+  const reviewToken = new URLSearchParams(window.location.search).get('review') || '';
   const [profile, setProfile] = useState<GuideProfile | null>(null);
   const [offers, setOffers] = useState<GuideOffer[]>([]);
   const [valueRamps, setValueRamps] = useState<GuideValueRamp[]>([]);
@@ -925,6 +1018,7 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
       setProfile(found);
       setOffers(found ? await listGuideOffers(found.user_id) : []);
       setValueRamps(found ? await listGuideValueRamps(found.user_id).catch(() => []) : []);
+      setReviews(found ? await listGuardianReviews(found.user_id).catch(() => []) : []);
     }).catch(() => { setProfile(null); setOffers([]); }).finally(() => setLoading(false));
   }, [slug]);
   if (loading) return <div style={{ minHeight: '100vh', background: black, color: ink, display: 'grid', placeItems: 'center', fontFamily: sans }}>Building Guardian page…</div>;
@@ -958,7 +1052,8 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
       {/* Shared with the builder preview, so what Guardians build is what they publish. */}
       <GuardianSiteHero name={profile.display_name} avatarUrl={profile.avatar_url} specialties={profile.specialties} headline={profile.headline || profile.display_name} tags={publicExpertiseTags} bio={profile.bio} accent={publicAccent} headingFont={publicHeadingFont} background={socials.theme_background} backgroundIsVideo={publicBackgroundIsVideo} greyscale={publicGreyscale}
         cards={valueRamps.filter((ramp) => ramp.status === 'published').length ? valueRamps.filter((ramp) => ramp.status === 'published').map((ramp) => ({ key: ramp.id, eyebrow: [ramp.audience, ramp.problem].filter(Boolean).join(' · '), title: customerFacingOfferTitle(offers.find((offer) => offer.id === ramp.offer_ids[0])?.title || ramp.name), copy: offers.find((offer) => offer.id === ramp.offer_ids[0])?.description || '', kind: offers.find((offer) => offer.id === ramp.offer_ids[0])?.kind, price: offers.find((offer) => offer.id === ramp.offer_ids[0])?.access_model === 'free' ? 'Free' : undefined, href: '#offers' })) : freeOffers.slice(0, 1).map((offer) => ({ key: offer.id, eyebrow: profile.specialties.slice(0, 2).join(' · '), title: customerFacingOfferTitle(offer.title), copy: offer.description || '', kind: offer.kind, price: 'Free', href: '#start' }))} />
-      <GuardianFunnel profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
+      {reviewToken && <ReviewForm token={reviewToken} guardianName={profile.display_name} accent={publicAccent} />}
+      <GuardianFunnel reviews={reviews.filter((r) => r.status === 'published')} profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
     </main>
   </div>;
 }
@@ -1093,6 +1188,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [showAddOfferOptions, setShowAddOfferOptions] = useState(false);
   // Short pitch video per offer ('free' = lead magnet), shown as the upsell on the previous step's download page.
   const [couponCopied, setCouponCopied] = useState(false);
+  const [guardianReviews, setGuardianReviews] = useState<GuardianReview[]>([]);
+  useEffect(() => { if (userId) listGuardianReviews(userId).then((rows) => setGuardianReviews(rows.filter((r) => r.status === 'published'))).catch(() => {}); }, [userId]);
   const [couponInput, setCouponInput] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponError, setCouponError] = useState('');
@@ -2236,9 +2333,9 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           </div><div className="g-sticky"><PreviewFrame device={previewDevice}>
           <div style={{ flex: '1 0 auto', width: '100%', maxWidth: '100%', minHeight: '100%', boxSizing: 'border-box', border: `1px solid ${line}`, borderRadius: 5, backgroundColor: '#F2EFE7', backgroundImage: backgroundType === 'image' ? `linear-gradient(rgba(242,239,231,.84),rgba(242,239,231,.84)),url(${effectiveBackground})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', color: '#11120F', padding: 'clamp(22px,5cqw,52px)', display: 'grid', alignItems: 'center', overflow: 'hidden' }}>
             {funnelPageState === 'offer' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,260px),1fr))', gap: 'clamp(28px,6cqw,80px)', alignItems: 'center' }}><div style={{ minWidth: 0 }}><span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 13 }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(17,18,15,.22)' }} /> : <span style={{ width: 30, height: 30, borderRadius: '50%', display: 'grid', placeItems: 'center', border: '1px solid rgba(17,18,15,.22)', fontFamily: serif }}>{(displayName || 'G')[0]}</span>}<span style={{ color: '#55564F', fontSize: 8, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{displayName || 'Your Guardian'} <ChevronRight size={10} style={{ display: 'inline', verticalAlign: '-2px' }} /> {funnelPreviewStage === 0 && freeOfferType === 'routine' ? 'Protocol' : 'Offer'}</span></span><span style={{ color: accentColor, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>Step {funnelPreviewStage + 1} · {activeFunnelStage.price}</span>{/* Headline is the value; the offer title lives on the card beside it. */}<h3 style={{ fontFamily: serif, fontSize: offerTitleSize(activeFunnelStage.value || activeFunnelStage.title), fontWeight: 300, lineHeight: .95, margin: '18px 0 0', overflowWrap: 'anywhere' }}>{activeFunnelStage.value || customerFacingOfferTitle(activeFunnelStage.title)}</h3></div><div>{activeFunnelStage.video && <video src={activeFunnelStage.video} controls playsInline style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', background: '#11120F', borderRadius: 4, margin: '0 0 18px' }} />}<ProductCard kind={activeFunnelStage.kind} title={customerFacingOfferTitle(activeFunnelStage.title)} copy={activeFunnelStage.meta.split(' · ').slice(1).join(' · ') || undefined} price={activeFunnelStage.price} name={displayName || 'your Guardian'} avatarUrl={avatarUrl} accent={accentColor} cta={activeFunnelStage.action} onClick={confirmFunnelOffer} /></div></div>}
-            {funnelPageState === 'checkout' && <div style={{ width: '100%', maxWidth: 620, margin: '0 auto 0 0', textAlign: 'left' }}>
-              {(() => { const art = productArt(activeFunnelStage.kind); return activeFunnelStage.kind === 'routine' ? <img src="/images/guides/generated/r3-protocol-card.png" alt="Printed Protocol and the ROUTINE³ app" style={{ display: 'block', width: 110, height: 110, objectFit: 'contain', margin: '0 0 10px' }} /> : art ? <span aria-hidden="true" style={{ display: 'block', margin: '0 0 10px', width: 90 * art.cellAspect, height: 90, backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${(art.index % art.cols) * 100 / Math.max(1, art.cols - 1)}% ${Math.floor(art.index / art.cols) * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.95) invert(.88)' }} /> : null; })()}<div><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '0 0 12px' }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(17,18,15,.22)' }} /> : <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', border: '1px solid rgba(17,18,15,.22)', fontFamily: serif }}>{(displayName || 'G')[0]}</span>}<span style={{ color: '#55564F', fontSize: 8, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{displayName || 'Your Guardian'}</span></span></div><span style={{ color: accentColor, fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{funnelPreviewStage === 0 ? 'Free' : 'Secure checkout'}</span>
-              <h3 style={{ fontFamily: serif, fontSize: 'clamp(40px,6cqw,66px)', fontWeight: 300, lineHeight: .98, margin: '16px 0 12px' }}>{customerFacingOfferTitle(activeFunnelStage.title)}</h3>
+            {funnelPageState === 'checkout' && <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', textAlign: 'left', display: 'grid', gap: 20 }}><div>
+              <div><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '0 0 12px' }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(17,18,15,.22)' }} /> : <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', border: '1px solid rgba(17,18,15,.22)', fontFamily: serif }}>{(displayName || 'G')[0]}</span>}<span style={{ color: '#55564F', fontSize: 8, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{displayName || 'Your Guardian'}</span></span></div><span style={{ color: accentColor, fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{funnelPreviewStage === 0 ? 'Free' : 'Secure checkout'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 18, margin: '14px 0 12px' }}>{(() => { const art = productArt(activeFunnelStage.kind); return activeFunnelStage.kind === 'routine' ? <img src="/images/guides/generated/r3-protocol-card.png" alt="Printed Protocol and the ROUTINE³ app" style={{ display: 'block', width: 96, height: 96, flex: '0 0 96px', objectFit: 'contain', margin: 0 }} /> : art ? <span aria-hidden="true" style={{ display: 'block', margin: 0, flex: '0 0 auto', width: 90 * art.cellAspect, height: 90, backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${(art.index % art.cols) * 100 / Math.max(1, art.cols - 1)}% ${Math.floor(art.index / art.cols) * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.95) invert(.88)' }} /> : null; })()}<h3 style={{ fontFamily: serif, fontSize: 'clamp(40px,6cqw,66px)', fontWeight: 300, lineHeight: .98, margin: 0 }}>{customerFacingOfferTitle(activeFunnelStage.title)}</h3></div>
               {funnelPreviewStage === 0 ? <><p style={{ color: '#66645F', fontSize: 14, lineHeight: 1.6, margin: '0 0 18px' }}>Enter your email to receive the free offer.</p>{/* Joined email + button, same seam as the homepage Subscribe control. */}<div style={{ maxWidth: 460, margin: '0 0 8px', display: 'flex' }}><input type="email" inputMode="email" autoComplete="email" required value={leadCaptureValue} onChange={(event) => setLeadCaptureValue(event.target.value)} placeholder="you@example.com" aria-label="Your email" aria-invalid={Boolean(leadCaptureValue) && !leadEmailIsValid} style={{ flex: 1, minWidth: 0, height: 44, boxSizing: 'border-box', border: `1px solid ${leadCaptureValue && !leadEmailIsValid ? '#A5463A' : '#11120F'}`, borderRight: 'none', borderRadius: '2px 0 0 2px', background: 'rgba(255,255,255,.7)', color: '#11120F', padding: '0 14px', fontFamily: sans, fontSize: 12, outline: 'none' }} /><button type="button" disabled={!leadEmailIsValid} onClick={completeFunnelCheckout} style={{ height: 44, boxSizing: 'border-box', padding: '0 16px', border: '1px solid #11120F', borderRadius: '0 2px 2px 0', background: '#11120F', color: '#FFFFFF', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: leadEmailIsValid ? 'pointer' : 'default', opacity: leadEmailIsValid ? 1 : .55 }}>Send it <ArrowRight size={13} /></button></div>{leadCaptureValue && !leadEmailIsValid && <span role="alert" style={{ display: 'block', color: '#8A3D31', fontSize: 9, marginBottom: 10 }}>Enter a valid email address.</span>}</> : <>{(() => { const amount = activeFunnelStage.amount || 0; const total = couponApplied ? Math.round(amount * (1 - COUPON_RATE) * 100) / 100 : amount; return <>
                 <div style={{ maxWidth: 420, margin: '0 0 18px', border: '1px solid rgba(17,18,15,.2)', background: 'rgba(255,255,255,.6)', textAlign: 'left' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', fontSize: 13 }}><span>{customerFacingOfferTitle(activeFunnelStage.title)}</span><span>{formatMoney(amount, currency)}</span></div>
@@ -2249,6 +2346,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
                 {couponError && <span role="alert" style={{ display: 'block', color: '#8A3D31', fontSize: 11, margin: '-8px 0 12px' }}>{couponError}</span>}
                 <button type="button" onClick={completeFunnelCheckout} style={{ ...btn, minHeight: 52, padding: '0 22px', background: accentColor, color: readableText(accentColor), borderColor: accentColor }}>Pay {formatMoney(total, currency)} <ArrowRight size={14} /></button>
               </>; })()}</>}
+            </div>
+              <ReviewRail reviews={guardianReviews.length ? guardianReviews : SAMPLE_REVIEWS} sample={!guardianReviews.length} accent={accentColor} />
             </div>}
             {funnelPageState === 'access' && !postPurchaseOffer && <div style={{ width: '100%', maxWidth: 650, margin: '0 auto', textAlign: 'center' }}><span style={{ width: 48, height: 48, margin: '0 auto 16px', borderRadius: '50%', background: accentColor, color: readableText(accentColor), display: 'grid', placeItems: 'center' }}><Check size={22} /></span><h3 style={{ fontFamily: serif, fontSize: 'clamp(40px,6cqw,66px)', fontWeight: 300, lineHeight: .98, margin: '0 0 12px' }}>Your offer is ready.</h3><p style={{ color: '#66645F', fontSize: 14, lineHeight: 1.6, margin: '0 auto 22px' }}>{funnelPreviewStage === 0 ? `Access details were sent to ${leadCaptureValue}. Use the free offer now, then see the limited personalised offer.` : 'Your purchase is confirmed and access details are ready.'}</p><div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>{funnelPreviewStage === 0 && freeDelivery.includes('Downloadable PDF') && <button type="button" style={{ ...btn, minHeight: 50, background: accentColor, color: readableText(accentColor), borderColor: accentColor }}><Download size={14} /> Download PDF</button>}{funnelPreviewStage === 0 && freeDelivery.includes('Interactive Protocol') && <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={{ ...btn, minHeight: 50, background: accentColor, color: readableText(accentColor), borderColor: accentColor, textDecoration: 'none' }}>Open in ROUTINE³ <ArrowRight size={14} /></a>}{funnelPreviewStage === 0 && !freeDelivery.some((delivery) => delivery === 'Downloadable PDF' || delivery === 'Interactive Protocol') && <button type="button" style={{ ...btn, minHeight: 50, background: accentColor, color: readableText(accentColor), borderColor: accentColor }}>{freeOfferCta[freeOfferType]} <ArrowRight size={14} /></button>}{!postPurchaseOffer && <button type="button" onClick={continueAfterAccess} style={{ ...btn, minHeight: 50, background: 'transparent', color: '#11120F', borderColor: 'rgba(17,18,15,.35)' }}>Continue <ArrowRight size={14} /></button>}</div></div>}
             {/* Upsell hero: the next offer's video leads; the delivered offer sits in a fixed footer bar. */}
@@ -2738,6 +2837,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
         </>}
         {tab === 'library' && user && <GuideLibrary guideId={user.id} selectedIds={selectedLibraryIds} onSelectedIds={setSelectedLibraryIds} onUse={(destination, sources) => { setBuilderLibrarySources(sources); setTab(destination === 'protocol' ? 'protocols' : 'offer_builder'); }} />}
         {tab === 'offer_builder' && <OfferBuilder profile={profile} protocols={protocols} offers={offers} librarySources={builderLibrarySources} onOpenProtocols={() => setTab('protocols')} onCreated={(offer) => setOffers((current) => [offer, ...current])} />}
+        {tab === 'leads' && !protocolId && !recipeId && user && <ReviewsPanel userId={user.id} slug={profile.slug} />}
         {(['leads','value_ramps','recipes','protocols'] as Tab[]).includes(tab) && !protocolId && !recipeId && <><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 20 }}><div style={{ display: 'flex', alignItems: 'center', gap: 18 }}><img src={guidePlates[tab]} alt="" style={{ width: 74, height: 74, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.74)', opacity: .86 }} /><div><div style={{ ...label, color: acid }}>{tab === 'value_ramps' ? 'Customer journeys' : 'Build'}</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '8px 0 0' }}>{tab === 'value_ramps' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)}</h1></div></div><button onClick={() => setAdding(!adding)} style={btn}><Plus size={14} /> Add {tab === 'value_ramps' ? 'Offer path' : tab === 'protocols' ? 'Protocol' : tab.slice(0,-1)}</button></div>{adding && <div style={{ display: 'grid', gridTemplateColumns: tab === 'leads' ? '1fr 1fr 1.2fr auto' : '1fr 1.4fr auto', gap: 9, margin: '28px 0' }}><input style={input} placeholder={tab === 'leads' ? 'Name' : tab === 'value_ramps' ? 'Ramp name' : 'Title'} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />{tab === 'leads' && <input style={input} type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />}<input style={input} placeholder={tab === 'value_ramps' ? 'Audience problem or goal' : tab === 'leads' ? 'Goal' : 'Short description'} value={newGoal} onChange={(e) => setNewGoal(e.target.value)} /><button onClick={quickAdd} disabled={adding && !newTitle} style={btn}>Create</button></div>}<div style={{ marginTop: 30 }}>{tab === 'leads' && (leads.length ? leads.map((x) => <Row key={x.id} title={x.name} meta={`${x.email} · ${x.goal || 'No goal yet'}`} />) : <Empty image={guidePlates.leads} title="No leads yet" copy="Add a lead or share your public guide page." />)}{tab === 'value_ramps' && (valueRamps.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))', gap: 12 }}>{valueRamps.map((ramp) => <article key={ramp.id} style={{ border: `1px solid ${line}`, background: panel, padding: 22, minHeight: 220, display: 'flex', flexDirection: 'column' }}><Route size={24} color={acid} /><div style={{ ...label, color: acid, marginTop: 24 }}>{ramp.audience} · {ramp.problem}</div><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 29, margin: '4px 0 8px' }}>{ramp.name}</h2><p style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>{ramp.offer_ids.length} reusable offers · {ramp.status}</p><span style={{ marginTop: 'auto', color: ink, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>/guardians/{profile.slug}/value-ramp/{ramp.slug}</span></article>)}</div> : <Empty image={guidePlates.value_ramps} title="Create your first offer path" copy="Choose one audience problem, then arrange reusable offers from a free first win to deeper support." action={<button type="button" onClick={() => setAdding(true)} style={btn}>Create offer path</button>} />)}{tab === 'recipes' && (recipes.length ? recipes.map((x) => <Row key={x.id} title={x.title} meta={`${x.meal_slot || 'Any meal'} · ${x.status}`} action="Open builder" onClick={() => setRecipeId(x.id)} />) : <Empty image={guidePlates.recipes} title="No recipes yet" copy="Create a meal, drink or snack and reuse it in Protocols and offers." />)}{tab === 'protocols' && (protocols.length ? (() => {
             // Family routines (partner, child…) nest under the Guardian's own routine.
             const isFamily = (x: AdminProtocol) => { const r = routineOwners.get(x.id)?.relation; return !!r && r !== 'self'; };

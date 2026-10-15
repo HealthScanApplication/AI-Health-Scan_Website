@@ -355,3 +355,36 @@ export async function getGuideFileDownloadUrl(path: string): Promise<string> {
   if (error) throw error;
   return data.signedUrl;
 }
+
+export type GuardianReview = { id: string; guide_id: string; reviewer_name: string; rating: number; body: string; status: 'published' | 'hidden'; created_at: string };
+export type GuardianReviewRequest = { token: string; guide_id: string; customer_email: string | null; customer_name: string | null; discount_code: string; used_at: string | null; created_at: string };
+
+export async function listGuardianReviews(guideId: string): Promise<GuardianReview[]> {
+  const { data, error } = await db().from('guardian_reviews').select('*').eq('guide_id', guideId).order('created_at', { ascending: false }).limit(40);
+  if (error) throw error;
+  return (data || []) as GuardianReview[];
+}
+
+export async function setGuardianReviewStatus(id: string, status: GuardianReview['status']): Promise<void> {
+  const { error } = await db().from('guardian_reviews').update({ status }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function listGuardianReviewRequests(guideId: string): Promise<GuardianReviewRequest[]> {
+  const { data, error } = await db().from('guardian_review_requests').select('*').eq('guide_id', guideId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GuardianReviewRequest[];
+}
+
+export async function createGuardianReviewRequest(guideId: string, request: { customer_email?: string; customer_name?: string; discount_code: string }): Promise<GuardianReviewRequest> {
+  const { data, error } = await db().from('guardian_review_requests').insert({ guide_id: guideId, customer_email: request.customer_email?.trim() || null, customer_name: request.customer_name?.trim() || null, discount_code: request.discount_code }).select().single();
+  if (error) throw error;
+  return data as GuardianReviewRequest;
+}
+
+/** Submits a review through a one-time link; resolves to the thank-you discount code. */
+export async function submitGuardianReview(token: string, review: { name: string; rating: number; body: string }): Promise<string> {
+  const { data, error } = await db().rpc('submit_guardian_review', { p_token: token, p_name: review.name, p_rating: review.rating, p_body: review.body });
+  if (error) throw error;
+  return String(data || '');
+}
