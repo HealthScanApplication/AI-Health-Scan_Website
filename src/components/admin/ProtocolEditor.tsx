@@ -108,6 +108,17 @@ const SMART_LIST_ORDER = ['Hygiene', 'Fitness', 'Wellness', 'Beauty', 'Work', 'H
 type CyclePhase = 'menstruation' | 'follicular' | 'ovulation' | 'luteal';
 const CYCLE_PHASE_LABEL: Record<CyclePhase, string> = { menstruation: 'Period', follicular: 'Follicular', ovulation: 'Ovulation', luteal: 'Luteal' };
 const CYCLE_PHASE_COLOR: Record<CyclePhase, string> = { menstruation: '#D9485F', follicular: '#4F8A6B', ovulation: '#C98A1B', luteal: '#7B61A8' };
+/** The app's week-strip mark for a date (mobile cycle.ts cycleDayMarks + cycleMarkKind). */
+function previewCycleMark(periodStart: string, cycleLength: number, periodLength: number, date: Date): 'period' | 'fertile' | 'ovulation' | null {
+  const c = previewCycle(periodStart, cycleLength, periodLength, date);
+  if (!c) return null;
+  const day = c.day - 1;
+  const ov = Math.max(10, Math.min(45, Math.max(20, cycleLength || 28)) - 14);
+  if (day < Math.min(14, Math.max(1, periodLength || 5))) return 'period';
+  if (day === ov) return 'ovulation';
+  if (day >= ov - 5 && day <= ov + 1) return 'fertile';
+  return null;
+}
 function previewCycle(periodStart: string, cycleLength: number, periodLength: number, date: Date): { day: number; phase: CyclePhase } | null {
   const [y, m, d] = periodStart.split('-').map(Number);
   if (!y || !m || !d) return null;
@@ -208,10 +219,10 @@ function toHomeItems(items: AdminProtocolItem[], linkImages?: Map<string, string
 }
 
 /* ── live preview — the exact app home screen, fed the saved steps ── */
-function PhonePreview({ name, items, imageUrl, profileName, linkImages }: { name: string; items: AdminProtocolItem[]; imageUrl?: string | null; profileName?: string | null; linkImages?: Map<string, string> }) {
+function PhonePreview({ name, items, imageUrl, profileName, linkImages, dayMarks }: { dayMarks?: (date: Date) => { cycle?: 'period' | 'fertile' | 'ovulation' | null; moon?: string | null }; name: string; items: AdminProtocolItem[]; imageUrl?: string | null; profileName?: string | null; linkImages?: Map<string, string> }) {
   return (
     <PhoneFrame width={300} screenBg="#FFFFFF">
-      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} imageUrl={imageUrl} profileName={profileName || 'Protocol owner'} grouping="smart" />
+      <ProtocolHomeScreen protocolName={name} items={toHomeItems(items, linkImages)} imageUrl={imageUrl} profileName={profileName || 'Protocol owner'} grouping="smart" dayMarks={dayMarks} />
     </PhoneFrame>
   );
 }
@@ -2125,6 +2136,10 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 imageUrl={form.profile_image_url || routinePerson?.avatarUrl || form.image_url || selected.image_url || routineCoverImage || routineCovers.get(selected.id)}
                 profileName={form.profile_name || routinePerson?.name || form.creator}
                 linkImages={new Map([...linkInfo].filter(([, v]) => v.image).map(([id, v]) => [id, v.image as string]))}
+                dayMarks={(date) => ({
+                  cycle: cyclePreviewOn || form.schedule_basis === 'menstrual_cycle' ? previewCycleMark(cycleStart, cycleLength, periodLength, date) : null,
+                  moon: form.schedule_basis === 'lunar_cycle' ? MOON_GLYPHS[moonPhaseName(date)] : null,
+                })}
               />
               <p style={{ fontSize: 11, fontStyle: 'italic', color: C.faint, margin: 0, textAlign: 'center', maxWidth: 280 }}>
                 Live preview — the home screen as it appears in the mobile app{cycleLen > 1 ? ` (day ${viewDay} of ${cycleLen})` : ''}.

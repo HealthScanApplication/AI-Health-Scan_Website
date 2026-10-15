@@ -14,7 +14,7 @@
  */
 import { useState } from "react";
 import {
-  User, ChartNoAxesCombined, ShoppingBasket, ListChecks, Plus, Repeat, Check,
+  User, ChartNoAxesCombined, ShoppingBasket, ListChecks, Plus, Repeat, Check, Sparkles,
   Timer, Apple, Ellipsis, SlidersHorizontal, RefreshCw, Sun,
 } from "lucide-react";
 import {
@@ -212,7 +212,10 @@ export function ProtocolHomeScreen({
   theme = "light",
   profileName = "John Ferreira",
   grouping = "smart",
+  dayMarks,
 }: {
+  /** Per-date marks under the week strip, as the app draws them (cycle) plus an optional moon glyph. */
+  dayMarks?: (date: Date) => { cycle?: "period" | "fertile" | "ovulation" | null; moon?: string | null };
   /** 'smart' groups by phase + category like the mobile smart lists. */
   grouping?: "time" | "smart";
   protocolName: string;
@@ -328,6 +331,15 @@ export function ProtocolHomeScreen({
                 <span style={{ width: 32, height: 32, borderRadius: 16, background: circleBg, border: isSelected ? `3px solid ${purple}` : `2px solid ${ui.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: filled ? (dark ? "#111827" : "#FFFFFF") : ui.text, fontVariantNumeric: "tabular-nums" }}>{d.getDate()}</span>
                 </span>
+                {dayMarks && (() => { const m = dayMarks(d); return (
+                  // Mark row (mobile CycleDayMark): period bar, fertile dots, ovulation sparkle; moon glyph beside.
+                  <span style={{ height: 10, marginTop: 3, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                    {m.cycle === "period" && <span style={{ width: 16, height: 2.5, borderRadius: 2, background: "#F87171" }} />}
+                    {m.cycle === "fertile" && <span style={{ width: 16, display: "inline-flex", justifyContent: "space-between" }}>{[0, 1, 2].map((k) => <span key={k} style={{ width: 3, height: 3, borderRadius: 2, background: "#14B8A6" }} />)}</span>}
+                    {m.cycle === "ovulation" && <Sparkles size={10} color="#14B8A6" strokeWidth={2} />}
+                    {m.moon && <span style={{ fontSize: 9, lineHeight: 1 }}>{m.moon}</span>}
+                  </span>
+                ); })()}
               </div>
             );
           })}
