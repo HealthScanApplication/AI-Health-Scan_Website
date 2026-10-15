@@ -66,6 +66,8 @@ export interface RuleStep {
   kind?: 'action' | 'rule';
   /** Window key: steps only interact (anchors, group checklists) inside the same window. */
   windowKey?: string;
+  /** Smart-list parent (has action sub-steps): titled as a group ("Workout 1", "Morning hygiene"); its children are the actions. */
+  isParent?: boolean;
   issues?: RuleIssue[];
 }
 const isMeal = (s: RuleStep) => s.group === 'meal' || s.group === 'consume';
@@ -97,7 +99,7 @@ export function enforceProtocolRules<T extends RuleStep>(steps: T[]): T[] {
   }
 
   for (const s of out) {
-    if (s.group === 'sleep' || s.kind === 'rule') continue;
+    if (s.group === 'sleep' || s.kind === 'rule' || s.isParent) continue;
     // 4. Meals: dish name, no verb.
     if (isMeal(s) && !isRuleTitle(s.title) && !/^stop\b/i.test(s.title)) {
       const t = mealTitle(s.title);

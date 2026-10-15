@@ -60,9 +60,10 @@ for (const [pid, all] of byProtocol) {
   for (const r of all) if (!r.hidden && TEST_ROW.test(r.display_name || '')) out.push(['cleanup', pid, r.id, 'hide', 'hidden', 'false', 'true', 'Leftover test row'].map(csv).join(','));
   const items = all.filter((r) => !r.hidden && !TEST_ROW.test(r.display_name || ''));
   const tops = items.filter((r) => !r.parent_protocol_item_id && (r.kind === 'action' || !r.kind));
+  const parents = new Set(items.filter((r) => r.parent_protocol_item_id && (r.kind === 'action' || !r.kind)).map((r) => r.parent_protocol_item_id));
   const steps: Step[] = tops.map((r) => ({
     id: r.id, title: r.display_name || '', group: groupOf(r), time: r.scheduled_time?.slice(0, 5) || null, notes: r.notes || '',
-    durationMinutes: r.duration_minutes, dos: [], donts: [], windowKey: `${r.day_number ?? ''}|${r.recurrence_start_date ?? ''}|${r.recurrence_end_date ?? ''}`,
+    durationMinutes: r.duration_minutes, dos: [], donts: [], isParent: parents.has(r.id), windowKey: `${r.day_number ?? ''}|${r.recurrence_start_date ?? ''}|${r.recurrence_end_date ?? ''}`,
   }));
   const fixed = enforceProtocolRules(steps) as Step[];
   const kept = new Set(fixed.map((s) => s.id));
