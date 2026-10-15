@@ -1056,11 +1056,14 @@ function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accen
   return <div onPointerMove={move} onPointerLeave={() => setTilt({ x: 0, y: 0, gx: 50, gy: 50, on: false })} style={{ position: 'relative', overflow: 'hidden', textAlign: 'left', fontFamily: APP.font, color: APP.text, background: APP.bg, border: `1px solid ${tilt.on ? APP.green : APP.border}`, borderRadius: 20, boxShadow: tilt.on ? '0 22px 50px rgba(17,24,39,.2)' : '0 14px 36px rgba(17,24,39,.12)', transform: `perspective(900px) rotateX(${tilt.x.toFixed(2)}deg) rotateY(${tilt.y.toFixed(2)}deg)${tilt.on ? ' translateY(-2px)' : ''}`, transition: tilt.on ? 'box-shadow 180ms ease, border-color 180ms ease' : 'transform 260ms ease, box-shadow 220ms ease, border-color 220ms ease', willChange: 'transform' }}>
     <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none', opacity: tilt.on ? 1 : 0, transition: 'opacity 200ms ease', background: `radial-gradient(260px circle at ${tilt.gx}% ${tilt.gy}%, rgba(255,255,255,.55), transparent 70%)`, mixBlendMode: 'soft-light' }} />
     {price && <span style={{ position: 'absolute', zIndex: 2, top: 14, left: 14, background: '#000', color: '#FFF', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase' }}>{price}</span>}
-    <div style={{ display: 'flex', gap: 16, alignItems: 'center', padding: '44px 18px 6px' }}>
+    {/* Format and audience tags sit in the top-right corner, opposite the price badge. */}
+    <div style={{ position: 'absolute', zIndex: 2, top: 14, right: 14, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, maxWidth: '62%' }}>
+      <OfferFormatTag kind={kind} />
+      {audience && <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 999, background: APP.surface, border: `1px solid ${APP.border}`, color: APP.text, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{audience}</span>}
+    </div>
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center', padding: `${audience ? 76 : 50}px 18px 6px` }}>
       <AppOfferImage kind={kind} size={84} align="left" />
       <div style={{ minWidth: 0, display: 'grid', gap: 8 }}>
-        <OfferFormatTag kind={kind} />
-        {audience && <span style={{ display: 'inline-flex', alignItems: 'center', width: 'fit-content', height: 24, padding: '0 10px', borderRadius: 999, background: APP.surface, border: `1px solid ${APP.border}`, color: APP.text, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{audience}</span>}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{avatarUrl ? <img src={avatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 22, height: 22, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 600 }}>{(name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 12, fontWeight: 500 }}>{name}</span></span>
       </div>
     </div>
@@ -1107,7 +1110,9 @@ type AudienceDetail = { min?: number; max?: number; stages?: string[] };
 function audienceLabel(details?: Record<string, AudienceDetail> | string | null, groups?: string[]): string {
   let map: Record<string, AudienceDetail> = {};
   if (typeof details === 'string') { try { map = JSON.parse(details); } catch { map = {}; } } else if (details) map = details;
-  const group = (groups || []).find((g) => g !== 'Everyone' && map[g]) || Object.keys(map).find((g) => g !== 'Everyone') || (groups || [])[0];
+  // Only audiences the Guardian actually picked: the builder keeps default ranges for every group.
+  const picked = groups && groups.length ? groups : Object.keys(map);
+  const group = picked.find((g) => g !== 'Everyone') || picked[0];
   if (!group) return '';
   const d = map[group] || {};
   const name = group === 'Busy families' ? 'Families' : group;
@@ -1312,7 +1317,7 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
     <main>
       {/* Shared with the builder preview, so what Guardians build is what they publish. */}
       <GuardianSiteHero audience={audienceLabel(profile.social_links?.audience_details)} reviewSummary={reviewStats(reviews)} headlineStyle={publicHeadlineStyle} name={profile.display_name} avatarUrl={profile.avatar_url} specialties={profile.specialties} headline={profile.headline || profile.display_name} tags={publicExpertiseTags} bio={profile.bio} accent={publicAccent} headingFont={publicHeadingFont} background={socials.theme_background} backgroundIsVideo={publicBackgroundIsVideo} greyscale={publicGreyscale}
-        cards={valueRamps.filter((ramp) => ramp.status === 'published').length ? valueRamps.filter((ramp) => ramp.status === 'published').map((ramp) => ({ key: ramp.id, eyebrow: [ramp.audience, ramp.problem].filter(Boolean).join(' · '), title: customerFacingOfferTitle(offers.find((offer) => offer.id === ramp.offer_ids[0])?.title || ramp.name), copy: offers.find((offer) => offer.id === ramp.offer_ids[0])?.description || '', kind: offers.find((offer) => offer.id === ramp.offer_ids[0])?.kind, price: offers.find((offer) => offer.id === ramp.offer_ids[0])?.access_model === 'free' ? 'Free' : undefined, href: '#offers' })) : freeOffers.slice(0, 1).map((offer) => ({ key: offer.id, eyebrow: profile.specialties.slice(0, 2).join(' · '), title: customerFacingOfferTitle(offer.title), copy: offer.description || '', kind: offer.kind, price: 'Free', href: '#start' }))} />
+        cards={valueRamps.filter((ramp) => ramp.status === 'published').length ? valueRamps.filter((ramp) => ramp.status === 'published').map((ramp) => ({ key: ramp.id, eyebrow: ramp.problem || undefined, title: customerFacingOfferTitle(offers.find((offer) => offer.id === ramp.offer_ids[0])?.title || ramp.name), copy: offers.find((offer) => offer.id === ramp.offer_ids[0])?.description || '', kind: offers.find((offer) => offer.id === ramp.offer_ids[0])?.kind, price: offers.find((offer) => offer.id === ramp.offer_ids[0])?.access_model === 'free' ? 'Free' : undefined, href: '#offers' })) : freeOffers.slice(0, 1).map((offer) => ({ key: offer.id, eyebrow: profile.specialties.slice(0, 2).join(' · '), title: customerFacingOfferTitle(offer.title), copy: offer.description || '', kind: offer.kind, price: 'Free', href: '#start' }))} />
       {reviewToken && <ReviewForm token={reviewToken} guardianName={profile.display_name} accent={publicAccent} />}
       <GuardianFunnel headlineStyle={publicHeadlineStyle} reviews={reviews.filter((r) => r.status === 'published')} profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
     </main>
@@ -1936,7 +1941,9 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   ];
   const activeStep = steps[step - 1];
   const rampAudienceOptions = audience.length ? audience : ['Everyone'];
-  const rampTargetAudience = rampAudienceOptions.includes(rampAudience) ? rampAudience : rampAudienceOptions[0];
+  // A specific group (e.g. Women) beats the 'Everyone' default, so the path matches the audience chip on the cards.
+  const specificAudience = rampAudienceOptions.find((group) => group !== 'Everyone');
+  const rampTargetAudience = rampAudience === 'Everyone' && specificAudience ? specificAudience : rampAudienceOptions.includes(rampAudience) ? rampAudience : rampAudienceOptions[0];
   const rampProblemOptions = audienceProblemsByGroup[rampTargetAudience] || [];
   const rampTargetProblem = rampProblemOptions.includes(rampProblem) ? rampProblem : rampProblemOptions[0] || chosen[0] || 'wellbeing';
   const routineAgeOptions = targetAgeRanges[routineGender] || targetAgeRanges.Everyone;
@@ -2614,7 +2621,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           <div id="profile-site-preview" className="g-sticky" style={{ scrollMarginTop: 20 }}><span style={{ ...label, display: 'block', color: acid, marginBottom: 7 }}>Profile site preview <span style={{ color: muted }}>· shows every published offer path</span></span><PreviewFrame device={previewDevice}><div style={{ flex: '1 0 auto', background: pageColor, fontFamily: sans }}>
             {headerStyle !== 'hidden' && <GuardianSiteHeader brandName={brandName.trim()} path={`routine3.com/${displayName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-') || 'your-name'}`} />}
             <GuardianSiteHero audience={audienceLabel(audienceDetails, audience)} reviewSummary={reviewStats(guardianReviews)} headlineStyle={headlineStyle} name={displayName} avatarUrl={avatarUrl} specialties={chosen} headline={generatedHeadline} tags={expertiseTags} bio={intro || `A practical ${chosen.slice(0, 2).join(' and ').toLowerCase() || 'guidance'} path shaped for ${audience.join(' and ').toLowerCase()}.`} accent={accentColor} headingFont={serif} background={effectiveBackground} backgroundIsVideo={backgroundType === 'video'} greyscale={imageTreatment === 'greyscale'}
-              cards={[{ key: 'first', eyebrow: `${rampTargetAudience} · ${rampTargetProblem}`, title: customerFacingOfferTitle(leadMagnetTitle || suggestedFreeOffer.title), copy: freeAudienceValue, kind: freeOfferType, price: 'Free', onClick: () => document.getElementById('value-ramp-funnel-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }]} />
+              cards={[{ key: 'first', eyebrow: rampTargetProblem, title: customerFacingOfferTitle(leadMagnetTitle || suggestedFreeOffer.title), copy: freeAudienceValue, kind: freeOfferType, price: 'Free', onClick: () => document.getElementById('value-ramp-funnel-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }]} />
           </div></PreviewFrame></div>
           </div>
         </FunnelStage>
