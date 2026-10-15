@@ -908,7 +908,7 @@ function ReviewRail({ reviews, accent, title = 'What people say', sample = false
       {[...reviews, ...reviews].map((r, index) => <figure key={`${r.id}-${index}`} aria-hidden={index >= reviews.length || undefined} style={{ flex: '0 0 250px', marginRight: 10, marginTop: 0, marginBottom: 0, marginLeft: 0, border: '1px solid rgba(17,18,15,.16)', background: 'rgba(255,255,255,.75)', borderRadius: 4, padding: '12px 14px', display: 'grid', gap: 8, alignContent: 'start' }}>
         <span aria-label={`${r.rating} out of 5 stars`} style={{ fontSize: 12, letterSpacing: 1 }}>{Array.from({ length: 5 }, (_, i) => <span key={i} style={{ color: i < r.rating ? accent : 'rgba(17,18,15,.2)' }}>★</span>)}</span>
         <blockquote style={{ margin: 0, color: '#2B2C27', fontSize: 12, lineHeight: 1.55 }}>{r.body}</blockquote>
-        <figcaption style={{ color: '#55564F', fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{r.reviewer_name}</figcaption>
+        <figcaption style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#55564F', fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}><span aria-hidden="true" style={{ width: 24, height: 24, flex: '0 0 24px', borderRadius: '50%', background: `${accent}26`, color: accent, display: 'grid', placeItems: 'center', fontFamily: serif, fontSize: 12, fontWeight: 400, letterSpacing: 0 }}>{(r.reviewer_name.replace(/^Sample · /, '').trim()[0] || '?').toUpperCase()}</span>{r.reviewer_name}</figcaption>
       </figure>)}
     </div></div>
   </section>;
