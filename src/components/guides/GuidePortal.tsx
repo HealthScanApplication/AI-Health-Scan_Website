@@ -948,6 +948,11 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [chosen, setChosen] = useState<string[]>([]);
   const [realm, setRealm] = useState<GuideRealm>('Body');
   const [audience, setAudience] = useState<string[]>(['Everyone']);
+  // Per-gender targeting: age range plus (for women) life stages. Saved with the profile on publish.
+  const [audienceDetails, setAudienceDetails] = useState<Record<string, { min: number; max: number; stages: string[] }>>({
+    Everyone: { min: 18, max: 80, stages: [] }, Women: { min: 18, max: 80, stages: [] }, Men: { min: 18, max: 80, stages: [] },
+  });
+  const describeAudience = (group: string) => { const d = audienceDetails[group]; return d ? `${group} ${d.min}–${d.max}${d.stages.length ? ` · ${d.stages.join(', ')}` : ''}` : group; };
   const [format, setFormat] = useState<string[]>(['Protocol (Physical + Interactive)']);
   const [intro, setIntro] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(accountAvatarUrl || defaultAvatars[0].image);
@@ -1393,7 +1398,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       const audienceText = audience.join(', ').toLowerCase();
       const headline = generatedHeadline;
       const bio = intro.trim() || `I help ${audienceText} with ${chosen.join(', ').toLowerCase()} through ${format.join(', ').toLowerCase()}.`;
-      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: savedStatus === 'approved' ? 'approved' : 'submitted', onboarding_step: 5 });
+      const profile = await saveGuideProfile({ user_id: userId, slug, display_name: displayName, headline, bio, avatar_url: avatarUrl, contact_email: contactEmail.trim(), whatsapp_phone: whatsappPhone.trim(), social_links: { instagram: instagramUrl.trim(), tiktok: tiktokUrl.trim(), youtube: youtubeUrl.trim(), linktree: linktreeUrl.trim(), website: websiteUrl.trim(), language: mainLanguage, pricing_region: pricingRegion, currency, site_goal: websiteGoal, booking_provider: bookingProvider, booking_url: bookingUrl.trim(), brand_name: brandName.trim() || displayName.trim(), logo_url: logoUrl || '', expertise_tags: expertiseTags.join(','), audience_details: JSON.stringify(Object.fromEntries(audience.filter((g) => audienceDetails[g]).map((g) => [g, audienceDetails[g]]))), theme_template: storyTemplate, theme_background: effectiveBackground, theme_background_type: backgroundType, theme_image_treatment: imageTreatment, theme_header_style: headerStyle, theme_heading: 'Canela', theme_body: 'Euclid', theme_page_color: pageColor, theme_accent_color: accentColor }, specialties: chosen, status: savedStatus === 'approved' ? 'approved' : 'submitted', onboarding_step: 5 });
       const selectedBrand = currentBrandDraft();
       const brandsToSave = brandProfiles.map((brand) => brand.localId === activeBrandId ? selectedBrand : brand);
       await replaceGuideBrands(userId, brandsToSave.map(({ localId, ...brand }) => ({ ...brand, is_primary: localId === activeBrandId })));
@@ -1748,8 +1753,32 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       </div>}
 
       {step === 3 && <>
-        {audienceSetupStage > 0 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(0)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
-        {audienceSetupStage === 0 && <div><label style={label}>Who do you usually help? <span style={{ color: acid }}>· choose all that apply</span></label><div style={CHOICE_GRID}>{audiences.map((x) => <TagChoice key={x} text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />)}</div><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 14 }}><button type="button" onClick={() => setStep(2)} style={{ ...btn, background: 'transparent', color: ink }}>← Back</button><button type="button" disabled={!audience.length} onClick={() => setAudienceSetupStage(1)} style={btn}>Continue <ArrowRight size={14} /></button></div></div>}
+        {audienceSetupStage > 0 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.map(describeAudience).join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(0)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
+        {audienceSetupStage === 0 && <div>
+          <style>{`.age-range{position:relative;height:22px}.age-range input[type=range]{position:absolute;inset:0;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}.age-range input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:${ink};border:2px solid ${black};cursor:pointer}.age-range input[type=range]::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:${ink};border:2px solid ${black};cursor:pointer}`}</style>
+          <label style={label}>Who do you help? <span style={{ color: acid }}>· start with gender</span></label>
+          <div style={CHOICE_GRID}>{['Everyone', 'Women', 'Men'].map((x) => <TagChoice key={x} text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />)}</div>
+          {['Everyone', 'Women', 'Men'].filter((g) => audience.includes(g)).map((g) => { const d = audienceDetails[g]; const set = (patch: Partial<typeof d>) => setAudienceDetails((current) => ({ ...current, [g]: { ...current[g], ...patch } })); return <div key={g} style={{ border: `1px solid ${line}`, background: 'rgba(245,242,234,.04)', padding: '14px 16px', marginTop: 10, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <strong style={{ color: ink, fontSize: 13, minWidth: 90 }}>{g}</strong>
+              <span style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>Ages</span>
+              <div className="age-range" style={{ flex: '1 1 220px', minWidth: 180 }}>
+                <span aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, top: 10, height: 2, background: line }} />
+                <span aria-hidden="true" style={{ position: 'absolute', top: 10, height: 2, background: acid, left: `${d.min / 90 * 100}%`, right: `${100 - d.max / 90 * 100}%` }} />
+                <input type="range" aria-label={`${g} minimum age`} min={0} max={90} value={d.min} onChange={(e) => set({ min: Math.min(Number(e.target.value), d.max - 1) })} />
+                <input type="range" aria-label={`${g} maximum age`} min={0} max={90} value={d.max} onChange={(e) => set({ max: Math.max(Number(e.target.value), d.min + 1) })} />
+              </div>
+              <span style={{ color: ink, fontSize: 13, fontWeight: 600, minWidth: 64, textAlign: 'right' }}>{d.min}–{d.max}{d.max >= 90 ? '+' : ''}</span>
+            </div>
+            {g === 'Women' && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', marginRight: 6 }}>Life stage</span>
+              {['Pregnancy', 'Postpartum', 'Premenopause', 'Perimenopause', 'Menopause', 'Postmenopause'].map((stage) => { const on = d.stages.includes(stage); return <button type="button" key={stage} aria-pressed={on} onClick={() => { const stages = on ? d.stages.filter((x) => x !== stage) : [...d.stages, stage]; set({ stages }); if (!on) setRoutineLifeStage(stage); }} style={{ height: 30, padding: '0 12px', border: `1px solid ${on ? acid : line}`, borderRadius: 2, background: on ? '#20251B' : 'transparent', color: on ? acid : ink, fontFamily: sans, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{stage}</button>; })}
+            </div>}
+          </div>; })}
+          <label style={{ ...label, marginTop: 18 }}>Other groups <span style={{ color: muted }}>· optional</span></label>
+          <div style={CHOICE_GRID}>{audiences.filter((x) => !['Everyone', 'Women', 'Men'].includes(x)).map((x) => <TagChoice key={x} text={x} description={audienceHelp[x]} active={audience.includes(x)} art={audienceArt[x]} onClick={() => toggleAudience(x)} />)}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 14 }}><button type="button" onClick={() => setStep(2)} style={{ ...btn, background: 'transparent', color: ink }}>← Back</button><button type="button" disabled={!audience.length} onClick={() => setAudienceSetupStage(1)} style={btn}>Continue <ArrowRight size={14} /></button></div>
+        </div>}
         {audienceSetupStage > 1 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Problems by audience</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{audience.map((group) => `${group}: ${(audienceProblemsByGroup[group] || []).join(', ')}`).join(' · ')}</strong></span><button type="button" onClick={() => setAudienceSetupStage(1)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
         {audienceSetupStage === 1 && <div>
           <label style={label}>What problems do you help each audience with? <span style={{ color: acid }}>· choose more than one</span></label>
