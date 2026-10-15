@@ -12,7 +12,8 @@ import { buildRecipePdf } from '../../utils/recipePdf';
 import { PhoneFrame } from '../mockups/PhoneFrame';
 import { buildRecipesWithAI, computeNutrition, gramsFor, searchCatalogIngredients, KEY_MICROS, UNITS, type CatalogIngredient, type MacroKey, type RecipeDraft, type RecipeIngredient } from '../../utils/guideRecipeAI';
 import { APP_STORE_URL } from '../../config/appLinks';
-import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
+import { EventProtocolBuilder } from './EventProtocolBuilder';
+import { buildProtocolWithAI, foldSleepSteps, saveDraftStep, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, requestGuardianReview, decideGuardianSite, listAllGuideProfiles, listGuardianSuggestions, setGuardianSuggestionStatus, listPublicGuardianOffers, listReviewSummaries, type AdminGuideProfile, type GuardianSuggestionRow, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
@@ -3120,34 +3121,8 @@ function GuardianProtocolAI({ accessToken, protocol, ownerId, initialRequest, in
       const sources = [sourceUrls.trim() && `Reference websites: ${sourceUrls.trim().replace(/\n+/g, ', ')}`, sourcePath && `Uploaded reference document: ${sourcePath}`].filter(Boolean).join('\n');
       const draft = await buildProtocolWithAI(accessToken, protocol.id, `${request.trim()}${sources ? `\n\n${sources}` : ''}`);
       const steps = foldSleepSteps(draft.steps);
-      const created = await Promise.all(steps.map((step, index) => createProtocolItem(accessToken, {
-        protocol_id: protocol.id,
-        display_name: step.title,
-        item_type: step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity',
-        kind: 'action',
-        scope: null,
-        scheduled_time: step.time ? `${step.time}:00` : null,
-        duration_minutes: step.duration_minutes,
-        group_name: null,
-        day_number: step.day_number,
-        sort_order: index + 1,
-        parent_protocol_item_id: null,
-        has_children: Boolean(step.tips?.length),
-        category: step.category,
-        subtype: step.category === 'sleep' ? 'sleep' : step.category === 'consume' ? 'meal' : step.category === 'supplement' ? 'supplement' : 'wellness',
-        hidden: false,
-        enabled: true,
-        notes: step.notes,
-        recurrence_type: 'daily',
-      })));
-      // Bedtime tips are saved the way the app models guidance: rule_do children of the step,
-      // shown as its do-checklist (no time of their own).
-      await Promise.all(steps.flatMap((step, index) => (step.tips || []).map((tip, tipIndex) => createProtocolItem(accessToken, {
-        protocol_id: protocol.id, display_name: tip, item_type: 'activity', kind: 'rule_do', scope: null,
-        scheduled_time: null, duration_minutes: null, group_name: null, day_number: step.day_number,
-        sort_order: tipIndex + 1, parent_protocol_item_id: created[index].id, has_children: false,
-        category: 'sleep', subtype: 'sleep', hidden: false, enabled: true, notes: '', recurrence_type: 'daily',
-      }))));
+      // Shared saver: actions with their rule_do / rule_dont children, or top-level rules (protocolRules.ts).
+      for (const [index, step] of steps.entries()) await saveDraftStep(accessToken, protocol.id, step, index + 1);
       setMessage(`${draft.summary} Added ${steps.length} editable draft steps. Review them before publishing.`);
       setStage(2);
       onBuilt();
@@ -3324,6 +3299,9 @@ function ProtocolAIBar({ accessToken, protocolId, guideId, onUpdated }: { access
   const [folderId, setFolderId] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState('');
+  // Long pasted text (an email, a leaflet) opens the dated-Protocol builder instead of a one-line edit.
+  const [pasted, setPasted] = useState('');
+  const isLongText = (text: string) => text.length > 240 || /\n.*\n/.test(text);
   useEffect(() => {
     Promise.all([listGuideLibraryFolders(guideId), listGuideLibraryItems(guideId)]).then(([f, i]) => { setFolders(f); setLibraryItems(i); }).catch(() => {});
   }, [guideId]);
@@ -3351,10 +3329,12 @@ function ProtocolAIBar({ accessToken, protocolId, guideId, onUpdated }: { access
         {folders.map((folder) => <option key={folder.id} value={folder.id}>📁 {folder.name} ({libraryItems.filter((item) => item.folder_id === folder.id).length})</option>)}
       </select>
       <a href="/guardians/workspace?tab=library" style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap' }}>Open library ↗</a>
-      <input value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Ask AI to change this Protocol, e.g. add a tofu scramble breakfast at 8am" aria-label="AI instruction" style={{ ...field, flex: '1 1 320px', minWidth: 0 }} />
+      <input value={instruction} onChange={(e) => setInstruction(e.target.value)} onPaste={(e) => { const text = e.clipboardData.getData('text'); if (isLongText(text)) { e.preventDefault(); setPasted(text); } }} placeholder="Ask AI to change this Protocol, or paste any text (an email, a prep sheet) to build a dated Protocol" aria-label="AI instruction" style={{ ...field, flex: '1 1 320px', minWidth: 0 }} />
+      {isLongText(instruction) && <button type="button" onClick={() => setPasted(instruction)} style={{ ...btn, height: 42, minHeight: 42, borderRadius: 2, background: 'transparent', color: acid, border: `1px solid ${acid}` }}>Build dated Protocol</button>}
       <button type="submit" disabled={busy || !instruction.trim()} style={{ ...btn, height: 42, minHeight: 42, borderRadius: 2, opacity: busy || !instruction.trim() ? .5 : 1 }}>{busy ? <><Loader2 size={13} className="animate-spin" /> Updating</> : <>Update with AI <ArrowRight size={13} /></>}</button>
     </div>
     {result && <div style={{ maxWidth: 1180, margin: '6px auto 0', color: result.startsWith('Could not') ? '#F0A7A7' : acid, fontSize: 11 }}>{result}</div>}
+    {pasted && <EventProtocolBuilder accessToken={accessToken} protocolId={protocolId} initialText={pasted} onClose={() => setPasted('')} onApplied={(message) => { setPasted(''); setInstruction(''); setResult(message); onUpdated(); }} />}
   </form>;
 }
 
