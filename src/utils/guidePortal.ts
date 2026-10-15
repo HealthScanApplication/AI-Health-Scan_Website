@@ -453,3 +453,12 @@ export async function listPublicGuardianOffers(): Promise<GuideOffer[]> {
   if (error) throw error;
   return (data || []) as GuideOffer[];
 }
+
+/** Average rating + count of published reviews per Guardian (for offer cards). */
+export async function listReviewSummaries(): Promise<Record<string, { rating: number; reviewCount: number }>> {
+  const { data, error } = await db().from('guardian_reviews').select('guide_id,rating').eq('status', 'published').limit(2000);
+  if (error) throw error;
+  const out: Record<string, { rating: number; reviewCount: number }> = {};
+  (data || []).forEach((row: any) => { const cur = out[row.guide_id] || { rating: 0, reviewCount: 0 }; cur.rating = (cur.rating * cur.reviewCount + row.rating) / (cur.reviewCount + 1); cur.reviewCount += 1; out[row.guide_id] = cur; });
+  return out;
+}
