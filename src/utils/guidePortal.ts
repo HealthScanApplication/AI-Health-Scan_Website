@@ -53,6 +53,13 @@ export interface GuideRecipe {
   ingredients: unknown[];
   instructions: unknown[];
   status: 'draft' | 'submitted' | 'published';
+  image_url?: string | null;
+  servings?: number | null;
+  prep_time?: number | null;
+  cook_time?: number | null;
+  nutrition_per_serving?: Record<string, unknown> | null;
+  nutrition_total?: Record<string, unknown> | null;
+  offer_ids?: string[];
 }
 
 export interface GuideValueRamp {
@@ -313,6 +320,22 @@ export async function createGuideRecipe(guideId: string, recipe: Pick<GuideRecip
   const { data, error } = await db().from('guide_recipes').insert({ guide_id: guideId, ...recipe }).select().single();
   if (error) throw error;
   return data as GuideRecipe;
+}
+
+const RECIPE_NUTRITION_COLUMNS = ['servings', 'prep_time', 'cook_time', 'nutrition_per_serving', 'nutrition_total', 'offer_ids'] as const;
+
+/** Save a full AI-built recipe. If the nutrition columns migration is not applied yet, saves the core fields only. */
+export async function saveGuideRecipeDraft(guideId: string, recipe: Omit<GuideRecipe, 'id' | 'guide_id' | 'status'> & { status?: GuideRecipe['status'] }, id?: string): Promise<{ recipe: GuideRecipe; savedNutrition: boolean }> {
+  const write = (row: Record<string, unknown>) => id ? db().from('guide_recipes').update(row).eq('id', id).select().single() : db().from('guide_recipes').insert({ guide_id: guideId, status: 'draft', ...row }).select().single();
+  // The retried write can come back as a one-row array rather than an object; normalise both.
+  const one = (data: unknown) => (Array.isArray(data) ? data[0] : data) as GuideRecipe;
+  const { data, error } = await write(recipe);
+  if (!error) return { recipe: one(data), savedNutrition: true };
+  if (!/column|schema cache/i.test(error.message)) throw error;
+  const core = Object.fromEntries(Object.entries(recipe).filter(([key]) => !(RECIPE_NUTRITION_COLUMNS as readonly string[]).includes(key)));
+  const retry = await write(core);
+  if (retry.error) throw retry.error;
+  return { recipe: one(retry.data), savedNutrition: false };
 }
 
 export async function updateGuideRecipe(id: string, recipe: Partial<Pick<GuideRecipe, 'title' | 'description' | 'meal_slot' | 'ingredients' | 'instructions' | 'status'>>): Promise<GuideRecipe> {

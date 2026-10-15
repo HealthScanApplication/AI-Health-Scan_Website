@@ -8,13 +8,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
 import { ContentStudio } from './ContentStudio';
+import { buildRecipesWithAI, computeNutrition, gramsFor, searchCatalogIngredients, KEY_MICROS, UNITS, type CatalogIngredient, type MacroKey, type RecipeDraft, type RecipeIngredient } from '../../utils/guideRecipeAI';
 import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, requestGuardianReview, decideGuardianSite, listAllGuideProfiles, listGuardianSuggestions, setGuardianSuggestionStatus, listPublicGuardianOffers, listReviewSummaries, type AdminGuideProfile, type GuardianSuggestionRow, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
-  listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
+  listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, saveGuideRecipeDraft, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
   type GuideValueRamp, type ImportedGuideProfile,
 } from '../../utils/guidePortal';
@@ -2825,8 +2826,157 @@ function Empty({ title, copy, action, image }: { title: string; copy: string; ac
   return <div style={{ border: `1px solid ${line}`, padding: 38, textAlign: 'center', background: panel }}>{image && <img src={image} alt="" loading="lazy" style={{ width: 104, height: 104, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.78)', opacity: .85, marginBottom: 14 }} />}<h3 style={{ fontFamily: serif, fontSize: 28, fontWeight: 300, margin: '0 0 8px' }}>{title}</h3><p style={{ color: muted, fontSize: 13, margin: '0 0 20px' }}>{copy}</p>{action}</div>;
 }
 
+function NutritionPanel({ draft }: { draft: RecipeDraft }) {
+  const n = computeNutrition(draft.ingredients, draft.servings);
+  const macro: Array<[MacroKey, string, string]> = [['energy_kcal', 'kcal', ''], ['protein_g', 'Protein', 'g'], ['carbohydrates_g', 'Carbs', 'g'], ['fats_g', 'Fat', 'g'], ['fiber_g', 'Fibre', 'g'], ['sugar_g', 'Sugar', 'g']];
+  const micros = KEY_MICROS.filter(([key]) => n.perServing.micros?.[key] != null);
+  const cell = (value: number | undefined, unit: string) => value == null ? '—' : `${value}${unit}`;
+  return <div style={{ border: `1px solid ${line}`, padding: 16, background: '#0D0E0B' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}><div style={{ ...label, color: acid, margin: 0 }}>Nutrition · calculated from the ROUTINE³ database</div><span style={{ color: n.matched === n.count ? acid : '#E8B86A', fontSize: 10 }}>{n.matched} of {n.count} ingredients matched</span></div>
+    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12, fontSize: 12 }}><thead><tr style={{ color: muted, textAlign: 'right' }}><th style={{ textAlign: 'left', fontWeight: 600, padding: '4px 0' }}></th><th style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Per serving ({n.servingWeight} g)</th><th style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Whole recipe ({n.totalWeight} g)</th></tr></thead>
+      <tbody>{macro.map(([key, name, unit]) => <tr key={key} style={{ borderTop: `1px solid ${line}`, textAlign: 'right' }}><td style={{ textAlign: 'left', padding: '6px 0', color: muted }}>{name}</td><td style={{ color: ink, fontWeight: key === 'energy_kcal' ? 700 : 400 }}>{cell(n.perServing[key], unit)}</td><td style={{ color: muted }}>{cell(n.total[key], unit)}</td></tr>)}
+      {micros.length > 0 && <tr style={{ borderTop: `1px solid ${line}` }}><td colSpan={3} style={{ ...label, margin: 0, padding: '12px 0 4px', fontSize: 9, color: n.microMatched === n.matched ? muted : '#E8B86A' }}>Micronutrients · from {n.microMatched} of {n.count} ingredients with micronutrient data</td></tr>}{micros.map(([key, name]) => { const unit = key.split('_').pop() === 'iu' ? ' IU' : ` ${key.split('_').pop()}`; return <tr key={key} style={{ borderTop: `1px solid ${line}`, textAlign: 'right' }}><td style={{ textAlign: 'left', padding: '5px 0', color: muted }}>{name}</td><td>{n.perServing.micros![key]}{unit}</td><td style={{ color: muted }}>{n.total.micros![key]}{unit}</td></tr>; })}</tbody></table>
+    {n.matched < n.count && <p style={{ color: muted, fontSize: 10, margin: '10px 0 0' }}>Unmatched ingredients add no nutrition. Pick a database match for each to complete the totals.</p>}
+  </div>;
+}
+
+function IngredientMatch({ item, onPick }: { item: RecipeIngredient; onPick: (match: CatalogIngredient) => void }) {
+  const [open, setOpen] = useState(false);
+  const [term, setTerm] = useState(item.name);
+  const [results, setResults] = useState<CatalogIngredient[]>([]);
+  useEffect(() => { if (!open) return; const t = setTimeout(() => { searchCatalogIngredients(term, 8).then(setResults).catch(() => setResults([])); }, 250); return () => clearTimeout(t); }, [term, open]);
+  return <div style={{ position: 'relative' }}>
+    <button type="button" onClick={() => setOpen(!open)} title="Change database match" style={{ border: `1px solid ${item.ingredient_id ? line : '#E8B86A'}`, background: 'transparent', color: item.ingredient_id ? acid : '#E8B86A', fontSize: 10, padding: '4px 8px', borderRadius: 3, cursor: 'pointer', maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.catalog_name ? `✓ ${item.catalog_name}` : 'No match · pick one'}</button>
+    {open && <div style={{ position: 'absolute', zIndex: 5, top: 30, right: 0, width: 260, background: panel, border: `1px solid ${line}`, padding: 8, boxShadow: '0 12px 30px rgba(0,0,0,.5)' }}>
+      <input autoFocus style={{ ...input, minHeight: 34 }} value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search ingredients" />
+      <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 6 }}>{results.map((r) => <button key={r.id} type="button" onClick={() => { onPick(r); setOpen(false); }} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', border: 0, background: 'transparent', color: ink, padding: '7px 4px', fontSize: 11, cursor: 'pointer', textAlign: 'left', borderBottom: `1px solid ${line}` }}><span>{r.name_common}</span><span style={{ color: muted }}>{r.per100?.energy_kcal != null ? `${r.per100.energy_kcal} kcal/100g` : 'no data'}</span></button>)}{!results.length && <div style={{ color: muted, fontSize: 11, padding: 6 }}>No ingredients found.</div>}</div>
+    </div>}
+  </div>;
+}
+
+function RecipeDraftEditor({ draft, onChange, onRemove, onSave, saving, savedLabel }: { draft: RecipeDraft; onChange: (draft: RecipeDraft) => void; onRemove: () => void; onSave: () => void; saving: boolean; savedLabel?: string }) {
+  const set = (patch: Partial<RecipeDraft>) => onChange({ ...draft, ...patch });
+  const setItem = (index: number, patch: Partial<RecipeIngredient>) => {
+    const ingredients = draft.ingredients.map((item, i) => {
+      if (i !== index) return item;
+      const next = { ...item, ...patch };
+      if (patch.amount != null || patch.unit != null || patch.per100 !== undefined) next.grams = gramsFor(next.amount, next.unit, next.piece_weight_g ? { piece_weight_g: next.piece_weight_g, piece_label: next.piece_label } : null, item.amount > 0 ? item.grams * (next.amount / item.amount) : item.grams);
+      return next;
+    });
+    set({ ingredients });
+  };
+  const small: React.CSSProperties = { ...input, minHeight: 34, padding: '0 8px', fontSize: 12 };
+  return <article style={{ border: `1px solid ${line}`, background: panel, padding: 22, marginTop: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '120px minmax(0,1fr)', gap: 18 }}>
+      <div style={{ width: 120, height: 120, border: `1px solid ${line}`, background: '#171812', overflow: 'hidden', display: 'grid', placeItems: 'center', color: muted, fontFamily: serif, fontSize: 40 }}>{draft.image_url ? <img src={draft.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : draft.title.charAt(0)}</div>
+      <div><input style={{ ...input, fontFamily: serif, fontSize: 26, minHeight: 50 }} value={draft.title} onChange={(e) => set({ title: e.target.value })} />
+        <textarea style={{ ...input, height: 60, paddingTop: 10, marginTop: 8, fontSize: 12 }} value={draft.description} onChange={(e) => set({ description: e.target.value })} /></div>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 10, marginTop: 14 }}>
+      <div><label style={label}>Meal</label><select style={small} value={draft.meal_slot} onChange={(e) => set({ meal_slot: e.target.value })}>{['breakfast', 'lunch', 'dinner', 'snack', 'drink', 'dessert', 'any'].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
+      <div><label style={label}>Servings</label><input type="number" min={1} style={small} value={draft.servings} onChange={(e) => set({ servings: Math.max(1, Number(e.target.value) || 1) })} /></div>
+      <div><label style={label}>Prep · min</label><input type="number" min={0} style={small} value={draft.prep_time ?? ''} onChange={(e) => set({ prep_time: e.target.value === '' ? null : Number(e.target.value) })} /></div>
+      <div><label style={label}>Cook · min</label><input type="number" min={0} style={small} value={draft.cook_time ?? ''} onChange={(e) => set({ cook_time: e.target.value === '' ? null : Number(e.target.value) })} /></div>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16, marginTop: 18 }}>
+      <div>
+        <label style={label}>Ingredients · amounts matched to the database</label>
+        {draft.ingredients.map((item, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: '62px 78px minmax(0,1fr) auto 22px', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+          <input type="number" min={0} style={small} value={item.amount} onChange={(e) => setItem(index, { amount: Number(e.target.value) || 0 })} />
+          <select style={small} value={item.unit} onChange={(e) => setItem(index, { unit: e.target.value })}>{UNITS.map((u) => <option key={u} value={u}>{u}</option>)}</select>
+          <div style={{ minWidth: 0 }}><input style={small} value={item.name} onChange={(e) => setItem(index, { name: e.target.value })} /><div style={{ color: muted, fontSize: 9, marginTop: 2 }}>{item.grams} g{item.per100?.energy_kcal != null ? ` · ${Math.round(item.per100.energy_kcal * item.grams / 100)} kcal` : ''}{item.preparation ? ` · ${item.preparation}` : ''}</div></div>
+          <IngredientMatch item={item} onPick={(match) => setItem(index, { ingredient_id: match.id, catalog_name: match.name_common, image_url: match.image_url, per100: match.per100, piece_weight_g: match.piece_weight_g, piece_label: match.piece_label })} />
+          <button type="button" aria-label="Remove ingredient" onClick={() => set({ ingredients: draft.ingredients.filter((_, i) => i !== index) })} style={{ border: 0, background: 'transparent', color: muted, cursor: 'pointer' }}>×</button>
+        </div>)}
+        <button type="button" onClick={() => set({ ingredients: [...draft.ingredients, { name: '', amount: 0, unit: 'g', grams: 0, ingredient_id: null, catalog_name: null, per100: null }] })} style={{ ...btn, minHeight: 32, background: 'transparent', color: ink, marginTop: 4 }}><Plus size={12} /> Ingredient</button>
+        <label style={{ ...label, marginTop: 18 }}>Method · one step per line</label>
+        <textarea style={{ ...input, height: 170, paddingTop: 10, lineHeight: 1.55, fontSize: 12 }} value={draft.instructions.join('\n')} onChange={(e) => set({ instructions: e.target.value.split('\n') })} />
+      </div>
+      <NutritionPanel draft={draft} />
+    </div>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+      <button type="button" onClick={onSave} disabled={saving || !draft.title.trim()} style={btn}>{saving ? 'Saving…' : savedLabel ? 'Save changes' : 'Save recipe'}</button>
+      <button type="button" onClick={onRemove} style={{ ...btn, background: 'transparent', color: muted }}>Discard</button>
+      {savedLabel && <span style={{ color: acid, fontSize: 11 }}>{savedLabel}</span>}
+    </div>
+  </article>;
+}
+
+function GuardianRecipeAI({ userId, accessToken, offers, onSaved }: { userId: string; accessToken: string; offers: GuideOffer[]; onSaved: (recipe: GuideRecipe) => void }) {
+  const books = offers.filter((offer) => offer.kind === 'recipe_book');
+  const [brief, setBrief] = useState('');
+  const [count, setCount] = useState(3);
+  const [mealSlot, setMealSlot] = useState('');
+  const [urls, setUrls] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [message, setMessage] = useState('');
+  const [drafts, setDrafts] = useState<Array<RecipeDraft & { key: number; savedId?: string; saving?: boolean; savedLabel?: string }>>([]);
+  const [bookId, setBookId] = useState(books[0]?.id || '');
+  useEffect(() => { if (!bookId && books[0]) setBookId(books[0].id); }, [books.length]);
+
+  async function addPhotos(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true); setMessage('');
+    try { const uploaded = await Promise.all(Array.from(files).slice(0, 4 - photos.length).map((file) => uploadGuideImage(userId, file))); setPhotos([...photos, ...uploaded].slice(0, 4)); }
+    catch (error: any) { setMessage(error?.message || 'Photo upload failed.'); }
+    finally { setUploading(false); }
+  }
+  async function build() {
+    setBuilding(true); setMessage('');
+    try {
+      const result = await buildRecipesWithAI(accessToken, { message: brief, count, mealSlot: mealSlot || undefined, sourceUrls: urls.split(/\s+/).filter((u) => /^https?:\/\//.test(u)), imageUrls: photos });
+      setDrafts([...result.recipes.map((recipe, i) => ({ ...recipe, key: Date.now() + i })), ...drafts]);
+      setMessage(result.summary || `${result.recipes.length} recipe${result.recipes.length === 1 ? '' : 's'} drafted. Review the amounts and database matches, then save.`);
+    } catch (error: any) { setMessage(error?.message || 'Could not build recipes.'); }
+    finally { setBuilding(false); }
+  }
+  async function save(key: number) {
+    const draft = drafts.find((d) => d.key === key); if (!draft) return;
+    const patch = (p: Partial<typeof draft>) => setDrafts((current) => current.map((d) => d.key === key ? { ...d, ...p } : d));
+    patch({ saving: true });
+    try {
+      const n = computeNutrition(draft.ingredients, draft.servings);
+      const { recipe, savedNutrition } = await saveGuideRecipeDraft(userId, {
+        title: draft.title.trim(), description: draft.description.trim() || null, meal_slot: draft.meal_slot, image_url: draft.image_url,
+        ingredients: draft.ingredients.filter((i) => i.name.trim()).map(({ name, amount, unit, grams, preparation, ingredient_id, catalog_name, per100 }) => ({ name, amount, unit, grams, preparation, ingredient_id, catalog_name, per100 })),
+        instructions: draft.instructions.map((s) => s.trim()).filter(Boolean),
+        servings: draft.servings, prep_time: draft.prep_time, cook_time: draft.cook_time,
+        nutrition_per_serving: { ...n.perServing, serving_size_g: n.servingWeight }, nutrition_total: { ...n.total, total_weight_g: n.totalWeight, matched_ingredients: n.matched, ingredient_count: n.count },
+        offer_ids: bookId ? [bookId] : [],
+      }, draft.savedId);
+      onSaved(recipe);
+      const book = books.find((b) => b.id === bookId);
+      patch({ saving: false, savedId: recipe.id, savedLabel: savedNutrition ? `Saved${book ? ` to “${book.title}”` : ''}.` : 'Saved. Servings, timings, nutrition and book link need the recipe nutrition migration on this environment.' });
+    } catch (error: any) { patch({ saving: false, savedLabel: error?.message || 'Could not save.' }); }
+  }
+  const unsaved = drafts.filter((d) => !d.savedId);
+  return <section style={{ border: `1px solid ${line}`, padding: 24, marginTop: 28, background: 'linear-gradient(180deg,#14160F,#0D0E0B)' }}>
+    <div style={{ ...label, color: acid }}>AI recipe builder</div>
+    <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 32, margin: '4px 0 6px' }}>Describe the recipes. AI drafts them, the database does the maths.</h2>
+    <p style={{ color: muted, fontSize: 12, lineHeight: 1.55, margin: '0 0 16px', maxWidth: 680 }}>Add photos of dishes or handwritten recipes and links to recipes you like. Every ingredient is matched to the ROUTINE³ ingredient database, and nutrition is calculated from those values.</p>
+    <textarea style={{ ...input, height: 96, paddingTop: 12 }} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. High-protein breakfasts for women in perimenopause, under 15 minutes, no dairy" />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginTop: 10 }}>
+      <div><label style={label}>How many recipes</label><select style={input} value={count} onChange={(e) => setCount(Number(e.target.value))}>{[1, 2, 3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n}</option>)}</select></div>
+      <div><label style={label}>Meal</label><select style={input} value={mealSlot} onChange={(e) => setMealSlot(e.target.value)}><option value="">Mixed</option>{['breakfast', 'lunch', 'dinner', 'snack', 'drink', 'dessert'].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
+      <div><label style={label}>Recipe book</label><select style={input} value={bookId} onChange={(e) => setBookId(e.target.value)}><option value="">Not in a book yet</option>{books.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}</select></div>
+    </div>
+    <label style={{ ...label, marginTop: 12 }}>Source links · optional</label>
+    <input style={input} value={urls} onChange={(e) => setUrls(e.target.value)} placeholder="https://… (space-separated, up to 3)" />
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+      {photos.map((url) => <span key={url} style={{ position: 'relative', width: 56, height: 56, border: `1px solid ${line}` }}><img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" aria-label="Remove photo" onClick={() => setPhotos(photos.filter((p) => p !== url))} style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: 10, border: 0, background: ink, color: black, cursor: 'pointer', fontSize: 11 }}>×</button></span>)}
+      {photos.length < 4 && <label style={{ ...btn, background: 'transparent', color: ink }}>{uploading ? 'Uploading…' : '+ Photos'}<input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} /></label>}
+      <button type="button" onClick={build} disabled={building || uploading || !brief.trim()} style={{ ...btn, marginLeft: 'auto' }}>{building ? 'Building recipes…' : `Build ${count} recipe${count === 1 ? '' : 's'}`}</button>
+    </div>
+    {message && <p style={{ color: muted, fontSize: 12, marginTop: 12 }}>{message}</p>}
+    {unsaved.length > 1 && <button type="button" onClick={() => unsaved.forEach((d) => save(d.key))} style={{ ...btn, marginTop: 10 }}>Save all {unsaved.length}</button>}
+    {drafts.map((draft) => <RecipeDraftEditor key={draft.key} draft={draft} saving={!!draft.saving} savedLabel={draft.savedLabel} onChange={(next) => setDrafts((current) => current.map((d) => d.key === draft.key ? { ...d, ...next } : d))} onRemove={() => setDrafts((current) => current.filter((d) => d.key !== draft.key))} onSave={() => save(draft.key)} />)}
+  </section>;
+}
+
 function RecipeBuilder({ recipe, onBack, onSaved }: { recipe: GuideRecipe; onBack: () => void; onSaved: (recipe: GuideRecipe) => void }) {
-  const asLines = (items: unknown[]) => items.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
+  const asLines = (items: unknown[]) => items.map((item: any) => typeof item === 'string' ? item : item?.name ? `${item.amount ?? ''} ${item.unit ?? ''} ${item.name}`.trim() : JSON.stringify(item)).join('\n');
   const [title, setTitle] = useState(recipe.title);
   const [description, setDescription] = useState(recipe.description || '');
   const [mealSlot, setMealSlot] = useState(recipe.meal_slot || 'any');
@@ -3275,7 +3425,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
         {tab === 'library' && user && <GuideLibrary guideId={user.id} selectedIds={selectedLibraryIds} onSelectedIds={setSelectedLibraryIds} onUse={(destination, sources) => { setBuilderLibrarySources(sources); setTab(destination === 'protocol' ? 'protocols' : 'offer_builder'); }} />}
         {tab === 'offer_builder' && <OfferBuilder profile={profile} protocols={protocols} offers={offers} librarySources={builderLibrarySources} onOpenProtocols={() => setTab('protocols')} onCreated={(offer) => setOffers((current) => [offer, ...current])} />}
         {tab === 'leads' && !protocolId && !recipeId && user && <ReviewsPanel userId={user.id} slug={profile.slug} />}
-        {(['leads','value_ramps','recipes','protocols'] as Tab[]).includes(tab) && !protocolId && !recipeId && <><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 20 }}><div style={{ display: 'flex', alignItems: 'center', gap: 18 }}><img src={guidePlates[tab]} alt="" style={{ width: 74, height: 74, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.74)', opacity: .86 }} /><div><div style={{ ...label, color: acid }}>{tab === 'value_ramps' ? 'Customer journeys' : 'Build'}</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '8px 0 0' }}>{tab === 'value_ramps' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)}</h1></div></div><button onClick={() => setAdding(!adding)} style={btn}><Plus size={14} /> Add {tab === 'value_ramps' ? 'Offer path' : tab === 'protocols' ? 'Protocol' : tab.slice(0,-1)}</button></div>{adding && <div style={{ display: 'grid', gridTemplateColumns: tab === 'leads' ? '1fr 1fr 1.2fr auto' : '1fr 1.4fr auto', gap: 9, margin: '28px 0' }}><input style={input} placeholder={tab === 'leads' ? 'Name' : tab === 'value_ramps' ? 'Ramp name' : 'Title'} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />{tab === 'leads' && <input style={input} type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />}<input style={input} placeholder={tab === 'value_ramps' ? 'Audience problem or goal' : tab === 'leads' ? 'Goal' : 'Short description'} value={newGoal} onChange={(e) => setNewGoal(e.target.value)} /><button onClick={quickAdd} disabled={adding && !newTitle} style={btn}>Create</button></div>}<div style={{ marginTop: 30 }}>{tab === 'leads' && (leads.length ? leads.map((x) => <Row key={x.id} title={x.name} meta={`${x.email} · ${x.goal || 'No goal yet'}`} />) : <Empty image={guidePlates.leads} title="No leads yet" copy="Add a lead or share your public guide page." />)}{tab === 'value_ramps' && (valueRamps.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))', gap: 12 }}>{valueRamps.map((ramp) => <article key={ramp.id} style={{ border: `1px solid ${line}`, background: panel, padding: 22, minHeight: 220, display: 'flex', flexDirection: 'column' }}><Route size={24} color={acid} /><div style={{ ...label, color: acid, marginTop: 24 }}>{ramp.audience} · {ramp.problem}</div><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 29, margin: '4px 0 8px' }}>{ramp.name}</h2><p style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>{ramp.offer_ids.length} reusable offers · {ramp.status}</p><span style={{ marginTop: 'auto', color: ink, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>/guardians/{profile.slug}/value-ramp/{ramp.slug}</span></article>)}</div> : <Empty image={guidePlates.value_ramps} title="Create your first offer path" copy="Choose one audience problem, then arrange reusable offers from a free first win to deeper support." action={<button type="button" onClick={() => setAdding(true)} style={btn}>Create offer path</button>} />)}{tab === 'recipes' && (recipes.length ? recipes.map((x) => <Row key={x.id} title={x.title} meta={`${x.meal_slot || 'Any meal'} · ${x.status}`} action="Open builder" onClick={() => setRecipeId(x.id)} />) : <Empty image={guidePlates.recipes} title="No recipes yet" copy="Create a meal, drink or snack and reuse it in Protocols and offers." />)}{tab === 'protocols' && (protocols.length ? (() => {
+        {(['leads','value_ramps','recipes','protocols'] as Tab[]).includes(tab) && !protocolId && !recipeId && <><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 20 }}><div style={{ display: 'flex', alignItems: 'center', gap: 18 }}><img src={guidePlates[tab]} alt="" style={{ width: 74, height: 74, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.74)', opacity: .86 }} /><div><div style={{ ...label, color: acid }}>{tab === 'value_ramps' ? 'Customer journeys' : 'Build'}</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '8px 0 0' }}>{tab === 'value_ramps' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)}</h1></div></div><button onClick={() => setAdding(!adding)} style={btn}><Plus size={14} /> Add {tab === 'value_ramps' ? 'Offer path' : tab === 'protocols' ? 'Protocol' : tab.slice(0,-1)}</button></div>{adding && <div style={{ display: 'grid', gridTemplateColumns: tab === 'leads' ? '1fr 1fr 1.2fr auto' : '1fr 1.4fr auto', gap: 9, margin: '28px 0' }}><input style={input} placeholder={tab === 'leads' ? 'Name' : tab === 'value_ramps' ? 'Ramp name' : 'Title'} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />{tab === 'leads' && <input style={input} type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />}<input style={input} placeholder={tab === 'value_ramps' ? 'Audience problem or goal' : tab === 'leads' ? 'Goal' : 'Short description'} value={newGoal} onChange={(e) => setNewGoal(e.target.value)} /><button onClick={quickAdd} disabled={adding && !newTitle} style={btn}>Create</button></div>}<div style={{ marginTop: 30 }}>{tab === 'leads' && (leads.length ? leads.map((x) => <Row key={x.id} title={x.name} meta={`${x.email} · ${x.goal || 'No goal yet'}`} />) : <Empty image={guidePlates.leads} title="No leads yet" copy="Add a lead or share your public guide page." />)}{tab === 'value_ramps' && (valueRamps.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))', gap: 12 }}>{valueRamps.map((ramp) => <article key={ramp.id} style={{ border: `1px solid ${line}`, background: panel, padding: 22, minHeight: 220, display: 'flex', flexDirection: 'column' }}><Route size={24} color={acid} /><div style={{ ...label, color: acid, marginTop: 24 }}>{ramp.audience} · {ramp.problem}</div><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 29, margin: '4px 0 8px' }}>{ramp.name}</h2><p style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>{ramp.offer_ids.length} reusable offers · {ramp.status}</p><span style={{ marginTop: 'auto', color: ink, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>/guardians/{profile.slug}/value-ramp/{ramp.slug}</span></article>)}</div> : <Empty image={guidePlates.value_ramps} title="Create your first offer path" copy="Choose one audience problem, then arrange reusable offers from a free first win to deeper support." action={<button type="button" onClick={() => setAdding(true)} style={btn}>Create offer path</button>} />)}{tab === 'recipes' && accessToken && <GuardianRecipeAI userId={user.id} accessToken={accessToken} offers={offers} onSaved={(saved) => setRecipes((current) => [saved, ...current.filter((r) => r.id !== saved.id)])} />}{tab === 'recipes' && (recipes.length ? recipes.map((x) => <Row key={x.id} title={x.title} meta={`${x.meal_slot || 'Any meal'} · ${x.status}`} action="Open builder" onClick={() => setRecipeId(x.id)} />) : <Empty image={guidePlates.recipes} title="No recipes yet" copy="Create a meal, drink or snack and reuse it in Protocols and offers." />)}{tab === 'protocols' && (protocols.length ? (() => {
             // Family routines (partner, child…) nest under the Guardian's own routine.
             const isFamily = (x: AdminProtocol) => { const r = routineOwners.get(x.id)?.relation; return !!r && r !== 'self'; };
             const family = protocols.filter(isFamily);
