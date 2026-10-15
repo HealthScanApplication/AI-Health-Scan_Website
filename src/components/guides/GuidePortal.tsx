@@ -857,8 +857,7 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
         {/* Wide like the builder's upsell: offer on the left, price on top and CTA pinned to the bottom of the right panel. */}
         <div style={{ flex: '1 1 340px', minWidth: 0, padding: '44px 24px 24px', display: 'grid', alignContent: 'center', justifyItems: 'center' }}>
           <AppOfferImage kind={upsell.kind} size={96} />
-          <div style={{ color: APP.greenDark, fontSize: 18, fontWeight: 600, margin: '10px 0 8px' }}>Thank you · add this to your order</div>
-          <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '0 0 8px' }}>{upsell.title}</h2>
+          <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '14px 0 8px' }}>{upsell.title}</h2>
           <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: 0 }}>{upsell.description || 'The next step in your journey.'}</p>
         </div>
         <div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -867,13 +866,11 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
             <div style={{ padding: '14px 16px 16px' }}>
               {seconds > 0 && <div style={{ color: APP.faint, fontSize: 13, textDecoration: 'line-through' }}>{money(upsell.price_cents, upsell.currency)}</div>}
               <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{money(upsellPrice, upsell.currency)}</div>
-              <div style={{ color: APP.muted, fontSize: 11 }}>{seconds ? `with code ${code}` : 'One-time'}</div>
             </div>
           </div>
           <div style={{ marginTop: 'auto', paddingTop: 8 }}>
-            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, opacity: busy ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{busy ? 'Adding…' : <>Add to my order{seconds ? <> · <span style={{ color: APP.green }}>30% off</span></> : null}</>}</span><span style={{ fontSize: 11, color: '#D1D5DB', letterSpacing: -0.2 }}>{money(upsellPrice, upsell.currency)} today, one click on the card you just used</span></button>
+            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Adding…' : `Add to my order · ${money(upsellPrice, upsell.currency)}`}</button>
             <button type="button" onClick={nextUpsell} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
-            {legal}
           </div>
         </div>
       </div> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
@@ -1915,10 +1912,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
       <button type="button" aria-label="No thanks" onClick={onNo} style={{ position: 'absolute', zIndex: 2, top: 22, right: 22, width: 36, height: 36, border: 0, background: 'transparent', color: APP.text, fontSize: 22, cursor: 'pointer' }}>×</button>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}><div style={{ flex: '1 1 340px', minWidth: 0, padding: '44px 24px 16px', display: 'grid', alignContent: 'center' }}>
         {offer.video ? <video src={offer.video} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 12, background: '#000', marginBottom: 12 }} /> : <AppOfferImage kind={offer.kind} size={80} />}
-        <div style={{ color: APP.greenDark, fontSize: 18, fontWeight: 600, margin: '10px 0 8px' }}>{live ? 'Your next step · 30% off' : 'Your next step'}</div>
-        <h3 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '0 0 8px' }}>{customerFacingOfferTitle(offer.title)}</h3>
+        <h3 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '14px 0 8px' }}>{customerFacingOfferTitle(offer.title)}</h3>
         <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: '0 0 14px' }}>{offer.value}</p>
-        <div style={{ textAlign: 'left', margin: '14px 0 4px' }}>{benefits.map((b) => <div key={b} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{b}</div>)}</div>
       </div>
       <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', gap: 14, margin: 16, padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)' }}>
         <div style={{ position: 'relative', background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)', textAlign: 'center' }}>
@@ -1926,17 +1921,14 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           <div style={{ padding: '14px 16px 16px' }}>
             {live && amount > 0 && <div style={{ color: APP.faint, fontSize: 13, textDecoration: 'line-through' }}>{formatMoney(amount, currency)}</div>}
             <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.5 }}>{amount ? formatMoney(total, currency) : 'Free'}</div>
-            <div style={{ color: APP.muted, fontSize: 11 }}>{live && amount ? `with code ${couponCode}` : 'One-time'}</div>
           </div>
         </div>
       {/* CTA, No thanks and terms sit at the bottom of the panel; the price box stays on top. */}
       <div style={{ marginTop: 'auto', paddingTop: 8 }}>
-        <button type="button" onClick={onYes} style={appButton}><span style={{ fontSize: 16, fontWeight: 600 }}>Add to my order{live && amount ? <> · <span style={{ color: APP.green }}>30% off</span></> : null}</span><span style={{ fontSize: 11, color: '#D1D5DB', letterSpacing: -0.2 }}>{amount ? `${formatMoney(total, currency)} today, one click on your saved card${live ? ` · code ${couponCode}` : ''}` : 'Free'}</span></button>
+        <button type="button" onClick={onYes} style={{ ...appButton, fontSize: 17, fontWeight: 600 }}>{amount ? `Add to my order · ${formatMoney(total, currency)}` : 'Add to my plan'}</button>
         <button type="button" onClick={onNo} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
-        <div style={{ color: APP.muted, fontSize: 11, marginTop: 4 }}>By adding you agree to the <span style={{ color: '#0EA5E9' }}>Terms</span> and <span style={{ color: '#0EA5E9' }}>Privacy Policy</span></div>
       </div>
       </div></div>
-      <div style={{ padding: '4px 16px 18px', background: APP.bg, textAlign: 'left' }}><ReviewRail reviews={guardianReviews.length ? guardianReviews : SAMPLE_REVIEWS} sample={!guardianReviews.length} accent={APP.greenDark} /></div>
     </div>;
   };
   useEffect(() => {
