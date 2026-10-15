@@ -2750,12 +2750,12 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         </section>
       </div>
     </form>}
-    {!summaryView && <StepRelated step={step} guardianSlug={guardianSlug} displayName={displayName} related={related} />}
+    {!summaryView && <StepRelated step={step} guardianSlug={guardianSlug} displayName={displayName} related={related} audience={audienceLabel(audienceDetails, audience)} />}
   </div>;
 }
 
 /** Below the fold of each setup step: the Guardian's existing items for that stage. */
-function StepRelated({ step, guardianSlug, displayName, related }: { step: number; guardianSlug: string; displayName: string; related: { leads: GuideLead[]; offers: GuideOffer[]; ramps: GuideValueRamp[]; protocols: AdminProtocol[] } }) {
+function StepRelated({ step, guardianSlug, displayName, related, audience = '' }: { audience?: string;  step: number; guardianSlug: string; displayName: string; related: { leads: GuideLead[]; offers: GuideOffer[]; ramps: GuideValueRamp[]; protocols: AdminProtocol[] } }) {
   const open = (href: string) => () => { window.location.href = href; };
   const offerImage = (offer: GuideOffer) => offer.access_model === 'free' ? '/images/guides/lead-plate.png' : '/images/guides/offer-plate.png';
   const rampRows = related.ramps.map((ramp) => ({ key: ramp.id, title: ramp.name, meta: `${[ramp.audience, ramp.problem].filter(Boolean).join(' · ')} · ${ramp.offer_ids.length} offers · ${ramp.status}`, image: '/images/guides/offer-plate.png', href: `/guardians/${guardianSlug}/value-ramp/${ramp.slug}` }));
@@ -2763,7 +2763,7 @@ function StepRelated({ step, guardianSlug, displayName, related }: { step: numbe
     1: { title: 'Your sites', tab: 'value_ramps', rows: [{ key: 'profile', title: `${displayName || 'Your'} profile site`, meta: `/guardians/${guardianSlug}`, image: '/images/guides/guide-plate.png', href: `/guardians/${guardianSlug}` }, ...rampRows] },
     2: { title: 'Your Protocols', tab: 'protocols', rows: related.protocols.map((protocol) => ({ key: protocol.id, title: protocol.name, meta: `${protocol.total_days || 1} days · ${protocol.is_public ? 'Published' : 'Draft'}`, image: protocol.image_url, href: '/guardians/workspace?tab=protocols' })) },
     3: { title: 'Your leads', tab: 'leads', rows: related.leads.map((lead) => ({ key: lead.id, title: lead.name, meta: `${lead.email} · ${lead.goal || 'No goal yet'} · ${lead.stage}`, href: '/guardians/workspace?tab=leads' })) },
-    4: { title: 'Your offers', tab: 'offer_builder', rows: related.offers.map((offer) => ({ key: offer.id, title: offer.title, meta: `${offer.kind.replaceAll('_', ' ')} · ${offer.access_model === 'free' ? 'Free' : 'Paid'} · ${offer.status}`, image: offerImage(offer), href: '/guardians/workspace?tab=offer_builder' })) },
+    4: { title: 'Your offers', tab: 'offer_builder', rows: related.offers.map((offer) => ({ key: offer.id, title: offer.title, meta: [APP_PLAN_KINDS.includes(offer.kind) ? 'PDF + ROUTINE³' : OTHER_FORMATS[offer.kind] || offer.kind.replaceAll('_', ' '), offer.access_model === 'free' ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Paid', audience, offer.status].filter(Boolean).join(' · '), image: offerImage(offer), href: '/guardians/workspace?tab=offer_builder' })) },
     5: { title: 'Your offer paths', tab: 'value_ramps', rows: rampRows },
   };
   const section = sections[step];
