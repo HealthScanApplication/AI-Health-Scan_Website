@@ -801,6 +801,8 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont }: { profil
   const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 46, border: '1px solid #11120F', borderRadius: 2, padding: '0 14px', fontFamily: 'inherit', fontSize: 14, background: '#FFF', color: '#11120F', outline: 'none' };
   const solid: React.CSSProperties = { minHeight: 46, border: '1px solid #11120F', borderRadius: 2, background: '#11120F', color: '#FFF', padding: '0 20px', fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10, textDecoration: 'none', cursor: 'pointer' };
   const steps = [entry, nextPaid, support].filter(Boolean) as GuideOffer[];
+  // Pitch videos saved by the builder in social_links.offer_videos ('free' = lead magnet).
+  const leadVideo = (() => { try { return (JSON.parse(String((profile.social_links as Record<string, unknown> | null)?.offer_videos || '{}')) as Record<string, string>).free || ''; } catch { return ''; } })();
   return <>
     {steps.length > 0 && <section id="offers" style={{ padding: 'clamp(60px,9vw,120px) clamp(24px,8vw,110px)', borderTop: '1px solid rgba(17,18,15,.2)' }}>
       <span style={eyebrow}>{ramp?.problem ? ramp.problem : `Work with ${profile.display_name}`}</span>
@@ -820,6 +822,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont }: { profil
           <span style={{ ...eyebrow, color: '#C7D08E' }}>Free · {entry.title}</span>
           <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(40px,6vw,72px)', lineHeight: .95, margin: '18px 0' }}>{state === 'done' ? 'You are in.' : 'Start today, free.'}</h2>
           <p style={{ color: 'rgba(245,242,234,.72)', fontSize: 14, lineHeight: 1.7, maxWidth: 520 }}>{state === 'done' ? `Open ${entry.title} now. It runs as a daily routine in the ROUTINE³ app, with reminders, so you keep going.` : entry.description || 'Get the guide and the interactive routine that goes with it.'}</p>
+          {leadVideo && state !== 'done' && <video src={leadVideo} controls playsInline style={{ display: 'block', width: '100%', maxWidth: 520, aspectRatio: '16 / 9', objectFit: 'cover', background: '#000', borderRadius: 4, marginTop: 18 }} />}
         </div>
         {state === 'done' ? <div style={{ display: 'grid', gap: 12 }}>
           <a href={entry.booking_url || APP_STORE_URL} style={{ ...solid, background: '#F5F2EA', color: '#11120F', borderColor: '#F5F2EA' }}>Open your free routine <ArrowRight size={13} /></a>
