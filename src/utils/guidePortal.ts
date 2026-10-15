@@ -404,3 +404,15 @@ async function callPayments<T>(body: Record<string, unknown>): Promise<T> {
 export const createOfferPayment = (offerId: string, email: string, name?: string) => callPayments<PaymentIntentResult>({ action: 'intent', offer_id: offerId, email, name });
 export const confirmOfferPayment = (purchaseId: string) => callPayments<{ status: PaymentIntentResult['status'] }>({ action: 'confirm', purchase_id: purchaseId });
 export const buyUpsellOneClick = (previousPurchaseId: string, offerId: string) => callPayments<PaymentIntentResult>({ action: 'upsell', previous_purchase_id: previousPurchaseId, offer_id: offerId });
+
+/** Short-lived download link for a free offer's uploaded file, after the visitor has opted in. */
+export async function getFreeOfferDownload(offerId: string, email: string): Promise<string> {
+  const { data, error } = await db().functions.invoke('guardian-files', { body: { offer_id: offerId, email } });
+  if (error) {
+    let message = 'Could not prepare the download.';
+    try { const detail = await (error as any).context?.json?.(); if (detail?.error) message = detail.error; } catch { /* keep default */ }
+    throw new Error(message);
+  }
+  if (!(data as any)?.url) throw new Error((data as any)?.error || 'Could not prepare the download.');
+  return (data as any).url as string;
+}

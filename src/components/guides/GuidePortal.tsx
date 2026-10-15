@@ -12,7 +12,7 @@ import { APP_STORE_URL } from '../../config/appLinks';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
-  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
+  importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
   listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, uploadGuideFile, uploadGuideImage,
   type GuideBrand, type GuideLead, type GuideLibraryFolder, type GuideLibraryItem, type GuideOffer, type GuideProfile, type GuideRecipe,
@@ -911,6 +911,18 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   const [form, setForm] = useState({ name: '', email: '', goal: '', consent: false });
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [checkoutOffer, setCheckoutOffer] = useState<GuideOffer | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
+  // Uploaded files live in a private bucket: ask guardian-files for a 1-hour link after opt-in.
+  async function downloadEntryFile() {
+    if (!entry?.file_path) return;
+    if (/^https?:\/\//.test(entry.file_path)) { window.open(entry.file_path, '_blank', 'noopener'); return; }
+    const tab = window.open('', '_blank'); // open now so popup blockers allow it, then point it at the file
+    setDownloading(true); setDownloadError('');
+    try { const url = await getFreeOfferDownload(entry.id, form.email); if (tab) tab.location.href = url; else window.location.href = url; }
+    catch (err: any) { tab?.close(); setDownloadError(err?.message || 'Could not prepare the download.'); }
+    finally { setDownloading(false); }
+  }
   // Paid offers without their own booking link are sold here; with no Stripe key we fall back to the link.
   const sellsHere = (offer: GuideOffer) => Boolean(STRIPE_KEY) && offer.access_model === 'paid' && offer.price_cents > 0 && !offer.booking_url;
   const openOffer = (offer: GuideOffer) => (event: React.MouseEvent) => { if (sellsHere(offer)) { event.preventDefault(); setCheckoutOffer(offer); } };
@@ -990,10 +1002,11 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
       {state === 'done' && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', maxWidth: 880, margin: '16px auto 0', boxSizing: 'border-box', padding: '16px 18px', background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 16, fontFamily: APP.font, color: APP.text }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}><span style={{ width: 32, height: 32, flex: '0 0 32px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={16} strokeWidth={2.5} /></span><span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{entry.title} is ready</strong><span style={{ color: APP.muted, fontSize: 12 }}>Sent to {form.email}</span></span></span>
         <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {/^https?:\/\//.test(entry.file_path || '') && <a href={entry.file_path!} target="_blank" rel="noopener noreferrer" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: `1px solid ${APP.border}`, background: APP.alt, color: APP.text }}><Download size={16} />PDF</a>}
+          {entry.file_path && <button type="button" onClick={downloadEntryFile} disabled={downloading} style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: `1px solid ${APP.border}`, background: APP.alt, color: APP.text }}><Download size={16} />{downloading ? 'Preparing…' : 'PDF'}</button>}
           <a href={entry.booking_url || APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Open in ROUTINE³" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: 0, background: '#000', color: '#FFF' }}>Open in <RoutineMark size={20} textColor="#FFFFFF" hairline="rgba(255,255,255,.7)" suffix="" /></a>
         </span>
       </div>}
+      {downloadError && <p role="alert" style={{ maxWidth: 880, margin: '8px auto 0', color: '#EF4444', fontFamily: APP.font, fontSize: 12 }}>{downloadError}</p>}
       {reviews.length > 0 && <div style={{ maxWidth: 880, margin: '24px auto 0', paddingTop: 20, borderTop: '1px solid rgba(17,24,39,.14)' }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
     </section>}
     <footer style={{ padding: `28px ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)', color: '#66645F', fontSize: 11, lineHeight: 1.6 }}>
