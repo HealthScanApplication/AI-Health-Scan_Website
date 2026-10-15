@@ -12,6 +12,7 @@ import { buildRecipePdf } from '../../utils/recipePdf';
 import { PhoneFrame } from '../mockups/PhoneFrame';
 import { buildRecipesWithAI, computeNutrition, gramsFor, searchCatalogIngredients, KEY_MICROS, UNITS, type CatalogIngredient, type MacroKey, type RecipeDraft, type RecipeIngredient } from '../../utils/guideRecipeAI';
 import { APP_STORE_URL } from '../../config/appLinks';
+import { EventProtocolBuilder } from './EventProtocolBuilder';
 import { buildProtocolWithAI, foldSleepSteps, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
   createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
@@ -3324,6 +3325,9 @@ function ProtocolAIBar({ accessToken, protocolId, guideId, onUpdated }: { access
   const [folderId, setFolderId] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState('');
+  // Long pasted text (an email, a leaflet) opens the dated-Protocol builder instead of a one-line edit.
+  const [pasted, setPasted] = useState('');
+  const isLongText = (text: string) => text.length > 240 || /\n.*\n/.test(text);
   useEffect(() => {
     Promise.all([listGuideLibraryFolders(guideId), listGuideLibraryItems(guideId)]).then(([f, i]) => { setFolders(f); setLibraryItems(i); }).catch(() => {});
   }, [guideId]);
@@ -3351,10 +3355,12 @@ function ProtocolAIBar({ accessToken, protocolId, guideId, onUpdated }: { access
         {folders.map((folder) => <option key={folder.id} value={folder.id}>📁 {folder.name} ({libraryItems.filter((item) => item.folder_id === folder.id).length})</option>)}
       </select>
       <a href="/guardians/workspace?tab=library" style={{ color: muted, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap' }}>Open library ↗</a>
-      <input value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Ask AI to change this Protocol, e.g. add a tofu scramble breakfast at 8am" aria-label="AI instruction" style={{ ...field, flex: '1 1 320px', minWidth: 0 }} />
+      <input value={instruction} onChange={(e) => setInstruction(e.target.value)} onPaste={(e) => { const text = e.clipboardData.getData('text'); if (isLongText(text)) { e.preventDefault(); setPasted(text); } }} placeholder="Ask AI to change this Protocol, or paste any text (an email, a prep sheet) to build a dated Protocol" aria-label="AI instruction" style={{ ...field, flex: '1 1 320px', minWidth: 0 }} />
+      {isLongText(instruction) && <button type="button" onClick={() => setPasted(instruction)} style={{ ...btn, height: 42, minHeight: 42, borderRadius: 2, background: 'transparent', color: acid, border: `1px solid ${acid}` }}>Build dated Protocol</button>}
       <button type="submit" disabled={busy || !instruction.trim()} style={{ ...btn, height: 42, minHeight: 42, borderRadius: 2, opacity: busy || !instruction.trim() ? .5 : 1 }}>{busy ? <><Loader2 size={13} className="animate-spin" /> Updating</> : <>Update with AI <ArrowRight size={13} /></>}</button>
     </div>
     {result && <div style={{ maxWidth: 1180, margin: '6px auto 0', color: result.startsWith('Could not') ? '#F0A7A7' : acid, fontSize: 11 }}>{result}</div>}
+    {pasted && <EventProtocolBuilder accessToken={accessToken} protocolId={protocolId} initialText={pasted} onClose={() => setPasted('')} onApplied={(message) => { setPasted(''); setInstruction(''); setResult(message); onUpdated(); }} />}
   </form>;
 }
 

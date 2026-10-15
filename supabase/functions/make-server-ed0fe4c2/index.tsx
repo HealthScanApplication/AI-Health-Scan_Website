@@ -599,6 +599,54 @@ Rules: use whole, minimally processed foods. Every ingredient needs a real quant
   }
 })
 
+// Pasted free text (e.g. a ceremony-prep email) → event-anchored Protocol plan. Offsets are days
+// relative to the event (0 = event day), so the web client dates them and links catalog records.
+app.post('/make-server-ed0fe4c2/guides/plan-event-protocol', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    if (!accessToken) return c.json({ error: 'Sign in before building a protocol' }, 401)
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+    if (authError || !user) return c.json({ error: 'Invalid session' }, 401)
+    const { protocolId, text, eventDate, eventTime, hasEvent } = await c.req.json()
+    if (!protocolId || typeof text !== 'string' || !text.trim()) return c.json({ error: 'Protocol and text are required' }, 400)
+    const { data: protocol } = await supabase.from('protocols').select('id').eq('id', protocolId).eq('user_id', user.id).maybeSingle()
+    if (!protocol) return c.json({ error: 'Protocol not found' }, 404)
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) return c.json({ error: 'AI protocol builder is not configured' }, 501)
+    const prompt = `A wellness Guardian pasted instructions they give clients. Turn them into a reviewable daily Protocol.
+${hasEvent ? `The instructions are anchored to an event on ${eventDate || 'an unknown date'}${eventTime ? ` at ${eventTime}` : ''}. Use day offsets relative to the event: 0 = event day, -7 = seven days before, 1 = the day after. "48 hours before" = start_offset -2, end_offset -1. "2 weeks before" = -14..-1. "1-2 days after" = 1..2. Phase-wide rules last until the day before the event (end_offset -1).` : 'There is no event: build a normal daily routine; use start_offset 0 and end_offset 0 for every item.'}
+
+Pasted text (already cleaned of greetings/signatures):
+"""${text.slice(0, 12000)}"""
+
+Return JSON only:
+{"summary":"1-2 sentences","event_title":"Ceremony","event_time":"HH:MM or null","cutoff_time":"HH:MM or null (last food on the day)","items":[{"title":"short verb + noun, 2-5 words","group":"sleep|hygiene|beauty|wellness|fitness|supplements|meal|work|home|tasks","time":"HH:MM or null","duration_minutes":null,"notes":"brief guidance","start_offset":-7,"end_offset":-1,"dos":[],"donts":[],"subtasks":[],"link_kind":"food|activity|null","link_query":"one or two plain words to search a recipe/ingredient/activity catalog, e.g. rice, vegetable soup, meditation"}]}
+
+Rules:
+- Every actionable instruction becomes an item. Drop pleasantries and logistics that are not actions.
+- Exactly two "sleep" items covering the whole window: "Wake up" (first, ~07:00) and "Go to bed" (last, ~22:00).
+- Avoid lists ("no pork, alcohol, salt…", tyramine foods, caffeine, alcohol) become ONE rule item per theme in group "meal" (or "wellness" for non-food), with the forbidden things as short entries in "donts" and allowed alternatives in "dos". Never leave an avoid list as loose notes.
+- Allowed foods become meal items (breakfast ~08:00, lunch ~12:30, dinner ~18:30) for each diet window, each with link_kind "food" and link_query the food (rice, potato, boiled egg, vegetable soup, polenta, salad, fruit…).
+- Practices (meditation, yoga, breathwork, walking, journaling) become items with link_kind "activity".
+- A packing / "what to bring" list becomes ONE item in group "tasks" the day before the event (offset -1) with the things as "subtasks".
+- A day-of eating cut-off ("nothing after 3 PM", "5 hours before") becomes a "Stop eating" meal item at that time on offset 0, and set cutoff_time.
+- Include the event itself on offset 0 at the event time.
+- Do not diagnose or prescribe; keep medication changes for a clinician. Max 40 items.`
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', response_format: { type: 'json_object' }, temperature: 0.2, messages: [{ role: 'user', content: prompt }] }),
+    })
+    const aiPayload = await aiResponse.json()
+    if (!aiResponse.ok) return c.json({ error: aiPayload?.error?.message || 'AI planning failed' }, 502)
+    const content = aiPayload?.choices?.[0]?.message?.content
+    if (!content) return c.json({ error: 'AI returned no plan' }, 502)
+    return c.json(JSON.parse(content))
+  } catch (error: any) {
+    return c.json({ error: error?.message || 'Could not plan protocol' }, 400)
+  }
+})
+
 app.get('/make-server-ed0fe4c2/', (c) => {
   return c.json({ 
     success: true,
