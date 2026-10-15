@@ -2552,10 +2552,33 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
           <div className="g-split"><div>
           <label style={{ ...label, color: acid }}>Offer funnel preview <span style={{ color: muted }}>· test purchase and access</span></label>
           <div aria-label="Customer journey stages" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', border: `1px solid ${line}`, margin: '10px 0 14px' }}>
-            {(funnelPreviewStage === 0 ? ['Discover', 'Sign up', 'Delivery / access', 'Next offer', 'Complete'] : ['Discover', 'Offer', 'Checkout', 'Delivery / access', 'Next offer', 'Complete']).map((title, index) => {
-              const currentStage = (funnelPageState === 'offer' ? 1 : funnelPageState === 'checkout' ? 2 : funnelPageState === 'access' ? 3 : funnelPageState === 'post_purchase' ? 4 : 5) - (funnelPreviewStage === 0 && funnelPageState !== 'offer' ? 1 : 0);
-              return <span key={title} aria-current={currentStage === index ? 'step' : undefined} style={{ padding: '10px 12px', borderTop: index ? `1px solid ${line}` : 0, background: currentStage === index ? ink : 'transparent', color: currentStage === index ? black : index < currentStage ? acid : muted }}><strong style={{ display: 'block', fontSize: 8 }}>{String(index + 1).padStart(2, '0')}</strong><span style={{ display: 'block', marginTop: 4, fontSize: 7, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{title}</span></span>;
-            })}
+            {/* Every part of the flow, free and paid, is clickable so the Guardian can jump straight to it. */}
+            {(() => {
+              const steps: { title: string; detail: string; stage: number; page: typeof funnelPageState }[] = [
+                { title: 'Sign up', detail: customerFacingOfferTitle(funnelStages[0].title), stage: 0, page: 'checkout' },
+                { title: 'Delivery + next offer', detail: 'Free offer delivered, upsell shown', stage: 0, page: 'access' },
+                ...funnelStages.slice(1).flatMap((stage, k) => [
+                  { title: `Upsell ${k + 1}`, detail: `${customerFacingOfferTitle(stage.title)} · ${stage.price}`, stage: k + 1, page: 'offer' as const },
+                  { title: `Bought ${k + 1}`, detail: k + 2 < funnelStages.length ? 'Confirmed, next upsell shown' : 'Confirmed', stage: k + 1, page: 'access' as const },
+                ]),
+                { title: 'Complete', detail: 'Order summary', stage: Math.max(0, funnelStages.length - 1), page: 'complete' },
+              ];
+              const go = (step: (typeof steps)[number]) => {
+                if (!leadEmailIsValid) setLeadCaptureValue('you@example.com');
+                setFunnelUnlockedStage(funnelStages.length - 1);
+                setFunnelPreviewStage(step.stage);
+                setFunnelTimerSeconds(600);
+                if (step.page === 'complete') setFunnelPurchases(funnelStages.map((stage) => stage.title));
+                setFunnelPageState(step.page);
+              };
+              return steps.map((step, index) => {
+                const current = step.page === funnelPageState && (step.page === 'complete' || step.stage === funnelPreviewStage);
+                return <button type="button" key={`${step.title}-${index}`} onClick={() => go(step)} aria-current={current ? 'step' : undefined} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: 0, borderTop: index ? `1px solid ${line}` : 0, background: current ? ink : 'transparent', color: current ? black : step.stage > 0 ? ink : acid, cursor: 'pointer', fontFamily: sans }}>
+                  <strong style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 8 }}><span>{String(index + 1).padStart(2, '0')} · {step.title}</span>{step.stage > 0 && step.page === 'offer' && <span style={{ opacity: .7 }}>PAID</span>}</strong>
+                  <span style={{ display: 'block', marginTop: 4, fontSize: 7, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: current ? black : muted }}>{step.detail}</span>
+                </button>;
+              });
+            })()}
           </div>
           <span style={{ ...label, display: 'block', marginBottom: 7 }}>Preview an offer</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', padding: '0 0 14px' }}>
