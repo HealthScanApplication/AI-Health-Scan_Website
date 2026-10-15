@@ -943,42 +943,45 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
         </li>)}
       </ol>
     </section>}
-    {reviews.length > 0 && <section style={{ padding: `0 ${PAGE_X} clamp(48px,7vw,90px)` }}><ReviewRail reviews={reviews} accent={accent} /></section>}
-    {entry && <section id="start" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, color: '#11120F' }}>
-      <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', border: '1px solid rgba(17,18,15,.18)', background: 'rgba(255,255,255,.72)', borderRadius: 5, overflow: 'hidden', boxShadow: '0 14px 36px rgba(17,18,15,.08)' }}><span style={{ position: 'absolute', zIndex: 2, top: 12, right: 12, background: '#11120F', color: '#FFF', padding: '7px 12px', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>Free</span>
-        <div style={{ flex: '1 1 300px', display: 'grid', placeItems: 'center', padding: 24, minHeight: 240, background: 'rgba(17,18,15,.035)', borderRight: '1px solid rgba(17,18,15,.12)' }}>{entry.kind === 'routine' ? <img src="/images/guides/generated/r3-protocol-card.png" alt="Printed Protocol and the ROUTINE³ app" style={{ width: '80%', maxWidth: 240, aspectRatio: '1', objectFit: 'contain' }} /> : (() => { const art = productArt(entry.kind); return art ? <span aria-hidden="true" style={{ width: 140 * art.cellAspect, height: 140, backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${(art.index % art.cols) * 100 / Math.max(1, art.cols - 1)}% ${Math.floor(art.index / art.cols) * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.95) invert(.88)' }} /> : null; })()}</div>
-        <div style={{ flex: '999 1 340px', minWidth: 0, padding: 'clamp(22px,4vw,44px)', display: 'grid', gap: 18 }}>
-        <div>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#D7D4CC', display: 'grid', placeItems: 'center', fontFamily: serif, fontSize: 13 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: '#55564F', fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}>{profile.display_name}</span></span>
-          <h2 style={{ fontFamily: headingFont, fontWeight: 300, fontSize: 'clamp(40px,6vw,72px)', lineHeight: .95, margin: '18px 0' }}>{state === 'done' ? 'You are in.' : entry.title}</h2>
-          <p style={{ color: 'rgba(17,18,15,.72)', fontSize: 14, lineHeight: 1.7, maxWidth: 520 }}>{state === 'done' ? `Open ${entry.title} now. It runs as a daily routine in the ROUTINE³ app, with reminders, so you keep going.` : entry.description || 'Get the guide and the interactive routine that goes with it.'}</p>
-          {leadVideo && state !== 'done' && <video src={leadVideo} controls playsInline style={{ display: 'block', width: '100%', maxWidth: 520, aspectRatio: '16 / 9', objectFit: 'cover', background: '#000', borderRadius: 4, marginTop: 18 }} />}
+    {entry && <section id="start" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}` }}>
+      {/* Same wide ROUTINE³ app-style card as the builder's sign-up preview: offer left, form in a white panel right. */}
+      <div style={{ position: 'relative', maxWidth: 880, margin: '0 auto', background: APP.bg, color: APP.text, fontFamily: APP.font, borderRadius: 24, overflow: 'hidden', boxShadow: '0 20px 50px rgba(17,24,39,.14)', display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}>
+        <span style={{ position: 'absolute', zIndex: 2, top: 16, left: 16, background: '#000', color: '#FFF', borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, letterSpacing: .5 }}>FREE</span>
+        <div style={{ flex: '1 1 340px', minWidth: 0, padding: '44px 24px 28px', display: 'grid', alignContent: 'center', textAlign: 'center' }}>
+          {leadVideo && state !== 'done' ? <video src={leadVideo} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', background: '#000', borderRadius: 12, marginBottom: 12 }} /> : <AppOfferImage kind={entry.kind} size={110} />}
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '12px 0 6px' }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{profile.display_name}</span></span>
+          <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 6px' }}>{state === 'done' ? 'You’re in!' : entry.title}</h2>
+          <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, lineHeight: 1.45, margin: 0 }}>{state === 'done' ? `${entry.title} runs as a daily routine in the ROUTINE³ app, with reminders, so you keep going.` : entry.description || 'Get the guide and the interactive routine that goes with it.'}</p>
         </div>
-        {state === 'done' ? <div style={{ display: 'grid', gap: 12 }}>
-          <a href={entry.booking_url || APP_STORE_URL} style={{ ...solid, background: '#11120F', color: '#FFFFFF', borderColor: '#11120F' }}>Open your free routine <ArrowRight size={13} /></a>
-          {nextPaid && <div style={{ border: '1px solid rgba(17,18,15,.3)', padding: 22 }}>
-            <span style={{ ...eyebrow, color: accent }}>Ready to go further? · {price(nextPaid)}</span>
-            <strong style={{ display: 'block', fontFamily: headingFont, fontWeight: 300, fontSize: 28, lineHeight: 1.05, margin: '12px 0 8px' }}>{nextPaid.title}</strong>
-            <p style={{ color: 'rgba(17,18,15,.72)', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px' }}>{nextPaid.description || 'The complete programme, step by step.'}</p>
-            <a href={offerHref(nextPaid)} onClick={openOffer(nextPaid)} style={{ ...solid, background: 'transparent', color: '#11120F', borderColor: '#11120F' }}>See what is included <ArrowRight size={13} /></a>
-          </div>}
-        </div> : <form onSubmit={optIn} style={{ display: 'grid', gap: 12 }}>
-          <input required placeholder="First name" aria-label="First name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={field} />
-
-          <div role="radiogroup" aria-label="Main goal (optional)" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['Health', 'Beauty', 'Fitness'].map((goal) => <button type="button" key={goal} role="radio" aria-checked={form.goal === goal} onClick={() => setForm({ ...form, goal: form.goal === goal ? '' : goal })} style={{ minHeight: 36, padding: '0 14px', border: '1px solid rgba(17,18,15,.5)', borderRadius: 2, background: form.goal === goal ? '#11120F' : 'transparent', color: form.goal === goal ? '#11120F' : '#11120F', fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>{goal}</button>)}
-          </div>
-          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12, lineHeight: 1.5, color: 'rgba(17,18,15,.78)', cursor: 'pointer' }}><input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} style={{ marginTop: 3 }} />{CONSENT_TEXT}</label>
-          {state === 'error' && <p style={{ color: '#F0A7A7', fontSize: 12, margin: 0 }}>We could not sign you up just now. Please try again.</p>}
-          {/* Joined email + button, same seam as the homepage Subscribe control. */}
-          <div style={{ display: 'flex' }}>
-            <input required type="email" placeholder="you@email.com" aria-label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ ...field, flex: 1, minWidth: 0, background: '#FFF', color: '#11120F', border: '1px solid #11120F', borderRight: 'none', borderRadius: '2px 0 0 2px' }} />
-            <button disabled={state === 'sending'} style={{ height: 46, boxSizing: 'border-box', padding: '0 16px', border: '1px solid #11120F', borderRadius: '0 2px 2px 0', background: '#11120F', color: '#FFFFFF', fontFamily: '"Archivo", "Inter", sans-serif', fontSize: 11, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', opacity: state === 'sending' ? .6 : 1 }}>{state === 'sending' ? 'Sending' : 'Get free access'} <ArrowRight size={13} /></button>
-          </div>
-          <p style={{ fontSize: 11, color: 'rgba(17,18,15,.5)', margin: 0 }}>We use your email to send your access. Marketing emails only if you tick the box.</p>
-        </form>}
+        <div style={{ flex: '1 1 320px', minWidth: 0, padding: '44px 24px 24px', background: APP.surface, boxShadow: '-2px 0 8px rgba(0,0,0,.06)', display: 'grid', alignContent: 'center', gap: 12 }}>
+          {state === 'done' ? <>
+            <span style={{ width: 52, height: 52, margin: '0 auto 4px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={24} /></span>
+            <a href={entry.booking_url || APP_STORE_URL} style={{ ...appButton, borderRadius: 12, background: APP.text, textDecoration: 'none', fontSize: 16, fontWeight: 600 }}>Open your free routine</a>
+            {nextPaid && <div style={{ border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', textAlign: 'center' }}>
+              <div style={{ background: APP.greenSoft, color: '#000', padding: '7px 0', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase' }}>Ready to go further? · {price(nextPaid)}</div>
+              <div style={{ padding: '12px 14px 14px' }}>
+                <strong style={{ display: 'block', fontSize: 17, fontWeight: 600, margin: '0 0 4px' }}>{nextPaid.title}</strong>
+                <p style={{ color: APP.muted, fontSize: 13, lineHeight: 1.5, margin: '0 0 12px' }}>{nextPaid.description || 'The complete programme, step by step.'}</p>
+                <a href={offerHref(nextPaid)} onClick={openOffer(nextPaid)} style={{ ...appButton, minHeight: 48, textDecoration: 'none', fontSize: 15, fontWeight: 600 }}>See what is included</a>
+              </div>
+            </div>}
+          </> : <form onSubmit={optIn} style={{ display: 'grid', gap: 12 }}>
+            <p style={{ color: APP.text, fontSize: 18, fontWeight: 600, margin: '0 0 2px', textAlign: 'center' }}>Enter your email to get it free</p>
+            <div>
+              <input required placeholder="First name" aria-label="First name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ width: '100%', boxSizing: 'border-box', height: 56, border: `1px solid ${APP.border}`, borderRadius: '12px 12px 0 0', padding: '0 16px', fontFamily: APP.font, fontSize: 16, background: APP.alt, color: APP.text, outline: 'none' }} />
+              <label style={{ display: 'flex', alignItems: 'center', height: 56, marginTop: -1, padding: '0 16px', background: APP.alt, border: `1px solid ${APP.border}`, borderRadius: '0 0 12px 12px', boxSizing: 'border-box' }}><Mail size={18} color={APP.muted} style={{ marginRight: 12, flex: '0 0 auto' }} /><input required type="email" placeholder="Email" aria-label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', fontFamily: APP.font, fontSize: 16, color: APP.text }} /></label>
+            </div>
+            <div role="radiogroup" aria-label="Main goal (optional)" style={{ display: 'flex', gap: 8 }}>
+              {['Health', 'Beauty', 'Fitness'].map((goal) => <button type="button" key={goal} role="radio" aria-checked={form.goal === goal} onClick={() => setForm({ ...form, goal: form.goal === goal ? '' : goal })} style={{ flex: 1, height: 40, border: `1px solid ${form.goal === goal ? APP.green : APP.border}`, borderRadius: 12, background: form.goal === goal ? APP.greenSoft : APP.alt, color: APP.text, fontFamily: APP.font, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{goal}</button>)}
+            </div>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.45, color: APP.muted, cursor: 'pointer', textAlign: 'left' }}><input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} style={{ width: 20, height: 20, flex: '0 0 20px', margin: 0, accentColor: '#22C55E' }} />{CONSENT_TEXT}</label>
+            {state === 'error' && <p role="alert" style={{ color: '#EF4444', fontSize: 12, margin: 0 }}>We could not sign you up just now. Please try again.</p>}
+            <button disabled={state === 'sending'} style={{ ...appButton, borderRadius: 12, background: APP.text, fontSize: 16, fontWeight: 600, opacity: state === 'sending' ? .6 : 1 }}>{state === 'sending' ? 'Sending…' : 'Get free access'}</button>
+            <p style={{ fontSize: 11, color: APP.muted, margin: 0, textAlign: 'center' }}>We use your email to send your access. Marketing emails only if you tick the box.</p>
+          </form>}
         </div>
       </div>
+      {reviews.length > 0 && <div style={{ maxWidth: 880, margin: '18px auto 0' }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
     </section>}
     <footer style={{ padding: `28px ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)', color: '#66645F', fontSize: 11, lineHeight: 1.6 }}>
       {profile.display_name} shares general wellbeing guidance, not medical advice. Speak to your GP or doctor before changing medication, diet or exercise, and about any health concern. Individual results vary.
