@@ -1054,6 +1054,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
   const [rampProblem, setRampProblem] = useState('Sleep problems');
   const [audienceSetupStage, setAudienceSetupStage] = useState(0);
   const [freeOfferSetupStage, setFreeOfferSetupStage] = useState(0);
+  const [showAllEntryOffers, setShowAllEntryOffers] = useState(false);
   const [paidOfferSetupStages, setPaidOfferSetupStages] = useState<Partial<Record<UpsellKind, number>>>({});
   const [onboardingProtocol, setOnboardingProtocol] = useState<AdminProtocol | null>(null);
   const [onboardingProtocolRevision, setOnboardingProtocolRevision] = useState(0);
@@ -1957,12 +1958,16 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         <div id="offer-builder-entry" style={{ scrollMarginTop: 20 }}><FunnelStage number="01" eyebrow="Free · Build trust" title="Give your audience one useful win." copy="Choose one useful result, name it clearly, then decide how people receive it." art={freeOfferArt[freeOfferType]}>
           {freeOfferSetupStage > 0 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Entry offer</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{freeOfferTypes.find((offer) => offer.value === freeOfferType)?.label}</strong></span><button type="button" onClick={() => setFreeOfferSetupStage(0)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
           {freeOfferSetupStage === 0 && <><label style={label}>Choose the entry offer</label>
-          <div style={{ overflowX: 'auto' }}>
+          {!showAllEntryOffers && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,220px),1fr))', gap: 10 }}>
+            <FreeOfferCard eyebrow="LEAD MAGNET · RECOMMENDED" title={suggestedFreeOffer.title} copy="Best fit for this audience." active recommended art={freeOfferArt[suggestedFreeOffer.kind]} onClick={() => { setFreeOfferType(suggestedFreeOffer.kind); setFreeDelivery(suggestedFreeOffer.kind === 'routine' ? ['Downloadable PDF', 'Interactive Protocol'] : [suggestedDelivery(suggestedFreeOffer.kind)]); setFreeAudienceValue(freeValueSuggestions[suggestedFreeOffer.kind]); setLeadMagnetTitle(suggestedFreeOffer.title); setFreeOfferSetupStage(1); }} />
+            {[0, 1].map((n) => <button key={n} type="button" onClick={() => setShowAllEntryOffers(true)} style={{ minHeight: 156, border: `1px dashed ${line}`, background: 'transparent', color: muted, fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><span><span style={{ display: 'block', fontSize: 26, fontWeight: 300, color: ink, marginBottom: 6 }}>+</span>Add another</span></button>)}
+          </div>}
+          {showAllEntryOffers && <div style={{ overflowX: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,minmax(145px,1fr))', gap: 0, minWidth: 870, borderTop: `1px solid ${line}`, borderLeft: `1px solid ${line}` }}>
               {[...freeOfferTypes].sort((offer) => Number(offer.value !== 'routine')).map((offer) => <FreeOfferCard key={offer.value} eyebrow={offer.eyebrow} title={offer.label} copy={offer.copy} active={freeOfferType === offer.value} art={freeOfferArt[offer.value]} onClick={() => { setFreeOfferType(offer.value); setFreeDelivery(offer.value === 'routine' ? ['Downloadable PDF', 'Interactive Protocol'] : [suggestedDelivery(offer.value)]); setFreeAudienceValue(freeValueSuggestions[offer.value]); setFreeOfferSetupStage(1); }} />)}
-              <FreeOfferCard eyebrow="RECOMMENDED" title={suggestedFreeOffer.title} copy="Best fit for this audience." active={false} recommended art={freeOfferArt[suggestedFreeOffer.kind]} onClick={() => { setFreeOfferType(suggestedFreeOffer.kind); setFreeDelivery(suggestedFreeOffer.kind === 'routine' ? ['Downloadable PDF', 'Interactive Protocol'] : [suggestedDelivery(suggestedFreeOffer.kind)]); setFreeAudienceValue(freeValueSuggestions[suggestedFreeOffer.kind]); setLeadMagnetTitle(suggestedFreeOffer.title); setFreeOfferSetupStage(1); }} />
             </div>
-          </div></>}
+            <button type="button" onClick={() => setShowAllEntryOffers(false)} style={{ ...btn, marginTop: 10, background: 'transparent', color: ink }}>← Back to recommended</button>
+          </div>}</>}
           {freeOfferSetupStage > 1 && <div style={{ border: `1px solid ${line}`, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span><span style={{ ...label, marginBottom: 3 }}>Offer</span><strong style={{ color: ink, fontSize: 12, fontWeight: 600 }}>{leadMagnetTitle}</strong><span style={{ display: 'block', color: muted, fontSize: 9, marginTop: 3 }}>{freeAudienceValue}</span></span><button type="button" onClick={() => setFreeOfferSetupStage(1)} style={{ ...btn, minHeight: 36, height: 36, background: 'transparent', color: ink, fontSize: 9 }}>Edit</button></div>}
           {freeOfferSetupStage === 1 && <div>
           <label style={label}>Offer name</label>
