@@ -74,12 +74,16 @@ function TimingField({ value, onChange, compact }: { value: Timing; onChange: (t
 }
 
 /** Shared-checker notes + flagged contradictions, shown before anything is saved. Conflicts are never auto-resolved. */
-function ReviewPanel({ notes, conflicts, onSave, onClose, busy, saveLabel, notesTitle = 'The shared Protocol rules will adjust these on save:' }: { notes: ReviewNote[]; conflicts: Conflict[]; onSave?: () => void; onClose?: () => void; busy?: boolean; saveLabel?: string; notesTitle?: string }) {
+function ReviewPanel({ notes, conflicts, blocking = [], onSave, onClose, busy, saveLabel, notesTitle = 'The shared Protocol rules will adjust these on save:' }: { notes: ReviewNote[]; conflicts: Conflict[]; blocking?: ReviewNote[]; onSave?: () => void; onClose?: () => void; busy?: boolean; saveLabel?: string; notesTitle?: string }) {
   return <div style={{ ...card, margin: '0 0 14px', borderColor: conflicts.length ? warn : line }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
       <span style={{ ...label, margin: 0, color: conflicts.length ? warn : acid }}>Review · {conflicts.length} conflict{conflicts.length === 1 ? '' : 's'} · {notes.length} rule note{notes.length === 1 ? '' : 's'}</span>
       {onClose && <button type="button" style={iconBtn} onClick={onClose}><X size={14} /></button>}
     </div>
+    {blocking.length > 0 && <div style={{ marginBottom: 10 }}>
+      <div style={{ color: '#E88A7A', fontSize: 12, fontWeight: 700, display: 'flex', gap: 6, alignItems: 'center' }}><AlertTriangle size={13} /> Fix {blocking.length === 1 ? 'this' : `these ${blocking.length}`} before saving:</div>
+      {blocking.slice(0, 12).map((b, i) => <div key={i} style={{ fontSize: 12, marginTop: 4 }}><span style={{ color: ink }}>{b.where}</span><span style={{ color: muted }}> · {b.message}</span></div>)}
+    </div>}
     {conflicts.length > 0 && <div style={{ marginBottom: 10 }}>
       <div style={{ color: warn, fontSize: 12, fontWeight: 700, display: 'flex', gap: 6, alignItems: 'center' }}><AlertTriangle size={13} /> Contradictions to decide. They are saved as they are; change the meal, session or rule if you want them gone.</div>
       {conflicts.slice(0, 12).map((c, i) => <div key={i} style={{ fontSize: 12, marginTop: 4 }}><span style={{ color: ink }}>{c.where}: {c.item}</span><span style={{ color: muted }}> vs “{c.rule}” · {c.reason}</span></div>)}
@@ -90,8 +94,8 @@ function ReviewPanel({ notes, conflicts, onSave, onClose, busy, saveLabel, notes
       {notes.slice(0, 10).map((n, i) => <div key={i} style={{ fontSize: 11, color: muted }}>{n.where}: {n.message}</div>)}
       {notes.length > 10 && <div style={{ color: muted, fontSize: 11 }}>+{notes.length - 10} more</div>}
     </div>}
-    {!notes.length && !conflicts.length && <p style={{ color: acid, fontSize: 12, margin: '0 0 10px' }}>Every item follows the Protocol rules and nothing contradicts.</p>}
-    {onSave && <button type="button" style={btn} disabled={busy} onClick={onSave}>{saveLabel || 'Save'}</button>}
+    {!notes.length && !conflicts.length && !blocking.length && <p style={{ color: acid, fontSize: 12, margin: '0 0 10px' }}>Every item follows the Protocol rules and nothing contradicts.</p>}
+    {onSave && <button type="button" style={{ ...btn, opacity: blocking.length ? .4 : 1 }} disabled={busy || blocking.length > 0} onClick={onSave}>{blocking.length ? 'Fix the items above to save' : saveLabel || 'Save'}</button>}
   </div>;
 }
 
@@ -179,7 +183,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
       {protocolId && <button type="button" style={ghost} onClick={() => onOpen(protocolId)}>Open in editor</button>}
       <Status busy={busy} message={message} />
     </div>
-    {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
+    {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: `132px repeat(7,minmax(118px,1fr))`, gap: 6, minWidth: 990 }}>
         <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} /></div>)}
@@ -273,7 +277,7 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
       {protocolId && <button type="button" style={ghost} onClick={() => onOpen(protocolId)}>Open in editor</button>}
       <Status busy={busy} message={message} />
     </div>
-    {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
+    {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(150px,1fr))', gap: 6, minWidth: 1080 }}>
         {WEEK.map(({ day, short }) => {
@@ -298,7 +302,7 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
               <div style={{ marginTop: 6 }}><RulesEditor compact title="Do-checklist" rules={s.rules || []} onChange={(rules) => patchSession(i, { rules })} placeholder="e.g. Warm up for 5 minutes" /></div>
               <button type="button" onClick={() => { setAdding(i); setQuery(''); }} style={{ ...iconBtn, fontSize: 10, marginTop: 4, color: adding === i ? acid : muted }}><Plus size={11} /> Exercise</button>
             </div>)}
-            <button type="button" onClick={() => setCfg({ ...cfg, sessions: [...cfg.sessions, { day, time: '07:00', anchor: 'clock', offset: 0, rules: [], title: 'Train', minutes: cfg.minutes, intensity: 'moderate', exercises: [] }] })} style={{ ...iconBtn, fontSize: 10, marginTop: 8 }}><Plus size={11} /> Session</button>
+            <button type="button" onClick={() => setCfg({ ...cfg, sessions: [...cfg.sessions, { day, time: '07:00', anchor: 'clock', offset: 0, rules: [], title: 'Walk 20 minutes', minutes: cfg.minutes, intensity: 'moderate', exercises: [] }] })} style={{ ...iconBtn, fontSize: 10, marginTop: 8 }}><Plus size={11} /> Session</button>
           </div>;
         })}
       </div>
@@ -326,7 +330,7 @@ export function CombineProtocols({ accessToken, ownerId, protocols, leads, onSav
   const [chosen, setChosen] = useState<string[]>([]);
   const [clashes, setClashes] = useState<Clash[] | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [combinedReview, setCombinedReview] = useState<{ notes: ReviewNote[]; conflicts: Conflict[] } | null>(null);
+  const [combinedReview, setCombinedReview] = useState<{ notes: ReviewNote[]; blocking: ReviewNote[]; conflicts: Conflict[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => { listBuilderMeta(accessToken, ownerId).then(setMeta).catch(() => {}); }, [accessToken, ownerId]);
@@ -373,9 +377,9 @@ export function CombineProtocols({ accessToken, ownerId, protocols, leads, onSav
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 700 }}><AlertTriangle size={13} /> {clashes.length} time clash{clashes.length > 1 ? 'es' : ''}. You can fix them in the editor after combining.</div>
       {clashes.slice(0, 6).map((c) => <div key={`${c.day}${c.time}`} style={{ marginTop: 3 }}>{c.day} {c.time}: {c.names.join(' / ')}</div>)}
     </div> : <p style={{ color: acid, fontSize: 12 }}>No time clashes between the chosen protocols.</p>)}
-    {combinedReview && chosen.length > 1 && <ReviewPanel notes={combinedReview.notes} conflicts={combinedReview.conflicts} notesTitle="Flagged by the shared Protocol rules (steps are copied as they are; sleep items take the shared names):" />}
+    {combinedReview && chosen.length > 1 && <ReviewPanel notes={combinedReview.notes} conflicts={combinedReview.conflicts} blocking={combinedReview.blocking} notesTitle="Fixed by the shared Protocol rules when combining:" />}
     <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
-      <button type="button" style={btn} disabled={busy || !name || chosen.length < 2} onClick={create}>Create {name ? `${name}’s` : 'personal'} Protocol</button>
+      <button type="button" style={btn} disabled={busy || !name || chosen.length < 2 || !!combinedReview?.blocking.length} onClick={create}>Create {name ? `${name}’s` : 'personal'} Protocol</button>
       <Status busy={busy} message={message || (chosen.length < 2 ? 'Choose at least two protocols.' : 'Steps are copied as they are; one Start Sleep / End Sleep pair is kept or added. Conflicts stay flagged for you to decide.')} />
     </div>
   </div>;

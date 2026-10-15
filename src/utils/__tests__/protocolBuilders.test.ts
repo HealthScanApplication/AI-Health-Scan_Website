@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fitsSlot, mealPlacementIssues, nameSlotHint, planMealItems, reviewDiet, slotForTime, type DietConfig, type MealPick } from '../protocolBuilders';
+import { reviewFitness, saveDietProtocol, withSetInfo, type FitnessConfig, fitsSlot, mealPlacementIssues, nameSlotHint, planMealItems, reviewDiet, slotForTime, type DietConfig, type MealPick } from '../protocolBuilders';
 
 const pick = (name: string, id = name): MealPick => ({ source: 'catalog', id, name, image: null, nutrition: { energy_kcal: 500, protein_g: 25, carbohydrates_g: 50, fats_g: 20 } });
 const diet = (plan: DietConfig['plan'], extra: Partial<DietConfig> = {}): DietConfig => ({ framework: 'balanced', kcal: 2000, protein: 20, carbs: 50, fat: 30, slots: ['breakfast', 'lunch', 'dinner'], plan, ...extra });
@@ -11,9 +11,10 @@ describe('a lunch recipe assigned to breakfast', () => {
     expect(fitsSlot('Kitchari Lunch Bowl', 'lunch')).toBe(true);
     expect(fitsSlot('Stuffed capsicum', 'breakfast')).toBe(true);
   });
-  it('is flagged in the diet review when a Guardian puts it there anyway', () => {
+  it('blocks the save when a Guardian puts it there anyway', async () => {
     const review = reviewDiet(diet({ '1:breakfast': pick('Kitchari Lunch Bowl') }));
-    expect(review.conflicts.some((c) => c.item === 'Kitchari Lunch Bowl' && /lunch recipe filed under Breakfast/.test(c.reason))).toBe(true);
+    expect(review.blocking.some((b) => b.where === 'Kitchari Lunch Bowl' && /lunch recipe filed under Breakfast/.test(b.message))).toBe(true);
+    await expect(saveDietProtocol('token', 'owner', null, 'Week', diet({ '1:breakfast': pick('Kitchari Lunch Bowl') }))).rejects.toThrow(/Fix before saving/);
   });
 });
 
@@ -51,5 +52,24 @@ describe('a meal with a drink in the slot', () => {
   it('gives each slot its own time instead of one fixed time for every meal', () => {
     const plans = planMealItems(diet({ '1:breakfast': pick('Porridge'), '1:lunch': pick('Vegetable soup'), '1:dinner': pick('Lentil curry') }));
     expect(plans.map((p) => [p.label, p.time])).toEqual([['Breakfast', '08:00'], ['Lunch', '13:00'], ['Dinner', '19:00']]);
+  });
+});
+
+const fitness = (sessions: FitnessConfig['sessions']): FitnessConfig => ({ goal: 'general', level: 'beginner', minutes: 30, sessions });
+const ex = (name: string, category: string, extra = {}) => ({ id: name, name, image: null, category, minutes: null, sets: null, reps: null, rest_seconds: null, ...extra });
+
+describe('fitness hard gate', () => {
+  it('blocks a session without exercises whose title is not verb + noun', () => {
+    const review = reviewFitness(fitness([{ day: 1, time: '07:00', title: 'Cardio session', minutes: 30, intensity: 'moderate', exercises: [] }]));
+    expect(review.blocking).toHaveLength(1);
+  });
+  it('lets a session with exercises keep its group title (smart-list parent)', () => {
+    const review = reviewFitness(fitness([{ day: 1, time: '07:00', title: 'Upper body', minutes: 30, intensity: 'moderate', exercises: [ex('Archer Push-Up', 'Strength', { sets: 3, reps: '10' })] }]));
+    expect(review.blocking).toEqual([]);
+  });
+  it('fills missing set info from the level: sets × reps for strength, minutes for timed work', () => {
+    const { cfg, notes } = withSetInfo(fitness([{ day: 1, time: '07:00', title: 'Upper body', minutes: 30, intensity: 'moderate', exercises: [ex('Archer Push-Up', 'Strength'), ex('Treadmill Walk', 'Cardio')] }]));
+    expect(cfg.sessions[0].exercises.map((e) => [e.sets, e.reps, e.minutes])).toEqual([[2, '10', null], [null, null, 10]]);
+    expect(notes).toHaveLength(2);
   });
 });
