@@ -64,6 +64,8 @@ export interface RuleStep {
   link?: { kind: 'food' | 'activity'; query: string } | null;
   /** 'rule' = becomes top-level dated rule rows (no time, no done state). */
   kind?: 'action' | 'rule';
+  /** Meals and drinks: their consume slot (Breakfast / Lunch / Dinner / Snack), saved as group_name. */
+  mealSlot?: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
   /** For rules: which list it governs — Drinks, Consume (food), or general. */
   ruleGroup?: RuleGroup;
   /** Window key: steps only interact (anchors, group checklists) inside the same window. */
@@ -124,6 +126,13 @@ export function enforceProtocolRules<T extends RuleStep>(steps: T[]): T[] {
     if (isMeal(s) && !isRuleTitle(s.title) && !/^stop\b/i.test(s.title)) {
       const t = mealTitle(s.title);
       if (t !== s.title) s.title = t;
+      // The slot named in the title wins ("Kitchari lunch bowl" → Lunch, moved into the lunch window).
+      const named = /\b(breakfast|brunch|lunch|dinner|supper|snack)\b/i.exec(s.title)?.[1].toLowerCase();
+      const slot = named ? ({ brunch: 'Breakfast', supper: 'Dinner' } as Record<string, string>)[named] || named[0].toUpperCase() + named.slice(1) : null;
+      const m = mins(s.time);
+      const window: Record<string, [number, number, string]> = { Breakfast: [300, 659, '08:00'], Lunch: [660, 959, '12:30'], Dinner: [990, 1319, '18:30'], Snack: [0, 1440, '15:30'] };
+      if (slot && m != null && (m < window[slot][0] || m > window[slot][1])) { note(s, 'no_time', `Moved into the ${slot.toLowerCase()} window`); s.time = window[slot][2]; }
+      s.mealSlot = (slot || (m == null ? null : m < 660 ? 'Breakfast' : m < 960 ? 'Lunch' : 'Dinner')) as RuleStep['mealSlot'];
       continue;
     }
     // 5. Vague practice → concrete linked activity.
@@ -171,6 +180,7 @@ export function enforceProtocolRules<T extends RuleStep>(steps: T[]): T[] {
       note(s, 'no_time', `No time given — placed at ${s.time}`);
     }
   }
+  for (const s of out) if (isMeal(s) && s.kind !== 'rule' && !s.mealSlot && s.time) { const m = mins(s.time)!; s.mealSlot = m < 660 ? 'Breakfast' : m < 960 ? 'Lunch' : 'Dinner'; }
   for (const s of out) { s.dos = Array.from(new Set(s.dos)); s.donts = Array.from(new Set(s.donts)); }
   return out;
 }

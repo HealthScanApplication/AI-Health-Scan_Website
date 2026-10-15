@@ -48,6 +48,7 @@ export interface PlanItem {
   kind?: 'action' | 'rule';
   /** For rules: the list it governs (Drinks / Consume / Supplements / general). */
   ruleGroup?: RuleGroup;
+  mealSlot?: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
   anchor?: 'wake' | 'bedtime' | 'before_meal' | 'after_meal' | null;
   offsetMinutes?: number | null;
   issues?: RuleIssue[];
@@ -472,7 +473,7 @@ export async function applyEventPlan(accessToken: string, protocolId: string, pl
     const kidCount = it.dos.length + it.donts.length + it.subtasks.length;
     const parent = await createProtocolItem(accessToken, {
       protocol_id: protocolId, display_name: it.title, kind: 'action', scope: null, item_type,
-      scheduled_time: it.time ? `${it.time}:00` : null, duration_minutes: it.durationMinutes, group_name: it.group === 'beauty' ? 'Beauty' : null,
+      scheduled_time: it.time ? `${it.time}:00` : null, duration_minutes: it.durationMinutes, group_name: it.mealSlot || (it.group === 'beauty' ? 'Beauty' : null),
       day_number: 1, sort_order: startSort + index + 1, parent_protocol_item_id: null, has_children: kidCount > 0,
       category: CATEGORY[it.group], subtype: SUBTYPE[it.group], hidden: false, enabled: true, notes: it.notes,
       ...window(it), ...link,

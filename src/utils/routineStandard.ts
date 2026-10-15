@@ -21,7 +21,7 @@ export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export interface Row {
   id: string; protocol_id?: string; display_name: string | null; kind?: string | null; category?: string | null; subtype?: string | null;
-  item_type?: string | null; scope?: string | null; scheduled_time?: string | null; duration_minutes?: number | null; notes?: string | null;
+  item_type?: string | null; scope?: string | null; group_name?: string | null; scheduled_time?: string | null; duration_minutes?: number | null; notes?: string | null;
   parent_protocol_item_id?: string | null; hidden?: boolean | null; sort_order?: number | null; day_number?: number | null;
   recurrence_start_date?: string | null; recurrence_end_date?: string | null;
   sets?: number | null; reps?: number | null; rounds?: number | null; work_seconds?: number | null; rest_seconds?: number | null;
@@ -54,6 +54,30 @@ export function mealSlotFor(time?: string | null): MealSlot {
   const m = hhmm(time) ?? 720;
   return m < 11 * 60 ? 'breakfast' : m < 16 * 60 ? 'lunch' : 'dinner';
 }
+
+/** Slot windows: the slot sets the time. Default times are used when a meal sits outside its slot. */
+export const SLOT_WINDOW: Record<MealSlot, { from: number; to: number; default: string }> = {
+  breakfast: { from: 5 * 60, to: 10 * 60 + 59, default: '08:00:00' },
+  lunch: { from: 11 * 60, to: 15 * 60 + 59, default: '12:30:00' },
+  dinner: { from: 16 * 60 + 30, to: 21 * 60 + 59, default: '18:30:00' },
+  snack: { from: 0, to: 24 * 60, default: '15:30:00' },
+};
+export const SLOT_TITLE: Record<MealSlot, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+/** A slot named in the title ("Kitchari Lunch Bowl", "Post-workout snack") wins over the clock. */
+export function slotFromTitle(title: string): MealSlot | null {
+  const m = /\b(breakfast|brunch|lunch|dinner|supper|snack)\b/i.exec(title);
+  if (!m) return null;
+  const w = m[1].toLowerCase();
+  return w === 'brunch' ? 'breakfast' : w === 'supper' ? 'dinner' : (w as MealSlot);
+}
+export function slotFromGroupName(groupName?: string | null): MealSlot | null {
+  return groupName ? slotFromTitle(groupName) : null;
+}
+// Group labels that only say "when" or "food" (the day part comes from the time anyway) — replaced by the slot.
+// Anything else ("Recovery", "Cleanse", "PAGG Supplement Stack") is the Guardian's own section: kept and flagged.
+const GENERIC_WORDS = new Set('consume consumption food foods meal meals nutrition drink drinks beverage beverages supplement supplements eat eating hydration nourishment fuel feed morning midday afternoon evening night daily all day schedule rhythm essentials hourly and'.split(' '));
+const GENERIC_GROUP = { test: (name: string) => name.toLowerCase().replace(/[&()\-–—,/]/g, ' ').split(/\s+/).filter(Boolean).every((w) => GENERIC_WORDS.has(w)) };
+const inSlot = (slot: MealSlot, min: number | null) => min != null && min >= SLOT_WINDOW[slot].from && min <= SLOT_WINDOW[slot].to;
 /** "Oats with green tea" → { meal: "Oats", drink: "Green tea" }. */
 export function splitMealDrink(title: string): { meal: string; drink: string | null } {
   const m = /^(.+?)\s+(?:with|and|\+|&)\s+(.+)$/i.exec(title.trim());
@@ -183,6 +207,51 @@ export function standardiseProtocol(rows: Row[], mode: Mode = 'cleanup'): Change
     changes.push({ item_id: `rule:${r.id}`, action: 'insert', reason: host ? 'Attached to the item it governs' : groupFields ? `Group rule on ${group === 'drinks' ? 'Drinks' : group === 'consume' ? 'Consume' : 'Supplements'} for the day` : 'Top-level rule for the day', insert: { parent_ref: host || undefined, display_name: t, kind: /^(avoid|no|don'?t|do not|never|skip)\b/i.test(t) ? 'rule_dont' : 'rule_do', notes: r.notes || '', ...(groupFields ? { scope: groupFields.scope, subtype: groupFields.subtype, category: groupFields.category } : {}) } });
   }
 
+  // Meals live in their consume slot (Breakfast / Lunch / Dinner / Snack), meal and drinks as separate items.
+  // The slot is group_name (mobile reads it via domainMealSlotName). The slot sets the time window.
+  const isConsumeRow = (r: Row) => r.category === 'consume' || ['meal', 'snack', 'drink', 'beverage'].includes(r.subtype || '');
+  for (const r of tops) {
+    const t = r.display_name || '';
+    if (isCalendarEntry(t) || isRuleLikeTitle(t) || r.category === 'sleep') continue;
+    const linkedFood = Boolean(r.catalog_recipe_id || r.catalog_ingredient_id);
+    // A meal filed under Wellness / Fitness / … (linked to a recipe, or named for a slot) moves to Consume.
+    const supplementOrActivity = r.category === 'supplement' || r.item_type === 'supplement' || r.item_type === 'product' || Boolean(r.supplement_id || r.catalog_product_id || r.catalog_activity_id);
+    if (!isConsumeRow(r) && !supplementOrActivity && (linkedFood || (slotFromTitle(t) && !/\b(walk|workout|run|meditat|stretch|after|movement|exercise)\b/i.test(t)))) {
+      changes.push({ item_id: r.id, action: 'update', field: 'category', from: r.category, to: 'consume', reason: 'Meal filed outside Consume' });
+      changes.push({ item_id: r.id, action: 'update', field: 'subtype', from: r.subtype, to: consumeKind(t) === 'drink' ? 'drink' : 'meal', reason: 'Meal filed outside Consume' });
+    }
+  }
+  const consumeRows = tops.filter((r) => (isConsumeRow(r) || r.catalog_recipe_id || r.catalog_ingredient_id) && r.category !== 'sleep' && !isCalendarEntry(r.display_name || '') && !isRuleLikeTitle(r.display_name || ''));
+  // Every meal of a day at one time = the times were never set: spread them by slot order.
+  const byDay = new Map<string, Row[]>();
+  for (const r of consumeRows) if (consumeKind(r.display_name || '') !== 'drink') byDay.set(`${r.day_number ?? ''}|${r.recurrence_start_date ?? ''}`, [...(byDay.get(`${r.day_number ?? ''}|${r.recurrence_start_date ?? ''}`) || []), r]);
+  const spread = new Set<string>();
+  for (const meals of byDay.values()) {
+    if (meals.length < 3 || new Set(meals.map((m) => m.scheduled_time || '')).size > 1) continue;
+    const order = [...meals].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const slots: MealSlot[] = order.length === 3 ? ['breakfast', 'lunch', 'dinner'] : ['breakfast', 'lunch', 'snack', 'dinner', 'snack', 'snack'];
+    order.forEach((m, i) => {
+      const slot = slotFromTitle(m.display_name || '') || slots[Math.min(i, slots.length - 1)];
+      spread.add(m.id);
+      changes.push({ item_id: m.id, action: 'update', field: 'scheduled_time', from: m.scheduled_time, to: SLOT_WINDOW[slot].default, reason: `All meals shared ${String(m.scheduled_time || 'no time').slice(0, 5)} — spread by slot` });
+      if (slotFromGroupName(m.group_name) !== slot && (!m.group_name || GENERIC_GROUP.test(m.group_name.trim()) || slotFromGroupName(m.group_name))) changes.push({ item_id: m.id, action: 'update', field: 'group_name', from: m.group_name, to: SLOT_TITLE[slot], reason: `${SLOT_TITLE[slot]} slot` });
+    });
+  }
+  for (const r of consumeRows) {
+    if (spread.has(r.id)) continue;
+    const t = r.display_name || '';
+    const min = hhmm(r.scheduled_time);
+    const named = slotFromTitle(t);
+    const slot: MealSlot = named || slotFromGroupName(r.group_name) || mealSlotFor(r.scheduled_time);
+    // "Kitchari Lunch Bowl" at 08:00: the title's slot wins; move it into the lunch window.
+    if (named && min != null && !inSlot(named, min)) changes.push({ item_id: r.id, action: 'update', field: 'scheduled_time', from: r.scheduled_time, to: SLOT_WINDOW[named].default, reason: `“${t}” is a ${named} but was at ${String(r.scheduled_time).slice(0, 5)}` });
+    if (slotFromGroupName(r.group_name) !== slot) {
+      // Generic labels ("Consume", "Supplement", "Meals") are replaced by the slot; a Guardian's own section name is kept and flagged.
+      if (!r.group_name || GENERIC_GROUP.test(r.group_name.trim()) || slotFromGroupName(r.group_name)) changes.push({ item_id: r.id, action: 'update', field: 'group_name', from: r.group_name, to: SLOT_TITLE[slot], reason: r.group_name ? `Slot mismatch: ${r.group_name} → ${SLOT_TITLE[slot]}` : `${SLOT_TITLE[slot]} slot` });
+      else changes.push({ item_id: r.id, action: 'flag', field: 'group_name', from: r.group_name, reason: `Custom group “${r.group_name}” — proposed slot ${SLOT_TITLE[slot]}` });
+    }
+  }
+
   // Meals and drinks.
   for (const r of tops) {
     const t = r.display_name || '';
@@ -206,7 +275,7 @@ export function standardiseProtocol(rows: Row[], mode: Mode = 'cleanup'): Change
     const { meal, drink } = splitMealDrink(t);
     const dish = mealTitle(meal);
     if (dish !== t) rename(r, dish, drink ? 'Meal title without the drink' : 'Meal = dish name');
-    if (drink) changes.push({ item_id: `drink:${r.id}`, action: 'insert', reason: 'Drink split out of the meal title', insert: { display_name: drink, category: 'consume', subtype: 'drink', kind: 'action', scheduled_time: r.scheduled_time } });
+    if (drink) changes.push({ item_id: `drink:${r.id}`, action: 'insert', reason: 'Drink split out of the meal title', insert: { display_name: drink, category: 'consume', subtype: 'drink', kind: 'action', scheduled_time: r.scheduled_time, group_name: SLOT_TITLE[slotFromTitle(t) || slotFromGroupName(r.group_name) || mealSlotFor(r.scheduled_time)] } });
   }
 
   // Sets: repeated titles in a row → numbered rounds; untimed duplicates of timed items → hide.

@@ -54,6 +54,71 @@ describe('meal names', () => {
   });
 });
 
+describe('meal slots (Breakfast / Lunch / Dinner / Snack)', () => {
+  const field = (cs: ReturnType<typeof changesFor>, id: string, f: string) => cs.find((c) => c.item_id === id && c.field === f)?.to;
+  it('meal and drink in the same slot get the slot as group_name, as separate items', () => {
+    const m = row({ display_name: 'Oats', category: 'consume', subtype: 'meal', scheduled_time: '08:00:00' });
+    const d = row({ display_name: 'Green tea', category: 'consume', subtype: 'drink', scheduled_time: '08:00:00' });
+    const cs = changesFor([m, d]);
+    expect(field(cs, m.id, 'group_name')).toBe('Breakfast');
+    expect(field(cs, d.id, 'group_name')).toBe('Breakfast');
+    expect(cs.some((c) => c.action === 'hide')).toBe(false);
+  });
+  it('slot mismatch: "Kitchari Lunch Bowl" saved as breakfast at 08:00 moves to Lunch 12:30', () => {
+    const m = row({ display_name: 'Kitchari Lunch Bowl', category: 'consume', subtype: 'meal', scheduled_time: '08:00:00', group_name: 'Breakfast' });
+    const cs = changesFor([m]);
+    expect(field(cs, m.id, 'scheduled_time')).toBe('12:30:00');
+    expect(field(cs, m.id, 'group_name')).toBe('Lunch');
+  });
+  it('a meal filed under Wellness moves to Consume', () => {
+    const m = row({ display_name: 'Lentil dinner', category: 'do', subtype: 'wellness', scheduled_time: '18:30:00' });
+    const linked = row({ display_name: 'Golden milk', category: 'do', subtype: 'wellness', scheduled_time: '21:00:00', catalog_recipe_id: 'r1' });
+    const walk = row({ display_name: 'Walk after dinner', category: 'do', subtype: 'exercise', scheduled_time: '19:30:00' });
+    const cs = changesFor([m, linked, walk]);
+    expect(field(cs, m.id, 'category')).toBe('consume');
+    expect(field(cs, linked.id, 'subtype')).toBe('meal');
+    expect(field(cs, walk.id, 'category')).toBeUndefined();
+  });
+  it('supplements and activities named "snack" are not meals; custom group names are flagged, not overwritten', () => {
+    const sup = row({ display_name: 'Ashwagandha', category: 'do', subtype: 'wellness', item_type: 'supplement', scheduled_time: '08:00:00', catalog_ingredient_id: 'i1' });
+    const mv = row({ display_name: 'Movement Snack', category: 'do', subtype: 'exercise', scheduled_time: '10:00:00' });
+    const custom = row({ display_name: 'Pre-bed protein', category: 'consume', subtype: 'meal', scheduled_time: '21:00:00', group_name: 'Nutrition Protocol' });
+    const generic = row({ display_name: 'Warm lemon water', category: 'consume', subtype: 'drink', scheduled_time: '07:00:00', group_name: 'Consume' });
+    const cs = changesFor([sup, mv, custom, generic]);
+    expect(field(cs, sup.id, 'category')).toBeUndefined();
+    expect(field(cs, mv.id, 'category')).toBeUndefined();
+    expect(cs.find((c) => c.item_id === custom.id && c.field === 'group_name')?.action).toBe('flag');
+    expect(field(cs, generic.id, 'group_name')).toBe('Breakfast');
+    const dayPart = row({ display_name: 'Oats', category: 'consume', subtype: 'meal', scheduled_time: '08:00:00', group_name: 'Morning Hydration & Nutrition' });
+    const own = row({ display_name: 'Oats', category: 'consume', subtype: 'meal', scheduled_time: '08:00:00', group_name: 'PAGG Supplement Stack' });
+    const cs2 = changesFor([dayPart, own]);
+    expect(field(cs2, dayPart.id, 'group_name')).toBe('Breakfast');
+    expect(cs2.find((c) => c.item_id === own.id && c.field === 'group_name')?.action).toBe('flag');
+  });
+  it('every meal sharing one time is spread by slot', () => {
+    const ms = ['Porridge', 'Soup', 'Stew'].map((t, i) => row({ display_name: t, category: 'consume', subtype: 'meal', scheduled_time: '08:00:00', sort_order: i, day_number: 1 }));
+    const cs = changesFor(ms);
+    expect(ms.map((m) => field(cs, m.id, 'scheduled_time'))).toEqual(['08:00:00', '12:30:00', '18:30:00']);
+    expect(ms.map((m) => field(cs, m.id, 'group_name'))).toEqual(['Breakfast', 'Lunch', 'Dinner']);
+  });
+  it('a split-out drink lands in the meal\'s slot', () => {
+    const m = row({ display_name: 'Oats with green tea', category: 'consume', subtype: 'meal', scheduled_time: '08:00:00' });
+    expect(changesFor([m]).find((c) => c.insert?.subtype === 'drink')?.insert?.group_name).toBe('Breakfast');
+  });
+  it('checker (new Protocols): meals get their slot; a titled slot wins over the clock', () => {
+    const out = enforceProtocolRules([
+      { title: 'Eat kitchari lunch bowl', group: 'meal', time: '08:00', notes: '', dos: [], donts: [] },
+      { title: 'Oats', group: 'meal', time: '07:30', notes: '', dos: [], donts: [] },
+      { title: 'Green tea', group: 'meal', time: '07:30', notes: '', dos: [], donts: [] },
+      { title: 'Stew', group: 'meal', time: '19:00', notes: '', dos: [], donts: [] },
+    ]);
+    expect(out.find((s) => s.title === 'Kitchari lunch bowl')).toMatchObject({ mealSlot: 'Lunch', time: '12:30' });
+    expect(out.find((s) => s.title === 'Oats')!.mealSlot).toBe('Breakfast');
+    expect(out.find((s) => s.title === 'Green tea')!.mealSlot).toBe('Breakfast');
+    expect(out.find((s) => s.title === 'Stew')!.mealSlot).toBe('Dinner');
+  });
+});
+
 describe('sleep anchors', () => {
   it('renames Wake / Sleep and folds duplicates as rules', () => {
     const w = row({ display_name: 'Wake', category: 'sleep', scheduled_time: '06:00:00' });

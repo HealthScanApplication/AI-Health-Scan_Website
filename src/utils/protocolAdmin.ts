@@ -116,6 +116,7 @@ export interface AIProtocolDraft {
     /** 'rule' = top-level do/don't rows for that day (Rules & Avoidances), no time. */
     kind?: 'action' | 'rule';
     ruleGroup?: RuleGroup;
+    mealSlot?: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
     issues?: RuleIssue[];
   }[];
 }
@@ -168,7 +169,7 @@ export function foldSleepSteps(steps: DraftStep[]): DraftStep[] {
 /** Saves a ruled draft step: the action (or top-level rule rows) plus its rule_do / rule_dont children. */
 export async function saveDraftStep(accessToken: string, protocolId: string, step: DraftStep, sortOrder: number, parentId?: string): Promise<AdminProtocolItem | null> {
   const subtype = step.category === 'sleep' ? 'sleep' : step.category === 'consume' ? 'meal' : step.category === 'supplement' ? 'supplement' : 'wellness';
-  const base = { protocol_id: protocolId, scope: null, group_name: null, day_number: step.day_number || 1, category: step.category, subtype, hidden: false, enabled: true, recurrence_type: 'daily' };
+  const base = { protocol_id: protocolId, scope: null, group_name: step.mealSlot || null, day_number: step.day_number || 1, category: step.category, subtype, hidden: false, enabled: true, recurrence_type: 'daily' };
   const itemType = step.category === 'consume' ? 'consume' : step.category === 'supplement' ? 'supplement' : 'activity';
   let parent: AdminProtocolItem | null = null;
   if (step.kind === 'rule') {
