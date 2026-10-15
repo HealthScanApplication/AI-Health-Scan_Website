@@ -961,8 +961,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
         </div>
         <div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, alignSelf: 'stretch', justifyContent: 'center', padding: '24px 22px 20px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {state === 'done' ? <>
-            <span style={{ width: 52, height: 52, margin: '0 auto 4px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={24} /></span>
-            <a href={entry.booking_url || APP_STORE_URL} style={{ ...appButton, borderRadius: 12, background: APP.text, textDecoration: 'none', fontSize: 16, fontWeight: 600 }}>Open your free routine</a>
+            {!nextPaid && <span style={{ width: 52, height: 52, margin: '0 auto 4px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={24} /></span>}
             {nextPaid && <div style={{ border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', textAlign: 'center' }}>
               <div style={{ background: APP.greenSoft, color: '#000', padding: '7px 0', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase' }}>Ready to go further? · {price(nextPaid)}</div>
               <div style={{ padding: '12px 14px 14px' }}>
@@ -987,6 +986,14 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
           </form>}
         </div>
       </div>
+      {/* Delivery card, same as the builder preview: status left, ways to open it right. */}
+      {state === 'done' && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', maxWidth: 880, margin: '16px auto 0', boxSizing: 'border-box', padding: '16px 18px', background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 16, fontFamily: APP.font, color: APP.text }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}><span style={{ width: 32, height: 32, flex: '0 0 32px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={16} strokeWidth={2.5} /></span><span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{entry.title} is ready</strong><span style={{ color: APP.muted, fontSize: 12 }}>Sent to {form.email}</span></span></span>
+        <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/^https?:\/\//.test(entry.file_path || '') && <a href={entry.file_path!} target="_blank" rel="noopener noreferrer" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: `1px solid ${APP.border}`, background: APP.alt, color: APP.text }}><Download size={16} />PDF</a>}
+          <a href={entry.booking_url || APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Open in ROUTINE³" style={{ height: 44, padding: '0 16px', borderRadius: 12, fontFamily: APP.font, fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box', border: 0, background: '#000', color: '#FFF' }}>Open in <RoutineMark size={20} textColor="#FFFFFF" hairline="rgba(255,255,255,.7)" suffix="" /></a>
+        </span>
+      </div>}
       {reviews.length > 0 && <div style={{ maxWidth: 880, margin: '24px auto 0', paddingTop: 20, borderTop: '1px solid rgba(17,24,39,.14)' }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
     </section>}
     <footer style={{ padding: `28px ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)', color: '#66645F', fontSize: 11, lineHeight: 1.6 }}>
