@@ -861,7 +861,16 @@ const productArt = (kind?: string): TagArt | undefined => kind ? (offerTypeArt a
 function ProductCard({ kind, eyebrow, title, copy, price, name, avatarUrl, accent, cta = 'View', href, onClick }: { kind?: string; eyebrow?: string; title: string; copy?: string; price?: string; name: string; avatarUrl?: string | null; accent: string; cta?: string; href?: string; onClick?: () => void }) {
   const art = productArt(kind);
   const stars = kind && kind in offerValueScores ? offerValueScores[kind as UpsellKind] : 2;
-  return <div style={{ border: '1px solid rgba(17,18,15,.16)', borderRadius: 5, background: 'rgba(255,255,255,.95)', boxShadow: '0 10px 28px rgba(17,18,15,.09)', overflow: 'hidden', position: 'relative', textAlign: 'left', color: '#11120F' }}>
+  // Self-contained tilt + cursor glow so it works on the public page too (no parent handler there).
+  const [tilt, setTilt] = useState({ x: 0, y: 0, gx: 50, gy: 50, on: false });
+  const move = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
+    const b = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - b.left) / b.width; const y = (event.clientY - b.top) / b.height;
+    setTilt({ x: (.5 - y) * 8, y: (x - .5) * 10, gx: x * 100, gy: y * 100, on: true });
+  };
+  return <div onPointerMove={move} onPointerLeave={() => setTilt({ x: 0, y: 0, gx: 50, gy: 50, on: false })} style={{ border: `1px solid ${tilt.on ? accent : 'rgba(17,18,15,.16)'}`, borderRadius: 5, background: 'rgba(255,255,255,.95)', boxShadow: tilt.on ? `0 18px 44px rgba(17,18,15,.16), 0 0 0 1px ${accent}, 0 0 28px ${accent}55` : '0 10px 28px rgba(17,18,15,.09)', overflow: 'hidden', position: 'relative', textAlign: 'left', color: '#11120F', transform: `perspective(900px) rotateX(${tilt.x.toFixed(2)}deg) rotateY(${tilt.y.toFixed(2)}deg)${tilt.on ? ' translateY(-2px)' : ''}`, transition: tilt.on ? 'box-shadow 180ms ease, border-color 180ms ease' : 'transform 260ms ease, box-shadow 220ms ease, border-color 220ms ease', willChange: 'transform' }}>
+    <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none', opacity: tilt.on ? 1 : 0, transition: 'opacity 200ms ease', background: `radial-gradient(260px circle at ${tilt.gx}% ${tilt.gy}%, rgba(255,255,255,.55), ${accent}1f 40%, transparent 70%)`, mixBlendMode: 'soft-light' }} />
     {price && <span style={{ position: 'absolute', top: 10, right: 10, background: '#11120F', color: '#FFF', padding: '6px 10px', fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{price}</span>}
     {art && <div style={{ height: 112, display: 'grid', placeItems: 'end center', paddingBottom: 10, borderBottom: '1px solid rgba(17,18,15,.12)', background: 'rgba(17,18,15,.03)' }}>{kind === 'routine' ? <img src="/images/guides/generated/r3-protocol-card.png" alt="" style={{ width: 80, height: 80, objectFit: 'contain' }} /> : <span aria-hidden="true" style={{ width: 72 * art.cellAspect, height: 72, backgroundImage: `url(${art.src})`, backgroundRepeat: 'no-repeat', backgroundSize: `${art.cols * 100}% ${art.rows * 100}%`, backgroundPosition: `${(art.index % art.cols) * 100 / Math.max(1, art.cols - 1)}% ${Math.floor(art.index / art.cols) * 100 / Math.max(1, art.rows - 1)}%`, filter: 'grayscale(1) contrast(.95) invert(.88)' }} />}</div>}
     <div style={{ padding: '16px 18px 18px' }}>
