@@ -20,6 +20,7 @@ export interface RuleIssue { code: 'no_time' | 'vague' | 'not_verb' | 'renamed' 
 export const END_SLEEP = 'End Sleep';
 export const START_SLEEP = 'Start Sleep';
 const WAKE_RE = /^(wake|end[\s-]?sleep|rise|get[\s-]?up|morning[\s-]?wake)\b/i;
+const PLAIN_BEDTIME = /^(start[\s-]?sleep|bed(time)?|go to (bed|sleep)|sleep|lights[\s-]?out|time for bed)$/i;
 export const isWakeTitle = (t: string) => WAKE_RE.test(t.trim());
 
 const MEAL_VERB = /^(eat|have|enjoy|drink|cook|prepare|make|sip|take)\s+(a |an |some |your )?/i;
@@ -88,7 +89,11 @@ export function enforceProtocolRules<T extends RuleStep>(steps: T[]): T[] {
     for (const s of rest) if (s !== bed) { bed!.dos.push(s.title); if (s.notes) bed!.notes = [bed!.notes, s.notes].filter(Boolean).join(' '); }
     out = out.filter((s) => !(rest.includes(s) && s !== bed));
     if (wake && wake.title !== END_SLEEP) { note(wake, 'renamed', `Renamed from “${wake.title}”`); wake.title = END_SLEEP; }
-    if (bed && bed.title !== START_SLEEP) { note(bed, 'renamed', `Renamed from “${bed.title}”`); bed.title = START_SLEEP; }
+    if (bed && bed.title !== START_SLEEP) {
+      // "Sleep in complete darkness" as the only bedtime item: keep its advice as a do on Start Sleep.
+      if (!PLAIN_BEDTIME.test(bed.title.trim())) bed.dos.unshift(bed.title);
+      note(bed, 'renamed', `Renamed from “${bed.title}”`); bed.title = START_SLEEP;
+    }
   }
 
   for (const s of out) {
