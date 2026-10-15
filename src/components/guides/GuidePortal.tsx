@@ -1909,7 +1909,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
     const total = live ? Math.round(amount * (1 - COUPON_RATE) * 100) / 100 : amount;
     const benefits = (offer.meta.split(' · ').slice(1).join(' · ') || 'Personal plan').split(/ \+ |, /).filter(Boolean).slice(0, 4);
     return <div style={{ width: '100%', maxWidth: 880, margin: '0 auto', background: APP.bg, borderRadius: 24, overflow: 'hidden', fontFamily: APP.font, color: APP.text, textAlign: 'center', boxShadow: '0 20px 50px rgba(17,24,39,.18)', position: 'relative' }}>
-      <button type="button" aria-label="No thanks" onClick={onNo} style={{ position: 'absolute', top: 16, right: 16, width: 36, height: 36, border: 0, background: 'transparent', color: APP.text, fontSize: 22, cursor: 'pointer' }}>×</button>
+      <button type="button" aria-label="No thanks" onClick={onNo} style={{ position: 'absolute', zIndex: 2, top: 22, right: 22, width: 36, height: 36, border: 0, background: 'transparent', color: APP.text, fontSize: 22, cursor: 'pointer' }}>×</button>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}><div style={{ flex: '1 1 340px', minWidth: 0, padding: '44px 24px 16px', display: 'grid', alignContent: 'center' }}>
         {offer.video ? <video src={offer.video} controls playsInline style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 12, background: '#000', marginBottom: 12 }} /> : <AppOfferImage kind={offer.kind} size={80} />}
         <div style={{ color: APP.greenDark, fontSize: 18, fontWeight: 600, margin: '10px 0 8px' }}>{live ? 'Your next step · 30% off' : 'Your next step'}</div>
@@ -1917,7 +1917,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
         <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: '0 0 14px' }}>{offer.value}</p>
         <div style={{ textAlign: 'left', margin: '14px 0 4px' }}>{benefits.map((b) => <div key={b} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{b}</div>)}</div>
       </div>
-      <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 14, margin: '56px 16px 16px', padding: '22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)' }}>
+      <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', gap: 14, margin: 16, padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)' }}>
         <div style={{ position: 'relative', background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)', textAlign: 'center' }}>
           <div style={{ background: APP.greenSoft, color: '#000', padding: '8px 0', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase' }}>{live ? `30% off · ends in ${String(Math.floor(funnelTimerSeconds / 60)).padStart(2, '0')}:${String(funnelTimerSeconds % 60).padStart(2, '0')}` : 'One-time offer'}</div>
           <div style={{ padding: '14px 16px 16px' }}>
@@ -1926,7 +1926,8 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             <div style={{ color: APP.muted, fontSize: 11 }}>{live && amount ? `with code ${couponCode}` : 'One-time'}</div>
           </div>
         </div>
-      <div>
+      {/* CTA, No thanks and terms sit at the bottom of the panel; the price box stays on top. */}
+      <div style={{ marginTop: 'auto', paddingTop: 8 }}>
         <button type="button" onClick={onYes} style={appButton}><span style={{ fontSize: 16, fontWeight: 600 }}>Add to my order{live && amount ? <> · <span style={{ color: APP.green }}>30% off</span></> : null}</span><span style={{ fontSize: 11, color: '#D1D5DB', letterSpacing: -0.2 }}>{amount ? `${formatMoney(total, currency)} today, one click on your saved card${live ? ` · code ${couponCode}` : ''}` : 'Free'}</span></button>
         <button type="button" onClick={onNo} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
         <div style={{ color: APP.muted, fontSize: 11, marginTop: 4 }}>By adding you agree to the <span style={{ color: '#0EA5E9' }}>Terms</span> and <span style={{ color: '#0EA5E9' }}>Privacy Policy</span></div>
