@@ -851,14 +851,17 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
   const legal = <p style={{ color: APP.muted, fontSize: 11, margin: '10px 0 0', textAlign: 'center' }}>Payments are processed securely by Stripe. By paying you agree to the <span style={{ color: '#0EA5E9' }}>Terms</span> and <span style={{ color: '#0EA5E9' }}>Privacy Policy</span>.</p>;
   const upsellPrice = upsell ? (seconds ? Math.round(upsell.price_cents * (1 - COUPON_RATE)) : upsell.price_cents) : 0;
   return <div role="dialog" aria-modal="true" aria-label="Checkout" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(17,24,39,.55)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
-    <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 440, background: APP.bg, color: APP.text, fontFamily: APP.font, borderRadius: 24, overflow: 'hidden', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.3)' }}>
-      <button type="button" aria-label="Close" onClick={stage === 'upsell' ? nextUpsell : onClose} style={{ position: 'absolute', top: 14, right: 14, width: 36, height: 36, border: 0, background: 'transparent', fontSize: 22, cursor: 'pointer', color: APP.text, zIndex: 2 }}>×</button>
-      {stage === 'upsell' && upsell ? <>
-        <div style={{ padding: '44px 20px 16px' }}>
-          <AppOfferImage kind={upsell.kind} size={80} />
+    <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: stage === 'upsell' ? 880 : 440, background: APP.bg, color: APP.text, fontFamily: APP.font, borderRadius: 24, overflow: 'hidden', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.3)' }}>
+      <button type="button" aria-label="Close" onClick={stage === 'upsell' ? nextUpsell : onClose} style={{ position: 'absolute', top: stage === 'upsell' ? 22 : 14, right: stage === 'upsell' ? 22 : 14, width: 36, height: 36, border: 0, background: 'transparent', fontSize: 22, cursor: 'pointer', color: APP.text, zIndex: 2 }}>×</button>
+      {stage === 'upsell' && upsell ? <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}>
+        {/* Wide like the builder's upsell: offer on the left, price on top and CTA pinned to the bottom of the right panel. */}
+        <div style={{ flex: '1 1 340px', minWidth: 0, padding: '44px 24px 24px', display: 'grid', alignContent: 'center', justifyItems: 'center' }}>
+          <AppOfferImage kind={upsell.kind} size={96} />
           <div style={{ color: APP.greenDark, fontSize: 18, fontWeight: 600, margin: '10px 0 8px' }}>Thank you · add this to your order</div>
           <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 700, lineHeight: '34px', letterSpacing: -0.8, margin: '0 0 8px' }}>{upsell.title}</h2>
-          <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: '0 0 14px' }}>{upsell.description || 'The next step in your journey.'}</p>
+          <p style={{ color: APP.muted, fontSize: 15, fontWeight: 600, lineHeight: '19px', margin: 0 }}>{upsell.description || 'The next step in your journey.'}</p>
+        </div>
+        <div style={{ flex: '1 1 320px', minWidth: 0, margin: 16, padding: '44px 22px 22px', background: APP.surface, borderRadius: 16, boxShadow: '0 2px 8px rgba(17,24,39,.08)', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: APP.surface, border: `2px solid ${APP.green}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 4px rgba(17,24,39,.1)' }}>
             <div style={{ background: APP.greenSoft, color: '#000', padding: '8px 0', fontSize: 11, fontWeight: 600, letterSpacing: .5, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}><Clock size={12} />{seconds ? `30% off · ends in ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}` : 'Offer ended · full price'}</div>
             <div style={{ padding: '14px 16px 16px' }}>
@@ -867,13 +870,13 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose }: { offer: Gu
               <div style={{ color: APP.muted, fontSize: 11 }}>{seconds ? `with code ${code}` : 'One-time'}</div>
             </div>
           </div>
+          <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, opacity: busy ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{busy ? 'Adding…' : <>Add to my order{seconds ? <> · <span style={{ color: APP.green }}>30% off</span></> : null}</>}</span><span style={{ fontSize: 11, color: '#D1D5DB', letterSpacing: -0.2 }}>{money(upsellPrice, upsell.currency)} today, one click on the card you just used</span></button>
+            <button type="button" onClick={nextUpsell} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
+            {legal}
+          </div>
         </div>
-        <div style={{ background: APP.surface, borderRadius: '20px 20px 0 0', boxShadow: '0 -2px 8px rgba(0,0,0,.1)', padding: '16px 20px 22px' }}>
-          <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, opacity: busy ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{busy ? 'Adding…' : <>Add to my order{seconds ? <> · <span style={{ color: APP.green }}>30% off</span></> : null}</>}</span><span style={{ fontSize: 11, color: '#D1D5DB', letterSpacing: -0.2 }}>{money(upsellPrice, upsell.currency)} today, one click on the card you just used</span></button>
-          <button type="button" onClick={nextUpsell} style={{ marginTop: 10, border: 0, background: 'transparent', color: APP.muted, fontFamily: APP.font, fontSize: 12, padding: 6, cursor: 'pointer' }}>No thanks</button>
-          {legal}
-        </div>
-      </> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
+      </div> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
         <span style={{ width: 56, height: 56, margin: '0 auto 14px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={26} /></span>
         <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, margin: '0 0 4px' }}>You’re all set!</h2>
         <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 18px' }}>{message || `Receipt sent to ${email}`}</p>
