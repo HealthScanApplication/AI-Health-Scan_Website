@@ -17,6 +17,7 @@ import {
 } from './protocolAdmin';
 import type { GuideRecipe } from './guidePortal';
 import { isBedName, isWakeName } from './sleepWindow';
+import { MEAL_SLOT_DEFAULT_TIMES, mealSlotName } from '../protocolDomain/mealSlot';
 import { END_SLEEP, START_SLEEP, enforceProtocolRules, isRuleTitle, type RuleIssue, type RuleStep } from './protocolRules';
 
 const rest = () => `https://${projectId}.supabase.co/rest/v1`;
@@ -71,12 +72,91 @@ export const DIET_FRAMEWORKS: DietFramework[] = [
   { id: 'low_fodmap', label: 'Low-FODMAP', protein: 20, carbs: 48, fat: 32, flag: 'low_fodmap', note: 'Uses the low_fodmap flag; check each recipe until the catalog tags it everywhere.' },
 ];
 
+// Slot times come from the shared mealSlot defaults (Breakfast < Lunch < Snack < Dinner), like the app.
 export const MEAL_SLOTS = [
-  { id: 'breakfast', label: 'Breakfast', time: '08:00', share: 0.25 },
-  { id: 'lunch', label: 'Lunch', time: '12:30', share: 0.35 },
-  { id: 'snack', label: 'Snack', time: '15:30', share: 0.1 },
-  { id: 'dinner', label: 'Dinner', time: '18:30', share: 0.3 },
+  { id: 'breakfast', label: 'Breakfast' as const, time: MEAL_SLOT_DEFAULT_TIMES.Breakfast, share: 0.25 },
+  { id: 'lunch', label: 'Lunch' as const, time: MEAL_SLOT_DEFAULT_TIMES.Lunch, share: 0.35 },
+  { id: 'snack', label: 'Snack' as const, time: MEAL_SLOT_DEFAULT_TIMES.Snack, share: 0.1 },
+  { id: 'dinner', label: 'Dinner' as const, time: MEAL_SLOT_DEFAULT_TIMES.Dinner, share: 0.3 },
 ];
+export const DEFAULT_DRINKS: Record<string, string[]> = { breakfast: ['Water'], lunch: ['Water'], dinner: ['Water'], snack: [] };
+
+/** The slot a recipe's own name commits it to ("Kitchari Lunch Bowl" → lunch), or null when it fits any slot. */
+export function nameSlotHint(name: string): 'breakfast' | 'lunch' | 'dinner' | 'snack' | null {
+  if (/\bbreakfast\b/i.test(name)) return 'breakfast';
+  if (/\blunch\b/i.test(name)) return 'lunch';
+  if (/\b(dinner|supper)\b/i.test(name)) return 'dinner';
+  if (/\bsnack\b/i.test(name)) return 'snack';
+  return null;
+}
+export const fitsSlot = (name: string, slotId: string) => { const hint = nameSlotHint(name); return !hint || hint === slotId; };
+
+/** A consume item's slot: its own group_name when it is a meal slot, else the slot its time falls in. */
+export function slotForTime(time: string | null | undefined): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' {
+  const m = /^(\d{1,2}):(\d{2})/.exec(time || '');
+  const min = m ? Number(m[1]) * 60 + Number(m[2]) : 12 * 60;
+  if (min < 11 * 60) return 'Breakfast';
+  if (min < 15 * 60) return 'Lunch';
+  if (min < 17 * 60 + 30) return 'Snack';
+  return 'Dinner';
+}
+
+export interface PlacementItem { display_name: string | null; category: string | null; item_type: string | null; subtype?: string | null; group_name: string | null; scheduled_time?: string | null; kind?: string | null; parent_protocol_item_id?: string | null }
+export interface PlacementIssue { item: string; message: string; fix?: Partial<PlacementItem> }
+const isConsume = (it: PlacementItem) => it.category === 'consume' || it.item_type === 'recipe' || it.item_type === 'consume';
+/**
+ * Meal placement rules: every consume step sits in its Breakfast/Lunch/Dinner/Snack slot (never Wellness
+ * or another non-consume group), and a recipe named for one meal is not filed under another.
+ */
+export function mealPlacementIssues(items: PlacementItem[]): PlacementIssue[] {
+  const out: PlacementIssue[] = [];
+  for (const it of items) {
+    if ((it.kind && it.kind !== 'action') || !isConsume(it)) continue;
+    const name = it.display_name || 'Meal';
+    const slot = mealSlotName(it.group_name);
+    if (!slot) { const to = slotForTime(it.scheduled_time); out.push({ item: name, message: `${it.group_name ? `In “${it.group_name}”` : 'In no meal slot'}; belongs in ${to}`, fix: { group_name: to, category: 'consume' } }); continue; }
+    const hint = nameSlotHint(name);
+    if (hint && hint !== slot.toLowerCase() && !(hint === 'dinner' && slot === 'Dinner')) out.push({ item: name, message: `A ${hint} recipe filed under ${slot}` });
+  }
+  return out;
+}
+
+export interface SlotChild { title: string; role: 'meal' | 'drink'; recipeId: string | null; image: string | null; notes: string }
+export interface SlotPlan { key: string; day: number; slotId: string; label: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'; time: string; timingNote: string; children: SlotChild[]; dos: string[]; donts: string[] }
+
+/**
+ * The saved shape of a diet week: one slot item per day × slot (in its consume smart list), with the meal
+ * (recipe-linked, titled by the dish) and its drinks as separate checkable children. Titles and times pass
+ * through the shared item checker.
+ */
+export function planMealItems(cfg: DietConfig): SlotPlan[] {
+  const slots = MEAL_SLOTS.filter((x) => cfg.slots.includes(x.id));
+  const steps: CheckedStep[] = [];
+  const plans: SlotPlan[] = [];
+  for (const { day } of WEEK) for (const slot of slots) {
+    const pick = cfg.plan[`${day}:${slot.id}`];
+    if (!pick) continue;
+    const key = `${day}:${slot.id}`;
+    const t = mealTiming(cfg, slot.id);
+    const rules = splitRules(cfg.mealRules?.[slot.id] || []);
+    const nut = pick.nutrition;
+    steps.push({ key: `${key}:meal`, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
+    const drinks = cfg.drinks?.[slot.id] ?? DEFAULT_DRINKS[slot.id] ?? [];
+    drinks.forEach((d, i) => steps.push({ key: `${key}:drink:${i}`, title: d, group: 'meal', time: resolveTiming(t), notes: '', dos: [], donts: [], windowKey: String(day) }));
+    plans.push({ key, day, slotId: slot.id, label: slot.label, time: resolveTiming(t), timingNote: t.anchor !== 'clock' ? describeTiming(t) : '', dos: [], donts: [], children: [
+      { title: pick.name, role: 'meal', recipeId: pick.source === 'catalog' ? pick.id : null, image: pick.image,
+        notes: nut ? `${Math.round(nut.energy_kcal)} kcal · P ${Math.round(nut.protein_g)} g · C ${Math.round(nut.carbohydrates_g)} g · F ${Math.round(nut.fats_g)} g per serving${pick.source === 'guide' ? ' · Guardian recipe' : ''}` : '' },
+      ...drinks.map((d) => ({ title: d, role: 'drink' as const, recipeId: null, image: null, notes: '' })),
+    ] });
+  }
+  const checked = new Map(enforceProtocolRules(steps).map((x) => [x.key, x]));
+  for (const plan of plans) {
+    const meal = checked.get(`${plan.key}:meal`);
+    if (meal) { plan.children[0].title = meal.title; plan.time = meal.time || plan.time; plan.dos = meal.dos; plan.donts = meal.donts; }
+    plan.children.slice(1).forEach((c, i) => { const d = checked.get(`${plan.key}:drink:${i}`); if (d) c.title = d.title; });
+  }
+  return plans;
+}
 
 export interface DietConfig {
   framework: string;
@@ -85,6 +165,7 @@ export interface DietConfig {
   slots: string[];
   plan: Record<string, MealPick | null>; // key `${day}:${slot}`
   timing?: Record<string, Timing>;         // per meal slot; default = the slot's clock time
+  drinks?: Record<string, string[]>;       // drink children per slot (default DEFAULT_DRINKS)
   rules?: string[];                        // the week's Meal group checklist (framework do's)
   mealRules?: Record<string, string[]>;    // do-checklist under every meal of that slot
 }
@@ -156,7 +237,8 @@ export async function autoFillDiet(accessToken: string, cfg: DietConfig, guideRe
   const own = guideRecipes.map(guideRecipeToPick).filter((p) => p.nutrition);
   for (const slot of slots) {
     const target = cfg.kcal * slot.share / shareTotal;
-    const pool = [...own.filter((p) => Math.abs(p.nutrition!.energy_kcal - target) / target < 0.35), ...await searchDietRecipes(accessToken, { framework, kcalTarget: target, limit: 21 })];
+    const pool = [...own.filter((p) => Math.abs(p.nutrition!.energy_kcal - target) / target < 0.35), ...await searchDietRecipes(accessToken, { framework, kcalTarget: target, limit: 40 })]
+      .filter((p) => fitsSlot(p.name, slot.id)); // never a "Lunch Bowl" at breakfast
     if (!pool.length) continue;
     WEEK.forEach(({ day }, index) => {
       const key = `${day}:${slot.id}`;
@@ -322,7 +404,9 @@ export function reviewDiet(cfg: DietConfig): Review {
     ...findConflicts(ruleRows(weekRules, 'week Meal checklist'), items),
     ...slots.flatMap((slot) => findConflicts(ruleRows(splitRules(cfg.mealRules?.[slot.id] || []), `${slot.label} checklist`), items.filter((i) => i.where.endsWith(slot.label)))),
   ];
-  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label), conflicts, weekRules };
+  const placement = mealPlacementIssues(checked.map((x) => ({ display_name: x.title, category: 'consume', item_type: 'recipe', group_name: MEAL_SLOTS.find((m) => m.id === x.key.split(':')[1])?.label || null, scheduled_time: x.time })))
+    .map((i) => ({ rule: 'Meal slots', item: i.item, where: 'Meal placement', reason: i.message }));
+  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label), conflicts: [...placement, ...conflicts], weekRules };
 }
 
 /** Every fitness session through the shared checker: verb + noun title, a time, rule children; plus flagged contradictions. */
@@ -354,7 +438,9 @@ export function reviewCombined(itemsByProtocol: { name: string; items: AdminProt
   const notes = notesOf(checked, (s) => s.key.split('|')[0]);
   const rules = itemsByProtocol.flatMap(({ name, items }) => items.filter((it) => it.kind === 'rule_dont' || it.kind === 'rule_do').map((it) => ({ text: it.display_name || '', scope: name, isDont: it.kind === 'rule_dont' || isRuleTitle(it.display_name || '') })));
   const actions = itemsByProtocol.flatMap(({ name, items }) => items.filter((it) => it.kind === 'action').map((it) => ({ title: it.display_name || '', where: name, day: it.recurrence_days_of_week?.length === 1 ? (WEEK.find((w) => w.dow === it.recurrence_days_of_week![0])?.day) : undefined, kind: (it.subtype === 'exercise' && !it.parent_protocol_item_id ? 'session' : it.category === 'consume' ? 'meal' : 'item') as 'session' | 'meal' | 'item' })));
-  return { notes, conflicts: findConflicts(rules, actions) };
+  const placement = itemsByProtocol.flatMap(({ name, items }) => mealPlacementIssues(items.filter((it) => !it.parent_protocol_item_id))
+    .map((i) => ({ where: name, message: `${i.item}: ${i.message}${i.fix ? ' (moved on combine)' : ''}` })));
+  return { notes: [...placement, ...notes], conflicts: findConflicts(rules, actions) };
 }
 
 /** Do's as checkable rule_do items: under a parent item (its do-checklist) or top-level in a group (that group's checklist). */
@@ -387,21 +473,21 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
   await clearItems(accessToken, protocol.id);
   const review = reviewDiet(cfg);
   let order = 0;
-  for (const { day } of WEEK) for (const slot of MEAL_SLOTS.filter((s) => cfg.slots.includes(s.id))) {
-    const pick = cfg.plan[`${day}:${slot.id}`];
-    const step = review.steps[`${day}:${slot.id}`];
-    if (!pick || !step) continue;
-    const nut = pick.nutrition;
-    const timing = mealTiming(cfg, slot.id);
-    const slotRules = { dos: step.dos, donts: step.donts };
-    const meal = await createProtocolItem(accessToken, {
-      protocol_id: protocol.id, display_name: step.title, kind: 'action', item_type: 'recipe', category: 'consume', subtype: 'meal',
-      group_name: slot.label, scheduled_time: hhmmss(step.time || resolveTiming(timing)), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: slotRules.dos.length + slotRules.donts.length > 0,
-      catalog_recipe_id: pick.source === 'catalog' ? pick.id : null, media_image_url: pick.image,
-      notes: nut ? `${Math.round(nut.energy_kcal)} kcal · P ${Math.round(nut.protein_g)} g · C ${Math.round(nut.carbohydrates_g)} g · F ${Math.round(nut.fats_g)} g per serving${pick.source === 'guide' ? ' · Guardian recipe' : ''}${timing.anchor !== 'clock' ? ` · ${describeTiming(timing)}` : ''}` : '',
-      ...weekly(day),
+  // Slot item (Breakfast/Lunch/Dinner/Snack smart list) → meal + drinks as checkable children, rules under the slot.
+  for (const plan of planMealItems(cfg)) {
+    const days = weekly(plan.day);
+    const slotItem = await createProtocolItem(accessToken, {
+      protocol_id: protocol.id, display_name: plan.label, kind: 'action', item_type: 'recipe', category: 'consume', subtype: plan.label === 'Snack' ? 'snack' : 'meal',
+      group_name: plan.label, scheduled_time: hhmmss(plan.time), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: true,
+      notes: plan.timingNote, ...days,
     } as Partial<AdminProtocolItem>);
-    await addRules(accessToken, protocol.id, slotRules, { parentId: meal.id, category: 'consume', days: weekly(day).recurrence_days_of_week, next: () => order++ });
+    for (const child of plan.children) await createProtocolItem(accessToken, {
+      protocol_id: protocol.id, parent_protocol_item_id: slotItem.id, display_name: child.title, kind: 'action',
+      item_type: child.role === 'meal' ? 'recipe' : 'consume', category: 'consume', subtype: child.role === 'meal' ? (plan.label === 'Snack' ? 'snack' : 'meal') : 'drink',
+      group_name: plan.label, scheduled_time: hhmmss(plan.time), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: false,
+      catalog_recipe_id: child.recipeId, media_image_url: child.image, notes: child.notes, ...days,
+    } as Partial<AdminProtocolItem>);
+    await addRules(accessToken, protocol.id, { dos: plan.dos, donts: plan.donts }, { parentId: slotItem.id, category: 'consume', days: days.recurrence_days_of_week, next: () => order++ });
   }
   await addRules(accessToken, protocol.id, review.weekRules, { group: 'Meal', category: 'consume', next: () => order++ });
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'diet', builder_config: cfg });
@@ -485,6 +571,7 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
       const created = await createProtocolItem(accessToken, {
         ...copy, protocol_id: protocol.id,
         ...(role ? { display_name: role === 'wake' ? END_SLEEP : START_SLEEP } : {}), // shared sleep names
+        ...(!it.parent_protocol_item_id ? mealPlacementIssues([it]).find((x) => x.fix)?.fix || {} : {}), // meals into their consume slot
         parent_protocol_item_id: it.parent_protocol_item_id ? idMap.get(it.parent_protocol_item_id) || null : null,
         sort_order: order++, // unique per protocol (idx_protocol_items_no_dupes includes sort_order)
       } as Partial<AdminProtocolItem>);

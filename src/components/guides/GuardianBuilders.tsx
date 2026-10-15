@@ -3,7 +3,7 @@ import { Dumbbell, Loader2, Plus, Search, Sparkles, Trash2, Utensils, Users, X, 
 import { listProtocolItems, type AdminProtocol, type AdminProtocolItem } from '../../utils/protocolAdmin';
 import type { GuideLead, GuideRecipe } from '../../utils/guidePortal';
 import {
-  DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, autoFillDiet, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
+  DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, autoFillDiet, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
   listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
@@ -128,7 +128,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
     const share = slots.reduce((sum, s) => sum + s.share, 0) || 1;
     const timer = setTimeout(() => {
       searchDietRecipes(accessToken, { framework, query, kcalTarget: slot ? cfg.kcal * slot.share / share : undefined, limit: 12 })
-        .then((hits) => setResults([...ownPicks.filter((p) => !query || p.name.toLowerCase().includes(query.toLowerCase())), ...hits]))
+        .then((hits) => { const all = [...ownPicks.filter((p) => !query || p.name.toLowerCase().includes(query.toLowerCase())), ...hits]; const slotId = picking.split(':')[1]; setResults([...all.filter((p) => fitsSlot(p.name, slotId)), ...all.filter((p) => !fitsSlot(p.name, slotId))]); })
         .catch((e) => setMessage(String(e.message || e)));
     }, 250);
     return () => clearTimeout(timer);
@@ -198,6 +198,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
     </div>
     <div style={{ ...card, marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
       <RulesEditor title="Meal checklist for the week" rules={cfg.rules || []} onChange={(rules) => setCfg((c) => ({ ...c, rules }))} placeholder={'One rule per line, e.g.\nCook with olive oil'} />
+      {slots.map((s) => <RulesEditor key={`${s.id}-drinks`} title={`${s.label} drinks`} rules={cfg.drinks?.[s.id] ?? DEFAULT_DRINKS[s.id] ?? []} onChange={(drinks) => setCfg((c) => ({ ...c, drinks: { ...c.drinks, [s.id]: drinks } }))} placeholder={'One drink per line, e.g.\nWater\nGreen tea'} />)}
       {slots.map((s) => <RulesEditor key={s.id} title={`${s.label} do-checklist`} rules={cfg.mealRules?.[s.id] || []} onChange={(rules) => setCfg((c) => ({ ...c, mealRules: { ...c.mealRules, [s.id]: rules } }))} placeholder="e.g. Chew slowly" />)}
     </div>
     {picking && <div style={{ ...card, marginTop: 14 }}>
@@ -209,7 +210,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 7 }}>
         {results.map((r) => <button key={`${r.source}-${r.id}`} type="button" onClick={() => { setPick(picking, r); setPicking(null); }} style={{ ...card, padding: 8, display: 'flex', gap: 8, textAlign: 'left', color: ink, cursor: 'pointer' }}>
           {r.image ? <img src={r.image} alt="" style={{ width: 42, height: 42, objectFit: 'cover', flex: 'none' }} /> : <div style={{ width: 42, height: 42, flex: 'none', border: `1px solid ${line}` }} />}
-          <span><span style={{ display: 'block', fontSize: 12 }}>{r.name}</span><span style={{ color: muted, fontSize: 10 }}>{r.nutrition ? `${Math.round(r.nutrition.energy_kcal)} kcal · P ${Math.round(r.nutrition.protein_g)} · C ${Math.round(r.nutrition.carbohydrates_g)} · F ${Math.round(r.nutrition.fats_g)}` : ''}{r.source === 'guide' ? ' · your recipe' : ''}</span></span>
+          <span><span style={{ display: 'block', fontSize: 12 }}>{r.name}</span><span style={{ color: muted, fontSize: 10 }}>{r.nutrition ? `${Math.round(r.nutrition.energy_kcal)} kcal · P ${Math.round(r.nutrition.protein_g)} · C ${Math.round(r.nutrition.carbohydrates_g)} · F ${Math.round(r.nutrition.fats_g)}` : ''}{r.source === 'guide' ? ' · your recipe' : ''}{!fitsSlot(r.name, picking.split(':')[1]) ? ' · named for another meal' : ''}</span></span>
         </button>)}
         {!results.length && <span style={{ color: muted, fontSize: 12 }}>No matching recipes with nutrition data.</span>}
       </div>
