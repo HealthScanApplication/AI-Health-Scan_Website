@@ -66,7 +66,7 @@ describe('diet supplements and fasting', () => {
   it('creates start and end items on the selected intermittent fasting days', () => {
     const items = dietSupportItems(diet({}, { fasting: { type: 'intermittent', start: '20:00', end: '12:00', days: [1, 3, 7] } }));
     expect(items.map((item) => [item.title, item.time, item.days])).toEqual([
-      ['Start intermittent fast', '20:00', [1, 3, 0]], ['End intermittent fast', '12:00', [1, 3, 0]],
+      ['Start intermittent fast', '20:00', [1, 3, 0]], ['End intermittent fast', '12:00', [2, 4, 1]],
     ]);
   });
   it('adds a safety note to dry fasting items', () => {

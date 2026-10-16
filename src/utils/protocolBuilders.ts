@@ -202,9 +202,10 @@ export function dietSupportItems(cfg: DietConfig): DietSupportItem[] {
   const days = [...new Set(fasting.days.filter((day) => WEEK.some((w) => w.day === day)).map((day) => WEEK.find((w) => w.day === day)!.dow))];
   if (!days.length) return supplements;
   const warning = fasting.type === 'dry' ? 'Dry fasting restricts fluids and can be dangerous. Use only with qualified medical guidance.' : '';
+  const endDays = fasting.end < fasting.start ? days.map((day) => (day + 1) % 7) : days;
   return [...supplements,
     { title: `Start ${label.toLowerCase()}`, time: fasting.start, category: 'do', itemType: 'activity', group: 'Fasting', days, notes: warning },
-    { title: `End ${label.toLowerCase()}`, time: fasting.end, category: 'do', itemType: 'activity', group: 'Fasting', days, notes: warning },
+    { title: `End ${label.toLowerCase()}`, time: fasting.end, category: 'do', itemType: 'activity', group: 'Fasting', days: endDays, notes: warning },
   ];
 }
 
