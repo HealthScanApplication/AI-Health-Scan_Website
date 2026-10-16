@@ -399,7 +399,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /* ── main editor ── */
-export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtocolId, ownerId, onSelectedChange }: {
+export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtocolId, ownerId, onSelectedChange, onCustomizeRecipe }: {
   accessToken: string;
   onOpenCatalogRecord?: (kind: CatalogKind, id: string) => void;
   /** deep-open a protocol (e.g. clicking a Protocol cell in the Kits master table) */
@@ -408,6 +408,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   ownerId?: string | null;
   /** Reports the protocol currently shown, so tools outside the editor (the AI bar) act on the same one. */
   onSelectedChange?: (id: string | null) => void;
+  onCustomizeRecipe?: (protocolId: string, itemId: string) => void;
 }) {
   const [protocols, setProtocols] = useState<AdminProtocol[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -1699,6 +1700,11 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                 <button onClick={() => setViewRec(null)} title="Close" style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, display: 'inline-flex', padding: 2 }}><X size={18} /></button>
               </div>
 
+              {viewRec.kind === 'recipe' && onCustomizeRecipe ? <div style={{ marginTop: 14 }}>
+                <strong>{viewRec.name}</strong>
+                <p style={{ fontSize: 12 }}>Customize your private copy in this Protocol.</p>
+                <button type="button" onClick={() => { if (selectedId) onCustomizeRecipe(selectedId, viewRec.itemId); setViewRec(null); }} style={{ ...inputStyle, cursor: 'pointer', padding: 10 }}>Customize recipe</button>
+              </div> : <>
               {/* edit name */}
               <div style={{ marginTop: 10 }}>
                 <label style={labelStyle}><Pencil size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />Record name</label>
@@ -1756,6 +1762,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   )}
                 </div>
               )}
+              </>}
             </div>
           </div>
         </div>

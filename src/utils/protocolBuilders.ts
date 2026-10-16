@@ -16,6 +16,7 @@ import {
   type AdminProtocol, type AdminProtocolItem,
 } from './protocolAdmin';
 import type { GuideRecipe } from './guidePortal';
+import { cloneProtocolChild, ensureGuideRecipeCatalog, syncProtocolChild } from './protocolCopies';
 import { isBedName, isWakeName } from './sleepWindow';
 import { MEAL_SLOT_DEFAULT_TIMES, mealSlotName } from '../protocolDomain/mealSlot';
 import { END_SLEEP, START_SLEEP, enforceProtocolRules, isRuleTitle, ruleGroupFor, ruleRowFields, type RuleIssue, type RuleStep } from './protocolRules';
@@ -245,6 +246,7 @@ export function guideRecipeToPick(recipe: GuideRecipe): MealPick {
 /** Catalog recipes with stored per-serving nutrition that fit the framework, sized for the slot's kcal budget. */
 export async function searchDietRecipes(accessToken: string, opts: { framework: DietFramework; query?: string; kcalTarget?: number; limit?: number }): Promise<MealPick[]> {
   const params = [
+    'is_published=eq.true',
     'select=id,name_common,image_url,nutrition_per_serving,dietary_info,health_score',
     'nutrition_per_serving=not.is.null',
     'or=(is_group.is.null,is_group.eq.false)',
@@ -606,6 +608,8 @@ async function ensureProtocol(accessToken: string, ownerId: string, existingId: 
 
 export async function saveDietProtocol(accessToken: string, ownerId: string, existingId: string | null, name: string, cfg: DietConfig) {
   assertGate(reviewDiet(cfg)); // hard gate before anything is written
+  const guideIds = [...new Set(Object.values(cfg.plan).filter((pick) => pick?.source === 'guide').map((pick) => pick!.id))];
+  const guideCatalog = new Map(await Promise.all(guideIds.map(async (id) => [id, await ensureGuideRecipeCatalog(accessToken, id)] as const)));
   const framework = DIET_FRAMEWORKS.find((f) => f.id === cfg.framework) || DIET_FRAMEWORKS[0];
   const t = macroGrams(cfg);
   const protocol = await ensureProtocol(accessToken, ownerId, existingId, name, { category: 'Nutrition', description: `${framework.label} · ${t.energy_kcal} kcal/day · P ${t.protein_g} g · C ${t.carbohydrates_g} g · F ${t.fats_g} g` });
@@ -625,7 +629,7 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
       protocol_id: protocol.id, parent_protocol_item_id: slotItem.id, display_name: child.title, kind: 'action',
       item_type: child.role === 'meal' ? 'recipe' : 'consume', category: 'consume', subtype: child.role === 'meal' ? (plan.label === 'Snack' ? 'snack' : 'meal') : 'drink',
       group_name: plan.label, scheduled_time: hhmmss(plan.time), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: false,
-      catalog_recipe_id: child.recipeId, media_image_url: child.image, notes: child.notes, ...days,
+      catalog_recipe_id: child.recipeId || (child.role === 'meal' ? guideCatalog.get(cfg.plan[plan.key]?.id || '') || null : null), media_image_url: child.image, notes: child.notes, ...days,
     } as Partial<AdminProtocolItem>);
     await addRules(accessToken, protocol.id, { dos: plan.dos, donts: plan.donts }, { parentId: slotItem.id, category: 'consume', days: days.recurrence_days_of_week, next: () => order++ });
   }
@@ -637,6 +641,7 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
   } as Partial<AdminProtocolItem>);
   await addGroupRules(accessToken, protocol.id, review.weekRules, 'meal', () => order++);
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'diet', builder_config: cfg });
+  await syncProtocolChild(accessToken, protocol.id);
   return { protocol, metaSaved: saved };
   });
 }
@@ -669,6 +674,7 @@ export async function saveFitnessProtocol(accessToken: string, ownerId: string, 
   }
   await addGroupRules(accessToken, protocol.id, review.weekRules, 'fitness', () => order++);
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'fitness', builder_config: cfg });
+  await syncProtocolChild(accessToken, protocol.id);
   return { protocol, metaSaved: saved };
   });
 }
@@ -696,6 +702,7 @@ const COPY_SKIP = new Set(['id', 'protocol_id', 'parent_protocol_item_id', 'crea
 
 /** One personal Protocol that holds a copy of every chosen protocol's steps (children keep their parent). */
 export async function combineProtocols(accessToken: string, ownerId: string, person: { name: string; lead_id?: string | null }, sources: AdminProtocol[]) {
+  const builderMeta = await listBuilderMeta(accessToken, ownerId);
   // Hard gate: the combined steps pass the shared checker (fixes applied below) or nothing is created.
   const sourceItems = await Promise.all(sources.map(async (s) => ({ name: s.name, items: await listProtocolItems(accessToken, s.id) })));
   const gate = reviewCombined(sourceItems);
@@ -710,6 +717,12 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
     : isWakeName(it.display_name || '') ? 'wake' : (it.category === 'sleep' || isBedName(it.display_name || '')) ? 'bed' : null;
   const haveSleep = new Set<string>();
   for (const source of sources) {
+    const kind = builderMeta[source.id]?.builder_kind;
+    if (kind === 'diet' || kind === 'fitness') {
+      await cloneProtocolChild(accessToken, protocol.id, source.id);
+      order = (await listProtocolItems(accessToken, protocol.id)).reduce((n, item) => Math.max(n, (item.sort_order || 0) + 1), order);
+      continue;
+    }
     const items = sourceItems[sources.indexOf(source)].items;
     const idMap = new Map<string, string>();
     const skipped = new Set<string>();
@@ -744,8 +757,8 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
 }
 
 /** The builder settings of the owner's protocols (empty when the columns are not on this database yet). */
-export async function listBuilderMeta(accessToken: string, ownerId: string): Promise<Record<string, { builder_kind: BuilderKind | null; builder_config: any }>> {
-  const res = await fetch(`${rest()}/protocols?user_id=eq.${ownerId}&builder_kind=not.is.null&select=id,builder_kind,builder_config`, { headers: headers(accessToken) });
+export async function listBuilderMeta(accessToken: string, ownerId: string): Promise<Record<string, { builder_kind: BuilderKind | null; builder_config: any; source_protocol_ids?: string[] }>> {
+  const res = await fetch(`${rest()}/protocols?user_id=eq.${ownerId}&builder_kind=not.is.null&select=id,builder_kind,builder_config,source_protocol_ids`, { headers: headers(accessToken) });
   if (!res.ok) return {};
-  return Object.fromEntries(((await res.json()) as any[]).map((r) => [r.id, { builder_kind: r.builder_kind, builder_config: r.builder_config }]));
+  return Object.fromEntries(((await res.json()) as any[]).map((r) => [r.id, { builder_kind: r.builder_kind, builder_config: r.builder_config, source_protocol_ids: r.source_protocol_ids }]));
 }

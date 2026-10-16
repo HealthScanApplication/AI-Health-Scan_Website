@@ -263,7 +263,7 @@ export function loadCandidates(accessToken: string, framework: DietFramework, on
   const key = framework.id;
   if (!cache.has(key)) cache.set(key, (async () => {
     onProgress?.('Loading recipes…');
-    const params = ['select=id,name_common,image_url,nutrition_per_serving,health_score,meal_slot,tags,servings', 'nutrition_per_serving=not.is.null',
+    const params = ['is_published=eq.true', 'select=id,name_common,image_url,nutrition_per_serving,health_score,meal_slot,tags,servings', 'nutrition_per_serving=not.is.null',
       'is_group=not.is.true', `tags=not.cs.${encodeURIComponent('{"fast food"}')}`, 'order=health_score.desc.nullslast', 'limit=600'];
     if (framework.flag) params.push(`dietary_info->>${framework.flag}=eq.true`);
     const recipes = (await get(accessToken, `catalog_recipes?${params.join('&')}`)) as any[];

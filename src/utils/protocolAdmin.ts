@@ -44,6 +44,9 @@ export interface AdminProtocol {
   profile_name?: string | null;
   profile_image_url?: string | null;
   schedule_basis?: 'calendar' | 'menstrual_cycle' | 'lunar_cycle' | null;
+  builder_kind?: 'diet' | 'fitness' | 'personal' | null;
+  builder_config?: any;
+  source_protocol_ids?: string[] | null;
 }
 
 export interface AdminProtocolItem {
@@ -90,6 +93,7 @@ export interface AdminProtocolItem {
   selected_intensity: string | null;
   filter: Record<string, unknown> | null;
   catalog_recipe_id: string | null;
+  source_child_protocol_id?: string | null;
   catalog_product_id: string | null;
   catalog_activity_id: string | null;
   catalog_ingredient_id: string | null;
@@ -472,6 +476,7 @@ async function suggestRecipesForSlot(accessToken: string, cfg: CatCfg, slotName:
   const base = descriptiveMealSlot(slotName) ?? slotName;
   const d = slotDescriptors(slotName);
   const url = `${rest()}/${cfg.table}?select=${catalogCols(cfg)}`
+    + `&is_published=eq.true`
     + `&image_url=not.is.null`
     + `&or=(is_group.is.null,is_group.eq.false)`
     + `&order=health_score.desc.nullslast`
@@ -516,6 +521,7 @@ export async function searchCatalog(accessToken: string, kind: CatalogKind, quer
     return suggestRecipesForSlot(accessToken, cfg, slotName, limit);
   }
   let url = `${rest()}/${cfg.table}?select=${catalogCols(cfg)}&limit=${limit}`;
+  if (kind === 'recipe') url += '&is_published=eq.true';
   if (q) {
     const or = cfg.nameCols.map((c) => `${c}.ilike.*${encodeURIComponent(q)}*`).join(',');
     url += `&or=(${or})`;

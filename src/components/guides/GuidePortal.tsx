@@ -9,6 +9,8 @@ import { ProtocolEditor } from '../admin/ProtocolEditor';
 import { RoutineMark } from '../Header';
 import { ContentStudio } from './ContentStudio';
 import { CombineProtocols, DietBuilder, FitnessBuilder } from './GuardianBuilders';
+import { ProtocolChildrenPanel } from './ProtocolChildrenPanel';
+import { customizeProtocolRecipe } from '../../utils/protocolCopies';
 import { ContentBuilder } from './ContentBuilder';
 import { HazardList, NutrientCoverage, RecipeFiltersPanel } from './RecipeInsights';
 import { avoidViolations, filtersToBrief, type RecipeFilters, type Tier } from '../../utils/recipeNutrients';
@@ -338,11 +340,11 @@ const nav: { id: Tab; label: string; Icon: typeof Users }[] = [
   { id: 'leads', label: 'Leads', Icon: Users },
   // One Offers section: the builder (each offer) and offer paths (funnels) are tabs inside it.
   { id: 'offer_builder', label: 'Offers', Icon: Package },
-  { id: 'recipes', label: 'Recipes', Icon: Salad },
+  { id: 'protocols', label: 'Protocols', Icon: HeartPulse },
   { id: 'diet', label: 'Diet', Icon: Utensils },
+  { id: 'recipes', label: 'Recipes', Icon: Salad },
   { id: 'fitness', label: 'Fitness', Icon: Dumbbell },
   { id: 'content', label: 'Content', Icon: Clapperboard },
-  { id: 'protocols', label: 'Protocols', Icon: HeartPulse },
   { id: 'profile', label: 'Profile', Icon: FileText },
 ];
 
@@ -3434,6 +3436,20 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
   const [routineOwners, setRoutineOwners] = useState<Map<string, { name: string; avatarUrl: string | null; relation: string | null }>>(new Map());
   const [editorProtocolId, setEditorProtocolId] = useState<string | null>(null);
   const [recipeId, setRecipeId] = useState<string | null>(null);
+  const [parentContext, setParentContext] = useState<string | null>(null);
+  const [childPlanId, setChildPlanId] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState('');
+  const refreshProtocols = () => { if (accessToken && user) return listProtocols(accessToken, user.id).then(setProtocols).catch((e) => setCopyError(e.message)); return Promise.resolve(); };
+  const returnToParent = () => { setTab('protocols'); setProtocolId(parentContext); setEditorProtocolId(null); setRecipeId(null); setChildPlanId(null); setParentContext(null); setProtocolRevision((v) => v + 1); refreshProtocols(); };
+  const customizeRecipe = async (id: string, itemId: string) => {
+    if (!accessToken) return;
+    setCopyError('');
+    try {
+      const recipe = await customizeProtocolRecipe(accessToken, id, itemId);
+      setRecipes((rows) => [recipe, ...rows.filter((r) => r.id !== recipe.id)]);
+      setParentContext(recipe.parent_protocol_id || id); setRecipeId(recipe.id); setTab('recipes'); setProtocolId(null);
+    } catch (e) { setCopyError((e as Error).message); }
+  };
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -3481,7 +3497,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
       </div>
     </header>
     <div style={{ display: 'grid', gridTemplateColumns: '210px minmax(0,1fr)', minHeight: 'calc(100vh - 63px)' }}>
-      <aside style={{ borderRight: `1px solid ${line}`, padding: '25px 14px' }}><a href="/guardians/workspace" style={{ display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 12px', marginBottom: 10, borderBottom: `1px solid ${line}`, color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>← Dashboard</a>{navItems.map(({ id, label: n, Icon }) => <button key={id} onClick={() => { setTab(id); setProtocolId(null); setRecipeId(null); }} style={{ width: '100%', height: 42, border: 0, background: (tab === id || (id === 'offer_builder' && tab === 'value_ramps')) ? '#1C1E19' : 'transparent', color: (tab === id || (id === 'offer_builder' && tab === 'value_ramps')) ? ink : muted, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', cursor: 'pointer', fontFamily: sans, fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}><Icon size={14} />{n}</button>)}</aside>
+      <aside style={{ borderRight: `1px solid ${line}`, padding: '25px 14px' }}><a href="/guardians/workspace" style={{ display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 12px', marginBottom: 10, borderBottom: `1px solid ${line}`, color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>← Dashboard</a>{navItems.map(({ id, label: n, Icon }) => <button key={id} onClick={() => { setTab(id); setProtocolId(null); setRecipeId(null); setChildPlanId(null); setParentContext(null); }} style={{ width: '100%', height: 42, border: 0, background: (tab === id || (id === 'offer_builder' && tab === 'value_ramps')) ? '#1C1E19' : 'transparent', color: (tab === id || (id === 'offer_builder' && tab === 'value_ramps')) ? ink : muted, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', paddingLeft: id === 'recipes' ? 44 : ['diet', 'fitness'].includes(id) ? 28 : 12, cursor: 'pointer', fontFamily: sans, fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}><Icon size={14} />{n}</button>)}</aside>
       <main style={{ padding: 'clamp(26px,5vw,68px)', overflow: 'hidden' }}>
         {tab === 'admin' && isAdminUser && <GuardianAdminPanel />}
         {tab === 'home' && <><div style={{ ...label, color: acid }}>Guardian workspace</div><h1 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(44px,6vw,76px)', lineHeight: .95, margin: '15px 0 18px' }}>Build what people follow.</h1><p style={{ color: muted, maxWidth: 650, lineHeight: 1.6 }}>Create reusable offers, then arrange them into as many audience-specific offer paths as you need.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', borderTop: `1px solid ${line}`, marginTop: 55 }}>{metric.map((m) => <div key={m.l} style={{ borderRight: `1px solid ${line}`, padding: '25px 18px 25px 0' }}><div style={{ fontFamily: serif, fontSize: 42 }}>{m.n}</div><div style={{ ...label, margin: '7px 0 0' }}>{m.l}</div></div>)}</div><div style={{ marginTop: 48, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 }}>{nav.slice(1,5).map(({ id, label: title }) => <button key={id} onClick={() => setTab(id)} style={{ border: `1px solid ${line}`, background: panel, color: ink, minHeight: 210, padding: 22, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}><span><img src={guidePlates[id]} alt="" style={{ width: 86, height: 86, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.75)', opacity: .82 }} /><span style={{ display: 'block', fontFamily: serif, fontSize: 25, fontWeight: 300, marginTop: 12 }}>{title}</span></span><ChevronRight size={17} color={muted} /></button>)}</div></>}
@@ -3563,10 +3579,19 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
             </>;
           })() : <Empty image={guidePlates.protocols} title="No Protocol drafts yet" copy="Build against the full Routine database with timings, quantities, linked records and PDF export." />)}</div></>}
         {tab === 'content' && <ContentBuilder profile={profile} offers={offers} protocols={protocols} recipes={recipes} />}
-        {tab === 'diet' && accessToken && user && <DietBuilder accessToken={accessToken} ownerId={user.id} protocols={protocols} recipes={recipes} onSaved={(saved) => setProtocols((current) => [saved, ...current.filter((p) => p.id !== saved.id)])} onOpen={(id) => { setTab('protocols'); setProtocolId(id); }} />}
-        {tab === 'fitness' && accessToken && user && <FitnessBuilder accessToken={accessToken} ownerId={user.id} protocols={protocols} onSaved={(saved) => setProtocols((current) => [saved, ...current.filter((p) => p.id !== saved.id)])} onOpen={(id) => { setTab('protocols'); setProtocolId(id); }} />}
+        {parentContext && <button type="button" onClick={returnToParent} style={{ ...btn, marginBottom: 16 }}>← Back to parent Protocol</button>}
+        {copyError && <p role="alert">{copyError}</p>}
+        {tab === 'diet' && accessToken && user && <DietBuilder key={childPlanId || 'diet'} initialProtocolId={childPlanId} accessToken={accessToken} ownerId={user.id} protocols={protocols} recipes={recipes} onSaved={(saved) => setProtocols((current) => [saved, ...current.filter((p) => p.id !== saved.id)])} onOpen={(id) => { setTab('protocols'); setProtocolId(id); }} />}
+        {tab === 'fitness' && accessToken && user && <FitnessBuilder key={childPlanId || 'fitness'} initialProtocolId={childPlanId} accessToken={accessToken} ownerId={user.id} protocols={protocols} onSaved={(saved) => setProtocols((current) => [saved, ...current.filter((p) => p.id !== saved.id)])} onOpen={(id) => { setTab('protocols'); setProtocolId(id); }} />}
         {tab === 'recipes' && recipeId && <RecipeBuilder key={recipeId} recipe={recipes.find((recipe) => recipe.id === recipeId)!} userId={user.id} offers={offers} onBack={() => setRecipeId(null)} onSaved={(saved) => setRecipes((current) => current.map((recipe) => recipe.id === saved.id ? saved : recipe))} />}
-        {tab === 'protocols' && protocolId && accessToken && user && <div style={{ background: '#F5F4EF', color: '#151515', padding: 18, minHeight: 700 }}><button onClick={() => setProtocolId(null)} style={{ ...btn, marginBottom: 14, background: '#151515', color: '#FFF' }}>← Protocols</button>{protocols.find((protocol) => protocol.id === protocolId) && <GuardianProtocolAI accessToken={accessToken} protocol={protocols.find((protocol) => protocol.id === protocolId)!} ownerId={user.id} initialSourceUrls={builderLibrarySources.filter((source) => source.kind === 'url').map((source) => source.source_url).filter(Boolean).join('\n')} initialSourcePath={builderLibrarySources.find((source) => source.kind === 'pdf')?.file_path || null} initialRequest={builderLibrarySources.length ? `Build a practical Protocol using these Library sources:\n${builderLibrarySources.map((source) => `- ${source.title}${source.kind === 'transcript' ? `: ${source.transcript?.slice(0, 4000)}` : ''}`).join('\n')}` : undefined} onBuilt={() => setProtocolRevision((value) => value + 1)} />}<ProtocolEditor key={`${protocolId}-${protocolRevision}`} accessToken={accessToken} initialProtocolId={editorProtocolId || protocolId} ownerId={user.id} onSelectedChange={setEditorProtocolId} /><div style={{ height: 90 }} />{/* Targets the protocol the editor is SHOWING, not the one first opened (bug: an update once hit Pati's routine). */}<ProtocolAIBar key={editorProtocolId || protocolId} accessToken={accessToken} protocolId={editorProtocolId || protocolId} guideId={user.id} onUpdated={() => setProtocolRevision((value) => value + 1)} /></div>}
+        {tab === 'protocols' && protocolId && accessToken && user && <div style={{ background: '#F5F4EF', color: '#151515', padding: 18, minHeight: 700 }}>
+          <button onClick={() => setProtocolId(null)} style={{ ...btn, marginBottom: 14, background: '#151515', color: '#FFF' }}>← Protocols</button>
+          <ProtocolChildrenPanel token={accessToken} ownerId={user.id} parentId={editorProtocolId || protocolId} protocols={protocols} onChanged={refreshProtocols} onEdit={(kind, id) => { setParentContext(editorProtocolId || protocolId); setChildPlanId(id); setTab(kind); setProtocolId(null); refreshProtocols(); }} />
+          {protocols.find((protocol) => protocol.id === protocolId) && <GuardianProtocolAI accessToken={accessToken} protocol={protocols.find((protocol) => protocol.id === protocolId)!} ownerId={user.id} initialSourceUrls={builderLibrarySources.filter((source) => source.kind === 'url').map((source) => source.source_url).filter(Boolean).join('\n')} initialSourcePath={builderLibrarySources.find((source) => source.kind === 'pdf')?.file_path || null} initialRequest={builderLibrarySources.length ? `Build a practical Protocol using these Library sources:\n${builderLibrarySources.map((source) => `- ${source.title}${source.kind === 'transcript' ? `: ${source.transcript?.slice(0, 4000)}` : ''}`).join('\n')}` : undefined} onBuilt={() => setProtocolRevision((value) => value + 1)} />}
+          <ProtocolEditor key={`${protocolId}-${protocolRevision}`} accessToken={accessToken} initialProtocolId={editorProtocolId || protocolId} ownerId={user.id} onSelectedChange={setEditorProtocolId} onCustomizeRecipe={customizeRecipe} />
+          <div style={{ height: 90 }} />
+          <ProtocolAIBar key={editorProtocolId || protocolId} accessToken={accessToken} protocolId={editorProtocolId || protocolId} guideId={user.id} onUpdated={() => setProtocolRevision((value) => value + 1)} />
+        </div>}
       </main>
     </div>
   </div>;

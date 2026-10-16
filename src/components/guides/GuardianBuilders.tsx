@@ -31,7 +31,7 @@ const iconBtn: React.CSSProperties = { border: 0, background: 'transparent', col
 
 type SavedMeta = Record<string, { builder_kind: BuilderKind | null; builder_config: any }>;
 
-interface CommonProps { accessToken: string; ownerId: string; protocols: AdminProtocol[]; onSaved: (protocol: AdminProtocol) => void; onOpen: (protocolId: string) => void }
+interface CommonProps { accessToken: string; ownerId: string; protocols: AdminProtocol[]; initialProtocolId?: string | null; onSaved: (protocol: AdminProtocol) => void; onOpen: (protocolId: string) => void }
 
 function Header({ kicker, title, copy, Icon }: { kicker: string; title: string; copy: string; Icon: typeof Users }) {
   return <div style={{ display: 'flex', gap: 18, alignItems: 'center', marginBottom: 26 }}>
@@ -112,7 +112,7 @@ function Bar({ value, target }: { value: number; target: number }) {
   return <div style={{ height: 4, background: 'rgba(245,242,234,.1)', marginTop: 5 }}><div style={{ height: 4, width: `${Math.min(100, ratio * 100)}%`, background: ok ? acid : warn }} /></div>;
 }
 
-export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved, onOpen }: CommonProps & { recipes: GuideRecipe[] }) {
+export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialProtocolId, onSaved, onOpen }: CommonProps & { recipes: GuideRecipe[] }) {
   const [cfg, setCfg] = useState<DietConfig>(emptyDiet);
   const [name, setName] = useState('Mediterranean week');
   const [protocolId, setProtocolId] = useState<string | null>(null);
@@ -132,6 +132,12 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
   const ownPicks = useMemo(() => recipes.map(guideRecipeToPick).filter((p) => p.nutrition), [recipes]);
 
   useEffect(() => { listBuilderMeta(accessToken, ownerId).then(setMeta).catch(() => {}); }, [accessToken, ownerId]);
+  useEffect(() => {
+    if (!initialProtocolId || !meta[initialProtocolId]?.builder_config) return;
+    setCfg({ ...emptyDiet(), ...structuredClone(meta[initialProtocolId].builder_config) });
+    setName(protocols.find((p) => p.id === initialProtocolId)?.name || 'Diet plan');
+    setProtocolId(initialProtocolId);
+  }, [initialProtocolId, meta]);
   useEffect(() => {
     if (!picking) return;
     const slot = MEAL_SLOTS.find((s) => s.id === picking.split(':')[1]);
@@ -170,7 +176,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
 
   return <div>
     <Header Icon={Utensils} kicker="Build" title="Diet" copy="Pick a framework, set daily energy and macros, then fill the week with recipes from the database. Totals are calculated from each recipe’s stored nutrition." />
-    <SavedList kind="diet" protocols={protocols} meta={meta} activeId={protocolId} onPick={load} onOpen={onOpen} />
+    <SavedList kind="diet" protocols={initialProtocolId ? protocols.filter((p) => p.id === initialProtocolId) : protocols} meta={meta} activeId={protocolId} onPick={load} onOpen={onOpen} />
     <div style={{ ...card, marginBottom: 14 }}>
       <span style={label}>Diet framework</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{DIET_FRAMEWORKS.map((f) => <button key={f.id} type="button" onClick={() => pickFramework(f.id)} style={chip(f.id === cfg.framework)}>{f.label}</button>)}</div>
@@ -278,7 +284,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
 const MUSCLE_ORDER = [...MUSCLE_GROUPS.map((g) => g.label as string), 'Cardio', 'Mobility', 'Other'];
 const emptyFitness = (): FitnessConfig => ({ goal: 'general', level: 'beginner', minutes: 40, sessions: [], rules: ['Drink water during every session'] });
 
-export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpen }: CommonProps) {
+export function FitnessBuilder({ accessToken, ownerId, protocols, initialProtocolId, onSaved, onOpen }: CommonProps) {
   const [cfg, setCfg] = useState<FitnessConfig>(emptyFitness);
   const [name, setName] = useState('General fitness week');
   const [protocolId, setProtocolId] = useState<string | null>(null);
@@ -293,6 +299,12 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
   const goal = FITNESS_GOALS.find((g) => g.id === cfg.goal) || FITNESS_GOALS[0];
 
   useEffect(() => { listBuilderMeta(accessToken, ownerId).then(setMeta).catch(() => {}); }, [accessToken, ownerId]);
+  useEffect(() => {
+    if (!initialProtocolId || !meta[initialProtocolId]?.builder_config) return;
+    setCfg({ ...emptyFitness(), ...structuredClone(meta[initialProtocolId].builder_config) });
+    setName(protocols.find((p) => p.id === initialProtocolId)?.name || 'Fitness plan');
+    setProtocolId(initialProtocolId);
+  }, [initialProtocolId, meta]);
   useEffect(() => {
     if (adding == null) return;
     const timer = setTimeout(() => { searchActivities(accessToken, { query, muscle, categories: query || muscle ? undefined : ['Strength', 'Gym', 'Calisthenics', 'Cardio', 'Hiit', 'Stretch', 'Fitness'], limit: 24 }).then(setResults).catch((e) => { setResults([]); setMessage(String(e.message || e)); }); }, 250);
@@ -312,7 +324,7 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
 
   return <div>
     <Header Icon={Dumbbell} kicker="Build" title="Fitness" copy="Choose a goal and level for a suggested weekly split, then shape each session with activities from the catalog." />
-    <SavedList kind="fitness" protocols={protocols} meta={meta} activeId={protocolId} onPick={load} onOpen={onOpen} />
+    <SavedList kind="fitness" protocols={initialProtocolId ? protocols.filter((p) => p.id === initialProtocolId) : protocols} meta={meta} activeId={protocolId} onPick={load} onOpen={onOpen} />
     <div style={{ ...card, marginBottom: 14 }}>
       <span style={label}>Goal</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{FITNESS_GOALS.map((g) => <button key={g.id} type="button" onClick={() => { setCfg({ ...cfg, goal: g.id }); if (!protocolId) setName(`${g.label} week`); }} style={chip(g.id === cfg.goal)}>{g.label}</button>)}</div>
