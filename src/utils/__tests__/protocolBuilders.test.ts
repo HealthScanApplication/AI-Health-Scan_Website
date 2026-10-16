@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reviewFitness, saveDietProtocol, withSetInfo, type FitnessConfig, fitsSlot, mealPlacementIssues, nameSlotHint, planMealItems, reviewDiet, slotForTime, type DietConfig, type MealPick } from '../protocolBuilders';
+import { dietSupportItems, reviewFitness, saveDietProtocol, withSetInfo, type FitnessConfig, fitsSlot, mealPlacementIssues, nameSlotHint, planMealItems, reviewDiet, slotForTime, type DietConfig, type MealPick } from '../protocolBuilders';
 
 const pick = (name: string, id = name): MealPick => ({ source: 'catalog', id, name, image: null, nutrition: { energy_kcal: 500, protein_g: 25, carbohydrates_g: 50, fats_g: 20 } });
 const diet = (plan: DietConfig['plan'], extra: Partial<DietConfig> = {}): DietConfig => ({ framework: 'balanced', kcal: 2000, protein: 20, carbs: 50, fat: 30, slots: ['breakfast', 'lunch', 'dinner'], plan, ...extra });
@@ -52,6 +52,27 @@ describe('a meal with a drink in the slot', () => {
   it('gives each slot its own time instead of one fixed time for every meal', () => {
     const plans = planMealItems(diet({ '1:breakfast': pick('Porridge'), '1:lunch': pick('Vegetable soup'), '1:dinner': pick('Lentil curry') }));
     expect(plans.map((p) => [p.label, p.time])).toEqual([['Breakfast', '08:00'], ['Lunch', '13:00'], ['Dinner', '19:00']]);
+  });
+});
+
+describe('diet supplements and fasting', () => {
+  it('creates timed daily supplement items for morning, afternoon and evening', () => {
+    const items = dietSupportItems(diet({}, { supplements: { morning: ['Vitamin D3'], afternoon: ['Take zinc'], evening: ['Magnesium'] }, supplementTimes: { morning: '07:30', afternoon: '14:30', evening: '21:00' } }));
+    expect(items.map((item) => [item.title, item.time, item.category, item.group])).toEqual([
+      ['Take Vitamin D3', '07:30', 'supplement', 'Supplements'], ['Take zinc', '14:30', 'supplement', 'Supplements'], ['Take Magnesium', '21:00', 'supplement', 'Supplements'],
+    ]);
+    expect(items.every((item) => item.days === null)).toBe(true);
+  });
+  it('creates start and end items on the selected intermittent fasting days', () => {
+    const items = dietSupportItems(diet({}, { fasting: { type: 'intermittent', start: '20:00', end: '12:00', days: [1, 3, 7] } }));
+    expect(items.map((item) => [item.title, item.time, item.days])).toEqual([
+      ['Start intermittent fast', '20:00', [1, 3, 0]], ['End intermittent fast', '12:00', [1, 3, 0]],
+    ]);
+  });
+  it('adds a safety note to dry fasting items', () => {
+    const items = dietSupportItems(diet({}, { fasting: { type: 'dry', start: '18:00', end: '08:00', days: [2] } }));
+    expect(items).toHaveLength(2);
+    expect(items.every((item) => /dangerous/.test(item.notes))).toBe(true);
   });
 });
 
