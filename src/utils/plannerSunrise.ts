@@ -1,10 +1,14 @@
 import { getTimes } from 'suncalc';
 
 export interface PlannerLocation { name:string; country:string; latitude:number; longitude:number; timezone:string }
+const timezoneValidity=new Map<string,boolean>();
 export function validPlannerLocation(value: unknown): value is PlannerLocation {
   const p = value as PlannerLocation | null;
   if (!p || typeof p.name !== 'string' || !p.name.trim() || typeof p.country !== 'string' || !Number.isFinite(p.latitude) || Math.abs(p.latitude)>90 || !Number.isFinite(p.longitude) || Math.abs(p.longitude)>180 || typeof p.timezone !== 'string') return false;
-  try { new Intl.DateTimeFormat('en',{timeZone:p.timezone}); return true; } catch { return false; }
+  const cached=timezoneValidity.get(p.timezone);
+  if(cached!==undefined)return cached;
+  try { new Intl.DateTimeFormat('en',{timeZone:p.timezone}); timezoneValidity.set(p.timezone,true);return true; }
+  catch { timezoneValidity.set(p.timezone,false);return false; }
 }
 export function plannerDate(timezone:string, now=new Date()): string {
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
