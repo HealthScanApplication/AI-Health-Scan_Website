@@ -31,6 +31,11 @@ describe('slot fit', () => {
 });
 
 describe('no repeats', () => {
+  it('uses supplied catalog references when reporting planned coverage', () => {
+    const meal = recipe('Lentil soup', { micros: { calcium_mg: 500 } });
+    const result = planWeek(cfg({ slots: ['lunch'], plan: { '1:lunch': meal } }), [meal], 15, { nutrientDefs: [{ key: 'calcium_mg', label: 'Calcium', unit: 'mg', dv: 1000, tier: 15, aliases: ['calcium_mg'] }] });
+    expect(result.days[0].coverage).toBe(50);
+  });
   it('uses a recipe at most once a day and twice a week', () => {
     const pool = [recipe('Porridge'), recipe('Lentil soup'), recipe('Bean chilli'), recipe('Veg curry'), recipe('Tofu stir-fry'), recipe('Chickpea salad'), recipe('Muesli'), recipe('Omelette'), recipe('Risotto'), recipe('Falafel bowl'), recipe('Dal'), recipe('Shakshuka')];
     const { plan } = planWeek(cfg(), pool, 15);

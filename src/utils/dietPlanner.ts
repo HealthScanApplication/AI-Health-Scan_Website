@@ -102,10 +102,10 @@ export interface PlanResult { plan: DietConfig['plan']; days: DayReport[]; ideas
  * used at most `maxPerWeek` times, slot fit; then one swap pass per day toward the kcal/protein targets.
  * Existing (Guardian-chosen) cells are kept.
  */
-export function planWeek(cfg: DietConfig, candidates: Candidate[], tier: Tier, opts: { maxPerWeek?: number; tolerance?: number } = {}): Omit<PlanResult, 'ideas'> {
+export function planWeek(cfg: DietConfig, candidates: Candidate[], tier: Tier, opts: { maxPerWeek?: number; tolerance?: number; nutrientDefs?: NutrientDef[] } = {}): Omit<PlanResult, 'ideas'> {
   const maxPerWeek = opts.maxPerWeek ?? 2;
   const tol = opts.tolerance ?? 0.1;
-  const defs = nutrientsForTier(tier);
+  const defs = opts.nutrientDefs || nutrientsForTier(tier);
   const slots = MEAL_SLOTS.filter((s) => cfg.slots.includes(s.id));
   const share = slots.reduce((sum, s) => sum + s.share, 0) || 1;
   const proteinTarget = cfg.kcal * cfg.protein / 100 / 4;
@@ -174,7 +174,7 @@ export function planWeek(cfg: DietConfig, candidates: Candidate[], tier: Tier, o
 
 export function dayReport(day: number, meals: Candidate[], defs: NutrientDef[]): DayReport {
   const t = meals.reduce(addTo, emptyDay());
-  const cov = coverage(t.micros, { protein_g: t.protein, fiber_g: t.fiber }, 90, []).filter((c) => defs.some((d) => d.key === c.def.key));
+  const cov = defs.map(def => { const amount = def.key === 'protein_g' ? t.protein : def.key === 'fiber_g' ? t.fiber : t.micros[def.key]; return { def, pct: amount != null && def.dv ? amount / def.dv * 100 : null }; });
   return {
     day, kcal: Math.round(t.kcal), protein: Math.round(t.protein), coverage: Math.round(dayCoverage(t, defs) * 100),
     gaps: cov.filter((c) => c.def.dv && (c.pct ?? 0) < 50).map((c) => c.def),
@@ -311,11 +311,11 @@ export function guideCandidates(recipes: GuideRecipe[]): Candidate[] {
 }
 
 /** Auto-fill entry point for the planner. */
-export async function smartFill(accessToken: string, cfg: DietConfig, guideRecipes: GuideRecipe[], tier: Tier, onProgress?: (msg: string) => void): Promise<PlanResult> {
+export async function smartFill(accessToken: string, cfg: DietConfig, guideRecipes: GuideRecipe[], tier: Tier, onProgress?: (msg: string) => void, catalogNutrients: NutrientDef[] = []): Promise<PlanResult> {
   const framework = DIET_FRAMEWORKS.find((f) => f.id === cfg.framework) || DIET_FRAMEWORKS[0];
   const { candidates, pool } = await loadCandidates(accessToken, framework, onProgress);
   onProgress?.('Choosing the week…');
-  const result = planWeek(cfg, [...guideCandidates(guideRecipes), ...candidates], tier);
+  const result = planWeek(cfg, [...guideCandidates(guideRecipes), ...candidates], tier, { nutrientDefs: nutrientsForTier(tier,catalogNutrients) });
   // Gaps most days share become recipe ideas.
   const counts = new Map<string, { def: NutrientDef; n: number }>();
   for (const d of result.days) for (const g of d.gaps) counts.set(g.key, { def: g, n: (counts.get(g.key)?.n || 0) + 1 });

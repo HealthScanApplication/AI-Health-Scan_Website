@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import {
-  coverage, gaps, nutrientsForTier,
+  coverage, gaps, nutrientsForTier, loadEssential90,
   type Coverage, type NutrientDef, type RecipeFilters, type RecipeHazard, type Tier,
 } from '../../utils/recipeNutrients';
 
@@ -17,17 +17,16 @@ const label: React.CSSProperties = { display: 'block', color: muted, fontFamily:
 const chip = (on: boolean, tone = acid): React.CSSProperties => ({ border: `1px solid ${on ? tone : line}`, background: on ? `${tone}22` : 'transparent', color: on ? tone : ink, borderRadius: 999, padding: '5px 10px', fontFamily: sans, fontSize: 11, fontWeight: 700, cursor: 'pointer' });
 const input: React.CSSProperties = { width: '100%', height: 36, boxSizing: 'border-box', border: `1px solid ${line}`, background: '#0D0E0C', color: ink, borderRadius: 2, padding: '0 10px', fontFamily: sans, fontSize: 12, outline: 'none' };
 
-/** The catalog's essential_90 extras, loaded once per page. */
+/** Shared catalog definitions; failed requests can retry on the next mount. */
 let essentialCache: Promise<NutrientDef[]> | null = null;
 export function useEssential90() {
   const [extra, setExtra] = useState<NutrientDef[]>([]);
-  // Tier 90 is the app's Essential 90 list (static); the catalog's essential_90 flag is not used (it includes hazards and rare earths).
-  useEffect(() => { (essentialCache ||= Promise.resolve([])).then(setExtra); }, []);
+  useEffect(() => { let alive = true; (essentialCache ||= loadEssential90()).then(rows => { if (alive) setExtra(rows); }).catch(() => { essentialCache = null; }); return () => { alive = false; }; }, []);
   return extra;
 }
 
 export const TIERS: Tier[] = [15, 30, 90];
-// The app calls its list "Essential 90" (89 nutrients + protein and fibre here); 15 and 30 are exact counts.
+// Collection names; the UI reports the actual full-collection count separately.
 export const tierLabel = (t: Tier, _extra: NutrientDef[] = []) => (t === 15 ? 'Core 15' : t === 30 ? 'Extended 30' : 'Essential 90');
 
 function Bar({ c }: { c: Coverage }) {
@@ -51,7 +50,8 @@ export function NutrientCoverage({ micros, macros, tier, onTier, title = 'Essent
       <span style={{ ...label, margin: 0, color: acid }}>{title}</span>
       <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => onTier(t)} style={chip(t === tier)}>{tierLabel(t, extra)}</button>)}</span>
     </div>
-    <div style={{ color: muted, fontSize: 10, marginBottom: 6 }}>{strong} of {cov.length} at 20%+ of daily value · {measured} measured in the ingredient data · grey = no data yet</div>
+    <div style={{ color: muted, fontSize: 10, marginBottom: 6 }}>{strong} of {cov.length} at 20%+ of {extra.length ? 'catalog reference amount' : 'daily value'} · {measured} measured in the ingredient data · grey = no data yet</div>
+    <div style={{ color: muted, fontSize: 10, marginBottom: 6 }}>{extra.length ? 'Database Essential 90 collection; actual entry count shown. Core 15 / Extended 30 are app subsets. Catalog references are not a recommendation to consume every listed substance.' : 'Built-in definitions shown; database definitions unavailable or loading.'}</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', columnGap: 16, maxHeight: tier === 90 ? 320 : undefined, overflowY: tier === 90 ? 'auto' : undefined }}>{cov.map((c) => <Bar key={c.def.key} c={c} />)}</div>
   </div>;
 }

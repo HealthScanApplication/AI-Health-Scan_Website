@@ -4,7 +4,7 @@ import { listProtocolItems, type AdminProtocol, type AdminProtocolItem } from '.
 import type { GuideLead, GuideRecipe } from '../../utils/guidePortal';
 import { smartFill, type RecipeIdea } from '../../utils/dietPlanner';
 import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
-import { TIERS, tierLabel } from './RecipeInsights';
+import { TIERS, tierLabel, useEssential90 } from './RecipeInsights';
 import { SupplementPicker } from './SupplementPicker';
 import { DietNutritionPanel } from './DietNutritionPanel';
 import { aggregateDiet, dietSelections, loadDietAnalysis, type DietAnalysis } from '../../utils/dietNutrition';
@@ -178,12 +178,13 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
 
   const run = async (label: string, work: () => Promise<void>) => { setBusy(true); setMessage(label); try { await work(); } catch (e) { const failedId = (e as { protocolId?: string }).protocolId; if (failedId) setProtocolId(failedId); setMessage(`Failed: ${(e as Error).message}`); setBusy(false); return; } setBusy(false); };
   const autoFill = () => run('Choosing recipes from the database…', async () => {
-    const res = await smartFill(accessToken, cfg, recipes, tier, setMessage);
+    const res = await smartFill(accessToken, cfg, recipes, tier, setMessage, catalogNutrients);
     setCfg({ ...cfg, plan: res.plan }); setIdeas(res.ideas);
     const filled = Object.values(res.plan).filter(Boolean).length;
     setMessage(`Week filled with ${new Set(Object.values(res.plan).filter(Boolean).map((p) => p!.id)).size} different recipes across ${filled} meals. Ranked by health score and ${tierLabel(tier)} coverage, gaps first.`);
   });
-  const defs = nutrientsForTier(tier);
+  const catalogNutrients = useEssential90();
+  const defs = nutrientsForTier(tier,catalogNutrients);
   const reports = nutritionReport.days.map((day) => {
     const measured = defs.filter((d) => d.dv && day.nutrients[d.key]?.amount != null);
     return { coverage: Math.round(measured.reduce((sum,d) => sum + Math.min(1,day.nutrients[d.key].amount! / d.dv!),0) / (defs.filter((d) => d.dv).length || 1)*100), gaps: measured.filter((d) => day.nutrients[d.key].amount! < d.dv!*.5), incomplete: defs.some((d) => day.nutrients[d.key]?.known !== day.count || day.nutrients[d.key]?.partial) };
