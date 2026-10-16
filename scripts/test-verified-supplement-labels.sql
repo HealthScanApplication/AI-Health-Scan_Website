@@ -1,5 +1,8 @@
 DO $$
 BEGIN
+  IF (SELECT count(*) FROM public.catalog_product_elements WHERE product_id='prod_us_4270000981708' AND element_id IN ('taurine','coenzyme_q10') AND metadata->'verified_label_20261016'->>'amount'='50' AND metadata->'verified_label_20261016'->>'unit'='mg' AND metadata->'verified_label_20261016'->>'serving'='30 g') <> 2 THEN
+    RAISE EXCEPTION 'XbyX additional nutrient panel declares taurine and CoQ10 at 50 mg per 30 g';
+  END IF;
   IF EXISTS (SELECT 1 FROM (VALUES ('product_hs_max_detox',5),('prod_us_4270000981708',31),('trelune_baja_gold_minerals',5)) v(id,n) LEFT JOIN public.catalog_products p ON p.id=v.id WHERE p.id IS NULL OR p.raw_data->'supplement_composition_repair'->>'status' IS DISTINCT FROM 'linked' OR jsonb_array_length(p.raw_data->'supplement_composition_repair'->'expected_element_ids') IS DISTINCT FROM v.n) THEN
     RAISE EXCEPTION 'Verified product status or expected ingredient count is incorrect';
   END IF;

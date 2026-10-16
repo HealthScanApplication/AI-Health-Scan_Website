@@ -24,7 +24,7 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM public.catalog_products p
     CROSS JOIN LATERAL jsonb_array_elements(coalesce(p.raw_data->'supplement_composition_repair'->'expected_element_ids','[]')) expected
-    WHERE NOT EXISTS (SELECT 1 FROM public.catalog_product_elements pe WHERE pe.product_id=p.id AND pe.element_id=expected#>>'{}')) THEN
+    WHERE p.product_kind='supplement' AND NOT EXISTS (SELECT 1 FROM public.catalog_product_elements pe WHERE pe.product_id=p.id AND pe.element_id=expected#>>'{}')) THEN
     RAISE EXCEPTION 'A repaired product is missing one of its expected ingredient links';
   END IF;
 END $$;

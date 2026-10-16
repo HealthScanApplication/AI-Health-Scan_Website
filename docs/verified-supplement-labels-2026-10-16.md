@@ -46,3 +46,11 @@ passed; public REST audit checked all 135 records (131 linked, four unresolved),
 including raw-element readability and the picker's exact ingredient counts.
 All 154 application tests and the production build passed. Independent review
 found no blocking issues; its full-junction coverage suggestion was implemented.
+
+Automated PR review identified the manufacturer's additional-nutrient panel:
+taurine and CoQ10 each 50 mg per 30 g. Follow-up migration
+`20261016152851` records these values separately from historical measurements,
+and fills only empty measurements created by this repair. Choline bitartrate
+150 mg is not assigned as 150 mg of elemental choline. The whole-catalogue
+legacy assertion timed out; its expected-link check is now scoped to supplement
+products, matching this repair and the complete public REST audit.
