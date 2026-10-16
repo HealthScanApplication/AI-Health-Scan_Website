@@ -28,8 +28,9 @@ import { MediaUploadField } from './MediaUploadField';
 import { MarkdownField } from './MarkdownField';
 import { listRoutineOwners } from '../../utils/guidePortal';
 import { computeSleepWindow, isWakeName, isBedName } from '../../utils/sleepWindow';
-import { descriptiveMealSlot, mealSlotName } from '../../protocolDomain/mealSlot';
-import { slotForTime } from '../../utils/protocolBuilders';
+import { descriptiveMealSlot } from '../../protocolDomain/mealSlot';
+import { smartListOf, slotFromGroupName, mealSlotFor, SLOT_TITLE, type Row as StandardRow } from '../../utils/routineStandard';
+import { checkProtocolItem, onGateWarnings, type GateWarning } from '../../utils/protocolGate';
 import {
   listProtocols, listProtocolItems, updateProtocol,
   createProtocolItem, updateProtocolItem, deleteProtocolItem, uploadProtocolImage,
@@ -102,7 +103,33 @@ function partOfDay(time: string | null): 'Morning' | 'Afternoon' | 'Evening' | '
   return 'Evening';
 }
 
-const SMART_LIST_ORDER = ['Breakfast', 'Lunch', 'Snack', 'Dinner', 'Drink', 'Hygiene', 'Fitness', 'Wellness', 'Beauty', 'Work', 'Home', 'Other'];
+// Routine layout standard: part of day → smart list. Meals sit in their slot by group_name (Breakfast / Lunch /
+// Dinner / Snack), each with its Drinks list beside it; Supplements is its own list.
+const SMART_LIST_ORDER = ['Hygiene', 'Wellness', 'Fitness', 'Beauty', 'Supplements',
+  'Breakfast', 'Breakfast drinks', 'Lunch', 'Lunch drinks', 'Snack', 'Snack drinks', 'Dinner', 'Dinner drinks', 'Work', 'Home', 'Tasks', 'Other'];
+function standardGroup(it: AdminProtocolItem): string {
+  const list = smartListOf(it as unknown as StandardRow);
+  if (list === 'supplements' || /^supplements?$/i.test((it.group_name || '').trim())) return 'Supplements';
+  if (list === 'meal' || list === 'drinks') {
+    const slot = SLOT_TITLE[slotFromGroupName(it.group_name) || mealSlotFor(it.scheduled_time)];
+    return list === 'drinks' ? `${slot} drinks` : slot;
+  }
+  if (it.subtype === 'beauty') return 'Beauty';
+  return ({ hygiene: 'Hygiene', wellness: 'Wellness', fitness: 'Fitness', work: 'Work', home: 'Home', tasks: 'Tasks' } as Record<string, string>)[list] || 'Other';
+}
+/** "3 × 10 · 30 s on / 30 s off · 5 min" from the set fields. */
+function setInfoText(it: AdminProtocolItem): string {
+  const parts: string[] = [];
+  if (it.sets && it.reps) parts.push(`${it.sets} × ${it.reps}`); else if (it.sets) parts.push(`${it.sets} sets`); else if (it.reps) parts.push(`${it.reps} reps`);
+  if (it.rounds) parts.push(`${it.rounds} rounds`);
+  if (it.work_seconds) parts.push(`${it.work_seconds} s${it.rest_seconds ? ` on / ${it.rest_seconds} s off` : ''}`);
+  if (it.duration_minutes) parts.push(`${it.duration_minutes} min`);
+  return parts.join(' · ');
+}
+const pegText = (it: AdminProtocolItem) => {
+  const a = (it.filter as any)?.anchor as { to: string; offset_minutes: number } | undefined;
+  return a ? `${a.to === 'wake' ? 'Wake' : 'Bedtime'} ${a.to === 'wake' ? '+' : '−'} ${Math.abs(a.offset_minutes)} min` : '';
+};
 
 /* Cycle phase math, mirrored from mobile src/features/cycle/cycle.ts. Preview only:
    real cycle data lives on the user's device (Keychain) and never reaches Supabase. */
@@ -144,25 +171,6 @@ function moonPhaseName(date: Date): string {
   if (age < 20.30) return 'Waning gibbous';
   if (age < 23.99) return 'Last quarter';
   return 'Waning crescent';
-}
-function smartListGroup(it: AdminProtocolItem): string {
-  // Meals live in their consume slot list (Breakfast/Lunch/Dinner/Snack), never Wellness.
-  if (it.category === 'consume' || it.item_type === 'recipe' || it.item_type === 'consume') {
-    const slot = mealSlotName(it.group_name);
-    if (slot) return slot === 'Supper' ? 'Dinner' : slot;
-    if (/drink|water|tea|coffee|juice/i.test(`${it.group_name || ''} ${it.subtype || ''}`)) return 'Drink';
-    return slotForTime(it.scheduled_time);
-  }
-  const text = `${it.group_name || ''} ${it.subtype || ''} ${it.category || ''} ${it.display_name || ''}`.toLowerCase();
-  if (/hygiene|wash|cleanse|brush|floss|shower|bath/.test(text)) return 'Hygiene';
-  if (/fitness|exercise|workout|walk|run|strength|mobility|stretch|train/.test(text)) return 'Fitness';
-  if (/beauty|skin|hair|makeup|moisturi|exfoliat|facial/.test(text)) return 'Beauty';
-  if (/work|focus|meeting|email|desk|commute/.test(text)) return 'Work';
-  if (/home|house|clean|laundry|garden|kitchen|chores/.test(text)) return 'Home';
-  if (/wellness|sleep|meditat|breath|recover|meal|drink|snack|supplement|health/.test(text)) return 'Wellness';
-  return it.category === 'do' || it.category === 'sleep' || it.category === 'consume' || it.category === 'supplement'
-    ? 'Wellness'
-    : 'Other';
 }
 const POD_ORDER = ['Morning', 'Afternoon', 'Evening', 'Anytime'] as const;
 const minutesOf = (t: string | null) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 1e9; };
@@ -432,6 +440,9 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   const [pdfBusy, setPdfBusy] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
+  // Live checker: what the save gate changed or flagged on the last saves (shown above the list).
+  const [gateLog, setGateLog] = useState<{ title: string; warnings: GateWarning[]; at: number }[]>([]);
+  useEffect(() => onGateWarnings((title, warnings) => setGateLog((cur) => [{ title, warnings, at: Date.now() }, ...cur].slice(0, 6))), []);
   const [adding, setAdding] = useState(false);
   const [kindTab, setKindTab] = useState<Kind>('action');
   const [editorFocus, setEditorFocus] = useState<'timeline' | 'details'>('timeline');
@@ -925,7 +936,16 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   // An item shows on cycle day D when day_number is null (= every day) or === D.
   const allDayItems = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id);
   const cycleLen = Math.max(selected?.total_days || 0, ...allDayItems.map((i) => i.day_number || 0), 1);
-  const showsOnDay = (it: AdminProtocolItem, d: number) => it.day_number == null || it.day_number === d;
+  // A viewed day passes both filters the app applies: the cycle day_number and, for weekly items, the weekday of
+  // that day's date (the Diet/Fitness planners save weekday repeats, e.g. "Kitchari Lunch Bowl" only on Tuesday).
+  const showsOnDay = (it: AdminProtocolItem, d: number) => {
+    if (it.day_number != null && it.day_number !== d && !(it.recurrence_type === 'weekly' && it.day_number === 1)) return false;
+    if (it.recurrence_type === 'weekly' && Array.isArray(it.recurrence_days_of_week) && it.recurrence_days_of_week.length) {
+      const date = new Date(`${previewStart}T12:00:00`); date.setDate(date.getDate() + d - 1);
+      return it.recurrence_days_of_week.includes(date.getDay());
+    }
+    return true;
+  };
   // the app only cycles when total_days is set — surface + one-click-fix when it isn't
   const totalDaysMissing = cycleLen > 1 && !(selected?.total_days && selected.total_days > 1);
   async function fixTotalDays() {
@@ -1558,6 +1578,33 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
           {it.media_image_url && <button type="button" onClick={() => removeStepMedia(it, 'media_image_url')} style={{ ...iconBtn, color: C.danger }} title="Remove image"><X size={13} /></button>}
           {it.media_audio_url && <button type="button" onClick={() => removeStepMedia(it, 'media_audio_url')} style={{ ...iconBtn, color: C.danger }} title="Remove audio"><X size={13} /></button>}
         </div>}
+        {it.kind === 'action' && (() => {
+          // Standard strip: set info, peg, and what the checker would flag on this row right now.
+          const info = setInfoText(it);
+          const peg = pegText(it);
+          const was = (it.filter as any)?.original_title as string | undefined;
+          const warn = checkProtocolItem({}, it as unknown as Record<string, unknown>).warnings;
+          const lk = linkInfo.get(it.id);
+          const rules = kids.filter((k) => k.kind === 'rule_do' || k.kind === 'rule_dont');
+          return <>
+            {(info || peg || warn.length > 0) && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 7 }}>
+              {info && <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: C.panel, color: C.sub }}>{info}</span>}
+              {peg && <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'var(--sb-brand-soft)', color: C.accent }}>Pegged: {peg}</span>}
+              {warn.map((w) => <span key={w.message} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, background: 'rgba(201,138,27,.12)', color: '#8A5A00' }}>⚠ {w.message}</span>)}
+            </div>}
+            <details style={{ marginTop: 7 }}>
+              <summary style={{ fontSize: 11, fontWeight: 700, color: C.sub, cursor: 'pointer' }}>Detail (as in the app)</summary>
+              <dl style={{ display: 'grid', gridTemplateColumns: '110px minmax(0,1fr)', gap: '4px 10px', margin: '6px 0 0', fontSize: 12 }}>
+                <dt style={{ color: C.faint }}>Description</dt><dd style={{ margin: 0 }}>{(it.notes || '').split('\n')[0] || <em style={{ color: C.faint }}>none</em>}</dd>
+                <dt style={{ color: C.faint }}>Set info</dt><dd style={{ margin: 0 }}>{info || <em style={{ color: C.faint }}>none</em>}</dd>
+                <dt style={{ color: C.faint }}>How to</dt><dd style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{(it.notes || '').split('\n').slice(1).join('\n') || <em style={{ color: C.faint }}>none</em>}</dd>
+                <dt style={{ color: C.faint }}>Rules</dt><dd style={{ margin: 0 }}>{rules.length ? rules.map((r) => <div key={r.id} style={{ color: r.kind === 'rule_dont' ? C.danger : C.accent }}>{r.kind === 'rule_dont' ? '✕' : '✓'} {r.display_name}</div>) : <em style={{ color: C.faint }}>none</em>}</dd>
+                <dt style={{ color: C.faint }}>Linked record</dt><dd style={{ margin: 0 }}>{lk ? `${lk.kind}: ${lk.name}` : <em style={{ color: C.faint }}>not linked</em>}</dd>
+                <dt style={{ color: C.faint }}>Was</dt><dd style={{ margin: 0 }}>{was || <em style={{ color: C.faint }}>unchanged</em>}</dd>
+              </dl>
+            </details>
+          </>;
+        })()}
         {kids.length > 0 && (
           <div style={{ marginTop: 6, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid ' + C.hair, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {kids.map((k) => <ChildRow key={k.id} k={k} />)}
@@ -2113,12 +2160,18 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   const sorted = [...tops].sort((a, b) => anchorKey(a) - anchorKey(b));
                   const ordered = kindTab === 'action' ? sorted : tops;
                   const stepNo = new Map<string, number>(ordered.map((it, i) => [it.id, i + 1]));
-                  const groupCard = (label: string, list: AdminProtocolItem[]) => (
-                    <div key={label} style={{ border: '1px solid ' + C.ink, background: C.paper }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.ink, padding: '7px 10px', borderBottom: '1px solid ' + C.ink, background: C.panel }}>{label}</div>
-                      <div className="pe-rows" style={{ display: 'flex', flexDirection: 'column' }}>{list.map((it) => <ItemRow key={it.id} it={it} num={stepNo.get(it.id)} />)}</div>
-                    </div>
-                  );
+                  const groupCard = (label: string, list: AdminProtocolItem[], numbered = kindTab === 'action') => {
+                    // A set is numbered 1, 2, 3 inside its smart list; a pegged set says what it follows.
+                    const peg = list.map(pegText).find(Boolean);
+                    return (
+                      <div key={label} style={{ border: '1px solid ' + C.ink, background: C.paper }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.ink, padding: '7px 10px', borderBottom: '1px solid ' + C.ink, background: C.panel }}>
+                          <span>{label}</span>{peg && <span style={{ fontWeight: 600, letterSpacing: 0, textTransform: 'none', color: C.accent }}>{peg}</span>}
+                        </div>
+                        <div className="pe-rows" style={{ display: 'flex', flexDirection: 'column' }}>{list.map((it, i) => <ItemRow key={it.id} it={it} num={numbered ? i + 1 : stepNo.get(it.id)} />)}</div>
+                      </div>
+                    );
+                  };
 
                   if (kindTab !== 'action') {
                     // rules grouped by scope
@@ -2126,11 +2179,40 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                     return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{[...byScope.entries()].map(([s, list]) => groupCard(s, list))}</div>;
                   }
 
-                  const byPod = group(sorted, (i) => partOfDay(i.scheduled_time));
+                  // Sleep anchors book-end the day; everything else sits in part of day → smart list.
+                  const isSleepRow = (i: AdminProtocolItem) => i.category === 'sleep' || isWakeName(i.display_name || '') || isBedName(i.display_name || '');
+                  const wakeRows = sorted.filter((i) => isSleepRow(i) && isWakeName(i.display_name || ''));
+                  const bedRows = sorted.filter((i) => isSleepRow(i) && !isWakeName(i.display_name || ''));
+                  const dayRules = items.filter((i) => !i.parent_protocol_item_id && (i.kind === 'rule_do' || i.kind === 'rule_dont') && !i.hidden);
+                  const ruleList = (i: AdminProtocolItem) => i.subtype === 'drink' ? 'Drinks' : i.scope === 'consume' || (!i.scope && i.category === 'consume') ? 'Consume' : i.scope === 'supplement' || i.category === 'supplement' ? 'Supplements' : i.group_name && !/^(meal|day)$/i.test(i.group_name) ? i.group_name : 'Day';
+                  const byPod = group(sorted.filter((i) => !isSleepRow(i)), (i) => partOfDay(i.scheduled_time));
+                  const anchorBand = (rows: AdminProtocolItem[], label: string) => rows.length > 0 && (
+                    <section style={{ border: '2px solid ' + C.ink, background: C.paper }}>
+                      <div style={{ padding: '7px 12px', fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#FFFFFF', background: '#5C6B7A' }}>{label}</div>
+                      {rows.map((it) => <ItemRow key={it.id} it={it} />)}
+                    </section>
+                  );
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {gateLog.length > 0 && (
+                        <div role="status" style={{ border: '1px solid #E8C07A', background: 'rgba(232,192,122,.12)', padding: '8px 10px', fontSize: 12 }}>
+                          <strong>Checker</strong> — last saves: {gateLog.slice(0, 3).map((g) => `${g.title}: ${g.warnings.map((w) => w.message).join('; ')}`).join(' · ')}
+                        </div>
+                      )}
+                      {dayRules.length > 0 && (
+                        <section style={{ border: '1px dashed ' + C.ink, background: C.panel, padding: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>Rules on this level</div>
+                          {[...group(dayRules, ruleList).entries()].map(([lvl, list]) => (
+                            <div key={lvl} style={{ marginBottom: 4, fontSize: 12 }}>
+                              <span style={{ fontWeight: 700 }}>{lvl}:</span>{' '}
+                              {list.map((r) => <span key={r.id} style={{ marginRight: 8, color: r.kind === 'rule_dont' ? C.danger : C.accent }}>{r.kind === 'rule_dont' ? '✕' : '✓'} {r.display_name}{r.recurrence_start_date ? ` (${r.recurrence_start_date}${r.recurrence_end_date && r.recurrence_end_date !== r.recurrence_start_date ? `–${r.recurrence_end_date}` : ''})` : ''}</span>)}
+                            </div>
+                          ))}
+                        </section>
+                      )}
+                      {anchorBand(wakeRows, 'End Sleep · wake')}
                       {POD_ORDER.filter((p) => byPod.has(p)).map((pod) => {
-                        const byGroup = group(byPod.get(pod)!, smartListGroup);
+                        const byGroup = group(byPod.get(pod)!, standardGroup);
                         const smartLists = [...byGroup.entries()].sort(([a], [b]) => SMART_LIST_ORDER.indexOf(a) - SMART_LIST_ORDER.indexOf(b));
                         return (
                           <section key={pod} style={{ border: '2px solid ' + C.ink, background: C.paper }}>
@@ -2141,6 +2223,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                           </section>
                         );
                       })}
+                      {anchorBand(bedRows, 'Start Sleep · bedtime')}
                     </div>
                   );
                 })()}
