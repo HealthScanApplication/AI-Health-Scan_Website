@@ -418,7 +418,7 @@ const elementsFields: FieldConfig[] = [
   },
   {
     key: "essential_90",
-    label: "Essential 90",
+    label: "Wallach historical core90 (not safety advice)",
     type: "boolean",
     showInDetail: true,
     showInEdit: true,

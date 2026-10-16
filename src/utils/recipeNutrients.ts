@@ -9,13 +9,14 @@
  * Tiers:
  *   15  core nutrients most diets fall short on;
  *   30  the 15 plus the remaining vitamins and trace minerals with an adult daily value;
- *   90  the database Essential 90 collection when loaded (actual count is shown), with the mobile
- *       list as an offline fallback. Core 15 / Extended 30 are app-defined subsets, with catalog metadata.
+ *   90  the versioned Wallach historical core90 identities, enriched from matching catalog rows.
+ *       Core15 / Extended30 remain app-defined convenience subsets, not Wallach-attributed lists.
  */
 import { projectId, publicAnonKey } from './supabase/info';
+import wallach from '../config/wallachEssential90.json';
 
 export type Tier = 15 | 30 | 90;
-export interface NutrientDef { key: string; label: string; unit: string; dv: number | null; tier: Tier; aliases: string[]; scale?: Record<string, number> }
+export interface NutrientDef { key: string; label: string; unit: string; dv: number | null; tier: Tier; aliases: string[]; scale?: Record<string, number>; elementId?: string; catalogBacked?: boolean; safety?: string }
 
 // unit conversions from an alias to the canonical unit (value × factor)
 // IU → mcg RAE: 0.3 for retinol, 0.05 for dietary beta-carotene. Ingredient rows in IU are mostly plants
@@ -78,31 +79,10 @@ export const NUTRIENTS: NutrientDef[] = [
   { key: 'epa_g', label: 'EPA', unit: 'g', dv: 0.25, tier: 90, aliases: ['epa_g', 'epa_mg'], scale: { epa_mg: 0.001 } },
 ];
 
-/**
- * The app's Essential 90, in its own order (AI-Health-Scan_Mobile src/components/OverviewScreen/HomeElements.tsx
- * ESSENTIAL_NUM). Each name maps to a canonical key above when the ingredient data measures it; the rest get a
- * key of their own (shown as "no data" until the catalog carries them).
- */
-export const APP_ESSENTIAL_90: Array<[number, string, string | null]> = [
-  [1, 'Calcium', 'calcium_mg'], [2, 'Iron', 'iron_mg'], [3, 'Magnesium', 'magnesium_mg'], [4, 'Zinc', 'zinc_mg'], [5, 'Selenium', 'selenium_mcg'],
-  [6, 'Copper', 'copper_mg'], [7, 'Manganese', 'manganese_mg'], [8, 'Chromium', 'chromium_mcg'], [9, 'Iodine', 'iodine_mcg'], [10, 'Phosphorus', 'phosphorus_mg'],
-  [11, 'Potassium', 'potassium_mg'], [12, 'Sodium', 'sodium_mg'], [13, 'Chloride', 'chloride_mg'], [14, 'Sulfur', 'sulfur_mg'],
-  [15, 'Vitamin A', 'vitamin_a_mcg'], [16, 'Vitamin D', 'vitamin_d_mcg'], [17, 'Vitamin C', 'vitamin_c_mg'], [18, 'Vitamin E', 'vitamin_e_mg'], [19, 'Vitamin K', 'vitamin_k_mcg'],
-  [20, 'Leucine', 'leucine_g'], [21, 'Isoleucine', 'isoleucine_g'], [22, 'Valine', 'valine_g'], [23, 'Lysine', 'lysine_g'], [24, 'Methionine', 'methionine_g'],
-  [25, 'Phenylalanine', 'phenylalanine_g'], [26, 'Threonine', 'threonine_g'], [27, 'Tryptophan', 'tryptophan_g'], [28, 'Histidine', 'histidine_g'],
-  [29, 'Alanine', null], [30, 'Arginine', null], [31, 'Asparagine', null], [32, 'Aspartate', null], [33, 'Cysteine', null], [34, 'Glutamate', null],
-  [35, 'Glutamine', null], [36, 'Glycine', null], [37, 'Proline', null], [38, 'Serine', null], [39, 'Tyrosine', null],
-  [40, 'Thiamine (B1)', 'thiamine_mg'], [41, 'Riboflavin (B2)', 'riboflavin_mg'], [42, 'Niacin (B3)', 'niacin_mg'], [43, 'Pantothenic acid (B5)', 'pantothenic_acid_mg'],
-  [44, 'Vitamin B6', 'vitamin_b6_mg'], [45, 'Biotin (B7)', 'biotin_mcg'], [46, 'Folate (B9)', 'folate_mcg'], [47, 'Vitamin B12', 'vitamin_b12_mcg'],
-  [48, 'Boron', null], [49, 'Cobalt', null], [50, 'Fluorine', null], [51, 'Lithium', null], [52, 'Molybdenum', 'molybdenum_mcg'], [53, 'Nickel', null],
-  [54, 'Silicon', null], [55, 'Tin', null], [56, 'Vanadium', null], [57, 'Strontium', null], [58, 'Rubidium', null],
-  [59, 'Lycopene', 'lycopene_mg'], [60, 'Lutein', 'lutein_mg'], [61, 'Zeaxanthin', null], [62, 'Beta-carotene', 'beta_carotene_mg'], [63, 'Alpha-carotene', null],
-  [64, 'Cryptoxanthin', null], [65, 'Quercetin', null], [66, 'Resveratrol', null], [67, 'Curcumin', null], [68, 'Catechins', null], [69, 'Anthocyanins', null],
-  [70, 'Ellagic acid', null], [71, 'Sulforaphane', null], [72, 'Allicin', null], [73, 'Capsaicin', null], [74, 'Gingerol', null], [75, 'Piperine', null],
-  [76, 'Omega-3', 'omega_3_g'], [77, 'Omega-6', 'omega_6_g'], [78, 'Omega-9', 'monounsaturated_g'], [79, 'DHA', 'dha_g'], [80, 'EPA', 'epa_g'],
-  [81, 'ALA', null], [82, 'GLA', null], [83, 'CLA', null], [84, 'Choline', 'choline_mg'], [85, 'Inositol', null], [86, 'CoQ10', 'coq10_mg'],
-  [87, 'Alpha-lipoic acid', null], [88, 'Taurine', null], [89, 'Carnitine', null],
-];
+/** Source-versioned historical collection; no inferred membership from names or flags. */
+export const WALLACH_MEMBERS = (['minerals','vitamins','amino_acids','fatty_acids'] as const).flatMap(group =>
+  wallach[group].map(([id,label,key]) => ({ id,label,key,group })));
+export const APP_ESSENTIAL_90: Array<[number,string,string]> = WALLACH_MEMBERS.map((m,i) => [i+1,m.label,m.key]);
 
 const ALIAS = new Map<string, NutrientDef>();
 const MASS_UNITS: Record<string,number> = { g: 1, mg: .001, mcg: .000001, ug: .000001 };
@@ -117,24 +97,20 @@ for (const n of NUTRIENTS) {
 }
 for (const n of NUTRIENTS) for (const a of n.aliases) ALIAS.set(a, n);
 
-const slug = (label: string) => label.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-/** Tier-90 defs for app essentials the static table does not already hold (sodium, sulfur, the other amino acids, phytonutrients…). */
-const APP_EXTRA: NutrientDef[] = APP_ESSENTIAL_90.filter(([, , key]) => !key || !NUTRIENTS.some((n) => n.key === key)).map(([, label, key]) => {
-  const base = key || slug(label);
-  const known: Record<string, Partial<NutrientDef>> = { sodium_mg: { unit: 'mg', dv: 1500 }, chloride_mg: { unit: 'mg', dv: 2300 }, sulfur_mg: { unit: 'mg', dv: null } };
-  return { key: key || `${base}_mg`, label, unit: known[base]?.unit || (key ? key.split('_').pop()! : 'mg'), dv: known[base]?.dv ?? null, tier: 90 as Tier,
-    aliases: key ? [key] : [`${base}_g`, `${base}_mg`, `${base}_mcg`, base], scale: key ? undefined : { [`${base}_g`]: 1000, [`${base}_mcg`]: .001 } };
+const WALLACH_DEFS: NutrientDef[] = WALLACH_MEMBERS.map(m => {
+  const known = NUTRIENTS.find(n => n.key === m.key);
+  const unit = m.key.split('_').pop()!;
+  const base = m.key.replace(/_(g|mg|mcg)$/,'');
+  const aliases = known?.aliases || [...Object.keys(MASS_UNITS).map(u => `${base}_${u}`), `${base}_mcgs`];
+  const scale = known?.scale || { ...Object.fromEntries(Object.entries(MASS_UNITS).map(([u,f]) => [`${base}_${u}`,f / MASS_UNITS[unit]])), [`${base}_mcgs`]: MASS_UNITS.mcg / MASS_UNITS[unit] };
+  return { ...known, key: m.key, label: m.label, elementId: m.id, unit, dv: known?.dv ?? null, tier: known?.tier || 90, aliases, scale, catalogBacked: false };
 });
-for (const n of APP_EXTRA) for (const a of n.aliases) if (!ALIAS.has(a)) ALIAS.set(a, n);
-const APP_KEYS = new Set(APP_ESSENTIAL_90.map(([, , key]) => key).filter(Boolean) as string[]);
+for (const n of WALLACH_DEFS) for (const a of n.aliases) if (!ALIAS.has(a)) ALIAS.set(a,n);
 
-/** Catalog definitions override metadata for 15/30; the full catalog is used for 90. */
+/** Catalog metadata for15/30; fixed historical identity membership for90, online and offline. */
 export const nutrientsForTier = (tier: Tier, extra: NutrientDef[] = []) => {
   if (tier < 90) return NUTRIENTS.filter((n) => n.tier <= tier).map(n => extra.find(e => e.key === n.key) || n);
-  if (extra.length) return [...extra, ...NUTRIENTS.filter(n => n.tier <= 30 && !extra.some(e => e.key === n.key))];
-  const fromStatic = NUTRIENTS.filter((n) => n.tier < 90 || APP_KEYS.has(n.key) || n.key === 'protein_g' || n.key === 'fiber_g');
-  const seen = new Set(fromStatic.map((n) => n.key));
-  return [...fromStatic, ...APP_EXTRA.filter((n) => !seen.has(n.key)), ...extra.filter((n) => !seen.has(n.key))];
+  return WALLACH_DEFS.map(n => extra.find(e => e.key === n.key && e.elementId === n.elementId) || n);
 };
 export const nutrientByKey = (key: string) => ALIAS.get(key) || NUTRIENTS.find((n) => n.key === key) || null;
 
@@ -216,35 +192,28 @@ export function coverage(micros: Record<string, number> | undefined, macros: { p
 }
 
 /** Nutrients of a tier below `threshold` % DV per serving (or not measured): what a gap-filling recipe should bring. */
-export const gaps = (cov: Coverage[], threshold = 20) => cov.filter((c) => c.pct == null || c.pct < threshold).map((c) => c.def);
+export const gaps = (cov: Coverage[], threshold = 20) => cov.filter((c) => c.def.dv != null && (c.pct == null || c.pct < threshold)).map((c) => c.def);
 
 /**
- * Load the catalog's flagged beneficial collection, including entries with no usable reference amount.
- * These classifications are catalog data, not claims of scientific essentiality or intake advice.
+ * Enrich the exact historical identity manifest from flagged catalog rows.
+ * Historical membership is separate from safety classification and usable intake references.
  */
 export async function loadEssential90(): Promise<NutrientDef[]> {
-  const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=id,name_common,nutrient_key,daily_value_amount,daily_value_unit,category,essential_90,is_beneficial&essential_90=eq.true&category=in.(Beneficial,Both)&order=id.asc&limit=1000`;
+  const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=id,name_common,nutrient_key,daily_value_amount,daily_value_unit,category,essential_90,is_beneficial&essential_90=eq.true&order=id.asc&limit=1000`;
   const res = await fetch(url, { headers: { apikey: publicAnonKey, Authorization: `Bearer ${publicAnonKey}` } });
   if (!res.ok) throw Error('Could not load database nutrient definitions');
   const rows = await res.json();
-  // Prefer a canonical nutrient row to an alias/form (e.g. vitamin K over K2).
-  rows.sort((a: any,b: any) => Number(ALIAS.get(b.nutrient_key)?.key === b.nutrient_key) - Number(ALIAS.get(a.nutrient_key)?.key === a.nutrient_key));
-  const out: NutrientDef[] = [];
-  for (const r of rows) {
-    if (!['Beneficial','Both'].includes(r.category) || r.is_beneficial === false) continue;
-    const label = r.name_common.split('•')[0].trim();
-    const existing = ALIAS.get(r.nutrient_key) || NUTRIENTS.find(n => n.label.toLowerCase() === label.toLowerCase());
-    const key = existing?.key || r.nutrient_key || `catalog:${r.id}`;
-    if (out.some(n => n.key === key)) continue;
-    const unit = existing?.unit || (r.nutrient_key?.match(/_(mg|mcg|g|ug)s?$/)?.[1] || r.daily_value_unit || '').replace('ug','mcg');
-    const value = num(r.daily_value_amount);
-    const from = (r.daily_value_unit || '').replace(/[μµ]g/g,'mcg').replace('ug','mcg').split(' ')[0];
-    const mass: Record<string,number> = { g: 1, mg: .001, mcg: .000001 };
-    // Placeholder 1 mg values do not establish an intake target. Never invent one.
-    const dv = value && value !== 1 && mass[from] && mass[unit] ? value * mass[from] / mass[unit] : null;
-    out.push({ key, label, unit, dv, tier: existing?.tier || 90, aliases: existing?.aliases || (r.nutrient_key ? [r.nutrient_key] : []), scale: existing?.scale });
-  }
-  return out;
+  return WALLACH_DEFS.map(def => {
+    // Exact element identity wins. A chemical form, additive or similarly named
+    // element can never acquire historical membership through a shared nutrient key.
+    const row = rows.find((r: any) => r.id === def.elementId);
+    if (!row) return def;
+    const value = num(row.daily_value_amount);
+    const from = (row.daily_value_unit || '').replace(/[μµ]g/g,'mcg').replace('ug','mcg').split(' ')[0];
+    const eligible = def.dv != null && row.category !== 'Hazardous' && row.is_beneficial !== false;
+    const dv = eligible && value && value !== 1 && MASS_UNITS[from] && MASS_UNITS[def.unit] ? value * MASS_UNITS[from] / MASS_UNITS[def.unit] : null;
+    return { ...def, dv, catalogBacked: true, safety: row.category };
+  });
 }
 
 /** The AI brief lines for the builder filters. */
@@ -254,7 +223,8 @@ export function filtersToBrief(f: RecipeFilters): string {
   if (f.diets.length) lines.push(`Diet: every recipe must be ${f.diets.join(' and ')}.`);
   if (f.useIngredients.length) lines.push(`Use these ingredients: ${f.useIngredients.join(', ')}.`);
   if (f.avoidIngredients.length) lines.push(`Never use (or any form of): ${f.avoidIngredients.join(', ')}.`);
-  if (f.boost.length) lines.push(`Make the recipes rich in: ${f.boost.map((k) => nutrientByKey(k)?.label || k).join(', ')} (choose whole-food ingredients known to be high in them).`);
+  const boost = f.boost.map(nutrientByKey).filter((n): n is NutrientDef => !!n?.dv);
+  if (boost.length) lines.push(`Make the recipes rich in: ${boost.map(n => n.label).join(', ')} (choose whole-food ingredients known to be high in them).`);
   if (f.limit.length) lines.push(`Keep these low: ${f.limit.join(', ')}.`);
   return lines.join('\n');
 }

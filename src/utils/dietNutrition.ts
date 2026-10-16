@@ -1,5 +1,5 @@
 import { mealDrinks, mealPickKey, MEAL_SLOTS, selectedServings, toMealNutrition, WEEK, type DietConfig, type MealPick } from './protocolBuilders';
-import { canonicalMicros, ingredientHazards, NUTRIENTS, recipeHazards, type RecipeHazard } from './recipeNutrients';
+import { canonicalMicros, ingredientHazards, NUTRIENTS, nutrientByKey, recipeHazards, type RecipeHazard } from './recipeNutrients';
 import type { GuideRecipe } from './guidePortal';
 import { projectId, publicAnonKey } from './supabase/info';
 
@@ -16,7 +16,7 @@ function canonicalValues(values: Record<string, number>): Record<string, number>
   for (const [raw, value] of Object.entries(values)) {
     if (number(value) == null) continue;
     const k = raw === 'fat_g' ? 'fats_g' : raw === 'carbs_g' ? 'carbohydrates_g' : raw === 'sugar_g' ? 'sugars_g' : raw;
-    const def = NUTRIENTS.find((d) => d.aliases.includes(k));
+    const def = nutrientByKey(k);
     const key = def?.key || k;
     // Prefer the canonical spelling to a duplicate alias. Do not sum the same
     // stored nutrient twice (e.g. folate_ug alongside folate_mcg).
