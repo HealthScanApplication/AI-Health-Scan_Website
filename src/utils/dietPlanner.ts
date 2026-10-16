@@ -9,7 +9,7 @@
  */
 import { projectId, publicAnonKey } from './supabase/info';
 import { canonicalMicros, coverage, ingredientHazards, nutrientsForTier, recipeHazards, type NutrientDef, type RecipeHazard, type Tier } from './recipeNutrients';
-import { DIET_FRAMEWORKS, MEAL_SLOTS, WEEK, nameSlotHint, toMealNutrition, type DietConfig, type DietFramework, type MealPick } from './protocolBuilders';
+import { DIET_FRAMEWORKS, MEAL_SLOTS, WEEK, nameSlotHint, toMealNutrition, mealIsFasting, type DietConfig, type DietFramework, type MealPick } from './protocolBuilders';
 import type { GuideRecipe } from './guidePortal';
 
 export interface Candidate extends MealPick {
@@ -130,7 +130,7 @@ export function planWeek(cfg: DietConfig, candidates: Candidate[], tier: Tier, o
     for (const s of slots) { const c = asCandidate(plan[`${day}:${s.id}`]); if (c) { totals = addTo(totals, c); usedToday.add(c.id); } }
     for (const s of slots) {
       const key = `${day}:${s.id}`;
-      if (plan[key]) continue;
+      if (plan[key] || mealIsFasting(cfg,day,s.id)) continue;
       const slotKcal = cfg.kcal * s.share / share;
       let best: { c: Candidate; score: number } | null = null;
       for (const c of candidates) {
@@ -151,7 +151,7 @@ export function planWeek(cfg: DietConfig, candidates: Candidate[], tier: Tier, o
       for (const s of slots) {
         const key = `${day}:${s.id}`;
         const cur = asCandidate(plan[key]);
-        if (!cur || cfg.plan[key]) continue; // never replace a Guardian's own pick
+        if (!cur || cfg.plan[key] || mealIsFasting(cfg,day,s.id)) continue; // never replace a Guardian's own pick
         const without = slots.reduce((t, x) => { const c = x.id === s.id ? null : asCandidate(plan[`${day}:${x.id}`]); return c ? addTo(t, c) : t; }, emptyDay());
         for (const c of candidates) {
           if (c.id === cur.id || usedToday.has(c.id) || blocked(c.id, day) || slotFit(c, s.id) == null || !c.nutrition || (c.healthScore ?? 55) < 40) continue;

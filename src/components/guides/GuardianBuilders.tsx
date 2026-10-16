@@ -5,11 +5,11 @@ import type { GuideLead, GuideRecipe } from '../../utils/guidePortal';
 import { smartFill, type RecipeIdea } from '../../utils/dietPlanner';
 import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
 import { TIERS, tierLabel, useEssential90 } from './RecipeInsights';
-import { SupplementPicker } from './SupplementPicker';
+import { DietFastingControls, FastingDayCell, WeeklySupplementRows, fastHatch } from './DietSchedule';
 import { DietNutritionPanel } from './DietNutritionPanel';
 import { aggregateDiet, dietSelections, loadDietAnalysis, type DietAnalysis } from '../../utils/dietNutrition';
 import {
-  MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, mealDrinks, mealPickKey, selectedServings, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, FASTING_TYPES, SUPPLEMENT_PERIODS, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
+  MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, mealDrinks, mealPickKey, selectedServings, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, mealIsFasting, fastingDrinkAllowed, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
   dietSupportItems, listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
@@ -195,6 +195,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
     setMessage(metaSaved ? 'Saved as a Protocol.' : 'Saved the meals. The diet settings could not be stored on this database yet.');
   });
   const load = (p: AdminProtocol) => { const c = meta[p.id]?.builder_config; if (c) { setCfg({ ...emptyDiet(), ...c, drinks: c.drinks }); setName(p.name); setProtocolId(p.id); setMessage(''); } };
+  const shownResults = results.filter(r => !picking || drinkIndex == null || fastingDrinkAllowed(cfg,Number(picking.split(':')[0]),picking.split(':')[1],r));
 
   return <div>
     <Header Icon={Utensils} kicker="Build" title="Diet" copy="Plan meals and drinks from your recipes and the published recipe database. Daily and weekly macros, micronutrients and hazards use recorded nutrition and selected servings; missing data stays unknown." />
@@ -221,18 +222,9 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
     </div>
     <DietNutritionPanel report={nutritionReport} loading={analysisBusy} error={analysisError} />
     {macroSum !== 100 && <p style={{ color: warn, fontSize: 12 }}>Macros add up to {macroSum}% of energy. Adjust them to 100%.</p>}
-    <div style={{ ...card, marginBottom: 14 }}>
-      <div style={{ ...label, color: acid }}>Fasting</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>{FASTING_TYPES.map((type) => <button key={type.id} type="button" style={chip((cfg.fasting?.type || 'none') === type.id)} onClick={() => setCfg((c) => ({ ...c, fasting: { ...(c.fasting || { start: '20:00', end: '12:00', days: WEEK.map((w) => w.day) }), type: type.id } }))}>{type.label}</button>)}</div>
-      {(cfg.fasting?.type || 'none') !== 'none' && <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, alignItems: 'end' }}>
-          <label><span style={label}>Fast starts</span><input type="time" style={input} value={cfg.fasting?.start || '20:00'} onChange={(e) => setCfg((c) => ({ ...c, fasting: { ...(c.fasting || { type: 'intermittent', end: '12:00', days: WEEK.map((w) => w.day) }), start: e.target.value } }))} /></label>
-          <label><span style={label}>Fast ends</span><input type="time" style={input} value={cfg.fasting?.end || '12:00'} onChange={(e) => setCfg((c) => ({ ...c, fasting: { ...(c.fasting || { type: 'intermittent', start: '20:00', days: WEEK.map((w) => w.day) }), end: e.target.value } }))} /></label>
-          <div><span style={label}>Days</span><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{WEEK.map((w) => { const on = cfg.fasting?.days.includes(w.day) ?? true; return <button key={w.day} type="button" style={{ ...chip(on), padding: '5px 9px', fontSize: 10 }} onClick={() => setCfg((c) => { const current = c.fasting || { type: 'intermittent', start: '20:00', end: '12:00', days: WEEK.map((x) => x.day) }; return { ...c, fasting: { ...current, days: current.days.includes(w.day) ? current.days.filter((d) => d !== w.day) : [...current.days, w.day] } }; })}>{w.short}</button>; })}</div></div>
-        </div>
-        {cfg.fasting?.type === 'dry' && <p style={{ color: warn, fontSize: 11, margin: '12px 0 0', display: 'flex', gap: 6, alignItems: 'center' }}><AlertTriangle size={13} /> Dry fasting restricts fluids and can be dangerous. Only include it with qualified medical guidance.</p>}
-      </>}
-    </div>
+    <section aria-label="Weekly diet planner">
+    <h2 style={{ fontSize: 16 }}>Weekly planner · meals, drinks &amp; supplements</h2>
+    <DietFastingControls cfg={cfg} setCfg={setCfg} />
     <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
       <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => setTier(t)} title="Rank meals by this essential-nutrient set and show each day's coverage" style={{ ...chip(t === tier), padding: '6px 10px', fontSize: 10 }}>{tierLabel(t)}</button>)}</span>
       <button type="button" style={btn} disabled={busy || !slots.length} onClick={autoFill}><Sparkles size={13} /> Auto-fill week</button>
@@ -242,42 +234,38 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
       <Status busy={busy} message={message} />
     </div>
     {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
-    <h2 style={{ fontSize: 16 }}>Meal planner · meals &amp; drinks</h2>
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: `132px repeat(7,minmax(118px,1fr))`, gap: 6, minWidth: 990 }}>
         <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{nutritionReport.days[i].nutrients.energy_kcal.amount == null ? 'Unknown' : Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} />
           <div style={{ color: ink, fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4 }}>P {nutritionReport.days[i].nutrients.protein_g.amount == null ? 'Unknown' : Math.round(dayTotals[i].protein_g)} / {targets.protein_g} g</div><Bar value={dayTotals[i].protein_g} target={targets.protein_g} />
           {nutritionReport.days[i].count > 0 && <div title={reports[i].gaps.map((g) => g.label).join(', ')} style={{ fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4, color: reports[i].coverage >= 60 ? acid : warn }}>{tierLabel(tier)} recorded: {reports[i].coverage}%{reports[i].incomplete && <span style={{ display: 'block' }}>Incomplete data</span>}{reports[i].gaps.length ? <span style={{ display: 'block', color: muted }}>low recorded: {reports[i].gaps.slice(0, 3).map((g) => g.label).join(', ')}{reports[i].gaps.length > 3 ? ` +${reports[i].gaps.length - 3}` : ''}</span> : null}</div>}
         </div>)}
+        <div style={{...label,alignSelf:'center'}}>Fasting · 24h timeline</div>{WEEK.map(w => <FastingDayCell key={w.day} cfg={cfg} day={w.day} />)}
         {slots.map((s) => [<div key={s.id} style={{ ...label, margin: 0, alignSelf: 'center' }}>{s.label}<div style={{ fontWeight: 400, margin: '4px 0 2px' }}><TimingField compact value={mealTiming(cfg, s.id)} onChange={(t) => setCfg({ ...cfg, timing: { ...cfg.timing, [s.id]: t } })} /></div><div style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>≈ {resolveTiming(mealTiming(cfg, s.id))}</div></div>, ...WEEK.map(({ day }) => {
-          const key = `${day}:${s.id}`; const pick = cfg.plan[key];
+          const key = `${day}:${s.id}`; const pick = cfg.plan[key]; const fasting = mealIsFasting(cfg,day,s.id);
           const drinks = mealDrinks(cfg,key);
-          return <div key={key} style={{ ...card, padding: 8, minHeight: 92, borderColor: picking === key ? acid : line, position: 'relative' }}>
+          return <div key={key} aria-label={`${key} meal slot`} style={{ ...card, background:fasting?fastHatch:panel, padding: 8, minHeight: 92, borderColor: picking === key ? acid : line, position: 'relative' }}>
+            {fasting && <div style={{fontSize:10,color:warn,marginBottom:6}}>Fasting · {pick?'existing meal conflicts':'no meal at this time'}</div>}
             {pick ? <>
               {pick.image && <img src={pick.image} alt="" style={{ width: '100%', height: 44, objectFit: 'cover', marginBottom: 5 }} />}
-              <button type="button" aria-label={`Change ${key} meal`} onClick={() => { setPicking(key); setDrinkIndex(null); setQuery(''); }} style={{ ...iconBtn, textAlign: 'left', color: ink, fontSize: 11, lineHeight: 1.25, paddingRight: 14 }}>{pick.name}</button>
+              <button type="button" disabled={fasting} aria-label={`Change ${key} meal`} onClick={() => { setPicking(key); setDrinkIndex(null); setQuery(''); }} style={{ ...iconBtn, textAlign: 'left', color: ink, fontSize: 11, lineHeight: 1.25, paddingRight: 14 }}>{pick.name}</button>
               <label style={{ fontSize: 10, display: 'block', marginTop: 5 }}>Servings <input aria-label={`${key} meal servings`} type="number" min="0.01" step="0.25" value={selectedServings(pick)} onChange={(e) => setPick(key,{ ...pick, servings: Math.max(.01,Number(e.target.value)||1) })} style={{ ...input, width: 55, height: 26, padding: 3 }} /></label>
               <div style={{ color: muted, fontSize: 10, marginTop: 3 }}>{pick.nutrition ? `${Math.round(pick.nutrition.energy_kcal)} kcal · P ${Math.round(pick.nutrition.protein_g)}` : 'No nutrition data'}{pick.healthScore != null ? ` · ♥ ${pick.healthScore}` : ''}{pick.source === 'guide' ? ' · yours' : ''}</div>
               {(analysis[mealPickKey(pick)]?.hazards || pick.hazards || pick.hazardFlags || []).slice(0, 2).map((h) => <div key={h.label} title="All hazard records are listed in the nutrition section above" style={{ fontSize: 9, marginTop: 2, color: h.level === 'high' ? '#E88A7A' : warn, display: 'flex', gap: 3, alignItems: 'center' }}><AlertTriangle size={9} /> {h.label}</div>)}
               <button type="button" title="Remove" onClick={(e) => { e.stopPropagation(); setPick(key, null); }} style={{ ...iconBtn, position: 'absolute', top: 4, right: 4 }}><X size={12} /></button>
-            </> : <button type="button" onClick={() => { setPicking(key); setDrinkIndex(null); setQuery(''); }} style={{ ...iconBtn, fontSize: 11 }}><Plus size={12} /> Add meal</button>}
+            </> : <button type="button" aria-label={`Add ${key} meal`} disabled={fasting} onClick={() => { setPicking(key); setDrinkIndex(null); setQuery(''); }} style={{ ...iconBtn, fontSize: 11, opacity:fasting?.4:1 }}><Plus size={12} /> Add meal</button>}
             {drinks.map((d,i) => <div key={i} style={{ borderTop: `1px solid ${line}`, marginTop: 7, paddingTop: 5, fontSize: 10 }}>
+              {!fastingDrinkAllowed(cfg,day,s.id,d) && <div style={{color:warn}}>Existing drink conflicts with fast</div>}
               <button type="button" onClick={() => { setPicking(key); setDrinkIndex(i); setQuery(typeof d === 'string' ? d : d.name); }} style={{ ...iconBtn, textAlign: 'left', fontSize: 10 }}>{typeof d === 'string' ? `${d} · match recipe (nutrition unknown)` : d.name}</button>
               {typeof d !== 'string' && <label style={{ display: 'block' }}>Servings <input aria-label={`${key} drink ${i+1} servings`} type="number" min="0.01" step="0.25" value={selectedServings(d)} onChange={(e) => setDrinks(key,drinks.map((x,n) => n===i ? { ...d, servings: Math.max(.01,Number(e.target.value)||1) } : x))} style={{ ...input, width: 55, height: 26, padding: 3 }} /></label>}
               <button type="button" aria-label={`Remove ${key} drink ${i+1}`} style={iconBtn} onClick={() => setDrinks(key,drinks.filter((_,n) => n!==i))}><X size={11} /></button>
             </div>)}
-            <button type="button" aria-label={`Add ${key} drink`} onClick={() => { setPicking(key); setDrinkIndex(drinks.length); setQuery(''); }} style={{ ...iconBtn, fontSize: 10, marginTop: 7 }}><Plus size={11} /> Add drink from recipes</button>
+            <button type="button" disabled={fasting && cfg.fasting?.type==='dry'} aria-label={`Add ${key} drink`} onClick={() => { setPicking(key); setDrinkIndex(drinks.length); setQuery(fasting?'Water':''); }} style={{ ...iconBtn, fontSize: 10, marginTop: 7 }}><Plus size={11} /> {fasting?'Add plain water from recipes':'Add drink from recipes'}</button>
           </div>;
         })])}
+        <WeeklySupplementRows cfg={cfg} setCfg={setCfg} accessToken={accessToken} />
       </div>
     </div>
-    <section aria-label="Supplements" style={{ ...card, marginTop: 18, marginBottom: 14 }}>
-      <div style={{ ...label, color: acid }}>Supplements</div>
-      <p style={{ color: muted, fontSize: 11 }}>Choose generic or branded supplements by name/barcode. Declared ingredient links are shown separately from meal nutrition.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}>{SUPPLEMENT_PERIODS.map((period) => <div key={period.id}>
-        <SupplementPicker accessToken={accessToken} title={`${period.label} supplements`} items={cfg.supplements?.[period.id] || []} onChange={(items) => setCfg((c) => ({ ...c, supplements: { ...c.supplements, [period.id]: items } }))} />
-        <label style={{ display: 'block', marginTop: 7 }}><span style={label}>Time</span><input type="time" style={input} value={cfg.supplementTimes?.[period.id] || period.time} onChange={(e) => setCfg((c) => ({ ...c, supplementTimes: { ...c.supplementTimes, [period.id]: e.target.value } }))} /></label>
-      </div>)}</div>
     </section>
     {ideas.length > 0 && <div style={{ ...card, marginTop: 14 }}>
       <div style={{ ...label, color: acid }}>Recipe ideas for this week's gaps · ingredients ranked by nutrients per kcal, fewest hazards</div>
@@ -299,12 +287,12 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
       </div>
       <div style={{ position: 'relative', marginBottom: 10 }}><Search size={13} color={muted} style={{ position: 'absolute', left: 10, top: 13 }} /><input autoFocus style={{ ...input, paddingLeft: 30 }} placeholder="Search recipes (yours and the catalog)" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 7 }}>
-        {results.map((r) => <button key={`${r.source}-${r.id}`} type="button" onClick={() => { if (drinkIndex == null) setPick(picking,r); else { const drinks = [...mealDrinks(cfg,picking)]; drinks[drinkIndex] = r; setDrinks(picking,drinks); } setPicking(null); }} style={{ ...card, padding: 8, display: 'flex', gap: 8, textAlign: 'left', color: ink, cursor: 'pointer' }}>
+        {shownResults.map((r) => <button key={`${r.source}-${r.id}`} type="button" onClick={() => { const [day,slot] = picking.split(':'); if (drinkIndex == null) { if (mealIsFasting(cfg,Number(day),slot)) { setMessage('This meal time is inside the fasting window. Adjust the time or fasting schedule first.');return; } setPick(picking,r); } else { if (!fastingDrinkAllowed(cfg,Number(day),slot,r)) return; const drinks = [...mealDrinks(cfg,picking)]; drinks[drinkIndex] = r; setDrinks(picking,drinks); } setPicking(null); }} style={{ ...card, padding: 8, display: 'flex', gap: 8, textAlign: 'left', color: ink, cursor: 'pointer' }}>
           {r.image ? <img src={r.image} alt="" style={{ width: 42, height: 42, objectFit: 'cover', flex: 'none' }} /> : <div style={{ width: 42, height: 42, flex: 'none', border: `1px solid ${line}` }} />}
           <span><span style={{ display: 'block', fontSize: 12 }}>{r.name}</span><span style={{ color: muted, fontSize: 10 }}>{r.nutrition ? `${Math.round(r.nutrition.energy_kcal)} kcal · P ${Math.round(r.nutrition.protein_g)} · C ${Math.round(r.nutrition.carbohydrates_g)} · F ${Math.round(r.nutrition.fats_g)}` : ''}{r.source === 'guide' ? ' · your recipe' : ''}{!fitsSlot(r.name, picking.split(':')[1]) ? ' · named for another meal' : ''}</span></span>
         </button>)}
         {searching && <span role="status" style={{ color: muted, fontSize: 12 }}>Searching recipes…</span>}
-        {!searching && !results.length && <span style={{ color: muted, fontSize: 12 }}>No matching recipes. Recipes without nutrition can still be selected; their values remain unknown.</span>}
+        {!searching && !shownResults.length && <span style={{ color: muted, fontSize: 12 }}>No matching recipes allowed at this time. During fasting, only plain-water recipes can be added unless this is a dry fast. Recipes without nutrition remain unknown.</span>}
       </div>
     </div>}
   </div>;
