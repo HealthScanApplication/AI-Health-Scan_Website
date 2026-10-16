@@ -489,7 +489,7 @@ const PROTOCOL_ITEM_RULES = `Item rules (strict):
 async function catalogNameHints(): Promise<string> {
   const [activities, recipes] = await Promise.all([
     supabase.from('catalog_activities').select('name').not('name', 'is', null).limit(80),
-    supabase.from('catalog_recipes').select('name_common').not('name_common', 'is', null).order('health_score', { ascending: false, nullsFirst: false }).limit(80),
+    supabase.from('catalog_recipes').select('name_common').eq('is_published', true).not('name_common', 'is', null).order('health_score', { ascending: false, nullsFirst: false }).limit(80),
   ])
   const a = (activities.data || []).map((r: any) => r.name).filter(Boolean).join(', ')
   const r = (recipes.data || []).map((x: any) => x.name_common).filter(Boolean).join(', ')

@@ -61,6 +61,8 @@ export interface GuideRecipe {
   nutrition_per_serving?: Record<string, unknown> | null;
   nutrition_total?: Record<string, unknown> | null;
   offer_ids?: string[];
+  catalog_recipe_id?: string | null;
+  parent_protocol_id?: string | null;
 }
 
 export interface GuideValueRamp {
