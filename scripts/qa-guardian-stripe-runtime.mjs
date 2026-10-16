@@ -12,6 +12,7 @@ const declined = process.env.QA_PAYMENT_CASE === 'decline';
 const sepa = process.env.QA_PAYMENT_CASE?.startsWith('sepa');
 const sepaFailed = process.env.QA_PAYMENT_CASE === 'sepa-failed';
 const currency = sepa ? 'EUR' : 'GBP';
+const reuseBrowserFixture = process.env.QA_REUSE_BROWSER_PROFILE === '1';
 function sql(query) {
   return execFileSync('supabase', ['db', 'query', '--linked', '--project-ref', project, query, '--output', 'json'], {
     encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000,
@@ -32,7 +33,11 @@ try {
   const bundle = await (await fetch(`https://routine3.com/assets/${chunk}`)).text();
   const pk = bundle.match(/pk_test_[A-Za-z0-9]+/)?.[0];
   if (!pk || !bundle.includes('Live payments are disabled pending full staging verification')) throw new Error('Missing test key or production hold');
-  sql(`begin; insert into public.guide_profiles(user_id,slug,display_name,status) values('${owner}','${slug}','QA Stripe runtime','submitted'); insert into public.guide_offers(id,guide_id,kind,title,status,access_model,price_cents,currency) values('${offer}','${owner}','ebook','QA staging only','published','paid',100,'${currency}'); commit;`);
+  if (reuseBrowserFixture) {
+    const profile = JSON.parse(sql(`select slug from public.guide_profiles where user_id='${owner}';`)).rows?.[0];
+    if (profile?.slug !== 'qa-browser-checkout-20261016') throw new Error('Only the named disposable browser QA profile may be reused');
+  }
+  sql(`begin; ${reuseBrowserFixture ? '' : `insert into public.guide_profiles(user_id,slug,display_name,status) values('${owner}','${slug}','QA Stripe runtime','submitted');`} insert into public.guide_offers(id,guide_id,kind,title,status,access_model,price_cents,currency) values('${offer}','${owner}','ebook','QA staging only','published','paid',100,'${currency}'); commit;`);
   created = true;
   console.log('Fixture visibility:', sql(`select id, status, access_model from public.guide_offers where id='${offer}';`));
   const intent = await action({ action: 'intent', offer_id: offer, email: `guardian-qa-${offer}@example.invalid`, name: 'Staging QA' });
@@ -109,7 +114,7 @@ try {
   process.exitCode = 1;
 } finally {
   if (created) {
-    sql(`begin; delete from public.guardian_purchases where offer_id in ('${upsellOffer}','${offer}'); delete from public.guide_offers where id in ('${upsellOffer}','${offer}') and guide_id='${owner}'; delete from public.guide_profiles where user_id='${owner}' and slug='${slug}'; commit;`);
+    sql(`begin; delete from public.guardian_purchases where offer_id in ('${upsellOffer}','${offer}'); delete from public.guide_offers where id in ('${upsellOffer}','${offer}') and guide_id='${owner}'; ${reuseBrowserFixture ? '' : `delete from public.guide_profiles where user_id='${owner}' and slug='${slug}';`} commit;`);
     console.log(JSON.stringify({ check: 'staging_fixture_cleanup', passed: true, offer }));
   }
 }
