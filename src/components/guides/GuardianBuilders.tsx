@@ -7,7 +7,7 @@ import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
 import { TIERS, tierLabel } from './RecipeInsights';
 import {
   MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, FASTING_TYPES, SUPPLEMENT_PERIODS, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
-  listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
+  dietSupportItems, listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
 
@@ -217,7 +217,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
       <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => setTier(t)} title="Rank meals by this essential-nutrient set and show each day's coverage" style={{ ...chip(t === tier), padding: '6px 10px', fontSize: 10 }}>{tierLabel(t)}</button>)}</span>
       <button type="button" style={btn} disabled={busy || !slots.length} onClick={autoFill}><Sparkles size={13} /> Auto-fill week</button>
       <button type="button" style={ghost} disabled={busy} onClick={() => setCfg({ ...cfg, plan: {} })}>Clear</button>
-      <button type="button" style={btn} disabled={busy || !Object.values(cfg.plan).some(Boolean)} onClick={() => setReview(reviewDiet(cfg))}>Review &amp; {protocolId ? 'update' : 'save'}</button>
+      <button type="button" style={btn} disabled={busy || (!Object.values(cfg.plan).some(Boolean) && !dietSupportItems(cfg).length)} onClick={() => setReview(reviewDiet(cfg))}>Review &amp; {protocolId ? 'update' : 'save'}</button>
       {protocolId && <button type="button" style={ghost} onClick={() => onOpen(protocolId)}>Open in editor</button>}
       <Status busy={busy} message={message} />
     </div>
