@@ -1,4 +1,4 @@
-import { mealDrinks, mealPickKey, MEAL_SLOTS, selectedServings, toMealNutrition, WEEK, type DietConfig, type MealPick } from './protocolBuilders';
+import { mealDrinks, mealPickKey, MEAL_SLOTS, selectedServings, toMealNutrition, WEEK, type DietConfig, type MealPick, type PlanIngredient } from './protocolBuilders';
 import { canonicalMicros, ingredientHazards, NUTRIENTS, nutrientByKey, recipeHazards, type RecipeHazard } from './recipeNutrients';
 import type { GuideRecipe } from './guidePortal';
 import { projectId, publicAnonKey } from './supabase/info';
@@ -44,10 +44,13 @@ export interface DietTotals {
   count: number; unlinked: number; unassessed: number;
   nutrients: Record<string, { amount: number | null; known: number; partial?: boolean }>;
   hazards: Array<RecipeHazard & { amount: number | null; unknown: number; occurrences: number }>;
+  /** Ingredients across the selections; grams = portion in this plan (servings applied), null if unknown. */
+  ingredients: PlanIngredient[];
 }
 const LEVELS = ['trace','low','moderate','high'];
 function totals(items: Array<MealPick | string>, analysis: DietAnalysis): DietTotals {
-  const result: DietTotals = { count: items.length, unlinked: 0, unassessed: 0, nutrients: {}, hazards: [] };
+  const result: DietTotals = { count: items.length, unlinked: 0, unassessed: 0, nutrients: {}, hazards: [], ingredients: [] };
+  const ingredients = new Map<string, PlanIngredient>();
   for (const k of ['energy_kcal','protein_g','carbohydrates_g','fats_g','fiber_g', ...NUTRIENTS.map((d) => d.key)]) result.nutrients[k] = { amount: null, known: 0 };
   const hazards = new Map<string, DietTotals['hazards'][number]>();
   for (const item of items) {
@@ -55,6 +58,11 @@ function totals(items: Array<MealPick | string>, analysis: DietAnalysis): DietTo
     const p = { ...item, ...analysis[mealPickKey(item)], servings: item.servings };
     const servings = selectedServings(p);
     if (!p.analysisComplete) result.unassessed++;
+    for (const i of p.ingredients || []) {
+      const cur = ingredients.get(i.name) || { ...i, grams: 0 };
+      cur.grams = cur.grams == null || i.grams == null ? null : cur.grams + i.grams * servings;
+      ingredients.set(i.name, cur);
+    }
     for (const [k, v] of Object.entries(knownNutrients(p))) {
       const cell = result.nutrients[k] ||= { amount: null, known: 0 };
       cell.amount = (cell.amount ?? 0) + v * servings; cell.known++;
@@ -74,6 +82,7 @@ function totals(items: Array<MealPick | string>, analysis: DietAnalysis): DietTo
     }
   }
   result.hazards = [...hazards.values()].sort((a,b) => LEVELS.indexOf(b.level)-LEVELS.indexOf(a.level) || a.label.localeCompare(b.label));
+  result.ingredients = [...ingredients.values()].sort((a,b) => (b.grams ?? 0)-(a.grams ?? 0));
   return result;
 }
 export function aggregateDiet(cfg: DietConfig, analysis: DietAnalysis = {}) {
@@ -110,12 +119,12 @@ export async function loadDietAnalysis(token: string, picks: MealPick[], recipes
     let complete = true;
     const items = pick.source === 'guide' ? ((row as GuideRecipe).ingredients || []).map((i: any) => {
       if (!i?.per100 || number(i.grams) == null) complete = false;
-      return { name: i?.catalog_name || i?.name || 'Ingredient', grams: number(i?.grams) ?? 0, micros: number(i?.grams) == null ? {} : i?.per100?.micros || {}, hazards: i?.per100?.hazards || [] };
+      return { name: i?.catalog_name || i?.name || 'Ingredient', grams: number(i?.grams) ?? 0, known: number(i?.grams) != null, per100: i?.per100?.micros || {}, micros: number(i?.grams) == null ? {} : i?.per100?.micros || {}, hazards: i?.per100?.hazards || [] };
     }) : links.filter((j) => j.recipe_id === pick.id).map((j) => {
       const ing = ingredients.get(j.ingredient_id);
       const retention = j.retention_factor == null ? 1 : number(j.retention_factor);
       if (!ing || number(j.amount_g) == null || retention == null) complete = false;
-      return { name: ing?.name_common || 'Ingredient', grams: (number(j.amount_g) ?? 0) * (retention ?? 0), micros: number(j.amount_g) == null || retention == null ? {} : recordedMicros(ing), hazards: ingredientHazards(ing) };
+      return { name: ing?.name_common || 'Ingredient', grams: (number(j.amount_g) ?? 0) * (retention ?? 0), known: number(j.amount_g) != null && retention != null, per100: ing ? { ...canonicalValues(ing.nutrition_per_100g || {}), ...recordedMicros(ing) } : {}, micros: number(j.amount_g) == null || retention == null ? {} : recordedMicros(ing), hazards: ingredientHazards(ing) };
     });
     if (!items.length) complete = false;
     for (const i of items) for (const [k,v] of Object.entries(i.micros)) if (number(v) != null) micros[k] = (micros[k] || 0) + Number(v) * i.grams / 100 / divisor;
@@ -127,7 +136,8 @@ export async function loadDietAnalysis(token: string, picks: MealPick[], recipes
     });
     const unknownHazards = hazards.filter((h) => !complete || items.some((i) => i.hazards.some((hz) => hz.key === h.key && hz.per100 == null))).map((h) => h.key);
     result[mealPickKey(pick)] = { ...pick, nutrition: toMealNutrition(row.nutrition_per_serving), micros, hazards, analysisComplete: complete,
-      partialNutrients: Object.keys(micros).filter((key) => !complete || items.some((i) => i.micros[key] == null)), unknownHazards };
+      partialNutrients: Object.keys(micros).filter((key) => !complete || items.some((i) => i.micros[key] == null)), unknownHazards,
+      ingredients: items.map((i) => ({ name: i.name, grams: i.known ? i.grams / divisor : null, per100: i.per100, hazards: i.hazards })) };
   }
   return result;
 }
