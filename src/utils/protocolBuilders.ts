@@ -313,7 +313,8 @@ export async function draftFitnessWeek(accessToken: string, goalId: string, leve
 
 /* ── saving ── */
 const hhmmss = (t: string) => (t.length === 5 ? `${t}:00` : t);
-const weekly = (day: number) => ({ recurrence_type: 'weekly', recurrence_days_of_week: [WEEK.find((w) => w.day === day)?.dow ?? 1] });
+// Each item sits on its own day of the 7-day Protocol (day_number 1–7); the editor and app list a day's items by day_number.
+const weekly = (day: number) => ({ day_number: day, recurrence_type: 'daily', recurrence_days_of_week: null as number[] | null });
 
 async function clearItems(accessToken: string, protocolId: string) {
   const items = await listProtocolItems(accessToken, protocolId);
@@ -470,14 +471,14 @@ export function reviewCombined(itemsByProtocol: { name: string; items: AdminProt
 }
 
 /** Do's as checkable rule_do items: under a parent item (its do-checklist) or top-level in a group (that group's checklist). */
-async function addRules(accessToken: string, protocolId: string, rules: string[] | RuleList | undefined, opts: { parentId?: string | null; group?: string | null; category: string; days?: number[]; next: () => number }) {
+async function addRules(accessToken: string, protocolId: string, rules: string[] | RuleList | undefined, opts: { parentId?: string | null; group?: string | null; category: string; day?: number; next: () => number }) {
   const list = Array.isArray(rules) || !rules ? splitRules(rules || []) : rules;
   const all = [...list.dos.map((t) => ['rule_do', t]), ...list.donts.map((t) => ['rule_dont', t])];
   for (const [kind, rule] of all) await createProtocolItem(accessToken, {
     protocol_id: protocolId, display_name: rule, kind, item_type: 'activity', category: opts.category, subtype: null,
     parent_protocol_item_id: opts.parentId || null, group_name: opts.parentId ? null : opts.group || null, scheduled_time: null, day_number: 1,
     sort_order: opts.next() , has_children: false, enabled: true, hidden: false, notes: '',
-    ...(opts.days ? { recurrence_type: 'weekly', recurrence_days_of_week: opts.days } : { recurrence_type: 'daily' }),
+    recurrence_type: 'daily', ...(opts.day ? { day_number: opts.day } : {}),
   } as Partial<AdminProtocolItem>);
 }
 
@@ -529,7 +530,7 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
       group_name: plan.label, scheduled_time: hhmmss(plan.time), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: false,
       catalog_recipe_id: child.recipeId, media_image_url: child.image, notes: child.notes, ...days,
     } as Partial<AdminProtocolItem>);
-    await addRules(accessToken, protocol.id, { dos: plan.dos, donts: plan.donts }, { parentId: slotItem.id, category: 'consume', days: days.recurrence_days_of_week, next: () => order++ });
+    await addRules(accessToken, protocol.id, { dos: plan.dos, donts: plan.donts }, { parentId: slotItem.id, category: 'consume', day: plan.day, next: () => order++ });
   }
   await addGroupRules(accessToken, protocol.id, review.weekRules, 'meal', () => order++);
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'diet', builder_config: cfg });
@@ -560,7 +561,7 @@ export async function saveFitnessProtocol(accessToken: string, ownerId: string, 
       catalog_activity_id: e.id, sets: e.sets, reps: e.reps ? parseInt(e.reps, 10) || null : null, reps_display: e.reps, rest_seconds: e.rest_seconds,
       duration_minutes: e.minutes, day_number: 1, sort_order: order++, has_children: false, enabled: true, hidden: false, notes: '', ...weekly(s.day),
     } as Partial<AdminProtocolItem>);
-    await addRules(accessToken, protocol.id, step ? { dos: step.dos, donts: step.donts } : s.rules, { parentId: parent.id, category: 'do', days: weekly(s.day).recurrence_days_of_week, next: () => order++ });
+    await addRules(accessToken, protocol.id, step ? { dos: step.dos, donts: step.donts } : s.rules, { parentId: parent.id, category: 'do', day: s.day, next: () => order++ });
   }
   await addGroupRules(accessToken, protocol.id, review.weekRules, 'fitness', () => order++);
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'fitness', builder_config: cfg });
