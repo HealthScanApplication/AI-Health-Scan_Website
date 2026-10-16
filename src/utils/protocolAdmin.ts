@@ -12,6 +12,7 @@
  * environment (staging | production) via ../utils/supabase/info.
  */
 import { projectId, publicAnonKey } from './supabase/info';
+import { gateProtocolItem } from './protocolGate';
 import { enforceProtocolRules, isWakeTitle, ruleGroupFor, ruleRowFields, END_SLEEP, START_SLEEP, type Anchor, type RuleGroup, type RuleIssue } from './protocolRules';
 import {
   recipeMatchesSlot, recipeMealBucket, slotNameToBucket,
@@ -376,10 +377,17 @@ export async function updateProtocolItem(
   id: string,
   patch: Partial<AdminProtocolItem>,
 ): Promise<AdminProtocolItem> {
+  // Hard gate: a patch that touches the title, time, slot or kind is checked against the stored row.
+  let body: Partial<AdminProtocolItem> = patch;
+  if (['display_name', 'scheduled_time', 'group_name', 'category', 'subtype', 'kind'].some((k) => k in patch)) {
+    const current = await fetch(`${rest()}/protocol_items?id=eq.${id}&select=${ITEM_COLS}`, { headers: headers(accessToken) })
+      .then((r) => (r.ok ? r.json() : [])).then((rows) => rows?.[0]).catch(() => undefined);
+    body = gateProtocolItem(patch, current).item as Partial<AdminProtocolItem>;
+  }
   const res = await fetch(`${rest()}/protocol_items?id=eq.${id}`, {
     method: 'PATCH',
     headers: headers(accessToken, { Prefer: 'return=representation' }),
-    body: JSON.stringify(patch),
+    body: JSON.stringify(body),
   });
   return first(await handle(res, 'Update step'));
 }
@@ -388,10 +396,12 @@ export async function createProtocolItem(
   accessToken: string,
   item: Partial<AdminProtocolItem>,
 ): Promise<AdminProtocolItem> {
+  // Hard gate: every new row on the website goes through the same item rules as the AI builders.
+  const gated = gateProtocolItem(item).item;
   const res = await fetch(`${rest()}/protocol_items`, {
     method: 'POST',
     headers: headers(accessToken, { Prefer: 'return=representation' }),
-    body: JSON.stringify(item),
+    body: JSON.stringify(gated),
   });
   return first(await handle(res, 'Create step'));
 }
