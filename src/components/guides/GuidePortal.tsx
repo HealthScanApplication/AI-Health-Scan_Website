@@ -13,6 +13,7 @@ import { ProtocolChildrenPanel } from './ProtocolChildrenPanel';
 import { customizeProtocolRecipe } from '../../utils/protocolCopies';
 import { ContentBuilder } from './ContentBuilder';
 import { useGuardianPage } from './useGuardianPage';
+import { getGuardianStripeConfiguration } from '../../utils/guardianStripe';
 import { HazardList, NutrientCoverage, RecipeFiltersPanel } from './RecipeInsights';
 import { avoidViolations, filtersToBrief, type RecipeFilters, type Tier } from '../../utils/recipeNutrients';
 import { buildRecipePdf } from '../../utils/recipePdf';
@@ -823,7 +824,6 @@ const CONSENT_TEXT = 'Send me occasional emails with new guidance and offers. Un
 
 // Real checkout on the public page: first paid offer takes the card with Stripe's Payment Element
 // (saved for later with consent), then each following offer is a one-click upsell on that card.
-const STRIPE_KEY = (import.meta as any).env?.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 // Stripe.js must load from js.stripe.com (Stripe's requirement), so no npm dependency is needed.
 let stripeScript: Promise<any> | null = null;
 function loadStripeJs(key: string): Promise<any> {
@@ -862,7 +862,9 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
   async function start(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setMessage('');
     try {
-      const stripe = await loadStripeJs(STRIPE_KEY!);
+      const config = getGuardianStripeConfiguration();
+      if (!config.enabled || !config.publishableKey) throw new Error(config.error || 'Checkout is unavailable.');
+      const stripe = await loadStripeJs(config.publishableKey);
       if (!stripe) throw new Error('Could not load payments.');
       const intent = await createOfferPayment(offer.id, email, name);
       setPurchaseId(intent.purchase_id);
@@ -988,8 +990,9 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
     catch (err: any) { tab?.close(); setDownloadError(err?.message || 'Could not prepare the download.'); }
     finally { setDownloading(false); }
   }
-  // Paid offers without their own booking link are sold here; with no Stripe key we fall back to the link.
-  const sellsHere = (offer: GuideOffer) => Boolean(STRIPE_KEY) && offer.access_model === 'paid' && offer.price_cents > 0 && !offer.booking_url;
+  const stripeConfig = getGuardianStripeConfiguration();
+  // The environment must pass validation and the release hold before opening Stripe checkout.
+  const sellsHere = (offer: GuideOffer) => stripeConfig.enabled && offer.access_model === 'paid' && offer.price_cents > 0 && !offer.booking_url;
   const openOffer = (offer: GuideOffer) => (event: React.MouseEvent) => { if (sellsHere(offer)) { event.preventDefault(); setCheckoutOffer(offer); } };
   const paidAfter = (offer: GuideOffer) => ordered.slice(ordered.indexOf(offer) + 1).filter(sellsHere);
   const price = (offer: GuideOffer) => offer.access_model === 'free' ? 'Free' : offer.price_cents ? formatMoney(offer.price_cents / 100, offer.currency || 'GBP') : 'Enquire';
@@ -1013,6 +1016,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   const leadVideo = offerVideos.free || '';
   return <>
     {checkoutOffer && <OfferCheckout offer={checkoutOffer} upsells={paidAfter(checkoutOffer)} profile={profile} accent={accent} reviews={reviews} videos={offerVideos} onClose={() => setCheckoutOffer(null)} />}
+    {!stripeConfig.enabled && ordered.some(offer => offer.access_model === 'paid' && offer.price_cents > 0 && !offer.booking_url) && <p role="status" style={{ padding: '16px 24px', textAlign: 'center', color: accent }}>{stripeConfig.error}</p>}
     {steps.length > 0 && <section id="offers" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)' }}>
       {/* App-style heading (Poppins, like the ROUTINE³ paywall): green label, bold title, muted subtitle. */}
       <div style={{ fontFamily: APP.font, textAlign: 'center', margin: '0 auto 28px', maxWidth: 640 }}>

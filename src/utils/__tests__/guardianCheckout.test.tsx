@@ -11,6 +11,7 @@ vi.mock('../../utils/guidePortal',async original=>({...await original<any>(),
 const offer={id:'qa-offer',title:'QA offer',currency:'GBP',price_cents:100,kind:'ebook',access_model:'paid',status:'published'} as any;
 const profile={display_name:'QA Guardian',slug:'qa',avatar_url:null} as any;
 beforeEach(()=>{
+  vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY_STAGING','pk_test_CheckoutFixture');
   api.confirm.mockReset().mockResolvedValue({status:'paid'});
   api.pay.mockReset().mockResolvedValue({paymentIntent:{status:'succeeded'}});
   (window as any).Stripe=()=>({elements:()=>({create:()=>{
@@ -19,7 +20,7 @@ beforeEach(()=>{
   }}),confirmPayment:api.pay});
   vi.stubGlobal('requestAnimationFrame',(fn:()=>void)=>setTimeout(fn,0));
 });
-afterEach(()=>{cleanup();vi.unstubAllGlobals();delete (window as any).Stripe;});
+afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.unstubAllEnvs();delete (window as any).Stripe;});
 async function checkout(){
   render(<OfferCheckout offer={offer} upsells={[]} profile={profile} accent="#000" onClose={()=>{}} />);
   fireEvent.change(screen.getByRole('textbox',{name:'First name'}),{target:{value:'QA'}});
