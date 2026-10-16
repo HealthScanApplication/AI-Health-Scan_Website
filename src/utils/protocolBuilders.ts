@@ -18,7 +18,7 @@ import {
 import type { GuideRecipe } from './guidePortal';
 import { isBedName, isWakeName } from './sleepWindow';
 import { MEAL_SLOT_DEFAULT_TIMES, mealSlotName } from '../protocolDomain/mealSlot';
-import { END_SLEEP, START_SLEEP, enforceProtocolRules, isRuleTitle, type RuleIssue, type RuleStep } from './protocolRules';
+import { END_SLEEP, START_SLEEP, enforceProtocolRules, isRuleTitle, ruleGroupFor, ruleRowFields, type RuleIssue, type RuleStep } from './protocolRules';
 
 const rest = () => `https://${projectId}.supabase.co/rest/v1`;
 const headers = (accessToken: string, extra: Record<string, string> = {}) => ({
@@ -140,9 +140,9 @@ export function planMealItems(cfg: DietConfig): SlotPlan[] {
     const t = mealTiming(cfg, slot.id);
     const rules = splitRules(cfg.mealRules?.[slot.id] || []);
     const nut = pick.nutrition;
-    steps.push({ key: `${key}:meal`, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
+    steps.push({ key: `${key}:meal`, mealSlot: slot.label, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
     const drinks = cfg.drinks?.[slot.id] ?? DEFAULT_DRINKS[slot.id] ?? [];
-    drinks.forEach((d, i) => steps.push({ key: `${key}:drink:${i}`, title: d, group: 'meal', time: resolveTiming(t), notes: '', dos: [], donts: [], windowKey: String(day) }));
+    drinks.forEach((d, i) => steps.push({ key: `${key}:drink:${i}`, mealSlot: slot.label, title: d, group: 'meal', time: resolveTiming(t), notes: '', dos: [], donts: [], windowKey: String(day) }));
     plans.push({ key, day, slotId: slot.id, label: slot.label, time: resolveTiming(t), timingNote: t.anchor !== 'clock' ? describeTiming(t) : '', dos: [], donts: [], children: [
       { title: pick.name, role: 'meal', recipeId: pick.source === 'catalog' ? pick.id : null, image: pick.image,
         notes: nut ? `${Math.round(nut.energy_kcal)} kcal · P ${Math.round(nut.protein_g)} g · C ${Math.round(nut.carbohydrates_g)} g · F ${Math.round(nut.fats_g)} g per serving${pick.source === 'guide' ? ' · Guardian recipe' : ''}` : '' },
@@ -344,7 +344,8 @@ export function splitRules(lines: string[]): RuleList {
 export interface Conflict { rule: string; item: string; where: string; reason: string }
 export interface ReviewNote { where: string; message: string }
 export interface CheckedStep extends RuleStep { key: string }
-export interface Review { steps: Record<string, CheckedStep>; notes: ReviewNote[]; conflicts: Conflict[]; weekRules: RuleList }
+/** notes = auto-fixes applied on save; blocking = must be fixed before saving (the hard gate); conflicts = contradictions, flagged only. */
+export interface Review { steps: Record<string, CheckedStep>; notes: ReviewNote[]; blocking: ReviewNote[]; conflicts: Conflict[]; weekRules: RuleList }
 
 // Interim subject tags for flagging only. Replace with the shared resolveConflicts once it is approved and built.
 const SUBJECTS: { tag: string; rule: RegExp; item: RegExp }[] = [
@@ -383,7 +384,25 @@ export function findConflicts(rules: { text: string; scope: string; isDont: bool
 
 const ruleRows = (list: RuleList, scope: string) => [...list.dos.map((text) => ({ text, scope, isDont: false })), ...list.donts.map((text) => ({ text, scope, isDont: true }))];
 const notesOf = (steps: CheckedStep[], where: (s: CheckedStep) => string): ReviewNote[] =>
-  steps.flatMap((s) => (s.issues || []).map((i: RuleIssue) => ({ where: where(s), message: i.code === 'renamed' || i.code === 'vague' ? `${i.message} → “${s.title}”` : i.message })));
+  steps.flatMap((s) => (s.issues || []).filter((i) => i.code !== 'not_verb').map((i: RuleIssue) => ({ where: where(s), message: i.code === 'renamed' || i.code === 'vague' ? `${i.message} → “${s.title}”` : i.message })));
+/** The hard gate: an action whose title still is not verb + noun after the checker's fixes cannot be saved. */
+const blockingOf = (steps: CheckedStep[], where: (s: CheckedStep) => string): ReviewNote[] =>
+  steps.filter((s) => !s.isParent && s.kind !== 'rule' && s.group !== 'sleep' && s.group !== 'meal' && (s.issues || []).some((i) => i.code === 'not_verb'))
+    .map((s) => ({ where: where(s), message: `“${s.title}” must start with a verb (e.g. “Walk 20 minutes”)` }));
+
+/** Exercises save with set info: sets × reps for strength, minutes for timed work; gaps are filled from the level. */
+export function withSetInfo(cfg: FitnessConfig): { cfg: FitnessConfig; notes: ReviewNote[] } {
+  const dose = LEVEL[cfg.level] || LEVEL.beginner;
+  const notes: ReviewNote[] = [];
+  const sessions = cfg.sessions.map((s) => ({ ...s, minutes: s.minutes || cfg.minutes || 30, exercises: s.exercises.map((e) => {
+    if ((e.sets && e.reps) || e.minutes) return e;
+    const timed = /cardio|sports|stretch|recovery|yoga|hiit/i.test(e.category || '');
+    const fixed = timed ? { ...e, minutes: 10 } : { ...e, sets: e.sets || dose.sets, reps: e.reps || dose.reps, rest_seconds: e.rest_seconds ?? dose.rest };
+    notes.push({ where: `${WEEK.find((w) => w.day === s.day)?.short} ${s.title}`, message: `${e.name}: set info added (${timed ? '10 min' : `${fixed.sets} × ${fixed.reps}`})` });
+    return fixed;
+  }) }));
+  return { cfg: { ...cfg, sessions }, notes };
+}
 
 /** Every diet meal through the shared checker: dish name, a time, rule children; plus flagged contradictions. */
 export function reviewDiet(cfg: DietConfig): Review {
@@ -406,15 +425,17 @@ export function reviewDiet(cfg: DietConfig): Review {
   ];
   const placement = mealPlacementIssues(checked.map((x) => ({ display_name: x.title, category: 'consume', item_type: 'recipe', group_name: MEAL_SLOTS.find((m) => m.id === x.key.split(':')[1])?.label || null, scheduled_time: x.time })))
     .map((i) => ({ rule: 'Meal slots', item: i.item, where: 'Meal placement', reason: i.message }));
-  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label), conflicts: [...placement, ...conflicts], weekRules };
+  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label),
+    blocking: [...blockingOf(checked, label), ...placement.map((p) => ({ where: p.item, message: `${p.reason}. Swap the meal or move it to its slot.` }))], conflicts, weekRules };
 }
 
 /** Every fitness session through the shared checker: verb + noun title, a time, rule children; plus flagged contradictions. */
-export function reviewFitness(cfg: FitnessConfig): Review {
+export function reviewFitness(input: FitnessConfig): Review {
+  const { cfg, notes: setNotes } = withSetInfo(input);
   const steps: CheckedStep[] = cfg.sessions.map((s, i) => {
     const rules = splitRules(s.rules || []);
     const anchor = s.anchor === 'wake' ? 'wake' : s.anchor === 'bed' ? 'bedtime' : null;
-    return { key: String(i), title: s.title, group: 'fitness', time: anchor ? null : s.time, anchor, offsetMinutes: anchor ? (s.offset || 0) : null, durationMinutes: s.minutes, notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(s.day), link: s.exercises[0] ? { kind: 'activity', query: s.exercises[0].name } : null };
+    return { key: String(i), title: s.title, group: 'fitness', time: anchor ? null : s.time, anchor, offsetMinutes: anchor ? (s.offset || 0) : null, durationMinutes: s.minutes, notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(s.day), link: s.exercises[0] ? { kind: 'activity', query: s.exercises[0].name } : null, isParent: s.exercises.length > 0 };
   });
   const checked = enforceProtocolRules(steps);
   const label = (s: CheckedStep) => { const session = cfg.sessions[Number(s.key)]; return `${WEEK.find((w) => w.day === session.day)?.short} ${session.title}`; };
@@ -424,14 +445,15 @@ export function reviewFitness(cfg: FitnessConfig): Review {
     ...findConflicts(ruleRows(weekRules, 'week Fitness checklist'), items),
     ...cfg.sessions.flatMap((s) => findConflicts(ruleRows(splitRules(s.rules || []), `${s.title} checklist`), items.filter((i) => i.day === s.day))),
   ];
-  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label), conflicts, weekRules };
+  return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: [...notesOf(checked, label), ...setNotes], blocking: blockingOf(checked, label), conflicts, weekRules };
 }
 
 /** Combine review: the chosen protocols' top-level steps through the checker (notes only, nothing rewritten) plus rule-vs-item conflicts across protocols. */
-export function reviewCombined(itemsByProtocol: { name: string; items: AdminProtocolItem[] }[]): { notes: ReviewNote[]; conflicts: Conflict[] } {
+export function reviewCombined(itemsByProtocol: { name: string; items: AdminProtocolItem[] }[]): { notes: ReviewNote[]; blocking: ReviewNote[]; conflicts: Conflict[]; fixes: Record<string, { title: string; time: string | null }> } {
   const groupOf = (it: AdminProtocolItem) => it.category === 'sleep' ? 'sleep' : it.category === 'consume' ? 'meal' : it.subtype === 'exercise' ? 'fitness' : it.category || 'do';
   const steps: CheckedStep[] = itemsByProtocol.flatMap(({ name, items }) => items.filter((it) => !it.parent_protocol_item_id && it.kind === 'action').map((it) => ({
     key: `${name}|${it.id}`, title: it.display_name || '', group: groupOf(it), time: it.scheduled_time?.slice(0, 5) || null, notes: '', dos: [], donts: [], windowKey: name,
+    isParent: items.some((c) => c.parent_protocol_item_id === it.id && c.kind === 'action'),
   })));
   // Sleep is checked across the combined plan (one window) so duplicate wake/bed items show up.
   const checked = enforceProtocolRules(steps.map((s) => s.group === 'sleep' ? { ...s, windowKey: 'all' } : s));
@@ -440,7 +462,11 @@ export function reviewCombined(itemsByProtocol: { name: string; items: AdminProt
   const actions = itemsByProtocol.flatMap(({ name, items }) => items.filter((it) => it.kind === 'action').map((it) => ({ title: it.display_name || '', where: name, day: it.recurrence_days_of_week?.length === 1 ? (WEEK.find((w) => w.dow === it.recurrence_days_of_week![0])?.day) : undefined, kind: (it.subtype === 'exercise' && !it.parent_protocol_item_id ? 'session' : it.category === 'consume' ? 'meal' : 'item') as 'session' | 'meal' | 'item' })));
   const placement = itemsByProtocol.flatMap(({ name, items }) => mealPlacementIssues(items.filter((it) => !it.parent_protocol_item_id))
     .map((i) => ({ where: name, message: `${i.item}: ${i.message}${i.fix ? ' (moved on combine)' : ''}` })));
-  return { notes: [...placement, ...notes], conflicts: findConflicts(rules, actions) };
+  const fixes = Object.fromEntries(checked.map((c) => [c.key.split('|')[1], { title: c.title, time: c.time }]));
+  // Sources are existing Protocols: the shared verb list is closed ("Pay bills", "Reflect…" read as not verb-first), so a
+  // missing verb is a note to fix in the editor here, not a block. Builder-authored titles stay hard-gated.
+  const verbNotes = blockingOf(checked, (s) => s.key.split('|')[0]).map((b) => ({ ...b, message: `${b.message.replace(' must start', ' should start')} (check in the editor)` }));
+  return { notes: [...placement, ...notes, ...verbNotes], blocking: [], conflicts: findConflicts(rules, actions), fixes };
 }
 
 /** Do's as checkable rule_do items: under a parent item (its do-checklist) or top-level in a group (that group's checklist). */
@@ -455,6 +481,21 @@ async function addRules(accessToken: string, protocolId: string, rules: string[]
   } as Partial<AdminProtocolItem>);
 }
 
+/** Week checklists as top-level rule rows, filed by the shared ruleGroupFor/ruleRowFields (Drinks, Consume, general) like the AI builder. */
+async function addGroupRules(accessToken: string, protocolId: string, list: RuleList, fallback: string, next: () => number) {
+  for (const [kind, text] of [...list.dos.map((t) => ['rule_do', t]), ...list.donts.map((t) => ['rule_dont', t])]) {
+    const row = ruleRowFields(ruleGroupFor(text, fallback));
+    await createProtocolItem(accessToken, {
+      protocol_id: protocolId, display_name: text, kind, ...row, item_type: row.category === 'consume' ? 'consume' : 'activity', group_name: null,
+      parent_protocol_item_id: null, scheduled_time: null, day_number: 1, sort_order: next(), has_children: false, enabled: true, hidden: false, notes: '', recurrence_type: 'daily',
+    } as Partial<AdminProtocolItem>);
+  }
+}
+
+function assertGate(review: Pick<Review, 'blocking'>) {
+  if (review.blocking.length) throw new Error(`Fix before saving: ${review.blocking.map((b) => `${b.where}: ${b.message}`).join('; ')}`);
+}
+
 /** Run the item writes; on failure the error carries the protocol id so a retry updates the same protocol. */
 async function withProtocol<T>(protocol: AdminProtocol, work: () => Promise<T>): Promise<T> {
   try { return await work(); } catch (error) { throw Object.assign(error as Error, { protocolId: protocol.id }); }
@@ -466,6 +507,7 @@ async function ensureProtocol(accessToken: string, ownerId: string, existingId: 
 }
 
 export async function saveDietProtocol(accessToken: string, ownerId: string, existingId: string | null, name: string, cfg: DietConfig) {
+  assertGate(reviewDiet(cfg)); // hard gate before anything is written
   const framework = DIET_FRAMEWORKS.find((f) => f.id === cfg.framework) || DIET_FRAMEWORKS[0];
   const t = macroGrams(cfg);
   const protocol = await ensureProtocol(accessToken, ownerId, existingId, name, { category: 'Nutrition', description: `${framework.label} · ${t.energy_kcal} kcal/day · P ${t.protein_g} g · C ${t.carbohydrates_g} g · F ${t.fats_g} g` });
@@ -489,18 +531,20 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
     } as Partial<AdminProtocolItem>);
     await addRules(accessToken, protocol.id, { dos: plan.dos, donts: plan.donts }, { parentId: slotItem.id, category: 'consume', days: days.recurrence_days_of_week, next: () => order++ });
   }
-  await addRules(accessToken, protocol.id, review.weekRules, { group: 'Meal', category: 'consume', next: () => order++ });
+  await addGroupRules(accessToken, protocol.id, review.weekRules, 'meal', () => order++);
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'diet', builder_config: cfg });
   return { protocol, metaSaved: saved };
   });
 }
 
 export async function saveFitnessProtocol(accessToken: string, ownerId: string, existingId: string | null, name: string, cfg: FitnessConfig) {
+  assertGate(reviewFitness(cfg)); // hard gate before anything is written
   const goal = FITNESS_GOALS.find((g) => g.id === cfg.goal) || FITNESS_GOALS[0];
   const protocol = await ensureProtocol(accessToken, ownerId, existingId, name, { category: 'Fitness', description: `${goal.label} · ${cfg.level} · ${cfg.sessions.length} sessions/week` });
   return withProtocol(protocol, async () => {
   await clearItems(accessToken, protocol.id);
   const review = reviewFitness(cfg);
+  cfg = withSetInfo(cfg).cfg;
   let order = 0;
   for (const [index, s] of cfg.sessions.map((x, i) => [i, x] as const).sort((a, b) => a[1].day - b[1].day)) {
     const step = review.steps[String(index)];
@@ -518,7 +562,7 @@ export async function saveFitnessProtocol(accessToken: string, ownerId: string, 
     } as Partial<AdminProtocolItem>);
     await addRules(accessToken, protocol.id, step ? { dos: step.dos, donts: step.donts } : s.rules, { parentId: parent.id, category: 'do', days: weekly(s.day).recurrence_days_of_week, next: () => order++ });
   }
-  await addRules(accessToken, protocol.id, review.weekRules, { group: 'Fitness', category: 'do', next: () => order++ });
+  await addGroupRules(accessToken, protocol.id, review.weekRules, 'fitness', () => order++);
   const saved = await saveBuilderMeta(accessToken, protocol.id, { builder_kind: 'fitness', builder_config: cfg });
   return { protocol, metaSaved: saved };
   });
@@ -547,6 +591,10 @@ const COPY_SKIP = new Set(['id', 'protocol_id', 'parent_protocol_item_id', 'crea
 
 /** One personal Protocol that holds a copy of every chosen protocol's steps (children keep their parent). */
 export async function combineProtocols(accessToken: string, ownerId: string, person: { name: string; lead_id?: string | null }, sources: AdminProtocol[]) {
+  // Hard gate: the combined steps pass the shared checker (fixes applied below) or nothing is created.
+  const sourceItems = await Promise.all(sources.map(async (s) => ({ name: s.name, items: await listProtocolItems(accessToken, s.id) })));
+  const gate = reviewCombined(sourceItems);
+  if (gate.blocking.length) throw new Error(`Fix before combining: ${gate.blocking.map((b) => `${b.where}: ${b.message}`).join('; ')}`);
   const protocol = await createProtocol(accessToken, {
     user_id: ownerId, name: `${person.name} · Personal Protocol`, category: 'Health', total_days: Math.max(7, ...sources.map((s) => s.total_days || 7)),
     description: `Combined from ${sources.map((s) => s.name).join(' + ')}`,
@@ -557,7 +605,7 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
     : isWakeName(it.display_name || '') ? 'wake' : (it.category === 'sleep' || isBedName(it.display_name || '')) ? 'bed' : null;
   const haveSleep = new Set<string>();
   for (const source of sources) {
-    const items = await listProtocolItems(accessToken, source.id);
+    const items = sourceItems[sources.indexOf(source)].items;
     const idMap = new Map<string, string>();
     const skipped = new Set<string>();
     const parentsFirst = [...items].sort((a, b) => Number(!!a.parent_protocol_item_id) - Number(!!b.parent_protocol_item_id));
@@ -570,6 +618,7 @@ export async function combineProtocols(accessToken: string, ownerId: string, per
       for (const [k, v] of Object.entries(it)) if (!COPY_SKIP.has(k)) copy[k] = v;
       const created = await createProtocolItem(accessToken, {
         ...copy, protocol_id: protocol.id,
+        ...(gate.fixes[it.id] ? { display_name: gate.fixes[it.id].title, ...(gate.fixes[it.id].time ? { scheduled_time: hhmmss(gate.fixes[it.id].time!) } : {}) } : {}), // shared checker fixes
         ...(role ? { display_name: role === 'wake' ? END_SLEEP : START_SLEEP } : {}), // shared sleep names
         ...(!it.parent_protocol_item_id ? mealPlacementIssues([it]).find((x) => x.fix)?.fix || {} : {}), // meals into their consume slot
         parent_protocol_item_id: it.parent_protocol_item_id ? idMap.get(it.parent_protocol_item_id) || null : null,
