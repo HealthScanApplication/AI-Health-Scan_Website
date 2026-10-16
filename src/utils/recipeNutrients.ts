@@ -9,9 +9,8 @@
  * Tiers:
  *   15  core nutrients most diets fall short on;
  *   30  the 15 plus the remaining vitamins and trace minerals with an adult daily value;
- *   90  the app's Essential 90 (mobile HomeElements ESSENTIAL_NUM, ordinals 1–89: minerals, vitamins,
- *       amino acids, B vitamins, trace elements, phytonutrients, fatty acids, other) plus protein and fibre.
- *   The app defines only the 90; Core 15 and Extended 30 are subsets chosen here (most common shortfalls first).
+ *   90  the database Essential 90 collection when loaded (actual count is shown), with the mobile
+ *       list as an offline fallback. Core 15 / Extended 30 are app-defined subsets, with catalog metadata.
  */
 import { projectId, publicAnonKey } from './supabase/info';
 
@@ -106,6 +105,16 @@ export const APP_ESSENTIAL_90: Array<[number, string, string | null]> = [
 ];
 
 const ALIAS = new Map<string, NutrientDef>();
+const MASS_UNITS: Record<string,number> = { g: 1, mg: .001, mcg: .000001, ug: .000001 };
+for (const n of NUTRIENTS) {
+  const match = /^(.*)_(g|mg|mcg|ug)$/.exec(n.key);
+  if (!match) continue;
+  for (const [u,factor] of Object.entries(MASS_UNITS)) {
+    const alias = `${match[1]}_${u}`;
+    if (!n.aliases.includes(alias)) n.aliases.push(alias);
+    n.scale = { ...n.scale, [alias]: factor / MASS_UNITS[n.unit] };
+  }
+}
 for (const n of NUTRIENTS) for (const a of n.aliases) ALIAS.set(a, n);
 
 const slug = (label: string) => label.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -113,15 +122,16 @@ const slug = (label: string) => label.toLowerCase().replace(/\(.*?\)/g, '').repl
 const APP_EXTRA: NutrientDef[] = APP_ESSENTIAL_90.filter(([, , key]) => !key || !NUTRIENTS.some((n) => n.key === key)).map(([, label, key]) => {
   const base = key || slug(label);
   const known: Record<string, Partial<NutrientDef>> = { sodium_mg: { unit: 'mg', dv: 1500 }, chloride_mg: { unit: 'mg', dv: 2300 }, sulfur_mg: { unit: 'mg', dv: null } };
-  return { key: base, label, unit: known[base]?.unit || (key ? key.split('_').pop()! : 'mg'), dv: known[base]?.dv ?? null, tier: 90 as Tier,
-    aliases: key ? [key] : [`${base}_g`, `${base}_mg`, `${base}_mcg`, base] };
+  return { key: key || `${base}_mg`, label, unit: known[base]?.unit || (key ? key.split('_').pop()! : 'mg'), dv: known[base]?.dv ?? null, tier: 90 as Tier,
+    aliases: key ? [key] : [`${base}_g`, `${base}_mg`, `${base}_mcg`, base], scale: key ? undefined : { [`${base}_g`]: 1000, [`${base}_mcg`]: .001 } };
 });
 for (const n of APP_EXTRA) for (const a of n.aliases) if (!ALIAS.has(a)) ALIAS.set(a, n);
 const APP_KEYS = new Set(APP_ESSENTIAL_90.map(([, , key]) => key).filter(Boolean) as string[]);
 
-/** Tier 90 = protein + fibre + the app's Essential 90; 15 and 30 are the static subsets. `extra` is kept for callers that add more. */
+/** Catalog definitions override metadata for 15/30; the full catalog is used for 90. */
 export const nutrientsForTier = (tier: Tier, extra: NutrientDef[] = []) => {
-  if (tier < 90) return NUTRIENTS.filter((n) => n.tier <= tier);
+  if (tier < 90) return NUTRIENTS.filter((n) => n.tier <= tier).map(n => extra.find(e => e.key === n.key) || n);
+  if (extra.length) return [...extra, ...NUTRIENTS.filter(n => n.tier <= 30 && !extra.some(e => e.key === n.key))];
   const fromStatic = NUTRIENTS.filter((n) => n.tier < 90 || APP_KEYS.has(n.key) || n.key === 'protein_g' || n.key === 'fiber_g');
   const seen = new Set(fromStatic.map((n) => n.key));
   return [...fromStatic, ...APP_EXTRA.filter((n) => !seen.has(n.key)), ...extra.filter((n) => !seen.has(n.key))];
@@ -209,21 +219,30 @@ export function coverage(micros: Record<string, number> | undefined, macros: { p
 export const gaps = (cov: Coverage[], threshold = 20) => cov.filter((c) => c.pct == null || c.pct < threshold).map((c) => c.def);
 
 /**
- * The catalog's essential_90 beneficial nutrients not already in the static tables, as tier-90 defs
- * (daily value from catalog_elements). Rare-earth / trace "essentials" without a meaningful DV are skipped.
+ * Load the catalog's flagged beneficial collection, including entries with no usable reference amount.
+ * These classifications are catalog data, not claims of scientific essentiality or intake advice.
  */
 export async function loadEssential90(): Promise<NutrientDef[]> {
-  const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=name_common,nutrient_key,daily_value_amount,daily_value_unit,category&essential_90=eq.true&category=in.(Beneficial,Both)&nutrient_key=not.is.null&limit=300`;
+  const url = `https://${projectId}.supabase.co/rest/v1/catalog_elements?select=id,name_common,nutrient_key,daily_value_amount,daily_value_unit,category,essential_90,is_beneficial&essential_90=eq.true&category=in.(Beneficial,Both)&order=id.asc&limit=1000`;
   const res = await fetch(url, { headers: { apikey: publicAnonKey, Authorization: `Bearer ${publicAnonKey}` } });
-  if (!res.ok) return [];
-  const rows = (await res.json()) as Array<{ name_common: string; nutrient_key: string; daily_value_amount: number | string | null; daily_value_unit: string | null }>;
+  if (!res.ok) throw Error('Could not load database nutrient definitions');
+  const rows = await res.json();
+  // Prefer a canonical nutrient row to an alias/form (e.g. vitamin K over K2).
+  rows.sort((a: any,b: any) => Number(ALIAS.get(b.nutrient_key)?.key === b.nutrient_key) - Number(ALIAS.get(a.nutrient_key)?.key === a.nutrient_key));
   const out: NutrientDef[] = [];
   for (const r of rows) {
-    if (ALIAS.has(r.nutrient_key)) continue;
-    const dv = num(r.daily_value_amount);
-    if (!dv || dv === 1) continue; // placeholder DVs (1 mg) mark elements with no established intake
-    const unit = (r.nutrient_key.match(/_(mg|mcg|g|ug)s?$/)?.[1] || r.daily_value_unit || 'mg').replace('ug', 'mcg');
-    out.push({ key: r.nutrient_key, label: r.name_common.split('•')[0].trim(), unit, dv, tier: 90, aliases: [r.nutrient_key] });
+    if (!['Beneficial','Both'].includes(r.category) || r.is_beneficial === false) continue;
+    const label = r.name_common.split('•')[0].trim();
+    const existing = ALIAS.get(r.nutrient_key) || NUTRIENTS.find(n => n.label.toLowerCase() === label.toLowerCase());
+    const key = existing?.key || r.nutrient_key || `catalog:${r.id}`;
+    if (out.some(n => n.key === key)) continue;
+    const unit = existing?.unit || (r.nutrient_key?.match(/_(mg|mcg|g|ug)s?$/)?.[1] || r.daily_value_unit || '').replace('ug','mcg');
+    const value = num(r.daily_value_amount);
+    const from = (r.daily_value_unit || '').replace(/[μµ]g/g,'mcg').replace('ug','mcg').split(' ')[0];
+    const mass: Record<string,number> = { g: 1, mg: .001, mcg: .000001 };
+    // Placeholder 1 mg values do not establish an intake target. Never invent one.
+    const dv = value && value !== 1 && mass[from] && mass[unit] ? value * mass[from] / mass[unit] : null;
+    out.push({ key, label, unit, dv, tier: existing?.tier || 90, aliases: existing?.aliases || (r.nutrient_key ? [r.nutrient_key] : []), scale: existing?.scale });
   }
   return out;
 }
