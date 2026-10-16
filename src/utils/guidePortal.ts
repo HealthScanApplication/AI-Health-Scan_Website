@@ -428,8 +428,9 @@ async function callPayments<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 export const createOfferPayment = (offerId: string, email: string, name?: string) => callPayments<PaymentIntentResult>({ action: 'intent', offer_id: offerId, email, name });
-export const confirmOfferPayment = (purchaseId: string) => callPayments<{ status: PaymentIntentResult['status'] }>({ action: 'confirm', purchase_id: purchaseId });
-export const buyUpsellOneClick = (previousPurchaseId: string, offerId: string) => callPayments<PaymentIntentResult>({ action: 'upsell', previous_purchase_id: previousPurchaseId, offer_id: offerId });
+export const confirmOfferPayment = (purchaseId: string) => callPayments<{ status: PaymentIntentResult['status']; discount_ends_at?: number }>({ action: 'confirm', purchase_id: purchaseId });
+export const buyUpsellOneClick = (previousPurchaseId: string, offerId: string, expectedAmountCents?: number) => callPayments<PaymentIntentResult>({ action: 'upsell', previous_purchase_id: previousPurchaseId, offer_id: offerId, expected_amount_cents: expectedAmountCents });
+export const recoverUpsellPayment = (previousPurchaseId: string, offerId: string) => callPayments<PaymentIntentResult>({ action: 'upsell', previous_purchase_id: previousPurchaseId, offer_id: offerId, lookup_only: true });
 
 /** Short-lived download link for a free offer's uploaded file, after the visitor has opted in. */
 export async function getFreeOfferDownload(offerId: string, email: string): Promise<string> {

@@ -13,6 +13,7 @@ vi.mock('../../utils/guidePortal',async original=>({...await original<any>(),cre
 const offer={id:'qa-offer',title:'QA offer',currency:'GBP',price_cents:100,kind:'ebook',access_model:'paid',status:'published'} as any;
 const profile={display_name:'QA Guardian',slug:'qa',avatar_url:null} as any;
 beforeEach(()=>{
+  sessionStorage.clear();
   state.projectId='mofhvoudjxinvpplsytd';
   vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY','pk_live_LegacyIgnored');
   vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY_STAGING','pk_test_StagingAccount');

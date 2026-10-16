@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, ChevronRight, FileText, HeartPulse, LogOut,
   Mail, Package, Plus, Salad, Sparkles, Users, Globe2, Loader2,
@@ -14,6 +14,7 @@ import { customizeProtocolRecipe } from '../../utils/protocolCopies';
 import { ContentBuilder } from './ContentBuilder';
 import { useGuardianPage } from './useGuardianPage';
 import { getGuardianStripeConfiguration } from '../../utils/guardianStripe';
+import { readCheckoutSession, saveCheckoutSession, clearCheckoutSession, checkoutReturnUrl, clearCheckoutReturnParameters } from '../../utils/guardianCheckoutSession';
 import { HazardList, NutrientCoverage, RecipeFiltersPanel } from './RecipeInsights';
 import { avoidViolations, filtersToBrief, type RecipeFilters, type Tier } from '../../utils/recipeNutrients';
 import { buildRecipePdf } from '../../utils/recipePdf';
@@ -21,9 +22,10 @@ import { PhoneFrame } from '../mockups/PhoneFrame';
 import { buildRecipesWithAI, computeNutrition, gramsFor, searchCatalogIngredients, KEY_MICROS, UNITS, type CatalogIngredient, type MacroKey, type RecipeDraft, type RecipeIngredient } from '../../utils/guideRecipeAI';
 import { APP_STORE_URL } from '../../config/appLinks';
 import { EventProtocolBuilder } from './EventProtocolBuilder';
+import { GuardianModal } from './GuardianModal';
 import { buildProtocolWithAI, foldSleepSteps, saveDraftStep, updateProtocolWithAI, listProtocolItems, createProtocol, findOrCreateProtocol, createProtocolItem, listProtocols, type AdminProtocol } from '../../utils/protocolAdmin';
 import {
-  createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
+  recoverUpsellPayment, createGuideLead, createGuideOffer, createGuideRecipe, createGuideValueRamp, getGuideProfile, getGuideProfileBySlug,
   importGuideProfile, listGuideLeads, listGuideOffers, listGuideRecipes, listGuideValueRamps, listRoutineOwners, upsertGuideOffer, upsertGuideValueRamp, listPublicGuideProfiles, saveGuideProfile, listGuardianReviews, listGuardianReviewRequests, createGuardianReviewRequest, submitGuardianReview, setGuardianReviewStatus, createOfferPayment, confirmOfferPayment, buyUpsellOneClick, getFreeOfferDownload, requestGuardianReview, decideGuardianSite, listAllGuideProfiles, listGuardianSuggestions, setGuardianSuggestionStatus, listPublicGuardianOffers, listReviewSummaries, type AdminGuideProfile, type GuardianSuggestionRow, type GuardianReview, type GuardianReviewRequest, submitGuardianSuggestion, submitGuardianOptIn,
   createGuideLibraryFolder, createGuideLibraryItem, deleteGuideLibraryItem, getGuideFileDownloadUrl,
   listGuideLibraryFolders, listGuideLibraryItems, replaceGuideBrands, updateGuideRecipe, saveGuideRecipeDraft, listPersonalProtocolPeople, uploadGuideFile, uploadGuideImage,
@@ -560,7 +562,8 @@ function SocialUrlField({ label: text, value, placeholder, Icon, onChange }: { l
   </div>;
 }
 
-function AuthPanel({ bare = false, initialMode = 'signup', initialEmail = '' }: { bare?: boolean; initialMode?: 'login' | 'signup'; initialEmail?: string }) {
+function AuthPanel({ bare = false, initialMode = 'signup', initialEmail = '', onModalClose }: { bare?: boolean; initialMode?: 'login' | 'signup'; initialEmail?: string; onModalClose?: () => void }) {
+  const authFormId = useId();
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [name, setName] = useState('');
@@ -598,8 +601,12 @@ function AuthPanel({ bare = false, initialMode = 'signup', initialEmail = '' }: 
     }
     setBusy(false);
   }
-  return (
-    <form id="guide-signin" onSubmit={submit} style={bare ? { maxWidth: 460, width: '100%' } : { border: `1px solid ${line}`, background: panel, padding: 'clamp(24px,4vw,48px)', maxWidth: 460 }}>
+  const actions = <>
+    <button form={authFormId} disabled={busy} style={{ ...btn, width: '100%', opacity: busy ? .55 : 1 }}>{busy ? 'Please wait' : mode === 'login' ? 'Sign in' : 'Create Guardian account'} <ArrowRight size={14} /></button>
+    <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} style={{ border: 0, background: 'none', color: muted, width: '100%', marginTop: 15, cursor: 'pointer', fontFamily: sans, fontSize: 12 }}>{mode === 'login' ? 'New Guardian? Create an account' : 'Already have an account? Sign in'}</button>
+  </>;
+  const form = (
+    <form id={authFormId} onSubmit={submit} style={onModalClose ? {} : bare ? { maxWidth: 460, width: '100%' } : { border: `1px solid ${line}`, background: panel, padding: 'clamp(24px,4vw,48px)', maxWidth: 460 }}>
       {!bare && <><div style={{ ...label, color: acid }}>{mode === 'login' ? 'Sign in' : 'Step 1 · Create your account'}</div>
       <h2 style={{ margin: '12px 0 10px', fontFamily: serif, fontSize: 'clamp(32px,4vw,52px)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.045em' }}>{mode === 'login' ? 'Welcome back, Guardian.' : 'Build with ROUTINE³.'}</h2>
       <p style={{ color: muted, fontFamily: sans, fontSize: 14, lineHeight: 1.6, margin: '0 0 24px' }}>{mode === 'login' ? 'Pick up where you left off: your Protocols, offers and site are waiting.' : 'Create your profile, collect leads, and publish paid resources, recipes and protocols from one workspace.'}</p></>}
@@ -607,12 +614,10 @@ function AuthPanel({ bare = false, initialMode = 'signup', initialEmail = '' }: 
       <div style={{ marginBottom: 12 }}><label style={label}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={input} /></div>
       <div style={{ marginBottom: 16 }}><label style={label}>Password</label><input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required style={input} /></div>
       {error && <div style={{ color: '#F0A7A7', fontSize: 12, fontFamily: sans, marginBottom: 14 }}>{error}</div>}
-      <button disabled={busy} style={{ ...btn, width: '100%', opacity: busy ? 0.55 : 1, ...(bare ? { minHeight: 42, borderRadius: 2, fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', background: '#FFFFFF', color: '#16140F', borderColor: '#FFFFFF' } : {}) }}>{busy ? 'Please wait' : mode === 'login' ? 'Sign in' : 'Create Guardian account'} <ArrowRight size={14} /></button>
-      <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} style={{ border: 0, background: 'none', color: muted, width: '100%', marginTop: 15, cursor: 'pointer', fontFamily: sans, fontSize: 12 }}>
-        {mode === 'login' ? 'New Guardian? Create an account' : 'Already have an account? Sign in'}
-      </button>
+      {!onModalClose && actions}
     </form>
   );
+  return onModalClose ? <GuardianModal label={mode === 'login' ? 'Sign in' : 'Sign up'} onClose={onModalClose} panelStyle={{ background: black, color: ink, fontFamily: sans }} footer={actions} footerStyle={{ borderColor: line }}>{form}</GuardianModal> : form;
 }
 
 const guardianDirectoryTypes = [
@@ -653,15 +658,13 @@ function SuggestGuardianModal({ type, onClose }: { type: string; onClose: () => 
   const lab: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#66645F', margin: '0 0 6px' };
   const socials: [keyof typeof form, string, string][] = [['instagram', 'Instagram', '@handle'], ['tiktok', 'TikTok', '@handle'], ['youtube', 'YouTube', 'Channel URL'], ['website', 'Website', 'https://']];
   return (
-    <div role="dialog" aria-modal="true" aria-label={`Suggest a ${type.toLowerCase()}`} onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(9,10,8,.62)', display: 'grid', placeItems: 'center', padding: 16 }}>
-      <form onClick={(e) => e.stopPropagation()} onSubmit={submit} style={{ width: '100%', maxWidth: 480, maxHeight: '92vh', overflowY: 'auto', boxSizing: 'border-box', background: '#F2EFE7', color: '#11120F', borderRadius: 4, padding: 'clamp(22px,4vw,34px)', fontFamily: sans }}>
+    <GuardianModal label={`Suggest a ${type.toLowerCase()}`} onClose={onClose} panelStyle={{ background: '#F2EFE7', color: '#11120F', fontFamily: sans }} header={<span>Suggest a Guardian · {type}</span>} footer={status === 'sent' ? <button type="button" onClick={onClose} style={{ ...btn, width: '100%', background: '#11120F', color: '#FFF' }}>Done</button> : <button form="guardian-suggestion" disabled={status === 'sending' || !hasSocial || !form.name.trim()} style={{ ...btn, width: '100%', background: '#11120F', color: '#FFF', opacity: status === 'sending' || !hasSocial || !form.name.trim() ? .5 : 1 }}>{status === 'sending' ? 'Sending' : 'Send suggestion'} <ArrowRight size={13} /></button>}>
+      <form id="guardian-suggestion" onSubmit={submit}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
           <div><span style={{ color: '#667245', fontSize: 9, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' }}>Suggest a Guardian · {type}</span><h3 style={{ fontFamily: serif, fontSize: 34, fontWeight: 300, lineHeight: 1, margin: '10px 0 18px' }}>Who should we invite?</h3></div>
-          <button type="button" aria-label="Close" onClick={onClose} style={{ border: 0, background: 'none', fontSize: 22, lineHeight: 1, cursor: 'pointer', color: '#11120F' }}>×</button>
         </div>
         {status === 'sent' ? <>
           <p style={{ fontSize: 14, lineHeight: 1.6 }}>Thank you. We will review {form.name.trim() || 'them'} and reach out.</p>
-          <button type="button" onClick={onClose} style={{ ...btn, background: '#11120F', color: '#FFF', borderColor: '#11120F', borderRadius: 2, width: '100%', marginTop: 10 }}>Done</button>
         </> : <>
           <div style={{ marginBottom: 12 }}><label style={lab}>Their name</label><input required value={form.name} onChange={set('name')} style={field} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginBottom: 12 }}>
@@ -671,10 +674,9 @@ function SuggestGuardianModal({ type, onClose }: { type: string; onClose: () => 
           <div style={{ marginBottom: 16 }}><label style={lab}>Your email (optional)</label><input type="email" value={form.suggester_email} onChange={set('suggester_email')} style={field} /></div>
           {!hasSocial && <p style={{ fontSize: 11, color: '#66645F', margin: '0 0 12px' }}>Add at least one social link or website so we can find them.</p>}
           {status === 'error' && <p style={{ fontSize: 12, color: '#A23B3B', margin: '0 0 12px' }}>We could not send that just now. Please try again.</p>}
-          <button disabled={status === 'sending' || !hasSocial || !form.name.trim()} style={{ ...btn, background: '#11120F', color: '#FFF', borderColor: '#11120F', borderRadius: 2, width: '100%', opacity: status === 'sending' || !hasSocial || !form.name.trim() ? 0.5 : 1 }}>{status === 'sending' ? 'Sending' : 'Send suggestion'} <ArrowRight size={13} /></button>
         </>}
       </form>
-    </div>
+    </GuardianModal>
   );
 }
 
@@ -721,12 +723,7 @@ function PublicGuidePage({ isSignedIn }: { isSignedIn: boolean }) {
           {([['Protocol builder', 'protocols', Hammer], ['Diet planner', 'diet', Utensils], ['Fitness planner', 'fitness', Dumbbell], ['Offer builder', 'offer_builder', PencilRuler], ['Content builder', 'content', Clapperboard], ['Site builder', 'profile', Blocks]] as const).map(([text, tab, Icon], index) => <a key={text} href={isSignedIn ? `/guardians/workspace?tab=${tab}` : '#guardian-apply'} onClick={(e) => { if (!isSignedIn) { e.preventDefault(); setAuthMode('login'); } }} title={isSignedIn ? text : `${text} · sign in to use`} style={{ height: 32, fontFamily: '"Archivo", "Inter", sans-serif', fontWeight: 600, padding: '0 14px', borderLeft: index ? `1px solid ${isSignedIn ? ink : 'rgba(245,242,234,.4)'}` : 0, color: ink, opacity: isSignedIn ? 1 : .45, textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}><Icon size={13} strokeWidth={1.8} />{text}</a>)}
         </nav>
       </div>
-      {authMode && <div role="dialog" aria-modal="true" aria-label={authMode === 'login' ? 'Sign in' : 'Sign up'} onClick={() => setAuthMode(null)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(9,10,8,.72)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: 460, background: black }}>
-          <button type="button" aria-label="Close" onClick={() => setAuthMode(null)} style={{ position: 'absolute', top: 10, right: 12, zIndex: 2, border: 0, background: 'none', color: ink, fontSize: 22, lineHeight: 1, cursor: 'pointer' }}>×</button>
-          <AuthPanel key={authMode} initialMode={authMode} initialEmail={heroEmail.trim()} />
-        </div>
-      </div>}
+      {authMode && <AuthPanel key={authMode} initialMode={authMode} initialEmail={heroEmail.trim()} onModalClose={() => setAuthMode(null)} />}
       <main>
         <section style={{ position: 'relative', minHeight: '100svh', display: 'grid', alignItems: 'center', overflow: 'hidden', backgroundImage: 'linear-gradient(rgba(9,10,8,.22),rgba(9,10,8,.84)),url(/images/guides/templates/community-table.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div style={{ width: '100%', boxSizing: 'border-box', padding: 'clamp(110px,14vh,150px) clamp(20px,6vw,90px) clamp(54px,8vh,90px)' }}>
@@ -836,20 +833,27 @@ function loadStripeJs(key: string): Promise<any> {
   });
   return stripeScript.then((Stripe) => Stripe(key));
 }
-export function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [], videos = {} }: { offer: GuideOffer; upsells: GuideOffer[]; profile: GuideProfile; accent: string; onClose: () => void; reviews?: GuardianReview[]; videos?: Record<string, string> }) {
-  const [stage, setStage] = useState<'details' | 'card' | 'paying' | 'pending' | 'upsell' | 'done'>('details');
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
+export function OfferCheckout({ offer, upsells, profile, accent, onClose, onFreshCheckout, reviews = [], videos = {} }: { offer: GuideOffer; upsells: GuideOffer[]; profile: GuideProfile; accent: string; onClose: () => void; onFreshCheckout?: (offer: GuideOffer) => void; reviews?: GuardianReview[]; videos?: Record<string, string> }) {
+  const checkoutFormId = useId();
+  const [recovery] = useState(() => readCheckoutSession(offer.id));
+  const [stage, setStage] = useState<'details' | 'card' | 'paying' | 'pending' | 'upsell' | 'done'>(recovery ? 'pending' : 'details');
+  const [email, setEmail] = useState(recovery?.email || '');
+  const [name, setName] = useState(recovery?.name || '');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [purchaseId, setPurchaseId] = useState('');
+  const [purchaseId, setPurchaseId] = useState(recovery?.purchaseId || '');
+  const [pendingUpsell, setPendingUpsell] = useState(recovery?.pendingUpsell);
+  const [upsellFailed, setUpsellFailed] = useState(false);
   const [cardReady, setCardReady] = useState(false);
-  const [bought, setBought] = useState<string[]>([]);
+  const [bought, setBought] = useState<string[]>(() => [offer, ...upsells].filter(item => recovery?.boughtOfferIds?.includes(item.id)).map(item => item.id));
   const [upsellIndex, setUpsellIndex] = useState(0);
   const [seconds, setSeconds] = useState(600);
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null);
   const mountRef = useRef<HTMLDivElement>(null);
+  const discountEndsAt = useRef(recovery?.discountEndsAt || 0);
+  const remember = (id = purchaseId, pending: typeof pendingUpsell = undefined, boughtOfferIds = bought) => saveCheckoutSession({ offerId: offer.id, purchaseId: id, email, name, pendingUpsell: pending, boughtOfferIds, discountEndsAt: discountEndsAt.current });
+  useEffect(() => { if (recovery) clearCheckoutReturnParameters(); }, [recovery]);
   const showPaymentForm = stage === 'card' || stage === 'paying';
   useEffect(() => {
     if (!showPaymentForm || !elementsRef.current || !mountRef.current) return;
@@ -872,7 +876,16 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
   }, [showPaymentForm]);
   const money = (cents: number, currency = offer.currency || 'GBP') => formatMoney(cents / 100, currency);
   const upsell = upsells[upsellIndex];
-  useEffect(() => { if (stage !== 'upsell' || seconds <= 0) return; const t = window.setInterval(() => setSeconds((v) => Math.max(0, v - 1)), 1000); return () => window.clearInterval(t); }, [stage, seconds]);
+  useEffect(() => { if (stage !== 'upsell') return; const update = () => setSeconds(Math.max(0, Math.floor((discountEndsAt.current - Date.now()) / 1000))); update(); const t = window.setInterval(update, 1000); return () => window.clearInterval(t); }, [stage]);
+  async function authenticate(clientSecret: string) {
+    if (!stripeRef.current) {
+      const config = getGuardianStripeConfiguration();
+      if (!config.enabled || !config.publishableKey) throw new Error('Checkout is unavailable.');
+      stripeRef.current = await loadStripeJs(config.publishableKey);
+    }
+    const { error } = await stripeRef.current.handleNextAction({ clientSecret });
+    if (error) throw new Error(error.message || 'Payment authentication was not completed.');
+  }
   async function start(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setMessage('');
     try {
@@ -882,6 +895,7 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
       if (!stripe) throw new Error('Could not load payments.');
       const intent = await createOfferPayment(offer.id, email, name);
       setPurchaseId(intent.purchase_id);
+      remember(intent.purchase_id);
       stripeRef.current = stripe;
       elementsRef.current = stripe.elements({ clientSecret: intent.client_secret!, appearance: { theme: 'stripe', variables: { colorPrimary: '#111827', colorBackground: '#F6F8FA', colorText: '#111827', borderRadius: '12px', fontFamily: 'Poppins, Inter, system-ui, sans-serif' } }, fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap' }] });
       setStage('card');
@@ -893,7 +907,7 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
     if (!cardReady || stage !== 'card') return;
     setStage('paying'); setMessage('');
     try {
-      const { error, paymentIntent } = await stripeRef.current.confirmPayment({ elements: elementsRef.current, redirect: 'if_required', confirmParams: { return_url: window.location.href, receipt_email: email } });
+      const { error, paymentIntent } = await stripeRef.current.confirmPayment({ elements: elementsRef.current, redirect: 'if_required', confirmParams: { return_url: checkoutReturnUrl(offer.id), receipt_email: email } });
       if (error) { setMessage(error.message || 'Payment failed.'); setStage('card'); return; }
       if (paymentIntent?.status === 'succeeded') await verifyPurchase();
       else { setMessage('Payment is processing. Check its status before attempting another payment.'); setStage('pending'); }
@@ -902,39 +916,83 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
   async function verifyPurchase() {
     setBusy(true); setMessage('');
     try {
-      const result = await confirmOfferPayment(purchaseId);
+      let result = pendingUpsell && !pendingUpsell.purchaseId
+        ? await recoverUpsellPayment(purchaseId, pendingUpsell.offerId)
+        : await confirmOfferPayment(pendingUpsell?.purchaseId || purchaseId);
+      if (pendingUpsell && result.status === 'requires_action') {
+        const existing = await recoverUpsellPayment(purchaseId, pendingUpsell.offerId);
+        if (existing.client_secret) {
+          await authenticate(existing.client_secret);
+          result = await confirmOfferPayment(existing.purchase_id);
+        }
+      }
       if (result.status === 'paid') {
-        setBought(current => current.includes(offer.title) ? current : [offer.title, ...current]);
-        setSeconds(600); setStage(upsells.length ? 'upsell' : 'done');
+        if (pendingUpsell) {
+          const index = upsells.findIndex(item => item.id === pendingUpsell.offerId);
+          const item = upsells[index];
+          if (!item) throw new Error('The follow-on offer is no longer available.');
+          setBought(current => current.includes(item.id) ? current : [...current, item.id]);
+          setPendingUpsell(undefined);
+          const ids = [...new Set([...bought, item.id])];
+          remember(purchaseId, undefined, ids);
+          if (index + 1 < upsells.length) { setUpsellIndex(index + 1); setStage('upsell'); }
+          else { clearCheckoutSession(); setStage('done'); }
+          return;
+        }
+        setBought(current => current.includes(offer.id) ? current : [offer.id, ...current]);
+        discountEndsAt.current = 'discount_ends_at' in result && typeof result.discount_ends_at === 'number' ? result.discount_ends_at : 0;
+        setSeconds(Math.max(0, Math.floor((discountEndsAt.current - Date.now()) / 1000)));
+        const purchasedIds = [...new Set([offer.id, ...bought])];
+        remember(purchaseId, undefined, purchasedIds);
+        const next = upsells.findIndex(item => !purchasedIds.includes(item.id));
+        if (next < 0) { clearCheckoutSession(); setStage('done'); }
+        else { setUpsellIndex(next); setStage('upsell'); }
       } else if (result.status === 'failed') {
-        setMessage('Payment was not completed. Please check your payment method and try again.'); setStage('card');
+        if (pendingUpsell) {
+          setUpsellFailed(true); setMessage('The follow-on payment was not completed. Your original order is confirmed. You can finish here or start a separate checkout at the listed price with another payment method.'); setStage('pending');
+        } else {
+          setMessage('Payment was not completed. Please check your payment method and try again.');
+          if (!elementsRef.current) { clearCheckoutSession(); setStage('details'); } else setStage('card');
+        }
       } else { setMessage('Payment is processing. Check its status before attempting another payment.'); setStage('pending'); }
     } catch { setMessage('Order confirmation is unavailable. Check payment status before attempting another payment.'); setStage('pending'); }
     finally { setBusy(false); }
   }
   async function acceptUpsell() {
     if (!upsell) return; setBusy(true); setMessage('');
+    const unresolved = { purchaseId: '', offerId: upsell.id };
+    setPendingUpsell(unresolved); remember(purchaseId, unresolved);
     try {
-      let result = await buyUpsellOneClick(purchaseId, upsell.id);
+      let result = await buyUpsellOneClick(purchaseId, upsell.id, upsellPrice);
+      const pending = { purchaseId: result.purchase_id, offerId: upsell.id };
+      setPendingUpsell(pending); remember(purchaseId, pending);
       if (result.status === 'requires_action' && result.client_secret) {
-        const { error } = await stripeRef.current.handleNextAction({ clientSecret: result.client_secret });
-        if (error) throw new Error(error.message);
+        await authenticate(result.client_secret);
         result = { ...result, status: (await confirmOfferPayment(result.purchase_id)).status };
       }
-      if (result.status !== 'paid') throw new Error('Your card was not charged. Please try again.');
-      setBought((current) => [...current, upsell.title]); nextUpsell();
-    } catch (err: any) { setMessage(err?.message || 'Could not add this to your order.'); }
+      if (result.status !== 'paid') { setUpsellFailed(result.status === 'failed'); setMessage(result.status === 'failed' ? 'The follow-on payment was not completed. Your original order is confirmed. Start a separate checkout at the listed price to use another method.' : 'Payment is processing. Check its status before attempting another payment.'); setStage('pending'); return; }
+      setPendingUpsell(undefined);
+      setBought((current) => current.includes(upsell.id) ? current : [...current, upsell.id]);
+      remember(purchaseId, undefined, [...new Set([...bought, upsell.id])]);
+      nextUpsell();
+    } catch (err: any) {
+      setMessage(err?.message || 'Payment status could not be verified. Check its status before attempting another payment.');
+      if (err?.message?.includes('Offer price changed')) { setPendingUpsell(undefined); remember(purchaseId); discountEndsAt.current = 0; setSeconds(0); setStage('upsell'); }
+      else setStage('pending');
+    }
     finally { setBusy(false); }
   }
-  const nextUpsell = () => { if (upsellIndex + 1 < upsells.length) { setUpsellIndex(upsellIndex + 1); setSeconds(600); } else setStage('done'); };
+  const nextUpsell = () => { if (upsellIndex + 1 < upsells.length) setUpsellIndex(upsellIndex + 1); else { clearCheckoutSession(); setStage('done'); } };
   // Same look as the ROUTINE³ app's sign-up and paywall screens (see APP tokens).
   const field: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 56, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '0 16px', fontFamily: APP.font, fontSize: 16, background: APP.alt, color: APP.text, outline: 'none' };
   const code = `${(profile.display_name.split(' ')[0] || 'Guardian').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10)}30`;
   const legal = <p style={{ color: APP.muted, fontSize: 11, margin: '10px 0 0', textAlign: 'center' }}>Payments are processed securely by Stripe. By paying you agree to the <span style={{ color: '#0EA5E9' }}>Terms</span> and <span style={{ color: '#0EA5E9' }}>Privacy Policy</span>.</p>;
   const upsellPrice = upsell ? (seconds ? Math.round(upsell.price_cents * (1 - COUPON_RATE)) : upsell.price_cents) : 0;
-  return <div role="dialog" aria-modal="true" aria-label="Checkout" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(17,24,39,.55)', display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto' }}>
-    <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: stage === 'upsell' ? 880 : 440, background: APP.bg, color: APP.text, fontFamily: APP.font, borderRadius: 24, overflow: 'hidden', textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,.3)' }}>
-      <button type="button" aria-label="Close" onClick={stage === 'upsell' ? nextUpsell : onClose} style={{ position: 'absolute', top: stage === 'upsell' && upsell && videos[upsell.kind] ? 12 : stage === 'upsell' ? 58 : 14, right: stage === 'upsell' ? 12 : 14, borderRadius: '50%', ...(stage === 'upsell' ? { background: 'rgba(255,255,255,.9)' } : {}), width: 36, height: 36, border: 0, background: 'transparent', fontSize: 22, cursor: 'pointer', color: APP.text, zIndex: 2 }}>×</button>
+  const footer = stage === 'pending' ? <div style={{ display: 'grid', gap: 8 }}><button type="button" disabled={busy} onClick={verifyPurchase} style={appButton}>{busy ? 'Checking…' : 'Check payment status'}</button>{upsellFailed && pendingUpsell && onFreshCheckout && <button type="button" onClick={() => { const item = upsells.find(entry => entry.id === pendingUpsell.offerId); if (item) { clearCheckoutSession(); onFreshCheckout(item); } }} style={appButton}>Use another payment method · listed price</button>}</div>
+    : stage === 'done' ? <button type="button" onClick={onClose} style={appButton}>Done</button>
+    : stage === 'upsell' ? <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, opacity: busy ? .6 : 1 }}>{busy ? 'Adding…' : seconds ? 'Get limited offer' : 'Get it now'}</button>
+    : <button form={checkoutFormId} disabled={stage === 'details' ? busy : stage === 'paying' || !cardReady} style={{ ...appButton, opacity: (busy || stage === 'paying' || (stage === 'card' && !cardReady)) ? .6 : 1 }}>{stage === 'details' ? busy ? 'Loading…' : 'Continue to payment' : stage === 'paying' ? 'Paying…' : `Pay ${money(offer.price_cents)}`}</button>;
+  return <GuardianModal label="Checkout" onClose={stage === 'upsell' ? nextUpsell : onClose} header={<span style={{ fontSize: 12 }}>Secure checkout</span>} footer={footer} panelStyle={{ background: APP.bg, color: APP.text, fontFamily: APP.font, textAlign: 'center' }} bodyStyle={{ padding: 0 }} footerStyle={{ borderColor: APP.border }}>
       {stage === 'upsell' && upsell ? <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}>
         {videos[upsell.kind] && <video src={videos[upsell.kind]} controls playsInline style={{ flex: '1 1 100%', width: '100%', aspectRatio: '16 / 9', maxHeight: 380, objectFit: 'cover', background: '#111827' }} />}
         <div style={{ flex: '1 1 100%', background: seconds ? APP.greenSoft : APP.alt, color: '#000', padding: '10px 48px 10px 16px', fontSize: 12, fontWeight: 700, letterSpacing: .5, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><Clock size={14} strokeWidth={2.4} />{seconds ? <>30% off · ends in {String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')} · code {code} applied</> : 'Offer ended'}</div>
@@ -950,42 +1008,34 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
             {seconds > 0 && <span style={{ color: APP.faint, fontSize: 20, fontWeight: 500, textDecoration: 'line-through' }}>{money(upsell.price_cents, upsell.currency)}</span>}
             <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: -0.8 }}>{money(upsellPrice, upsell.currency)}</span>
           </div>
-          <div>
-            <button type="button" disabled={busy} onClick={acceptUpsell} style={{ ...appButton, fontSize: 17, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Adding…' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Clock size={18} strokeWidth={2.4} />{seconds ? <>Get limited offer · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{`${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`}</span></> : 'Get it now'}</span>}</button>
-          </div>
         </div>
       {reviews.length > 0 && <div style={{ flex: '1 1 calc(100% - 32px)', minWidth: 0, textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
       </div> : stage === 'pending' ? <div style={{ padding: '48px 24px 26px' }}>
         <h2 style={{ fontFamily: APP.font, fontSize: 26, margin: '0 0 12px' }}>Payment confirmation pending</h2>
-        <p style={{ color: APP.muted }}>Your order is not confirmed yet. Checking status will not charge you again.</p>
-        <button type="button" disabled={busy} onClick={verifyPurchase} style={appButton}>{busy ? 'Checking…' : 'Check payment status'}</button>
+        <p style={{ color: APP.muted }}>{pendingUpsell ? 'Your original order is confirmed. The follow-on payment is not confirmed yet.' : 'Your order is not confirmed yet.'} Checking status will not charge you again.</p>
       </div> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
         <span style={{ width: 56, height: 56, margin: '0 auto 14px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={26} /></span>
         <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, margin: '0 0 4px' }}>You’re all set!</h2>
-        <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 18px' }}>{message || `Payment confirmed for ${email}`}</p>
-        <div style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '6px 16px', textAlign: 'left', marginBottom: 18 }}>{bought.map((t) => <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{t}</div>)}</div>
-        <button type="button" onClick={onClose} style={{ ...appButton, borderRadius: 12, background: APP.text, fontSize: 16, fontWeight: 600 }}>Done</button>
+        <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 18px', overflowWrap: 'anywhere' }}>{message || `Payment confirmed for ${email}`}</p>
+        <div style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '6px 16px', textAlign: 'left', marginBottom: 18 }}>{bought.map((id) => <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{[offer, ...upsells].find(item => item.id === id)?.title}</div>)}</div>
       </div> : <div style={{ padding: '44px 24px 24px' }}>
         <AppOfferImage kind={offer.kind} size={80} />
         <div style={{ margin: '12px 0 2px' }}><OfferFormatTag kind={offer.kind} /></div>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 6px' }}>{profile.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 24, height: 24, borderRadius: '50%', background: APP.border, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{(profile.display_name || 'G')[0]}</span>}<span style={{ color: APP.muted, fontSize: 13, fontWeight: 500 }}>{profile.display_name}</span></span>
         <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, lineHeight: '34px', letterSpacing: -0.5, margin: '0 0 4px' }}>{offer.title}</h2>
         <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 20px' }}>{money(offer.price_cents)} · secure checkout</p>
-        {stage === 'details' ? <form onSubmit={start} style={{ display: 'grid', gap: 0, textAlign: 'left' }}>
+        {stage === 'details' ? <form id={checkoutFormId} onSubmit={start} style={{ display: 'grid', gap: 0, textAlign: 'left' }}>
           <input required placeholder="First name" aria-label="First name" value={name} onChange={(e) => setName(e.target.value)} style={{ ...field, borderRadius: '12px 12px 0 0' }} />
           <input required type="email" placeholder="Email" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ ...field, borderRadius: '0 0 12px 12px', marginTop: -1 }} />
-          <button disabled={busy} style={{ ...appButton, borderRadius: 12, marginTop: 16, background: APP.text, fontSize: 16, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Loading…' : 'Continue to payment'}</button>
-        </form> : <form onSubmit={pay} style={{ display: 'grid', gap: 12, textAlign: 'left' }}>
+        </form> : <form id={checkoutFormId} onSubmit={pay} style={{ display: 'grid', gap: 12, textAlign: 'left' }}>
           <div ref={mountRef} style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: 14 }} />
           {!cardReady && !message && <p role="status">Loading secure payment form…</p>}
-          <span style={{ color: APP.muted, fontSize: 11, lineHeight: 1.5 }}>Your card is saved securely by Stripe so you can add follow-on offers in one click.</span>
-          <button disabled={stage === 'paying' || !cardReady} style={{ ...appButton, opacity: stage === 'paying' || !cardReady ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{stage === 'paying' ? 'Paying…' : `Pay ${money(offer.price_cents)}`}</span></button>
+          <span style={{ color: APP.muted, fontSize: 11, lineHeight: 1.5 }}>Where supported, Stripe saves your payment method securely for follow-on offers.</span>
         </form>}
         {legal}
       </div>}
       {message && stage !== 'done' && <p role="alert" style={{ color: '#EF4444', fontSize: 12, margin: '0 20px 16px', textAlign: 'left' }}>{message}</p>}
-    </div>
-  </div>;
+  </GuardianModal>;
 }
 function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = [], headlineStyle = 'editorial' }: { headlineStyle?: HeadlineStyle; reviews?: GuardianReview[]; profile: GuideProfile; offers: GuideOffer[]; ramp: GuideValueRamp | null; accent: string; headingFont: string }) {
   const ordered = orderFunnelOffers(offers, ramp);
@@ -995,6 +1045,13 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   const [form, setForm] = useState({ name: '', email: '', goal: '', consent: false });
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [checkoutOffer, setCheckoutOffer] = useState<GuideOffer | null>(null);
+  useEffect(() => {
+    const returnedOffer = new URL(window.location.href).searchParams.get('guardian_checkout');
+    if (!returnedOffer) return;
+    const returned = offers.find(item => item.id === returnedOffer && item.access_model === 'paid' && item.status === 'published');
+    if (returned && readCheckoutSession(returned.id)) setCheckoutOffer(returned);
+    else clearCheckoutReturnParameters();
+  }, [offers]);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
   // Uploaded files live in a private bucket: ask guardian-files for a 1-hour link after opt-in.
@@ -1032,7 +1089,7 @@ function GuardianFunnel({ profile, offers, ramp, accent, headingFont, reviews = 
   const offerVideos = (() => { try { return JSON.parse(String((profile.social_links as Record<string, unknown> | null)?.offer_videos || '{}')) as Record<string, string>; } catch { return {} as Record<string, string>; } })();
   const leadVideo = offerVideos.free || '';
   return <>
-    {checkoutOffer && <OfferCheckout offer={checkoutOffer} upsells={paidAfter(checkoutOffer)} profile={profile} accent={accent} reviews={reviews} videos={offerVideos} onClose={() => setCheckoutOffer(null)} />}
+    {checkoutOffer && <OfferCheckout key={checkoutOffer.id} offer={checkoutOffer} upsells={paidAfter(checkoutOffer)} profile={profile} accent={accent} reviews={reviews} videos={offerVideos} onFreshCheckout={setCheckoutOffer} onClose={() => setCheckoutOffer(null)} />}
     {!stripeConfig.enabled && ordered.some(offer => offer.access_model === 'paid' && offer.price_cents > 0 && !offer.booking_url) && <p role="status" style={{ padding: '16px 24px', textAlign: 'center', color: accent }}>{stripeConfig.error}</p>}
     {steps.length > 0 && <section id="offers" style={{ padding: `clamp(60px,9vw,120px) ${PAGE_X}`, borderTop: '1px solid rgba(17,18,15,.2)' }}>
       {/* App-style heading (Poppins, like the ROUTINE³ paywall): green label, bold title, muted subtitle. */}
@@ -2425,9 +2482,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
             <label style={label}>Choose lead magnets <span style={{ color: acid }}>· one or more</span></label>
             <div style={CHOICE_GRID}>{freeOfferTypes.map((offer) => { const active = selectedLeadMagnets.includes(offer.value); const toggle = () => { setSelectedLeadMagnets((current) => active ? current.length === 1 ? current : current.filter((item) => item !== offer.value) : [...current, offer.value]); if (!active) setFreeOfferType(offer.value); }; return <CreatorChoiceCard key={offer.value} creator={displayName || 'Your Guardian'} avatarUrl={avatarUrl} badge={offer.eyebrow} byline={offer.label} title={offer.label} description={offer.copy} footer={`Lead magnet · ${offer.label}`} order={active ? selectedLeadMagnets.indexOf(offer.value) + 1 : undefined} active={active} image={freeOfferImages[offer.value]} onClick={toggle} onInfo={offer.value === 'routine' ? () => setShowProtocolInfo(true) : undefined} />; })}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12, marginTop: 18 }}><button type="button" onClick={() => setOfferPlanStage(0)} style={{ ...btn, width: '100%', background: 'transparent', color: ink }}>← Back</button><button type="button" onClick={() => setOfferPlanStage(2)} style={{ ...btn, width: '100%' }}>Continue <ArrowRight size={14} /></button></div>
-            {showProtocolInfo && <div role="presentation" onMouseDown={() => setShowProtocolInfo(false)} style={{ position: 'fixed', zIndex: 1000, inset: 0, background: 'rgba(0,0,0,.76)', padding: 20, display: 'grid', placeItems: 'center' }}>
-              <section role="dialog" aria-modal="true" aria-labelledby="r3-protocol-info-title" onMouseDown={(event) => event.stopPropagation()} style={{ width: 'min(680px,100%)', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', border: `1px solid ${acid}`, background: panel, color: ink, padding: 'clamp(20px,4vw,34px)', position: 'relative' }}>
-                <button type="button" onClick={() => setShowProtocolInfo(false)} aria-label="Close R3 Protocol information" style={{ position: 'absolute', top: 12, right: 12, width: 32, height: 32, border: `1px solid ${line}`, background: 'transparent', color: ink, fontSize: 18, cursor: 'pointer' }}>×</button>
+            {showProtocolInfo && <GuardianModal label="R3 Protocol information" closeLabel="Close R3 Protocol information" onClose={() => setShowProtocolInfo(false)} panelStyle={{ background: panel, color: ink, border: `1px solid ${acid}` }} footerStyle={{ borderColor: line }} footer={<div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}><button type="button" onClick={() => { setSelectedLeadMagnets((current) => current.includes('routine') ? current : ['routine', ...current]); setFreeOfferType('routine'); setFreeDelivery(['Downloadable PDF', 'Interactive Protocol']); setShowProtocolInfo(false); }} style={{ ...btn, flex: '1 1 200px', minHeight: 48 }}>Use R3 Protocol <ArrowRight size={14} /></button><a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={{ ...btn, flex: '1 1 200px', minHeight: 48, boxSizing: 'border-box', background: 'transparent', color: ink, textDecoration: 'none', textAlign: 'center' }}>View ROUTINE³ on the App Store <ArrowRight size={14} /></a></div>}>
                 <div style={{ display: 'grid', gridTemplateColumns: '96px minmax(0,1fr)', gap: 18, alignItems: 'center', marginRight: 42 }}><R3CreatorBenefitArt index={0} size={96} /><span><span style={{ color: acid, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase' }}>R3 Protocol · A remarkable creator opportunity</span><h3 id="r3-protocol-info-title" style={{ margin: '9px 0 0', fontFamily: serif, fontSize: 32, fontWeight: 400, lineHeight: 1.08 }}>Build guidance that keeps working between every conversation.</h3></span></div>
                 <p style={{ margin: '14px 0 18px', color: muted, fontSize: 11, lineHeight: 1.55 }}>Give people a printable Protocol and a living digital twin in ROUTINE³. Earn recurring revenue, personalise the experience and support progress day by day.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 8 }}>
@@ -2440,9 +2495,7 @@ function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone
                     ['Re-export the latest PDF', 'Users can create a fresh printable copy whenever their Protocol changes.', 6],
                   ].map(([title, copy, artIndex]) => <div key={title} style={{ border: `1px solid ${line}`, padding: 13, display: 'grid', gridTemplateColumns: '58px minmax(0,1fr)', gap: 11, alignItems: 'center' }}><span style={{ minWidth: 58, display: 'grid', placeItems: 'center' }}><R3CreatorBenefitArt index={Number(artIndex)} /></span><span><strong style={{ display: 'block', color: acid, fontSize: 11 }}>{title}</strong><span style={{ display: 'block', marginTop: 6, color: muted, fontSize: 9, lineHeight: 1.5 }}>{copy}</span></span></div>)}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 9, marginTop: 18 }}><button type="button" onClick={() => { setSelectedLeadMagnets((current) => current.includes('routine') ? current : ['routine', ...current]); setFreeOfferType('routine'); setFreeDelivery(['Downloadable PDF', 'Interactive Protocol']); setShowProtocolInfo(false); }} style={{ ...btn, width: '100%', minHeight: 48 }}>Use R3 Protocol <ArrowRight size={14} /></button><a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={{ ...btn, width: '100%', minHeight: 48, boxSizing: 'border-box', background: 'transparent', color: ink, textDecoration: 'none', textAlign: 'center' }}>View ROUTINE³ on the App Store <ArrowRight size={14} /></a></div>
-              </section>
-            </div>}
+            </GuardianModal>}
           </div>}
           {offerPlanStage === 2 && <div>
             <div style={{ border: `1px solid ${line}`, background: panel, padding: 14, marginBottom: 16 }}>

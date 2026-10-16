@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, CalendarDays, Check, Loader2, X } from 'lucide-react';
+import { ArrowRight, CalendarDays, Check, Loader2 } from 'lucide-react';
+import { GuardianModal } from './GuardianModal';
 import {
   applyEventPlan, cleanPastedText, dayPart, detectEvent, linkPlanItems, offsetDate, planEventProtocol,
   SMART_GROUPS, SMART_GROUP_TITLE, type EventPlan, type PlanItem,
@@ -58,16 +59,18 @@ export function EventProtocolBuilder({ accessToken, protocolId, initialText, onC
   const linkable = plan?.items.filter((it) => it.link) || [];
   const matched = linkable.filter((it) => it.match).length;
 
-  return <div role="dialog" aria-modal="true" aria-label="Build a dated Protocol from text" style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,.6)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflowY: 'auto', padding: '32px 16px' }}>
-    <div style={{ width: '100%', maxWidth: 980, background: black, color: ink, border: `1px solid ${line}`, fontFamily: sans, padding: 'clamp(16px,3vw,28px)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-        <div>
+  return <GuardianModal label="Build a dated Protocol from text" onClose={onClose} zIndex={60}
+    panelStyle={{ background: black, color: ink, border: `1px solid ${line}`, fontFamily: sans, borderRadius: 2 }}
+    bodyStyle={{ paddingTop: 0 }} footerStyle={{ borderTop: `1px solid ${line}`, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}
+    header={<>
           <div style={{ color: acid, fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>From pasted text</div>
           <h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(28px,4vw,40px)', margin: '6px 0 4px' }}>{plan ? 'Review the suggested Protocol' : 'Turn this into a Protocol'}</h2>
           <p style={{ color: muted, fontSize: 12, margin: 0 }}>Nothing changes until you apply. Steps are added to the Protocol on screen; existing steps stay as they are.</p>
-        </div>
-        <button type="button" aria-label="Close" onClick={onClose} style={{ ...btn, background: 'transparent', color: ink, padding: 0, width: 40, justifyContent: 'center' }}><X size={16} /></button>
-      </div>
+    </>}
+    footer={!plan ? <button type="button" onClick={build} disabled={Boolean(busy)} style={{ ...btn, marginLeft: 'auto', opacity: busy ? .6 : 1 }}>{busy ? <><Loader2 size={13} className="animate-spin" /> {busy}</> : <>Build suggestion <ArrowRight size={13} /></>}</button> : <>
+      <button type="button" onClick={() => setPlan(null)} disabled={Boolean(busy)} style={{ ...btn, background: 'transparent', color: ink, border: `1px solid ${line}` }}>Back</button>
+      <button type="button" onClick={apply} disabled={Boolean(busy) || !plan.items.some((it) => it.include)} style={{ ...btn, height: 'auto', minHeight: 40, paddingTop: 8, paddingBottom: 8, opacity: busy ? .6 : 1 }}>{busy ? <><Loader2 size={13} className="animate-spin" /> {busy}</> : <><Check size={13} /> Apply {plan.items.filter((it) => it.include).length} steps to this Protocol</>}</button>
+    </>}>
 
       <section style={{ marginTop: 18, border: `1px solid ${line}`, padding: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', fontSize: 11, color: muted }}>
@@ -90,10 +93,6 @@ export function EventProtocolBuilder({ accessToken, protocolId, initialText, onC
       </section>
 
       {error && <p role="alert" style={{ color: '#F0A7A7', fontSize: 12 }}>{error}</p>}
-
-      {!plan && <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="button" onClick={build} disabled={Boolean(busy)} style={{ ...btn, opacity: busy ? .6 : 1 }}>{busy ? <><Loader2 size={13} className="animate-spin" /> {busy}</> : <>Build suggestion <ArrowRight size={13} /></>}</button>
-      </div>}
 
       {plan && <>
         <p style={{ fontSize: 12, color: muted, margin: '16px 0 0' }}>{plan.summary} <span style={{ color: acid }}>{matched}/{linkable.length} linked to catalog records</span>{linkable.length - matched ? <span style={{ color: warn }}> · {linkable.length - matched} unmatched</span> : null}{plan.source === 'local' ? ' · offline planner' : ''}</p>
@@ -128,13 +127,8 @@ export function EventProtocolBuilder({ accessToken, protocolId, initialText, onC
             })}
           </section>;
         })}
-        <div style={{ position: 'sticky', bottom: -32, background: black, borderTop: `1px solid ${line}`, marginTop: 20, padding: '14px 0', display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => setPlan(null)} disabled={Boolean(busy)} style={{ ...btn, background: 'transparent', color: ink, border: `1px solid ${line}` }}>Back</button>
-          <button type="button" onClick={apply} disabled={Boolean(busy) || !plan.items.some((it) => it.include)} style={{ ...btn, opacity: busy ? .6 : 1 }}>{busy ? <><Loader2 size={13} className="animate-spin" /> {busy}</> : <><Check size={13} /> Apply {plan.items.filter((it) => it.include).length} steps to this Protocol</>}</button>
-        </div>
       </>}
-    </div>
-  </div>;
+  </GuardianModal>;
 }
 
 function Row({ it, plan, onToggle }: { it: PlanItem; plan: EventPlan; onToggle: (id: string) => void }) {
