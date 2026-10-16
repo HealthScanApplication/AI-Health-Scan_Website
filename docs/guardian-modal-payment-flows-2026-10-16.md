@@ -32,4 +32,5 @@
 - Full regression suite: 249 tests across 26 files; production build passes (existing chunk-size/dynamic-import warnings remain).
 - Final security checks: staging and production `ALLOW_LIVE_PAYMENTS` digests both match `false`; the frontend production hold is unchanged. Existing catalog security-advisor findings predate this change; no schema/grant changes are included.
 
-Final asynchronous bank-upsell outcome and merge verification are recorded below when completed.
+- Final Chrome bank upsell outcome: server verification reached **paid**; the success dialog listed both the original and follow-on offers with its Done action in the fixed footer. The bank upsell was €14 and only one purchase was created. Card success/concurrent-upsell checks were rerun successfully against the final bank-capable handler.
+- Browser and runtime fixtures are disposable and removed after verification. Stripe retains synthetic test records for audit; no live charges were made.
