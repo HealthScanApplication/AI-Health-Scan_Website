@@ -5,6 +5,7 @@ import type { GuideLead, GuideRecipe } from '../../utils/guidePortal';
 import { dayReport, loadCandidates, smartFill, type Candidate, type RecipeIdea } from '../../utils/dietPlanner';
 import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
 import { TIERS, tierLabel } from './RecipeInsights';
+import { SupplementPicker } from './SupplementPicker';
 import {
   MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, FASTING_TYPES, SUPPLEMENT_PERIODS, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
   dietSupportItems, listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
@@ -199,10 +200,10 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
     {macroSum !== 100 && <p style={{ color: warn, fontSize: 12 }}>Macros add up to {macroSum}% of energy. Adjust them to 100%.</p>}
     <div style={{ ...card, marginBottom: 14 }}>
       <div style={{ ...label, color: acid }}>Supplements</div>
-      <p style={{ color: muted, fontSize: 11, margin: '0 0 12px' }}>Add one supplement per line. Each becomes a checkable Protocol item at the selected time.</p>
+      <p style={{ color: muted, fontSize: 11, margin: '0 0 12px' }}>Choose a generic supplement or a branded product by name or barcode. Each linked selection becomes a checkable Protocol item at the selected time. Match older text entries to link them.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}>
         {SUPPLEMENT_PERIODS.map((period) => <div key={period.id}>
-          <RulesEditor title={`${period.label} supplements`} rules={cfg.supplements?.[period.id] || []} onChange={(items) => setCfg((c) => ({ ...c, supplements: { ...c.supplements, [period.id]: items } }))} placeholder={'One per line, e.g.\nVitamin D3\nOmega-3'} />
+          <SupplementPicker accessToken={accessToken} title={`${period.label} supplements`} items={cfg.supplements?.[period.id] || []} onChange={(items) => setCfg((c) => ({ ...c, supplements: { ...c.supplements, [period.id]: items } }))} />
           <label style={{ display: 'block', marginTop: 7 }}><span style={{ ...label, fontSize: 9 }}>Time</span><input type="time" style={input} value={cfg.supplementTimes?.[period.id] || period.time} onChange={(e) => setCfg((c) => ({ ...c, supplementTimes: { ...c.supplementTimes, [period.id]: e.target.value } }))} /></label>
         </div>)}
       </div>

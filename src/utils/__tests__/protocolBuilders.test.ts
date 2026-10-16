@@ -1,8 +1,35 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { dietSupportItems, reviewFitness, saveDietProtocol, withSetInfo, type FitnessConfig, fitsSlot, mealPlacementIssues, nameSlotHint, planMealItems, reviewDiet, slotForTime, type DietConfig, type MealPick } from '../protocolBuilders';
 
 const pick = (name: string, id = name): MealPick => ({ source: 'catalog', id, name, image: null, nutrition: { energy_kcal: 500, protein_g: 25, carbohydrates_g: 50, fats_g: 20 } });
 const diet = (plan: DietConfig['plan'], extra: Partial<DietConfig> = {}): DietConfig => ({ framework: 'balanced', kcal: 2000, protein: 20, carbs: 50, fat: 30, slots: ['breakfast', 'lunch', 'dinner'], plan, ...extra });
+
+it('keeps supplement catalogue IDs and images when generating timed protocol items', () => {
+  const items = dietSupportItems(diet({}, { supplements: { morning: [
+    { id: 'generic-d3', name: 'Vitamin D3', source: 'supplement', image: 'd3.jpg' },
+    { id: 'branded-d3', name: 'Brand D3', source: 'product', image: null, barcode: '0012345678905' },
+  ] } }));
+  expect(items[0]).toMatchObject({ title: 'Take Vitamin D3', time: '08:00', link: { supplement_id: 'generic-d3', media_image_url: 'd3.jpg' } });
+  expect(items[1]).toMatchObject({ title: 'Take Brand D3', link: { catalog_product_id: 'branded-d3', media_image_url: null } });
+});
+
+it('writes linked supplements into protocol items and retains them in saved builder settings', async () => {
+  const writes: any[] = [];
+  const config = diet({}, { supplements: { evening: [{ id: 'prod_generic_zinc', name: 'Zinc', source: 'product', image: 'zinc.jpg' }] }, supplementTimes: { evening: '21:15' } });
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : null;
+    if (init?.method === 'POST' && url.endsWith('/protocol_items')) writes.push(body);
+    if (url.includes('/protocols') && init?.method === 'PATCH') writes.push(body);
+    return new Response(JSON.stringify(url.includes('/rpc/') ? null : init?.method === 'POST' || init?.method === 'PATCH' ? [{ id: 'diet-1', user_id: 'owner', ...body }] : []));
+  });
+  try {
+    await saveDietProtocol('token', 'owner', null, 'Supplement plan', config);
+    expect(writes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ display_name: 'Take Zinc', catalog_product_id: 'prod_generic_zinc', media_image_url: 'zinc.jpg', scheduled_time: '21:15:00', recurrence_type: 'daily' }),
+      expect.objectContaining({ builder_config: config }),
+    ]));
+  } finally { vi.unstubAllGlobals(); }
+});
 
 describe('a lunch recipe assigned to breakfast', () => {
   it('is recognised by its name and kept out of the breakfast slot by auto-fill', () => {
