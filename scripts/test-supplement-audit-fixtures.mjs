@@ -32,8 +32,9 @@ ${cases.map(([name, mutation, message]) => `
 END $fixture$;
 ${audit}
 ROLLBACK;`;
-const result = spawnSync('supabase', ['db', 'query', '--yes', '--linked', '--project-ref', 'mofhvoudjxinvpplsytd', sql], { encoding: 'utf8' });
+const result = spawnSync('supabase', ['db', 'query', '--yes', '--linked', '--project-ref', 'mofhvoudjxinvpplsytd', sql], { encoding: 'utf8', timeout: 120_000 });
 process.stdout.write(result.stdout || '');
 process.stderr.write(result.stderr || '');
+if (result.error) console.error(result.error.message);
 if (result.status === 0) console.log('PASS: clean catalogue and five corrupt fixtures (including non-supplement links and a partial unique index).');
 process.exitCode = result.status ?? 1;
