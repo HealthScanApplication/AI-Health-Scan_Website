@@ -10,7 +10,7 @@ import { DietNutritionPanel } from './DietNutritionPanel';
 import { aggregateDiet, dietSelections, loadDietAnalysis, type DietAnalysis } from '../../utils/dietNutrition';
 import {
   MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, mealDrinks, mealPickKey, selectedServings, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, mealIsFasting, fastingDrinkAllowed, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
-  dietSupportItems, listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
+  dietSupportItems, isDrinkPick, listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
 
@@ -160,8 +160,8 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
     const slot = MEAL_SLOTS.find((s) => s.id === picking.split(':')[1]);
     const share = slots.reduce((sum, s) => sum + s.share, 0) || 1;
     const timer = setTimeout(() => {
-      searchDietRecipes(accessToken, { framework, query, kcalTarget: drinkIndex == null && slot ? cfg.kcal * slot.share / share : undefined, limit: 24 })
-        .then((hits) => { if (!live) return; const all = [...ownPicks.filter((p) => !query || p.name.toLowerCase().includes(query.toLowerCase())), ...hits]; const slotId = picking.split(':')[1]; setResults([...all.filter((p) => fitsSlot(p.name, slotId)), ...all.filter((p) => !fitsSlot(p.name, slotId))]); })
+      searchDietRecipes(accessToken, { framework, query, drinksOnly: drinkIndex != null, kcalTarget: drinkIndex == null && slot ? cfg.kcal * slot.share / share : undefined, limit: 24 })
+        .then((hits) => { if (!live) return; const all = [...ownPicks.filter((p) => (drinkIndex == null || isDrinkPick(p)) && (!query || p.name.toLowerCase().includes(query.toLowerCase()))), ...hits]; const slotId = picking.split(':')[1]; setResults([...all.filter((p) => fitsSlot(p.name, slotId)), ...all.filter((p) => !fitsSlot(p.name, slotId))]); })
         .catch((e) => { if (live) setMessage(String(e.message || e)); }).finally(() => { if (live) setSearching(false); });
     }, 250);
     return () => { live = false; clearTimeout(timer); };
@@ -195,7 +195,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
     setMessage(metaSaved ? 'Saved as a Protocol.' : 'Saved the meals. The diet settings could not be stored on this database yet.');
   });
   const load = (p: AdminProtocol) => { const c = meta[p.id]?.builder_config; if (c) { setCfg({ ...emptyDiet(), ...c, drinks: c.drinks }); setName(p.name); setProtocolId(p.id); setMessage(''); } };
-  const shownResults = results.filter(r => !picking || drinkIndex == null || fastingDrinkAllowed(cfg,Number(picking.split(':')[0]),picking.split(':')[1],r));
+  const shownResults = results.filter(r => !picking || drinkIndex == null || (isDrinkPick(r) && fastingDrinkAllowed(cfg,Number(picking.split(':')[0]),picking.split(':')[1],r)));
 
   return <div>
     <Header Icon={Utensils} kicker="Build" title="Diet" copy="Plan meals and drinks from your recipes and the published recipe database. Daily and weekly macros, micronutrients and hazards use recorded nutrition and selected servings; missing data stays unknown." />
@@ -287,7 +287,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
       </div>
       <div style={{ position: 'relative', marginBottom: 10 }}><Search size={13} color={muted} style={{ position: 'absolute', left: 10, top: 13 }} /><input autoFocus style={{ ...input, paddingLeft: 30 }} placeholder="Search recipes (yours and the catalog)" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 7 }}>
-        {shownResults.map((r) => <button key={`${r.source}-${r.id}`} type="button" onClick={() => { const [day,slot] = picking.split(':'); if (drinkIndex == null) { if (mealIsFasting(cfg,Number(day),slot)) { setMessage('This meal time is inside the fasting window. Adjust the time or fasting schedule first.');return; } setPick(picking,r); } else { if (!fastingDrinkAllowed(cfg,Number(day),slot,r)) return; const drinks = [...mealDrinks(cfg,picking)]; drinks[drinkIndex] = r; setDrinks(picking,drinks); } setPicking(null); }} style={{ ...card, padding: 8, display: 'flex', gap: 8, textAlign: 'left', color: ink, cursor: 'pointer' }}>
+        {shownResults.map((r) => <button key={`${r.source}-${r.id}`} type="button" onClick={() => { const [day,slot] = picking.split(':'); if (drinkIndex == null) { if (mealIsFasting(cfg,Number(day),slot)) { setMessage('This meal time is inside the fasting window. Adjust the time or fasting schedule first.');return; } setPick(picking,r); } else { if (!isDrinkPick(r) || !fastingDrinkAllowed(cfg,Number(day),slot,r)) return; const drinks = [...mealDrinks(cfg,picking)]; drinks[drinkIndex] = r; setDrinks(picking,drinks); } setPicking(null); }} style={{ ...card, padding: 8, display: 'flex', gap: 8, textAlign: 'left', color: ink, cursor: 'pointer' }}>
           {r.image ? <img src={r.image} alt="" style={{ width: 42, height: 42, objectFit: 'cover', flex: 'none' }} /> : <div style={{ width: 42, height: 42, flex: 'none', border: `1px solid ${line}` }} />}
           <span><span style={{ display: 'block', fontSize: 12 }}>{r.name}</span><span style={{ color: muted, fontSize: 10 }}>{r.nutrition ? `${Math.round(r.nutrition.energy_kcal)} kcal · P ${Math.round(r.nutrition.protein_g)} · C ${Math.round(r.nutrition.carbohydrates_g)} · F ${Math.round(r.nutrition.fats_g)}` : ''}{r.source === 'guide' ? ' · your recipe' : ''}{!fitsSlot(r.name, picking.split(':')[1]) ? ' · named for another meal' : ''}</span></span>
         </button>)}

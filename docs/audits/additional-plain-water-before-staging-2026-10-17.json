@@ -1,0 +1,193 @@
+{
+  "junctions": [
+    {
+      "amount_g": 15,
+      "created_at": "2026-04-05T20:23:35.934437+00:00",
+      "display_order": null,
+      "group_name": null,
+      "id": "ebb6709b-9b9d-4a1c-a6c1-bd99062e80c6",
+      "ingredient_group": null,
+      "ingredient_id": "plant_fruit_lemon",
+      "ingredient_name": "Lemon",
+      "is_optional": false,
+      "is_primary": true,
+      "notes": null,
+      "preparation": null,
+      "process_stage": null,
+      "quantity": null,
+      "recipe_id": "recipe_purified_water",
+      "retention_factor": 1,
+      "retention_reason": null,
+      "sort_order": 1,
+      "unit": null,
+      "updated_at": "2026-04-05T20:23:35.934437+00:00"
+    },
+    {
+      "amount_g": 2000,
+      "created_at": "2026-04-05T20:34:03.160363+00:00",
+      "display_order": null,
+      "group_name": null,
+      "id": "d97e63e3-aa67-4d73-946f-e8c81eea8d09",
+      "ingredient_group": null,
+      "ingredient_id": "ing_tap_water_average",
+      "ingredient_name": "Tap Water (average of cities)",
+      "is_optional": false,
+      "is_primary": true,
+      "notes": "DEV-437: backfilled from mL via 1g/mL approximation (ingredient density unknown)",
+      "preparation": null,
+      "process_stage": null,
+      "quantity": "2000",
+      "recipe_id": "recipe_purified_water",
+      "retention_factor": 1,
+      "retention_reason": null,
+      "sort_order": 0,
+      "unit": "g",
+      "updated_at": "2026-10-07T23:28:15.9034+00:00"
+    },
+    {
+      "amount_g": 3000,
+      "created_at": "2026-04-05T20:34:03.160363+00:00",
+      "display_order": null,
+      "group_name": null,
+      "id": "d125309d-e68d-42b0-a159-2094a3ca5fa0",
+      "ingredient_group": null,
+      "ingredient_id": "ing_tap_water_average",
+      "ingredient_name": "Tap Water (average of cities)",
+      "is_optional": false,
+      "is_primary": true,
+      "notes": "DEV-437: backfilled from mL via 1g/mL approximation (ingredient density unknown)",
+      "preparation": null,
+      "process_stage": null,
+      "quantity": "3000",
+      "recipe_id": "recipe_water_minimum",
+      "retention_factor": 1,
+      "retention_reason": null,
+      "sort_order": 0,
+      "unit": "g",
+      "updated_at": "2026-10-08T00:35:19.710444+00:00"
+    },
+    {
+      "amount_g": 10,
+      "created_at": "2026-04-05T20:23:35.934437+00:00",
+      "display_order": null,
+      "group_name": null,
+      "id": "d9bd8da2-2e4d-4d0a-9ac6-3fbeb949f755",
+      "ingredient_group": null,
+      "ingredient_id": "ing_psyllium_husk",
+      "ingredient_name": "Psyllium Husk",
+      "is_optional": false,
+      "is_primary": true,
+      "notes": null,
+      "preparation": null,
+      "process_stage": null,
+      "quantity": null,
+      "recipe_id": "recipe_water_minimum",
+      "retention_factor": 1,
+      "retention_reason": null,
+      "sort_order": 1,
+      "unit": null,
+      "updated_at": "2026-04-05T20:23:35.934437+00:00"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "recipe_purified_water",
+      "ingredients": [
+        {
+          "amount_g": 1000,
+          "name": "Water",
+          "unit": "ml"
+        }
+      ],
+      "is_group": false,
+      "name_common": "Purified Water",
+      "nutrition_per_100g": {
+        "_derivation": {
+          "basis": "raw",
+          "energy_before": 99.6,
+          "energy_rederived": "2026-10-13 rederive-recipe-energy.mjs",
+          "flagged_inputs": 0,
+          "ingredients": 2,
+          "macros_rederived": "2026-10-13 rederive-recipe-macros.mjs",
+          "method": "junction/gram-weighted",
+          "needs_curation": false,
+          "note": "Derived from linked ingredients. A macro is present only if every gram-bearing ingredient supplied it. Raw basis: no cooking yield applied.",
+          "satfat_sugar_derived": "2026-10-13 derive-recipe-satfat-sugar.mjs",
+          "source": "catalog_recipe_ingredients x catalog_ingredients",
+          "total_mass_g": 2015
+        },
+        "carbohydrates_g": 0.07,
+        "energy_kcal": 0.2,
+        "fats_g": 0,
+        "protein_g": 0.01,
+        "saturated_fat_g": 0,
+        "sodium_mg": 2,
+        "sugar_g": 0.06
+      },
+      "nutrition_per_serving": {
+        "calories": 270,
+        "carbohydrates_g": 37.8,
+        "energy_kcal": 250.9,
+        "fats_g": 7.6,
+        "fiber_g": 5,
+        "protein_g": 12.6,
+        "sodium_mg": 5,
+        "sugar_g": 20.2,
+        "water_g": 189.2
+      },
+      "serving_size": "252g",
+      "servings": 8
+    },
+    {
+      "id": "recipe_water_minimum",
+      "ingredients": [
+        {
+          "amount_g": 0,
+          "name": "Water",
+          "notes": "as needed",
+          "unit": "ml"
+        }
+      ],
+      "is_group": false,
+      "name_common": "Water Minimum",
+      "nutrition_per_100g": {
+        "_derivation": {
+          "basis": "raw",
+          "energy_before": 100,
+          "energy_rederived": "2026-10-13 rederive-recipe-energy.mjs",
+          "fabricated_input_ids": [
+            "ing_psyllium_husk"
+          ],
+          "flagged_inputs": 0,
+          "ingredients": 2,
+          "input_source_review_date": "2026-09-06",
+          "input_source_status": "FABRICATED_INPUTS_REQUIRE_RECONCILIATION",
+          "macros_rederived": "2026-10-13 rederive-recipe-macros.mjs",
+          "method": "junction/gram-weighted",
+          "needs_curation": true,
+          "note": "Derived from linked ingredients. A macro is present only if every gram-bearing ingredient supplied it. Raw basis: no cooking yield applied.",
+          "source": "catalog_recipe_ingredients x catalog_ingredients",
+          "total_mass_g": 3010
+        },
+        "carbohydrates_g": 0.05,
+        "energy_kcal": 0.3,
+        "fats_g": 0.01,
+        "protein_g": 0.02,
+        "sodium_mg": 50
+      },
+      "nutrition_per_serving": {
+        "calories": 268,
+        "carbohydrates_g": 37.6,
+        "energy_kcal": 250.8,
+        "fats_g": 7.5,
+        "fiber_g": 5,
+        "protein_g": 12.5,
+        "sodium_mg": 125.4,
+        "sugar_g": 12.5,
+        "water_g": 188.1
+      },
+      "serving_size": "251g",
+      "servings": 12
+    }
+  ]
+}
