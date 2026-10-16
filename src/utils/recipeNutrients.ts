@@ -9,8 +9,9 @@
  * Tiers:
  *   15  core nutrients most diets fall short on;
  *   30  the 15 plus the remaining vitamins and trace minerals with an adult daily value;
- *   90  every beneficial nutrient in the catalog's essential_90 list (loaded from catalog_elements),
- *       on top of the 30.
+ *   90  the app's Essential 90 (mobile HomeElements ESSENTIAL_NUM, ordinals 1–89: minerals, vitamins,
+ *       amino acids, B vitamins, trace elements, phytonutrients, fatty acids, other) plus protein and fibre.
+ *   The app defines only the 90; Core 15 and Extended 30 are subsets chosen here (most common shortfalls first).
  */
 import { projectId, publicAnonKey } from './supabase/info';
 
@@ -78,10 +79,53 @@ export const NUTRIENTS: NutrientDef[] = [
   { key: 'epa_g', label: 'EPA', unit: 'g', dv: 0.25, tier: 90, aliases: ['epa_g', 'epa_mg'], scale: { epa_mg: 0.001 } },
 ];
 
+/**
+ * The app's Essential 90, in its own order (AI-Health-Scan_Mobile src/components/OverviewScreen/HomeElements.tsx
+ * ESSENTIAL_NUM). Each name maps to a canonical key above when the ingredient data measures it; the rest get a
+ * key of their own (shown as "no data" until the catalog carries them).
+ */
+export const APP_ESSENTIAL_90: Array<[number, string, string | null]> = [
+  [1, 'Calcium', 'calcium_mg'], [2, 'Iron', 'iron_mg'], [3, 'Magnesium', 'magnesium_mg'], [4, 'Zinc', 'zinc_mg'], [5, 'Selenium', 'selenium_mcg'],
+  [6, 'Copper', 'copper_mg'], [7, 'Manganese', 'manganese_mg'], [8, 'Chromium', 'chromium_mcg'], [9, 'Iodine', 'iodine_mcg'], [10, 'Phosphorus', 'phosphorus_mg'],
+  [11, 'Potassium', 'potassium_mg'], [12, 'Sodium', 'sodium_mg'], [13, 'Chloride', 'chloride_mg'], [14, 'Sulfur', 'sulfur_mg'],
+  [15, 'Vitamin A', 'vitamin_a_mcg'], [16, 'Vitamin D', 'vitamin_d_mcg'], [17, 'Vitamin C', 'vitamin_c_mg'], [18, 'Vitamin E', 'vitamin_e_mg'], [19, 'Vitamin K', 'vitamin_k_mcg'],
+  [20, 'Leucine', 'leucine_g'], [21, 'Isoleucine', 'isoleucine_g'], [22, 'Valine', 'valine_g'], [23, 'Lysine', 'lysine_g'], [24, 'Methionine', 'methionine_g'],
+  [25, 'Phenylalanine', 'phenylalanine_g'], [26, 'Threonine', 'threonine_g'], [27, 'Tryptophan', 'tryptophan_g'], [28, 'Histidine', 'histidine_g'],
+  [29, 'Alanine', null], [30, 'Arginine', null], [31, 'Asparagine', null], [32, 'Aspartate', null], [33, 'Cysteine', null], [34, 'Glutamate', null],
+  [35, 'Glutamine', null], [36, 'Glycine', null], [37, 'Proline', null], [38, 'Serine', null], [39, 'Tyrosine', null],
+  [40, 'Thiamine (B1)', 'thiamine_mg'], [41, 'Riboflavin (B2)', 'riboflavin_mg'], [42, 'Niacin (B3)', 'niacin_mg'], [43, 'Pantothenic acid (B5)', 'pantothenic_acid_mg'],
+  [44, 'Vitamin B6', 'vitamin_b6_mg'], [45, 'Biotin (B7)', 'biotin_mcg'], [46, 'Folate (B9)', 'folate_mcg'], [47, 'Vitamin B12', 'vitamin_b12_mcg'],
+  [48, 'Boron', null], [49, 'Cobalt', null], [50, 'Fluorine', null], [51, 'Lithium', null], [52, 'Molybdenum', 'molybdenum_mcg'], [53, 'Nickel', null],
+  [54, 'Silicon', null], [55, 'Tin', null], [56, 'Vanadium', null], [57, 'Strontium', null], [58, 'Rubidium', null],
+  [59, 'Lycopene', 'lycopene_mg'], [60, 'Lutein', 'lutein_mg'], [61, 'Zeaxanthin', null], [62, 'Beta-carotene', 'beta_carotene_mg'], [63, 'Alpha-carotene', null],
+  [64, 'Cryptoxanthin', null], [65, 'Quercetin', null], [66, 'Resveratrol', null], [67, 'Curcumin', null], [68, 'Catechins', null], [69, 'Anthocyanins', null],
+  [70, 'Ellagic acid', null], [71, 'Sulforaphane', null], [72, 'Allicin', null], [73, 'Capsaicin', null], [74, 'Gingerol', null], [75, 'Piperine', null],
+  [76, 'Omega-3', 'omega_3_g'], [77, 'Omega-6', 'omega_6_g'], [78, 'Omega-9', 'monounsaturated_g'], [79, 'DHA', 'dha_g'], [80, 'EPA', 'epa_g'],
+  [81, 'ALA', null], [82, 'GLA', null], [83, 'CLA', null], [84, 'Choline', 'choline_mg'], [85, 'Inositol', null], [86, 'CoQ10', 'coq10_mg'],
+  [87, 'Alpha-lipoic acid', null], [88, 'Taurine', null], [89, 'Carnitine', null],
+];
+
 const ALIAS = new Map<string, NutrientDef>();
 for (const n of NUTRIENTS) for (const a of n.aliases) ALIAS.set(a, n);
 
-export const nutrientsForTier = (tier: Tier, extra: NutrientDef[] = []) => [...NUTRIENTS, ...extra].filter((n) => n.tier <= tier);
+const slug = (label: string) => label.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+/** Tier-90 defs for app essentials the static table does not already hold (sodium, sulfur, the other amino acids, phytonutrients…). */
+const APP_EXTRA: NutrientDef[] = APP_ESSENTIAL_90.filter(([, , key]) => !key || !NUTRIENTS.some((n) => n.key === key)).map(([, label, key]) => {
+  const base = key || slug(label);
+  const known: Record<string, Partial<NutrientDef>> = { sodium_mg: { unit: 'mg', dv: 1500 }, chloride_mg: { unit: 'mg', dv: 2300 }, sulfur_mg: { unit: 'mg', dv: null } };
+  return { key: base, label, unit: known[base]?.unit || (key ? key.split('_').pop()! : 'mg'), dv: known[base]?.dv ?? null, tier: 90 as Tier,
+    aliases: key ? [key] : [`${base}_g`, `${base}_mg`, `${base}_mcg`, base] };
+});
+for (const n of APP_EXTRA) for (const a of n.aliases) if (!ALIAS.has(a)) ALIAS.set(a, n);
+const APP_KEYS = new Set(APP_ESSENTIAL_90.map(([, , key]) => key).filter(Boolean) as string[]);
+
+/** Tier 90 = protein + fibre + the app's Essential 90; 15 and 30 are the static subsets. `extra` is kept for callers that add more. */
+export const nutrientsForTier = (tier: Tier, extra: NutrientDef[] = []) => {
+  if (tier < 90) return NUTRIENTS.filter((n) => n.tier <= tier);
+  const fromStatic = NUTRIENTS.filter((n) => n.tier < 90 || APP_KEYS.has(n.key) || n.key === 'protein_g' || n.key === 'fiber_g');
+  const seen = new Set(fromStatic.map((n) => n.key));
+  return [...fromStatic, ...APP_EXTRA.filter((n) => !seen.has(n.key)), ...extra.filter((n) => !seen.has(n.key))];
+};
 export const nutrientByKey = (key: string) => ALIAS.get(key) || NUTRIENTS.find((n) => n.key === key) || null;
 
 const num = (v: unknown) => { const n = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN; return Number.isFinite(n) ? n : null; };
