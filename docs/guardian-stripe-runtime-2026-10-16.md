@@ -66,7 +66,7 @@ These are API/runtime integration checks, not full browser checkout/3DS,
 asynchronous-method, upsell, replay-ordering, or file-access certification.
 Production configuration was not changed and live checkout remains disabled.
 
-## Browser verification follow-up — incomplete, merge held
+## Browser verification — initial investigation
 
 Opened a disposable approved staging Guardian with a GBP 1.00 paid offer.
 The browser details form and PaymentIntent creation work. In Brave, both the
@@ -85,3 +85,33 @@ Pay and a clear loading-failure alert instead of accepting a submission.
 size/import warnings remain). Changes are on
 `codex/guardian-browser-3ds-verification`, not merged: browser 3DS success,
 failure/cancel, retry, and redirect-return verification remain incomplete.
+
+## Chrome browser results — card/3DS checks completed
+
+User authorized Chrome comparison. Chrome's native controls loaded the real
+Stripe Payment Element and bank simulator. No browser security protection was
+disabled. The initial blank-widget cause is not proven to be Brave-specific;
+Stripe loading was slow and one retry reported a closed js.stripe.com connection.
+
+Verified against the published staging-backed page:
+
+- 3DS-required card `4000000000003220`, Complete: success screen and paid DB row.
+- Cancel challenge: authentication error, Pay available, no success screen,
+  failed purchase with null paid_at.
+- Explicit Fail challenge: authentication error, no success screen. Retrying
+  the same order and completing authentication succeeded with one purchase
+  row, not a new order.
+- One intermediate Stripe iframe connection failure required reloading the
+  disposable test page. No live charge or false paid row resulted.
+
+Verified the fix on PR47's Netlify preview at `af27d26`: Pay disabled during
+widget loading, enabled after real card fields became ready; 3DS Complete
+returned the success screen and a paid staging purchase.
+
+221 automated tests passed, including ready/loaderror, stalled loading and
+late-ready recovery. Production build passed. Independent read-only review
+found no blocking checkout-code issue; its QA-script assertion finding was fixed.
+
+This completes the scoped browser card/inline-3DS checks, not wallet/bank
+redirects, asynchronous non-card methods, upsells, or file-access certification.
+Production launch remains explicitly blocked; no release hold was removed.
