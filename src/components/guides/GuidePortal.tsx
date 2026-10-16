@@ -836,19 +836,26 @@ function loadStripeJs(key: string): Promise<any> {
   });
   return stripeScript.then((Stripe) => Stripe(key));
 }
-function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [], videos = {} }: { offer: GuideOffer; upsells: GuideOffer[]; profile: GuideProfile; accent: string; onClose: () => void; reviews?: GuardianReview[]; videos?: Record<string, string> }) {
-  const [stage, setStage] = useState<'details' | 'card' | 'paying' | 'paid' | 'upsell' | 'done'>('details');
+export function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [], videos = {} }: { offer: GuideOffer; upsells: GuideOffer[]; profile: GuideProfile; accent: string; onClose: () => void; reviews?: GuardianReview[]; videos?: Record<string, string> }) {
+  const [stage, setStage] = useState<'details' | 'card' | 'paying' | 'pending' | 'upsell' | 'done'>('details');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [purchaseId, setPurchaseId] = useState('');
-  const [bought, setBought] = useState<string[]>([offer.title]);
+  const [bought, setBought] = useState<string[]>([]);
   const [upsellIndex, setUpsellIndex] = useState(0);
   const [seconds, setSeconds] = useState(600);
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null);
   const mountRef = useRef<HTMLDivElement>(null);
+  const showPaymentForm = stage === 'card' || stage === 'paying';
+  useEffect(() => {
+    if (!showPaymentForm || !elementsRef.current || !mountRef.current) return;
+    const element = elementsRef.current.create('payment', { layout: 'tabs' });
+    element.mount(mountRef.current);
+    return () => element.destroy();
+  }, [showPaymentForm]);
   const money = (cents: number, currency = offer.currency || 'GBP') => formatMoney(cents / 100, currency);
   const upsell = upsells[upsellIndex];
   useEffect(() => { if (stage !== 'upsell' || seconds <= 0) return; const t = window.setInterval(() => setSeconds((v) => Math.max(0, v - 1)), 1000); return () => window.clearInterval(t); }, [stage, seconds]);
@@ -862,16 +869,30 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [],
       stripeRef.current = stripe;
       elementsRef.current = stripe.elements({ clientSecret: intent.client_secret!, appearance: { theme: 'stripe', variables: { colorPrimary: '#111827', colorBackground: '#F6F8FA', colorText: '#111827', borderRadius: '12px', fontFamily: 'Poppins, Inter, system-ui, sans-serif' } }, fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap' }] });
       setStage('card');
-      window.requestAnimationFrame(() => { const el = elementsRef.current.create('payment', { layout: 'tabs' }); el.mount(mountRef.current!); });
     } catch (err: any) { setMessage(err?.message || 'Could not start checkout.'); }
     finally { setBusy(false); }
   }
   async function pay(e: React.FormEvent) {
     e.preventDefault(); setStage('paying'); setMessage('');
-    const { error, paymentIntent } = await stripeRef.current.confirmPayment({ elements: elementsRef.current, redirect: 'if_required', confirmParams: { return_url: window.location.href, receipt_email: email } });
-    if (error) { setMessage(error.message || 'Payment failed.'); setStage('card'); return; }
-    if (paymentIntent?.status === 'succeeded') { await confirmOfferPayment(purchaseId).catch(() => null); setSeconds(600); setStage(upsells.length ? 'upsell' : 'done'); }
-    else { setMessage('Payment is processing. We will email you when it completes.'); setStage('done'); }
+    try {
+      const { error, paymentIntent } = await stripeRef.current.confirmPayment({ elements: elementsRef.current, redirect: 'if_required', confirmParams: { return_url: window.location.href, receipt_email: email } });
+      if (error) { setMessage(error.message || 'Payment failed.'); setStage('card'); return; }
+      if (paymentIntent?.status === 'succeeded') await verifyPurchase();
+      else { setMessage('Payment is processing. Check its status before attempting another payment.'); setStage('pending'); }
+    } catch { setMessage('Payment status could not be verified. Check its status before attempting another payment.'); setStage('pending'); }
+  }
+  async function verifyPurchase() {
+    setBusy(true); setMessage('');
+    try {
+      const result = await confirmOfferPayment(purchaseId);
+      if (result.status === 'paid') {
+        setBought(current => current.includes(offer.title) ? current : [offer.title, ...current]);
+        setSeconds(600); setStage(upsells.length ? 'upsell' : 'done');
+      } else if (result.status === 'failed') {
+        setMessage('Payment was not completed. Please check your payment method and try again.'); setStage('card');
+      } else { setMessage('Payment is processing. Check its status before attempting another payment.'); setStage('pending'); }
+    } catch { setMessage('Order confirmation is unavailable. Check payment status before attempting another payment.'); setStage('pending'); }
+    finally { setBusy(false); }
   }
   async function acceptUpsell() {
     if (!upsell) return; setBusy(true); setMessage('');
@@ -916,10 +937,14 @@ function OfferCheckout({ offer, upsells, profile, accent, onClose, reviews = [],
           </div>
         </div>
       {reviews.length > 0 && <div style={{ flex: '1 1 calc(100% - 32px)', minWidth: 0, textAlign: 'left', margin: '0 16px', padding: '16px 0 18px', borderTop: `1px solid ${APP.border}` }}><ReviewRail reviews={reviews} accent={APP.greenDark} /></div>}
+      </div> : stage === 'pending' ? <div style={{ padding: '48px 24px 26px' }}>
+        <h2 style={{ fontFamily: APP.font, fontSize: 26, margin: '0 0 12px' }}>Payment confirmation pending</h2>
+        <p style={{ color: APP.muted }}>Your order is not confirmed yet. Checking status will not charge you again.</p>
+        <button type="button" disabled={busy} onClick={verifyPurchase} style={appButton}>{busy ? 'Checking…' : 'Check payment status'}</button>
       </div> : stage === 'done' ? <div style={{ padding: '48px 24px 26px' }}>
         <span style={{ width: 56, height: 56, margin: '0 auto 14px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={26} /></span>
         <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, margin: '0 0 4px' }}>You’re all set!</h2>
-        <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 18px' }}>{message || `Receipt sent to ${email}`}</p>
+        <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 18px' }}>{message || `Payment confirmed for ${email}`}</p>
         <div style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '6px 16px', textAlign: 'left', marginBottom: 18 }}>{bought.map((t) => <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{t}</div>)}</div>
         <button type="button" onClick={onClose} style={{ ...appButton, borderRadius: 12, background: APP.text, fontSize: 16, fontWeight: 600 }}>Done</button>
       </div> : <div style={{ padding: '44px 24px 24px' }}>
