@@ -843,6 +843,7 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [purchaseId, setPurchaseId] = useState('');
+  const [cardReady, setCardReady] = useState(false);
   const [bought, setBought] = useState<string[]>([]);
   const [upsellIndex, setUpsellIndex] = useState(0);
   const [seconds, setSeconds] = useState(600);
@@ -852,9 +853,22 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
   const showPaymentForm = stage === 'card' || stage === 'paying';
   useEffect(() => {
     if (!showPaymentForm || !elementsRef.current || !mountRef.current) return;
+    setCardReady(false);
+    let disposed = false;
+    const failed = () => {
+      if (disposed) return;
+      setCardReady(false);
+      setMessage('The secure payment form could not load. Please check your connection or browser settings, then close checkout and try again. No payment has been submitted.');
+    };
+    const timeout = window.setTimeout(failed, 15000);
     const element = elementsRef.current.create('payment', { layout: 'tabs' });
+    element.on('ready', () => {
+      if (disposed) return;
+      window.clearTimeout(timeout); setCardReady(true); setMessage('');
+    });
+    element.on('loaderror', () => { window.clearTimeout(timeout); failed(); });
     element.mount(mountRef.current);
-    return () => element.destroy();
+    return () => { disposed = true; window.clearTimeout(timeout); element.destroy(); };
   }, [showPaymentForm]);
   const money = (cents: number, currency = offer.currency || 'GBP') => formatMoney(cents / 100, currency);
   const upsell = upsells[upsellIndex];
@@ -875,7 +889,9 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
     finally { setBusy(false); }
   }
   async function pay(e: React.FormEvent) {
-    e.preventDefault(); setStage('paying'); setMessage('');
+    e.preventDefault();
+    if (!cardReady || stage !== 'card') return;
+    setStage('paying'); setMessage('');
     try {
       const { error, paymentIntent } = await stripeRef.current.confirmPayment({ elements: elementsRef.current, redirect: 'if_required', confirmParams: { return_url: window.location.href, receipt_email: email } });
       if (error) { setMessage(error.message || 'Payment failed.'); setStage('card'); return; }
@@ -961,8 +977,9 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, review
           <button disabled={busy} style={{ ...appButton, borderRadius: 12, marginTop: 16, background: APP.text, fontSize: 16, fontWeight: 600, opacity: busy ? .6 : 1 }}>{busy ? 'Loading…' : 'Continue to payment'}</button>
         </form> : <form onSubmit={pay} style={{ display: 'grid', gap: 12, textAlign: 'left' }}>
           <div ref={mountRef} style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: 14 }} />
+          {!cardReady && !message && <p role="status">Loading secure payment form…</p>}
           <span style={{ color: APP.muted, fontSize: 11, lineHeight: 1.5 }}>Your card is saved securely by Stripe so you can add follow-on offers in one click.</span>
-          <button disabled={stage === 'paying'} style={{ ...appButton, opacity: stage === 'paying' ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{stage === 'paying' ? 'Paying…' : `Pay ${money(offer.price_cents)}`}</span></button>
+          <button disabled={stage === 'paying' || !cardReady} style={{ ...appButton, opacity: stage === 'paying' || !cardReady ? .6 : 1 }}><span style={{ fontSize: 16, fontWeight: 600 }}>{stage === 'paying' ? 'Paying…' : `Pay ${money(offer.price_cents)}`}</span></button>
         </form>}
         {legal}
       </div>}

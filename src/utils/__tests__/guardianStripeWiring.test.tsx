@@ -18,7 +18,7 @@ beforeEach(()=>{
   vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY_STAGING','pk_test_StagingAccount');
   vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY_PRODUCTION','pk_live_ProductionAccount');
   state.start.mockReset().mockResolvedValue({purchase_id:'qa-order',client_secret:'pi_test_secret_fake',amount_cents:100,currency:'GBP'});
-  state.stripe.mockReset().mockReturnValue({elements:()=>({create:()=>({mount:()=>{},destroy:()=>{}})})});
+  state.stripe.mockReset().mockReturnValue({elements:()=>({create:()=>({on:()=>{},mount:()=>{},destroy:()=>{}})})});
   (window as any).Stripe=state.stripe;
 });
 afterEach(()=>{cleanup();delete (window as any).Stripe;vi.unstubAllEnvs();});
