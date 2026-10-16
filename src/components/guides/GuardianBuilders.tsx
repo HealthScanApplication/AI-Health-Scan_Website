@@ -6,7 +6,7 @@ import { dayReport, loadCandidates, smartFill, type Candidate, type RecipeIdea }
 import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
 import { TIERS, tierLabel } from './RecipeInsights';
 import {
-  MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
+  MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, FASTING_TYPES, SUPPLEMENT_PERIODS, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
   listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
@@ -104,7 +104,7 @@ function ReviewPanel({ notes, conflicts, blocking = [], onSave, onClose, busy, s
 
 /* ───────────────────────── Diet ───────────────────────── */
 
-const emptyDiet = (): DietConfig => ({ framework: 'mediterranean', kcal: 2000, protein: 18, carbs: 47, fat: 35, slots: ['breakfast', 'lunch', 'dinner'], plan: {}, timing: { breakfast: { anchor: 'wake', time: '08:00', offset: 60 } }, rules: FRAMEWORK_RULES.mediterranean, mealRules: {} });
+const emptyDiet = (): DietConfig => ({ framework: 'mediterranean', kcal: 2000, protein: 18, carbs: 47, fat: 35, slots: ['breakfast', 'lunch', 'dinner'], plan: {}, timing: { breakfast: { anchor: 'wake', time: '08:00', offset: 60 } }, rules: FRAMEWORK_RULES.mediterranean, mealRules: {}, supplements: {}, supplementTimes: { morning: '08:00', afternoon: '14:00', evening: '20:00' }, fasting: { type: 'none', start: '20:00', end: '12:00', days: [1, 2, 3, 4, 5, 6, 7] } });
 
 function Bar({ value, target }: { value: number; target: number }) {
   const ratio = target ? value / target : 0;
@@ -191,6 +191,28 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
       </div>)}
     </div>
     {macroSum !== 100 && <p style={{ color: warn, fontSize: 12 }}>Macros add up to {macroSum}% of energy. Adjust them to 100%.</p>}
+    <div style={{ ...card, marginBottom: 14 }}>
+      <div style={{ ...label, color: acid }}>Supplements</div>
+      <p style={{ color: muted, fontSize: 11, margin: '0 0 12px' }}>Add one supplement per line. Each becomes a checkable Protocol item at the selected time.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}>
+        {SUPPLEMENT_PERIODS.map((period) => <div key={period.id}>
+          <RulesEditor title={`${period.label} supplements`} rules={cfg.supplements?.[period.id] || []} onChange={(items) => setCfg((c) => ({ ...c, supplements: { ...c.supplements, [period.id]: items } }))} placeholder={'One per line, e.g.\nVitamin D3\nOmega-3'} />
+          <label style={{ display: 'block', marginTop: 7 }}><span style={{ ...label, fontSize: 9 }}>Time</span><input type="time" style={input} value={cfg.supplementTimes?.[period.id] || period.time} onChange={(e) => setCfg((c) => ({ ...c, supplementTimes: { ...c.supplementTimes, [period.id]: e.target.value } }))} /></label>
+        </div>)}
+      </div>
+    </div>
+    <div style={{ ...card, marginBottom: 14 }}>
+      <div style={{ ...label, color: acid }}>Fasting</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>{FASTING_TYPES.map((type) => <button key={type.id} type="button" style={chip((cfg.fasting?.type || 'none') === type.id)} onClick={() => setCfg((c) => ({ ...c, fasting: { ...(c.fasting || { start: '20:00', end: '12:00', days: WEEK.map((w) => w.day) }), type: type.id } }))}>{type.label}</button>)}</div>
+      {(cfg.fasting?.type || 'none') !== 'none' && <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, alignItems: 'end' }}>
+          <label><span style={label}>Fast starts</span><input type="time" style={input} value={cfg.fasting?.start || '20:00'} onChange={(e) => setCfg((c) => ({ ...c, fasting: { ...(c.fasting || { type: 'intermittent', end: '12:00', days: WEEK.map((w) => w.day) }), start: e.target.value } }))} /></label>
+          <label><span style={label}>Fast ends</span><input type="time" style={input} value={cfg.fasting?.end || '12:00'} onChange={(e) => setCfg((c) => ({ ...c, fasting: { ...(c.fasting || { type: 'intermittent', start: '20:00', days: WEEK.map((w) => w.day) }), end: e.target.value } }))} /></label>
+          <div><span style={label}>Days</span><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{WEEK.map((w) => { const on = cfg.fasting?.days.includes(w.day) ?? true; return <button key={w.day} type="button" style={{ ...chip(on), padding: '5px 9px', fontSize: 10 }} onClick={() => setCfg((c) => { const current = c.fasting || { type: 'intermittent', start: '20:00', end: '12:00', days: WEEK.map((x) => x.day) }; return { ...c, fasting: { ...current, days: current.days.includes(w.day) ? current.days.filter((d) => d !== w.day) : [...current.days, w.day] } }; })}>{w.short}</button>; })}</div></div>
+        </div>
+        {cfg.fasting?.type === 'dry' && <p style={{ color: warn, fontSize: 11, margin: '12px 0 0', display: 'flex', gap: 6, alignItems: 'center' }}><AlertTriangle size={13} /> Dry fasting restricts fluids and can be dangerous. Only include it with qualified medical guidance.</p>}
+      </>}
+    </div>
     <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
       <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => setTier(t)} title="Rank meals by this essential-nutrient set and show each day's coverage" style={{ ...chip(t === tier), padding: '6px 10px', fontSize: 10 }}>{tierLabel(t)}</button>)}</span>
       <button type="button" style={btn} disabled={busy || !slots.length} onClick={autoFill}><Sparkles size={13} /> Auto-fill week</button>
