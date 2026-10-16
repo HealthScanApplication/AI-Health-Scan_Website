@@ -29,11 +29,16 @@ export const TIERS: Tier[] = [15, 30, 90];
 // Collection names; the UI reports the actual full-collection count separately.
 export const tierLabel = (t: Tier, _extra: NutrientDef[] = []) => (t === 15 ? 'Core 15' : t === 30 ? 'Extended 30' : 'Essential 90');
 
+export function Essential90Note({ defs }: { defs: NutrientDef[] }) {
+  const linked = defs.filter(d => d.catalogBacked).length;
+  return <p style={{ color: muted, fontSize: 11, margin: '6px 0' }}>Dr. Wallach’s historical core90: 60 minerals · 16 vitamins · 12 amino acids · 2 fatty-acid groups. {linked}/90 catalog identities loaded; remaining entries use the source-list fallback. Published variants add Omega-9 (91 entries); Omega-9 stays outside the core count. Core15/30 are app subsets. Historical membership is not proof of safety or a recommendation to consume these substances. <a href="https://youngevityproducts.co.uk/pages/the-90-nutrients" target="_blank" rel="noreferrer" style={{ color: acid }}>Source and variant</a></p>;
+}
+
 function Bar({ c }: { c: Coverage }) {
   const pct = c.pct ?? 0;
   const color = c.pct == null ? line : pct >= 20 ? acid : pct >= 10 ? warn : danger;
   return <div title={c.amount == null ? 'No ingredient data for this nutrient' : `${c.amount} ${c.def.unit} per serving${c.def.dv ? ` of ${c.def.dv} ${c.def.unit} daily value` : ''}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 70px 38px', gap: 8, alignItems: 'center', fontSize: 11, padding: '3px 0' }}>
-    <span style={{ color: c.amount == null ? 'rgba(184,182,175,.55)' : ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.def.label}</span>
+    <span style={{ color: c.amount == null ? 'rgba(184,182,175,.55)' : ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.def.label}{c.def.safety === 'Hazardous' ? ' · hazardous' : ''}</span>
     <span style={{ height: 4, background: 'rgba(245,242,234,.1)' }}><span style={{ display: 'block', height: 4, width: `${Math.min(100, pct)}%`, background: color }} /></span>
     <span style={{ color: c.amount == null ? 'rgba(184,182,175,.55)' : muted, textAlign: 'right' }}>{c.amount == null ? '—' : c.pct != null ? `${c.pct}%` : `${c.amount}${c.def.unit}`}</span>
   </div>;
@@ -51,7 +56,7 @@ export function NutrientCoverage({ micros, macros, tier, onTier, title = 'Essent
       <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => onTier(t)} style={chip(t === tier)}>{tierLabel(t, extra)}</button>)}</span>
     </div>
     <div style={{ color: muted, fontSize: 10, marginBottom: 6 }}>{strong} of {cov.length} at 20%+ of {extra.length ? 'catalog reference amount' : 'daily value'} · {measured} measured in the ingredient data · grey = no data yet</div>
-    <div style={{ color: muted, fontSize: 10, marginBottom: 6 }}>{extra.length ? 'Database Essential 90 collection; actual entry count shown. Core 15 / Extended 30 are app subsets. Catalog references are not a recommendation to consume every listed substance.' : 'Built-in definitions shown; database definitions unavailable or loading.'}</div>
+    <Essential90Note defs={extra} />
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', columnGap: 16, maxHeight: tier === 90 ? 320 : undefined, overflowY: tier === 90 ? 'auto' : undefined }}>{cov.map((c) => <Bar key={c.def.key} c={c} />)}</div>
   </div>;
 }
@@ -96,7 +101,7 @@ function Chips({ title, values, onChange, placeholder, tone }: { title: string; 
 export function RecipeFiltersPanel({ value, onChange, tier, onTier }: { value: RecipeFilters; onChange: (f: RecipeFilters) => void; tier: Tier; onTier: (t: Tier) => void }) {
   const extra = useEssential90();
   const set = (patch: Partial<RecipeFilters>) => onChange({ ...value, ...patch });
-  const tierDefs = nutrientsForTier(tier, extra);
+  const tierDefs = nutrientsForTier(tier, extra).filter(d => d.dv != null);
   return <div style={{ border: `1px solid ${line}`, padding: 14, marginTop: 12, display: 'grid', gap: 14 }}>
     <div><span style={label}>Diet</span><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{DIETS.map((d) => { const on = value.diets.includes(d); return <button key={d} type="button" onClick={() => set({ diets: on ? value.diets.filter((x) => x !== d) : [...value.diets, d] })} style={chip(on)}>{d}</button>; })}</div></div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 14 }}>

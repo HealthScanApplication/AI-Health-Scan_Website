@@ -10,6 +10,9 @@ import { type AdminRecord } from '../../utils/adminHelpers';
 import { DRVWidget } from './DRVWidget';
 import { TopFoodSources } from './TopFoodSources';
 import { HealthScanCoverageSection } from './HealthScanCoverageSection';
+import wallach from '../../config/wallachEssential90.json';
+
+const wallachIds = new Set([...wallach.minerals,...wallach.vitamins,...wallach.amino_acids,...wallach.fatty_acids].map(([id]) => id));
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -124,8 +127,8 @@ export function ElementDetailView({ record, accessToken }: Props) {
           {r.subcategory && (
             <Badge variant="outline" className="text-xs">{r.subcategory}</Badge>
           )}
-          {r.essential_90 && (
-            <Badge className="text-xs bg-yellow-100 text-yellow-800">Essential 90</Badge>
+          {String(r.essential_90) === 'true' && wallachIds.has(r.id) && (
+            <Badge className="text-xs bg-yellow-100 text-yellow-800">Wallach historical core90</Badge>
           )}
           {r.nutrient_category && (
             <Badge variant="outline" className="text-xs">{r.nutrient_category}</Badge>
