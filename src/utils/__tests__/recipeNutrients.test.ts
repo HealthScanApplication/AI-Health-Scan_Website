@@ -83,6 +83,7 @@ describe('fitness muscle groups', () => {
     expect(muscleGroupOf({ name: 'Jaw Relaxation', bodyParts: ['jaw', 'mouth'] })).toBe('Face');
     expect(muscleGroupOf({ name: 'Face Pull', bodyParts: ['rear_deltoids', 'rhomboids', 'trapezius'] })).not.toBe('Face');
     expect(muscleGroupOf({ name: 'Treadmill Walk', category: 'Cardio' })).toBe('Cardio');
+    expect(muscleGroupOf({ name: 'Barbell Decline Bench Press', bodyParts: ['chest', 'triceps', 'anterior_deltoids', 'shoulders'] })).toBe('Chest');
   });
   it('names a day from what it trains', () => {
     expect(dayNameFor([{ bodyParts: ['quadriceps'] }, { bodyParts: ['glutes'] }])).toBe('Leg day');

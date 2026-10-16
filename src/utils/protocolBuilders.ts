@@ -272,7 +272,8 @@ export function muscleGroupOf(a: { bodyParts?: string[]; category?: string | nul
   const parts = (a.bodyParts || []).map((p) => p.toLowerCase());
   if (/\b(face|facial|jaw|cheek)\b/i.test(a.name || '') && !/pull/i.test(a.name || '')) return 'Face';
   let best: string | null = null, bestScore = 0;
-  for (const g of MUSCLE_GROUPS) { const score = parts.filter((p) => (g.parts as readonly string[]).includes(p)).length * 10 - (parts.findIndex((p) => (g.parts as readonly string[]).includes(p)) + 1 || 99) / 100; if (score > bestScore) { bestScore = score; best = g.label; } }
+  // The catalog lists the prime mover first (bench press: chest, then triceps/deltoids), so it weighs 3; others 1.
+  for (const g of MUSCLE_GROUPS) { const score = parts.reduce((sum, p, i) => sum + ((g.parts as readonly string[]).includes(p) ? (i === 0 ? 3 : 1) : 0), 0); if (score > bestScore) { bestScore = score; best = g.label; } }
   if (best) return best;
   if (/cardio|sports|hiit/i.test(a.category || '')) return 'Cardio';
   if (/stretch|recovery|yoga|mobility/i.test(a.category || '')) return 'Mobility';

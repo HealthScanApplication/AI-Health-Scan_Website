@@ -280,6 +280,21 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
       <Status busy={busy} message={message} />
     </div>
     {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
+    {cfg.sessions.some((x) => x.exercises.length) && (() => {
+      // Share of the week's exercises per muscle group; groups with none show 0% so gaps are visible.
+      const all = cfg.sessions.flatMap((x) => x.exercises.map(muscleGroupOf));
+      const muscles = MUSCLE_GROUPS.map((g) => g.label as string).filter((g) => g !== 'Full body' && (g !== 'Face' || all.includes('Face')) && (g !== 'Neck' || all.includes('Neck')));
+      const count = (g: string) => all.filter((x) => x === g || (x === 'Full body')).length;
+      const worked = muscles.filter((g) => count(g) > 0).length;
+      return <div style={{ ...card, marginBottom: 14 }}>
+        <div style={{ ...label, color: acid }}>Muscles worked this week · {worked} of {muscles.length} groups · {all.length} exercises</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '6px 16px' }}>{muscles.map((g) => { const pct = all.length ? Math.round(count(g) / all.length * 100) : 0; return <div key={g} style={{ fontSize: 11 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: pct ? ink : '#E88A7A' }}><span>{g}</span><span>{pct}%</span></div>
+          <div style={{ height: 4, background: 'rgba(245,242,234,.1)', marginTop: 3 }}><div style={{ height: 4, width: `${Math.min(100, pct * 2.5)}%`, background: pct ? acid : 'transparent' }} /></div>
+        </div>; })}</div>
+        {all.some((x) => x === 'Cardio' || x === 'Mobility') && <div style={{ color: muted, fontSize: 10, marginTop: 8 }}>Also {all.filter((x) => x === 'Cardio').length} cardio and {all.filter((x) => x === 'Mobility').length} mobility exercises. Full-body moves count toward every group.</div>}
+      </div>;
+    })()}
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(150px,1fr))', gap: 6, minWidth: 1080 }}>
         {WEEK.map(({ day, short }) => {
@@ -295,7 +310,7 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
               <select style={{ ...input, height: 28, fontSize: 11, padding: '0 5px', marginBottom: 6 }} value={s.intensity} onChange={(e) => patchSession(i, { intensity: e.target.value as FitnessSession['intensity'] })}><option value="low">Low intensity</option><option value="moderate">Moderate</option><option value="high">High</option></select>
               {s.exercises.map((e, k) => ({ e, k, g: muscleGroupOf(e) })).sort((a, b) => MUSCLE_ORDER.indexOf(a.g) - MUSCLE_ORDER.indexOf(b.g)).map(({ e, k, g }, idx, arr) => <div key={`${e.id}-${k}`} style={{ fontSize: 11, padding: '5px 0', borderTop: '1px dashed rgba(245,242,234,.12)' }}>
                 {(idx === 0 || arr[idx - 1].g !== g) && <div style={{ color: acid, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', margin: '2px 0 4px' }}>{g}</div>}
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}><span>{e.name}</span><button type="button" style={iconBtn} onClick={() => patchSession(i, { exercises: s.exercises.filter((_, m) => m !== k) })}><X size={11} /></button></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>{e.image ? <img src={e.image} alt="" loading="lazy" style={{ width: 34, height: 34, objectFit: 'cover', flex: 'none', border: `1px solid ${line}` }} /> : <span style={{ width: 34, height: 34, flex: 'none', border: `1px solid ${line}` }} />}<span style={{ flex: 1, minWidth: 0 }}>{e.name}</span><button type="button" style={iconBtn} onClick={() => patchSession(i, { exercises: s.exercises.filter((_, m) => m !== k) })}><X size={11} /></button></div>
                 <div style={{ display: 'flex', gap: 3, marginTop: 3, color: muted, alignItems: 'center' }}>
                   <input style={{ ...input, height: 24, width: 34, fontSize: 10, padding: '0 3px' }} value={e.sets ?? ''} placeholder="sets" onChange={(ev) => patchSession(i, { exercises: s.exercises.map((x, m) => m === k ? { ...x, sets: Number(ev.target.value) || null } : x) })} />×
                   <input style={{ ...input, height: 24, width: 48, fontSize: 10, padding: '0 3px' }} value={e.reps ?? ''} placeholder="reps" onChange={(ev) => patchSession(i, { exercises: s.exercises.map((x, m) => m === k ? { ...x, reps: ev.target.value || null } : x) })} />
