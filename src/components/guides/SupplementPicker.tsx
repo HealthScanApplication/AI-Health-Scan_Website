@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { searchSupplements, type SupplementCatalogKind } from '../../utils/supplementCatalog';
+import { getSupplementComposition, searchSupplements, type SupplementCatalogKind } from '../../utils/supplementCatalog';
 import type { SupplementPick } from '../../utils/protocolBuilders';
 
 const field: React.CSSProperties = { width: '100%', background: '#0D0E0C', color: '#F5F2EA', border: '1px solid #55564F', padding: 9, borderRadius: 3 };
@@ -15,6 +15,18 @@ export function SupplementPicker({ accessToken, title, items, onChange }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [matching, setMatching] = useState<number | null>(null);
+  const [composition, setComposition] = useState<Record<string, number>>({});
+  const [compositionError, setCompositionError] = useState('');
+  const picksKey = JSON.stringify(items.filter((item): item is SupplementPick => typeof item !== 'string').map(({ id, source }) => ({ id, source })));
+  useEffect(() => {
+    const controller = new AbortController();
+    setComposition({}); setCompositionError('');
+    const picks = JSON.parse(picksKey) as Array<Pick<SupplementPick, 'id' | 'source'>>;
+    if (picks.length) getSupplementComposition(accessToken, picks, controller.signal).then((counts) => {
+      if (!controller.signal.aborted) setComposition(counts);
+    }).catch(() => { if (!controller.signal.aborted) setCompositionError('Could not verify current composition links. Reopen this plan to retry.'); });
+    return () => controller.abort();
+  }, [accessToken, picksKey]);
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
@@ -35,10 +47,11 @@ export function SupplementPicker({ accessToken, title, items, onChange }: {
       <div style={{ flex: 1, minWidth: 0, fontSize: 12 }}>
         <div>{typeof item === 'string' ? item : item.name}</div>
         {typeof item === 'string' ? <button type="button" style={{ ...button, marginTop: 5 }} onClick={() => { setMatching(index); setQuery(item.replace(/^take\s+/i, '')); setOpen(true); }}>Match catalogue entry</button>
-          : <><small style={{ color: '#B8B6AF', overflowWrap: 'anywhere' }}>{item.brand ? `${item.brand} · ` : ''}{item.barcode && /^\d{8,14}$/.test(item.barcode) ? item.barcode : 'Generic supplement'} · Linked</small>{item.elementCount === 0 && <div style={{ color: '#E8B07A', fontSize: 11 }}>Composition not linked yet</div>}</>}
+          : <><small style={{ color: '#B8B6AF', overflowWrap: 'anywhere' }}>{item.brand ? `${item.brand} · ` : ''}{item.barcode && /^\d{8,14}$/.test(item.barcode) ? item.barcode : 'Generic supplement'} · Linked</small><div style={{ color: '#B8B6AF', fontSize: 11 }}>{compositionError ? 'Composition unavailable' : composition[`${item.source}:${item.id}`] === undefined ? 'Checking composition…' : composition[`${item.source}:${item.id}`] ? `${composition[`${item.source}:${item.id}`]} declared ingredient links` : 'Composition needs label review'}</div></>}
       </div>
       <button type="button" aria-label={`Remove ${typeof item === 'string' ? item : item.name}`} style={button} onClick={() => { onChange(items.filter((_, i) => i !== index)); setOpen(false); setMatching(null); }}>×</button>
     </div>)}
+    {compositionError && <p role="status" style={{ color: '#E8B07A', fontSize: 11 }}>{compositionError}</p>}
     <button type="button" style={{ ...button, marginTop: 9 }} onClick={() => { setMatching(null); setQuery(''); setOpen(!open); }}>{open ? 'Close picker' : '+ Add supplement'}</button>
     {open && <section aria-label={`${title} catalogue picker`} style={{ marginTop: 10, padding: 10, border: '1px solid #55564F' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 9 }}>
@@ -51,7 +64,7 @@ export function SupplementPicker({ accessToken, title, items, onChange }: {
         setMatching(null); setOpen(false);
       }}>
         {result.image && <img src={result.image} alt="" style={{ width: 38, height: 38, objectFit: 'cover' }} />}
-        <span><span style={{ display: 'block' }}>{result.name}</span><small style={{ color: '#B8B6AF', overflowWrap: 'anywhere' }}>{result.brand || (kind === 'generic' ? 'Generic supplement' : 'Supplement product')}{kind === 'specific' && result.barcode ? ` · ${result.barcode}` : ''}</small><small style={{ display: 'block', color: result.elementCount ? '#C7D8A3' : '#E8B07A' }}>{result.elementCount ? `${result.elementCount} linked elements` : 'Composition not linked yet'}</small></span>
+        <span><span style={{ display: 'block' }}>{result.name}</span><small style={{ color: '#B8B6AF', overflowWrap: 'anywhere' }}>{result.brand || (kind === 'generic' ? 'Generic supplement' : 'Supplement product')}{kind === 'specific' && result.barcode ? ` · ${result.barcode}` : ''}</small><small style={{ display: 'block', color: result.elementCount ? '#C7D8A3' : '#E8B07A' }}>{result.elementCount ? `${result.elementCount} declared ingredient links` : 'Composition needs label review'}</small></span>
       </button>)}</div>
     </section>}
   </div>;
