@@ -16,6 +16,7 @@ import {
   type AdminProtocol, type AdminProtocolItem,
 } from './protocolAdmin';
 import type { GuideRecipe } from './guidePortal';
+import type { RecipeHazard } from './recipeNutrients';
 import { cloneProtocolChild, ensureGuideRecipeCatalog, syncProtocolChild } from './protocolCopies';
 import { isBedName, isWakeName } from './sleepWindow';
 import { MEAL_SLOT_DEFAULT_TIMES, mealSlotName } from '../protocolDomain/mealSlot';
@@ -54,8 +55,14 @@ export function describeTiming(t: Timing): string {
 }
 
 /* ── diet ── */
-export interface MealNutrition { energy_kcal: number; protein_g: number; carbohydrates_g: number; fats_g: number; fiber_g?: number }
-export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null; healthScore?: number | null; hazardFlags?: Array<{ label: string; level: string }> }
+export interface MealNutrition { energy_kcal: number; protein_g: number; carbohydrates_g: number; fats_g: number; fiber_g?: number; recorded?: string[]; nutrients?: Record<string, number> }
+export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null; healthScore?: number | null; hazardFlags?: Array<{ label: string; level: string }>; servings?: number; micros?: Record<string, number>; hazards?: RecipeHazard[]; analysisComplete?: boolean; partialNutrients?: string[]; unknownHazards?: string[] }
+export const selectedServings = (pick: MealPick) => typeof pick.servings === 'number' && Number.isFinite(pick.servings) && pick.servings > 0 ? pick.servings : 1;
+export const mealPickKey = (pick: Pick<MealPick, 'source' | 'id'>) => `${pick.source}:${pick.id}`;
+export function mealDrinks(cfg: DietConfig, key: string): Array<string | MealPick> {
+  if (!cfg.plan[key] && cfg.drinkPlan?.[key] == null) return [];
+  return cfg.drinkPlan?.[key] ?? cfg.drinks?.[key.split(':')[1]] ?? DEFAULT_DRINKS[key.split(':')[1]] ?? [];
+}
 export interface DietFramework { id: string; label: string; protein: number; carbs: number; fat: number; flag: string | null; note: string }
 
 /** Macro splits are % of energy; `flag` is the catalog_recipes.dietary_info key a recipe must have set to true. */
@@ -122,7 +129,7 @@ export function mealPlacementIssues(items: PlacementItem[]): PlacementIssue[] {
   return out;
 }
 
-export interface SlotChild { title: string; role: 'meal' | 'drink'; recipeId: string | null; image: string | null; notes: string }
+export interface SlotChild { title: string; role: 'meal' | 'drink'; recipeId: string | null; image: string | null; notes: string; servings?: number; guideRecipeId?: string }
 export interface SlotPlan { key: string; day: number; slotId: string; label: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'; time: string; timingNote: string; children: SlotChild[]; dos: string[]; donts: string[] }
 
 /**
@@ -136,25 +143,24 @@ export function planMealItems(cfg: DietConfig): SlotPlan[] {
   const plans: SlotPlan[] = [];
   for (const { day } of WEEK) for (const slot of slots) {
     const pick = cfg.plan[`${day}:${slot.id}`];
-    if (!pick) continue;
     const key = `${day}:${slot.id}`;
+    const drinks = mealDrinks(cfg, key);
+    if (!pick && !cfg.drinkPlan?.[key]?.length) continue;
     const t = mealTiming(cfg, slot.id);
     const rules = splitRules(cfg.mealRules?.[slot.id] || []);
-    const nut = pick.nutrition;
-    steps.push({ key: `${key}:meal`, mealSlot: slot.label, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
-    const drinks = cfg.drinks?.[slot.id] ?? DEFAULT_DRINKS[slot.id] ?? [];
-    drinks.forEach((d, i) => steps.push({ key: `${key}:drink:${i}`, mealSlot: slot.label, title: d, group: 'meal', time: resolveTiming(t), notes: '', dos: [], donts: [], windowKey: String(day) }));
+    if (pick) steps.push({ key: `${key}:meal`, mealSlot: slot.label, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
+    drinks.forEach((d, i) => steps.push({ key: `${key}:drink:${i}`, mealSlot: slot.label, title: typeof d === 'string' ? d : d.name, group: 'meal', time: resolveTiming(t), notes: '', dos: [], donts: [], windowKey: String(day) }));
+    const child = (p: MealPick, role: 'meal' | 'drink'): SlotChild => ({ title: p.name, role, recipeId: p.source === 'catalog' ? p.id : null, guideRecipeId: p.source === 'guide' ? p.id : undefined, image: p.image, servings: selectedServings(p), notes: `${selectedServings(p)} serving(s)${p.source === 'guide' ? ' · Guardian recipe' : ''}` });
     plans.push({ key, day, slotId: slot.id, label: slot.label, time: resolveTiming(t), timingNote: t.anchor !== 'clock' ? describeTiming(t) : '', dos: [], donts: [], children: [
-      { title: pick.name, role: 'meal', recipeId: pick.source === 'catalog' ? pick.id : null, image: pick.image,
-        notes: nut ? `${Math.round(nut.energy_kcal)} kcal · P ${Math.round(nut.protein_g)} g · C ${Math.round(nut.carbohydrates_g)} g · F ${Math.round(nut.fats_g)} g per serving${pick.source === 'guide' ? ' · Guardian recipe' : ''}` : '' },
-      ...drinks.map((d) => ({ title: d, role: 'drink' as const, recipeId: null, image: null, notes: '' })),
+      ...(pick ? [child(pick, 'meal')] : []),
+      ...drinks.map((d) => typeof d === 'string' ? { title: d, role: 'drink' as const, recipeId: null, image: null, notes: 'Legacy drink: match a recipe to include nutrition.' } : child(d, 'drink')),
     ] });
   }
   const checked = new Map(enforceProtocolRules(steps).map((x) => [x.key, x]));
   for (const plan of plans) {
     const meal = checked.get(`${plan.key}:meal`);
     if (meal) { plan.children[0].title = meal.title; plan.time = meal.time || plan.time; plan.dos = meal.dos; plan.donts = meal.donts; }
-    plan.children.slice(1).forEach((c, i) => { const d = checked.get(`${plan.key}:drink:${i}`); if (d) c.title = d.title; });
+    plan.children.filter((c) => c.role === 'drink').forEach((c, i) => { const d = checked.get(`${plan.key}:drink:${i}`); if (d) c.title = d.title; });
   }
   return plans;
 }
@@ -167,6 +173,7 @@ export interface DietConfig {
   plan: Record<string, MealPick | null>; // key `${day}:${slot}`
   timing?: Record<string, Timing>;         // per meal slot; default = the slot's clock time
   drinks?: Record<string, string[]>;       // drink children per slot (default DEFAULT_DRINKS)
+  drinkPlan?: Record<string, Array<MealPick | string>>; // per day:slot, with unmatched legacy text retained
   rules?: string[];                        // the week's Meal group checklist (framework do's)
   mealRules?: Record<string, string[]>;    // do-checklist under every meal of that slot
   supplements?: Partial<Record<SupplementPeriod, Array<string | SupplementPick>>>;
@@ -235,14 +242,17 @@ export function macroGrams(cfg: Pick<DietConfig, 'kcal' | 'protein' | 'carbs' | 
 const n = (v: unknown) => { const x = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN; return Number.isFinite(x) ? x : 0; };
 export function toMealNutrition(raw: any): MealNutrition | null {
   if (!raw || typeof raw !== 'object') return null;
-  const kcal = n(raw.energy_kcal) || n(raw.calories);
-  if (!kcal) return null;
-  return { energy_kcal: kcal, protein_g: n(raw.protein_g), carbohydrates_g: n(raw.carbohydrates_g), fats_g: n(raw.fats_g ?? raw.fat_g), fiber_g: n(raw.fiber_g) };
+  const valid = (v: unknown) => v !== null && v !== '' && (typeof v === 'number' || typeof v === 'string') && Number.isFinite(Number(v)) && Number(v) >= 0;
+  const values = { ...raw, energy_kcal: raw.energy_kcal ?? raw.calories, fats_g: raw.fats_g ?? raw.fat_g, carbohydrates_g: raw.carbohydrates_g ?? raw.carbs_g };
+  const nutrients: Record<string, number> = {};
+  for (const [k, v] of Object.entries({ ...values, ...(raw.micros || {}) })) if (valid(v) && /_(g|mg|mcg|ug|iu|kcal|kj)$/i.test(k)) nutrients[k] = Number(v);
+  if (!Object.keys(nutrients).length) return null;
+  return { energy_kcal: n(values.energy_kcal), protein_g: n(values.protein_g), carbohydrates_g: n(values.carbohydrates_g), fats_g: n(values.fats_g), fiber_g: n(values.fiber_g), recorded: Object.keys(nutrients), nutrients };
 }
 
 export function sumNutrition(picks: (MealPick | null | undefined)[]): MealNutrition {
   const out: MealNutrition = { energy_kcal: 0, protein_g: 0, carbohydrates_g: 0, fats_g: 0, fiber_g: 0 };
-  for (const p of picks) if (p?.nutrition) for (const k of Object.keys(out) as (keyof MealNutrition)[]) out[k] = (out[k] || 0) + (p.nutrition[k] || 0);
+  for (const p of picks) if (p?.nutrition) for (const k of ['energy_kcal','protein_g','carbohydrates_g','fats_g','fiber_g'] as const) out[k] = (out[k] || 0) + (p.nutrition[k] || 0) * selectedServings(p);
   return out;
 }
 
@@ -255,7 +265,6 @@ export async function searchDietRecipes(accessToken: string, opts: { framework: 
   const params = [
     'is_published=eq.true',
     'select=id,name_common,image_url,nutrition_per_serving,dietary_info,health_score',
-    'nutrition_per_serving=not.is.null',
     'or=(is_group.is.null,is_group.eq.false)',
     'order=health_score.desc.nullslast',
     `limit=${opts.query ? 40 : 160}`,
@@ -266,11 +275,10 @@ export async function searchDietRecipes(accessToken: string, opts: { framework: 
   const res = await fetch(`${rest()}/catalog_recipes?${params.join('&')}`, { headers: headers(accessToken) });
   if (!res.ok) throw new Error(`Recipe search failed (${res.status})`);
   const rows = (await res.json()) as any[];
-  let picks = rows.map((r) => ({ source: 'catalog' as const, id: r.id, name: r.name_common || 'Recipe', image: r.image_url || null, nutrition: toMealNutrition(r.nutrition_per_serving) }))
-    .filter((p) => p.nutrition);
+  let picks = rows.map((r) => ({ source: 'catalog' as const, id: r.id, name: r.name_common || 'Recipe', image: r.image_url || null, nutrition: toMealNutrition(r.nutrition_per_serving) }));
   if (opts.kcalTarget) {
     const t = opts.kcalTarget;
-    const fit = (p: MealPick) => Math.abs((p.nutrition!.energy_kcal - t) / t) - (opts.framework.id === 'high_protein' ? p.nutrition!.protein_g * 4 / p.nutrition!.energy_kcal : 0);
+    const fit = (p: MealPick) => p.nutrition ? Math.abs((p.nutrition.energy_kcal - t) / t) - (opts.framework.id === 'high_protein' && p.nutrition.energy_kcal > 0 ? p.nutrition.protein_g * 4 / p.nutrition.energy_kcal : 0) : Number.MAX_VALUE;
     picks = picks.sort((a, b) => fit(a) - fit(b));
   }
   return picks.slice(0, opts.limit || 12);
@@ -517,10 +525,10 @@ export function reviewDiet(cfg: DietConfig): Review {
   const steps: CheckedStep[] = [];
   for (const { day } of WEEK) for (const slot of slots) {
     const pick = cfg.plan[`${day}:${slot.id}`];
-    if (!pick) continue;
     const t = mealTiming(cfg, slot.id);
     const rules = splitRules(cfg.mealRules?.[slot.id] || []);
-    steps.push({ key: `${day}:${slot.id}`, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
+    if (pick) steps.push({ key: `${day}:${slot.id}`, title: pick.name, group: 'meal', time: resolveTiming(t), notes: '', dos: rules.dos, donts: rules.donts, windowKey: String(day), link: { kind: 'food', query: pick.name } });
+    mealDrinks(cfg,`${day}:${slot.id}`).forEach((drink,i) => steps.push({ key: `${day}:${slot.id}:drink:${i}`, title: typeof drink === 'string' ? drink : drink.name, group: 'meal', time: resolveTiming(t), notes: '', dos: [], donts: [], windowKey: String(day) }));
   }
   const checked = enforceProtocolRules(steps);
   const label = (s: CheckedStep) => { const [d, slot] = s.key.split(':'); return `${WEEK.find((w) => w.day === Number(d))?.short} ${MEAL_SLOTS.find((m) => m.id === slot)?.label}`; };
@@ -533,7 +541,8 @@ export function reviewDiet(cfg: DietConfig): Review {
   const placement = mealPlacementIssues(checked.map((x) => ({ display_name: x.title, category: 'consume', item_type: 'recipe', group_name: MEAL_SLOTS.find((m) => m.id === x.key.split(':')[1])?.label || null, scheduled_time: x.time })))
     .map((i) => ({ rule: 'Meal slots', item: i.item, where: 'Meal placement', reason: i.message }));
   return { steps: Object.fromEntries(checked.map((s) => [s.key, s])), notes: notesOf(checked, label),
-    blocking: [...blockingOf(checked, label), ...placement.map((p) => ({ where: p.item, message: `${p.reason}. Swap the meal or move it to its slot.` }))], conflicts, weekRules };
+    blocking: [...blockingOf(checked, label), ...placement.map((p) => ({ where: p.item, message: `${p.reason}. Swap the meal or move it to its slot.` })),
+      ...[...Object.values(cfg.plan), ...Object.values(cfg.drinkPlan || {}).flat()].filter((p): p is MealPick => !!p && typeof p !== 'string' && p.servings != null && (!Number.isFinite(p.servings) || p.servings <= 0)).map((p) => ({ where: p.name, message: 'Serving quantity must be a positive finite number.' }))], conflicts, weekRules };
 }
 
 /** Every fitness session through the shared checker: verb + noun title, a time, rule children; plus flagged contradictions. */
@@ -615,7 +624,7 @@ async function ensureProtocol(accessToken: string, ownerId: string, existingId: 
 
 export async function saveDietProtocol(accessToken: string, ownerId: string, existingId: string | null, name: string, cfg: DietConfig) {
   assertGate(reviewDiet(cfg)); // hard gate before anything is written
-  const guideIds = [...new Set(Object.values(cfg.plan).filter((pick) => pick?.source === 'guide').map((pick) => pick!.id))];
+  const guideIds = [...new Set([...Object.values(cfg.plan), ...Object.values(cfg.drinkPlan || {}).flat()].filter((pick): pick is MealPick => !!pick && typeof pick !== 'string' && pick.source === 'guide').map((pick) => pick.id))];
   const guideCatalog = new Map(await Promise.all(guideIds.map(async (id) => [id, await ensureGuideRecipeCatalog(accessToken, id)] as const)));
   const framework = DIET_FRAMEWORKS.find((f) => f.id === cfg.framework) || DIET_FRAMEWORKS[0];
   const t = macroGrams(cfg);
@@ -636,7 +645,7 @@ export async function saveDietProtocol(accessToken: string, ownerId: string, exi
       protocol_id: protocol.id, parent_protocol_item_id: slotItem.id, display_name: child.title, kind: 'action',
       item_type: child.role === 'meal' ? 'recipe' : 'consume', category: 'consume', subtype: child.role === 'meal' ? (plan.label === 'Snack' ? 'snack' : 'meal') : 'drink',
       group_name: plan.label, scheduled_time: hhmmss(plan.time), day_number: 1, sort_order: order++, enabled: true, hidden: false, has_children: false,
-      catalog_recipe_id: child.recipeId || (child.role === 'meal' ? guideCatalog.get(cfg.plan[plan.key]?.id || '') || null : null), media_image_url: child.image, notes: child.notes, ...days,
+      catalog_recipe_id: child.recipeId || guideCatalog.get(child.guideRecipeId || '') || null, amount: child.servings ?? null, amount_unit: child.servings ? 'serving' : null, media_image_url: child.image, notes: child.notes, ...days,
     } as Partial<AdminProtocolItem>);
     await addRules(accessToken, protocol.id, { dos: plan.dos, donts: plan.donts }, { parentId: slotItem.id, category: 'consume', days: days.recurrence_days_of_week, next: () => order++ });
   }

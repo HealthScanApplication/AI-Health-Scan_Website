@@ -85,7 +85,7 @@ export interface ScoreParts { total: number; health: number; gain: number; kcalF
  */
 export function scoreFor(c: Candidate, slotId: string, day: DayTotals, defs: NutrientDef[], slotKcal: number): ScoreParts | null {
   const slot = slotFit(c, slotId);
-  if (slot == null || !c.nutrition) return null;
+  if (slot == null || !c.nutrition || c.nutrition.energy_kcal <= 0) return null;
   const health = (c.healthScore ?? 55) / 100;
   const gain = Math.max(0, dayCoverage(addTo(day, c), defs) - dayCoverage(day, defs)); // 0–~0.5
   const kcalFit = Math.max(0, 1 - Math.abs(c.nutrition.energy_kcal - slotKcal) / slotKcal);

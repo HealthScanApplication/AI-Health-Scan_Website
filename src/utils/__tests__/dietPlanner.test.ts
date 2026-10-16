@@ -12,6 +12,10 @@ const cfg = (extra: Partial<DietConfig> = {}): DietConfig => ({ framework: 'vege
 const high = (label: string): RecipeHazard => ({ key: label.toLowerCase(), label, total: 1, perServing: 1, level: 'high', sources: ['x'], reasons: [], assessed: true });
 
 describe('slot fit', () => {
+  it('does not auto-fill meal slots with zero-energy drinks', () => {
+    const water = recipe('Water', { nutrition: { energy_kcal: 0, protein_g: 0, carbohydrates_g: 0, fats_g: 0 } });
+    expect(scoreFor(water, 'lunch', { micros: {}, kcal: 0, protein: 0, fiber: 0 }, [], 600)).toBeNull();
+  });
   it('keeps cake, shakes and sauces out of main meals', () => {
     expect(slotFit(recipe('Carrot Cake'), 'lunch')).toBeNull();
     expect(slotFit(recipe('Chocolate Protein Shake'), 'dinner')).toBeNull();
