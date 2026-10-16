@@ -3003,7 +3003,8 @@ function RecipeDraftEditor({ draft, onChange, onRemove, onSave, saving, savedLab
 
 function GuardianRecipeAI({ userId, accessToken, offers, recipes, author, onSaved }: { userId: string; accessToken: string; offers: GuideOffer[]; recipes: GuideRecipe[]; author?: string; onSaved: (recipe: GuideRecipe) => void }) {
   const books = offers.filter((offer) => offer.kind === 'recipe_book');
-  const [brief, setBrief] = useState('');
+  // A recipe idea sent from the Diet planner arrives as a ready brief.
+  const [brief, setBrief] = useState(() => { try { const b = sessionStorage.getItem('guardian:recipe-brief') || ''; sessionStorage.removeItem('guardian:recipe-brief'); return b; } catch { return ''; } });
   const [count, setCount] = useState(3);
   const [mealSlot, setMealSlot] = useState('');
   const [urls, setUrls] = useState('');

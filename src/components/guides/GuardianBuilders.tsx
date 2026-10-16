@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Dumbbell, Loader2, Plus, Search, Sparkles, Trash2, Utensils, Users, X, Combine, AlertTriangle } from 'lucide-react';
 import { listProtocolItems, type AdminProtocol, type AdminProtocolItem } from '../../utils/protocolAdmin';
 import type { GuideLead, GuideRecipe } from '../../utils/guidePortal';
+import { dayReport, loadCandidates, smartFill, type Candidate, type RecipeIdea } from '../../utils/dietPlanner';
+import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
+import { TIERS, tierLabel } from './RecipeInsights';
 import {
-  MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, autoFillDiet, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
+  MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
   listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
@@ -116,6 +119,9 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
   const [meta, setMeta] = useState<SavedMeta>({});
   const [picking, setPicking] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
+  const [tier, setTier] = useState<Tier>(15);
+  const [catalog, setCatalog] = useState<Map<string, Candidate>>(new Map());
+  const [ideas, setIdeas] = useState<RecipeIdea[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MealPick[]>([]);
   const [busy, setBusy] = useState(false);
@@ -145,7 +151,16 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
   const macroSum = cfg.protein + cfg.carbs + cfg.fat;
 
   const run = async (label: string, work: () => Promise<void>) => { setBusy(true); setMessage(label); try { await work(); } catch (e) { const failedId = (e as { protocolId?: string }).protocolId; if (failedId) setProtocolId(failedId); setMessage(`Failed: ${(e as Error).message}`); setBusy(false); return; } setBusy(false); };
-  const autoFill = () => run('Choosing recipes from the database…', async () => { setCfg({ ...cfg, plan: await autoFillDiet(accessToken, cfg, recipes) }); setMessage('Week filled. Swap any meal by clicking it.'); });
+  // Recipe nutrients + hazards from the junction records, for live day coverage (loaded per framework, cached).
+  useEffect(() => { let live = true; loadCandidates(accessToken, framework).then(({ candidates }) => { if (live) setCatalog(new Map(candidates.map((c) => [c.id, c]))); }).catch(() => {}); return () => { live = false; }; }, [cfg.framework, accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  const autoFill = () => run('Choosing recipes from the database…', async () => {
+    const res = await smartFill(accessToken, cfg, recipes, tier, setMessage);
+    setCfg({ ...cfg, plan: res.plan }); setIdeas(res.ideas);
+    const filled = Object.values(res.plan).filter(Boolean).length;
+    setMessage(`Week filled with ${new Set(Object.values(res.plan).filter(Boolean).map((p) => p!.id)).size} different recipes across ${filled} meals. Ranked by health score and ${tierLabel(tier)} coverage, gaps first.`);
+  });
+  const defs = nutrientsForTier(tier);
+  const reports = WEEK.map(({ day }) => dayReport(day, slots.map((s) => { const p = cfg.plan[`${day}:${s.id}`]; return p ? catalog.get(p.id) || { ...p, healthScore: null, mealSlot: null, tags: [], micros: {}, hazards: [], ingredientIds: [] } as Candidate : null; }).filter(Boolean) as Candidate[], defs));
   const save = () => run('Saving to Protocols…', async () => {
     const { protocol, metaSaved } = await saveDietProtocol(accessToken, ownerId, protocolId, name.trim() || `${framework.label} week`, cfg);
     setProtocolId(protocol.id); setMeta((m) => ({ ...m, [protocol.id]: { builder_kind: 'diet', builder_config: cfg } })); onSaved(protocol);
@@ -177,6 +192,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
     </div>
     {macroSum !== 100 && <p style={{ color: warn, fontSize: 12 }}>Macros add up to {macroSum}% of energy. Adjust them to 100%.</p>}
     <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+      <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => setTier(t)} title="Rank meals by this essential-nutrient set and show each day's coverage" style={{ ...chip(t === tier), padding: '6px 10px', fontSize: 10 }}>{tierLabel(t)}</button>)}</span>
       <button type="button" style={btn} disabled={busy || !slots.length} onClick={autoFill}><Sparkles size={13} /> Auto-fill week</button>
       <button type="button" style={ghost} disabled={busy} onClick={() => setCfg({ ...cfg, plan: {} })}>Clear</button>
       <button type="button" style={btn} disabled={busy || !Object.values(cfg.plan).some(Boolean)} onClick={() => setReview(reviewDiet(cfg))}>Review &amp; {protocolId ? 'update' : 'save'}</button>
@@ -186,20 +202,33 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
     {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: `132px repeat(7,minmax(118px,1fr))`, gap: 6, minWidth: 990 }}>
-        <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} /></div>)}
+        <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} />
+          <div style={{ color: ink, fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4 }}>P {Math.round(dayTotals[i].protein_g)} / {targets.protein_g} g</div><Bar value={dayTotals[i].protein_g} target={targets.protein_g} />
+          {dayTotals[i].energy_kcal > 0 && <div title={reports[i].gaps.map((g) => g.label).join(', ')} style={{ fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4, color: reports[i].coverage >= 60 ? acid : warn }}>{tierLabel(tier)}: {reports[i].coverage}%{reports[i].gaps.length ? <span style={{ display: 'block', color: muted }}>low: {reports[i].gaps.slice(0, 3).map((g) => g.label).join(', ')}{reports[i].gaps.length > 3 ? ` +${reports[i].gaps.length - 3}` : ''}</span> : null}</div>}
+        </div>)}
         {slots.map((s) => [<div key={s.id} style={{ ...label, margin: 0, alignSelf: 'center' }}>{s.label}<div style={{ fontWeight: 400, margin: '4px 0 2px' }}><TimingField compact value={mealTiming(cfg, s.id)} onChange={(t) => setCfg({ ...cfg, timing: { ...cfg.timing, [s.id]: t } })} /></div><div style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>≈ {resolveTiming(mealTiming(cfg, s.id))}</div></div>, ...WEEK.map(({ day }) => {
           const key = `${day}:${s.id}`; const pick = cfg.plan[key];
           return <div key={key} onClick={() => { setPicking(key); setQuery(''); }} style={{ ...card, padding: 8, minHeight: 92, cursor: 'pointer', borderColor: picking === key ? acid : line, position: 'relative' }}>
             {pick ? <>
               {pick.image && <img src={pick.image} alt="" style={{ width: '100%', height: 44, objectFit: 'cover', marginBottom: 5 }} />}
               <div style={{ fontSize: 11, lineHeight: 1.25, paddingRight: 14 }}>{pick.name}</div>
-              <div style={{ color: muted, fontSize: 10, marginTop: 3 }}>{pick.nutrition ? `${Math.round(pick.nutrition.energy_kcal)} kcal · P ${Math.round(pick.nutrition.protein_g)}` : 'No nutrition data'}{pick.source === 'guide' ? ' · yours' : ''}</div>
+              <div style={{ color: muted, fontSize: 10, marginTop: 3 }}>{pick.nutrition ? `${Math.round(pick.nutrition.energy_kcal)} kcal · P ${Math.round(pick.nutrition.protein_g)}` : 'No nutrition data'}{pick.healthScore != null ? ` · ♥ ${pick.healthScore}` : ''}{pick.source === 'guide' ? ' · yours' : ''}</div>
+              {(pick.hazardFlags || catalog.get(pick.id)?.hazards.filter((h) => h.level === 'high' || h.level === 'moderate').map((h) => ({ label: h.label, level: h.level })) || []).slice(0, 2).map((h) => <div key={h.label} title="Hazard from the ingredient database" style={{ fontSize: 9, marginTop: 2, color: h.level === 'high' ? '#E88A7A' : warn, display: 'flex', gap: 3, alignItems: 'center' }}><AlertTriangle size={9} /> {h.label}</div>)}
               <button type="button" title="Remove" onClick={(e) => { e.stopPropagation(); setPick(key, null); }} style={{ ...iconBtn, position: 'absolute', top: 4, right: 4 }}><X size={12} /></button>
             </> : <span style={{ color: muted, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={12} /> Add</span>}
           </div>;
         })])}
       </div>
     </div>
+    {ideas.length > 0 && <div style={{ ...card, marginTop: 14 }}>
+      <div style={{ ...label, color: acid }}>Recipe ideas for this week's gaps · ingredients ranked by nutrients per kcal, fewest hazards</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 10 }}>{ideas.map((idea) => <div key={idea.title} style={{ border: `1px solid ${line}`, padding: 12 }}>
+        <div style={{ fontFamily: serif, fontSize: 20 }}>{idea.title}</div>
+        <div style={{ color: muted, fontSize: 11, margin: '4px 0' }}>{idea.ingredients.join(' · ')}</div>
+        <div style={{ fontSize: 11, color: acid }}>Brings: {idea.covers.join(', ')}</div>
+        <button type="button" style={{ ...btn, marginTop: 8, minHeight: 32 }} onClick={() => { try { sessionStorage.setItem('guardian:recipe-brief', idea.brief); } catch { /* storage blocked: the builder opens empty */ } window.location.href = '/guardians/workspace?tab=recipes'; }}>Draft in recipe builder</button>
+      </div>)}</div>
+    </div>}
     <div style={{ ...card, marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
       <RulesEditor title="Meal checklist for the week" rules={cfg.rules || []} onChange={(rules) => setCfg((c) => ({ ...c, rules }))} placeholder={'One rule per line, e.g.\nCook with olive oil'} />
       {slots.map((s) => <RulesEditor key={`${s.id}-drinks`} title={`${s.label} drinks`} rules={cfg.drinks?.[s.id] ?? DEFAULT_DRINKS[s.id] ?? []} onChange={(drinks) => setCfg((c) => ({ ...c, drinks: { ...c.drinks, [s.id]: drinks } }))} placeholder={'One drink per line, e.g.\nWater\nGreen tea'} />)}

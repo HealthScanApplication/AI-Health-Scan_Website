@@ -54,7 +54,7 @@ export function describeTiming(t: Timing): string {
 
 /* ── diet ── */
 export interface MealNutrition { energy_kcal: number; protein_g: number; carbohydrates_g: number; fats_g: number; fiber_g?: number }
-export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null }
+export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null; healthScore?: number | null; hazardFlags?: Array<{ label: string; level: string }> }
 export interface DietFramework { id: string; label: string; protein: number; carbs: number; fat: number; flag: string | null; note: string }
 
 /** Macro splits are % of energy; `flag` is the catalog_recipes.dietary_info key a recipe must have set to true. */

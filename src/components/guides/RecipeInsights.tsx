@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import {
-  coverage, gaps, loadEssential90, nutrientsForTier,
+  coverage, gaps, nutrientsForTier,
   type Coverage, type NutrientDef, type RecipeFilters, type RecipeHazard, type Tier,
 } from '../../utils/recipeNutrients';
 
@@ -21,12 +21,14 @@ const input: React.CSSProperties = { width: '100%', height: 36, boxSizing: 'bord
 let essentialCache: Promise<NutrientDef[]> | null = null;
 export function useEssential90() {
   const [extra, setExtra] = useState<NutrientDef[]>([]);
-  useEffect(() => { (essentialCache ||= loadEssential90().catch(() => [])).then(setExtra); }, []);
+  // Tier 90 is the app's Essential 90 list (static); the catalog's essential_90 flag is not used (it includes hazards and rare earths).
+  useEffect(() => { (essentialCache ||= Promise.resolve([])).then(setExtra); }, []);
   return extra;
 }
 
 export const TIERS: Tier[] = [15, 30, 90];
-export const tierLabel = (t: Tier, extra: NutrientDef[] = []) => `${t === 15 ? 'Core' : t === 30 ? 'Extended' : 'Essential'} ${nutrientsForTier(t, extra).length}`;
+// The app calls its list "Essential 90" (89 nutrients + protein and fibre here); 15 and 30 are exact counts.
+export const tierLabel = (t: Tier, _extra: NutrientDef[] = []) => (t === 15 ? 'Core 15' : t === 30 ? 'Extended 30' : 'Essential 90');
 
 function Bar({ c }: { c: Coverage }) {
   const pct = c.pct ?? 0;
