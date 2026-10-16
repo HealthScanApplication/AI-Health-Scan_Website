@@ -36,6 +36,9 @@ export function gateProtocolItem(patch: Item, existing?: Item): { item: Item; wa
   return result;
 }
 
+/** Same rules without notifying listeners: for showing warnings on rows already on screen. */
+export function checkProtocolItem(patch: Item, existing?: Item) { return gate(patch, existing); }
+
 function gate(patch: Item, existing?: Item): { item: Item; warnings: GateWarning[] } {
   const row = { ...(existing || {}), ...patch };
   const out: Item = { ...patch };
@@ -82,7 +85,7 @@ function gate(patch: Item, existing?: Item): { item: Item; warnings: GateWarning
     const min = hhmm(row.scheduled_time);
     if (named && min != null && (min < SLOT_WINDOW[named].from || min > SLOT_WINDOW[named].to)) {
       out.scheduled_time = SLOT_WINDOW[named].default;
-      warnings.push({ field: 'scheduled_time', message: `“${title}” is a ${named}: moved to ${SLOT_WINDOW[named].default.slice(0, 5)}` });
+      warnings.push({ field: 'scheduled_time', message: `“${title}” is a ${named}: belongs in ${SLOT_TITLE[named]} (${SLOT_WINDOW[named].default.slice(0, 5)})` });
     }
     const current = String(row.group_name || '').trim();
     const slot = named || slotFromTitle(current) || (row.scheduled_time || out.scheduled_time ? mealSlotFor(out.scheduled_time || row.scheduled_time) : null);
