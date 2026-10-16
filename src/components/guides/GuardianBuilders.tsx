@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Dumbbell, Loader2, Plus, Search, Sparkles, Trash2, Utensils, Users, X, Combine, AlertTriangle } from 'lucide-react';
 import { listProtocolItems, type AdminProtocol, type AdminProtocolItem } from '../../utils/protocolAdmin';
 import type { GuideLead, GuideRecipe } from '../../utils/guidePortal';
@@ -7,10 +7,12 @@ import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
 import { TIERS, tierLabel, useEssential90 } from './RecipeInsights';
 import { DietFastingControls, FastingDayCell, WeeklySupplementRows, fastHatch } from './DietSchedule';
 import { DietNutritionPanel } from './DietNutritionPanel';
+import { DietLocationHeader } from './DietLocationHeader';
+import { plannerWeek, sunriseForDate, validPlannerLocation } from '../../utils/plannerSunrise';
 import { aggregateDiet, dietSelections, loadDietAnalysis, type DietAnalysis } from '../../utils/dietNutrition';
 import {
   MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, mealDrinks, mealPickKey, selectedServings, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, mealIsFasting, fastingDrinkAllowed, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
-  dietSupportItems, isDrinkPick, listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
+  dietSupportItems, isDrinkPick, SUPPLEMENT_PERIODS, listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
 
@@ -117,6 +119,10 @@ function Bar({ value, target }: { value: number; target: number }) {
 
 export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialProtocolId, onSaved, onOpen }: CommonProps & { recipes: GuideRecipe[] }) {
   const [cfg, setCfg] = useState<DietConfig>(emptyDiet);
+  const [now,setNow]=useState(()=>new Date());
+  useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),60000);return()=>clearInterval(timer);},[]);
+  const city=validPlannerLocation(cfg.location)?cfg.location:undefined;
+  const weekDates=city?plannerWeek(city.timezone,now):[];
   const [name, setName] = useState('Mediterranean week');
   const [protocolId, setProtocolId] = useState<string | null>(null);
   const [meta, setMeta] = useState<SavedMeta>({});
@@ -224,6 +230,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
     {macroSum !== 100 && <p style={{ color: warn, fontSize: 12 }}>Macros add up to {macroSum}% of energy. Adjust them to 100%.</p>}
     <section aria-label="Weekly diet planner">
     <h2 style={{ fontSize: 16 }}>Weekly planner · meals, drinks &amp; supplements</h2>
+    <DietLocationHeader city={city} now={now} onChange={location=>setCfg(c=>({...c,location}))} />
     <DietFastingControls cfg={cfg} setCfg={setCfg} />
     <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
       <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => setTier(t)} title="Rank meals by this essential-nutrient set and show each day's coverage" style={{ ...chip(t === tier), padding: '6px 10px', fontSize: 10 }}>{tierLabel(t)}</button>)}</span>
@@ -236,12 +243,14 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
     {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: `132px repeat(7,minmax(118px,1fr))`, gap: 6, minWidth: 990 }}>
-        <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{nutritionReport.days[i].nutrients.energy_kcal.amount == null ? 'Unknown' : Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} />
+        <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}{city&&<div style={{fontSize:10,letterSpacing:0,textTransform:'none',fontWeight:400,margin:'5px 0',color:acid}}>{weekDates[i]}<br/>Sunrise {sunriseForDate(city,weekDates[i])?`≈ ${sunriseForDate(city,weekDates[i])}`:'— (no sunrise)'}</div>}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{nutritionReport.days[i].nutrients.energy_kcal.amount == null ? 'Unknown' : Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} />
           <div style={{ color: ink, fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4 }}>P {nutritionReport.days[i].nutrients.protein_g.amount == null ? 'Unknown' : Math.round(dayTotals[i].protein_g)} / {targets.protein_g} g</div><Bar value={dayTotals[i].protein_g} target={targets.protein_g} />
           {nutritionReport.days[i].count > 0 && <div title={reports[i].gaps.map((g) => g.label).join(', ')} style={{ fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4, color: reports[i].coverage >= 60 ? acid : warn }}>{tierLabel(tier)} recorded: {reports[i].coverage}%{reports[i].incomplete && <span style={{ display: 'block' }}>Incomplete data</span>}{reports[i].gaps.length ? <span style={{ display: 'block', color: muted }}>low recorded: {reports[i].gaps.slice(0, 3).map((g) => g.label).join(', ')}{reports[i].gaps.length > 3 ? ` +${reports[i].gaps.length - 3}` : ''}</span> : null}</div>}
         </div>)}
         <div style={{...label,alignSelf:'center'}}>Fasting · 24h timeline</div>{WEEK.map(w => <FastingDayCell key={w.day} cfg={cfg} day={w.day} />)}
-        {slots.map((s) => [<div key={s.id} style={{ ...label, margin: 0, alignSelf: 'center' }}>{s.label}<div style={{ fontWeight: 400, margin: '4px 0 2px' }}><TimingField compact value={mealTiming(cfg, s.id)} onChange={(t) => setCfg({ ...cfg, timing: { ...cfg.timing, [s.id]: t } })} /></div><div style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>≈ {resolveTiming(mealTiming(cfg, s.id))}</div></div>, ...WEEK.map(({ day }) => {
+        {SUPPLEMENT_PERIODS.map(period=><Fragment key={period.id}>
+        <h3 style={{gridColumn:'1 / -1',fontSize:13,color:acid,margin:'12px 0 2px',borderTop:`1px solid ${line}`,paddingTop:12}}>{`${period.label} · meals, drinks & supplements`}</h3>
+        {slots.filter(s=>period.id==='morning'?s.id==='breakfast':period.id==='afternoon'?['lunch','snack'].includes(s.id):s.id==='dinner').map((s) => [<div key={s.id} style={{ ...label, margin: 0, alignSelf: 'center' }}>{s.label}<div style={{ fontWeight: 400, margin: '4px 0 2px' }}><TimingField compact value={mealTiming(cfg, s.id)} onChange={(t) => setCfg({ ...cfg, timing: { ...cfg.timing, [s.id]: t } })} /></div><div style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>≈ {resolveTiming(mealTiming(cfg, s.id))}</div></div>, ...WEEK.map(({ day }) => {
           const key = `${day}:${s.id}`; const pick = cfg.plan[key]; const fasting = mealIsFasting(cfg,day,s.id);
           const drinks = mealDrinks(cfg,key);
           return <div key={key} aria-label={`${key} meal slot`} style={{ ...card, background:fasting?fastHatch:panel, padding: 8, minHeight: 92, borderColor: picking === key ? acid : line, position: 'relative' }}>
@@ -263,7 +272,8 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, initialP
             <button type="button" disabled={fasting && cfg.fasting?.type==='dry'} aria-label={`Add ${key} drink`} onClick={() => { setPicking(key); setDrinkIndex(drinks.length); setQuery(fasting?'Water':''); }} style={{ ...iconBtn, fontSize: 10, marginTop: 7 }}><Plus size={11} /> {fasting?'Add plain water from recipes':'Add drink from recipes'}</button>
           </div>;
         })])}
-        <WeeklySupplementRows cfg={cfg} setCfg={setCfg} accessToken={accessToken} />
+        <WeeklySupplementRows cfg={cfg} setCfg={setCfg} accessToken={accessToken} periodId={period.id} />
+        </Fragment>)}
       </div>
     </div>
     </section>
