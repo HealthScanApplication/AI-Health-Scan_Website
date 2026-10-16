@@ -35,7 +35,7 @@ Local browser retests verified that sidebar navigation survives reload; Add form
 
 ## Automated coverage and review
 
-Ten real-component/hook interaction tests exercise the above routing/form contracts, including save failure, path choice and unknown paths. External data calls use controlled fixtures; rendering, event handlers and state transitions are real. The tests were observed failing before the corresponding fixes. Independent review found the retained-editor history bug, which was reproduced, fixed and retested before approval.
+Eleven real-component/hook interaction tests exercise the above routing/form contracts, including save failure, path choice, current-path anchor navigation and unknown paths. External data calls use controlled fixtures; rendering, event handlers and state transitions are real. The tests were observed failing before the corresponding fixes. Independent review found the retained-editor history bug, which was reproduced, fixed and retested before approval.
 
 ## Limits
 

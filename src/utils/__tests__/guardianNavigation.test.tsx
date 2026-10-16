@@ -78,6 +78,12 @@ it('links each public path card to that path, not a shared first-funnel anchor',
   await screen.findByRole('heading',{name:'Guidance'});
   expect(screen.getAllByRole('link',{name:'Get it free'}).map(link=>link.getAttribute('href'))).toContain('/guardians/test-guide/value-ramp/second-path');
 });
+it('scrolls to the current funnel rather than reloading the same path',async()=>{
+  window.history.replaceState({},'','/guardians/test-guide/value-ramp/first-path');
+  render(<GuardianWebsite slug="test-guide" isSignedIn />);
+  await screen.findByRole('heading',{name:'Guidance'});
+  expect(screen.getAllByRole('link',{name:'Get it free'})[0].getAttribute('href')).toBe('#offers');
+});
 it('keeps a failed Add form editable and shows its save error',async()=>{
   workspace();
   fireEvent.click(screen.getByRole('button',{name:'Add lead'}));
