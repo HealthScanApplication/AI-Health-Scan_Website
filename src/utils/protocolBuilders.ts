@@ -56,7 +56,8 @@ export function describeTiming(t: Timing): string {
 
 /* ── diet ── */
 export interface MealNutrition { energy_kcal: number; protein_g: number; carbohydrates_g: number; fats_g: number; fiber_g?: number; recorded?: string[]; nutrients?: Record<string, number> }
-export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null; healthScore?: number | null; hazardFlags?: Array<{ label: string; level: string }>; servings?: number; micros?: Record<string, number>; hazards?: RecipeHazard[]; analysisComplete?: boolean; partialNutrients?: string[]; unknownHazards?: string[] }
+export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null; category?: string | null; healthScore?: number | null; hazardFlags?: Array<{ label: string; level: string }>; servings?: number; micros?: Record<string, number>; hazards?: RecipeHazard[]; analysisComplete?: boolean; partialNutrients?: string[]; unknownHazards?: string[] }
+export const isDrinkPick = (pick: MealPick) => ['drink', 'beverage'].includes(pick.category?.trim().toLowerCase() || '');
 export const selectedServings = (pick: MealPick) => typeof pick.servings === 'number' && Number.isFinite(pick.servings) && pick.servings > 0 ? pick.servings : 1;
 export const mealPickKey = (pick: Pick<MealPick, 'source' | 'id'>) => `${pick.source}:${pick.id}`;
 export function mealDrinks(cfg: DietConfig, key: string): Array<string | MealPick> {
@@ -283,15 +284,15 @@ export function sumNutrition(picks: (MealPick | null | undefined)[]): MealNutrit
 }
 
 export function guideRecipeToPick(recipe: GuideRecipe): MealPick {
-  return { source: 'guide', id: recipe.id, name: recipe.title, image: recipe.image_url || null, nutrition: toMealNutrition(recipe.nutrition_per_serving) };
+  return { source: 'guide', id: recipe.id, name: recipe.title, category: recipe.meal_slot, image: recipe.image_url || null, nutrition: toMealNutrition(recipe.nutrition_per_serving) };
 }
 
 /** Catalog recipes with stored per-serving nutrition that fit the framework, sized for the slot's kcal budget. */
-export async function searchDietRecipes(accessToken: string, opts: { framework: DietFramework; query?: string; kcalTarget?: number; limit?: number }): Promise<MealPick[]> {
+export async function searchDietRecipes(accessToken: string, opts: { framework: DietFramework; query?: string; kcalTarget?: number; limit?: number; drinksOnly?: boolean }): Promise<MealPick[]> {
   const params = [
     'is_published=eq.true',
-    'select=id,name_common,image_url,nutrition_per_serving,dietary_info,health_score',
-    'or=(is_group.is.null,is_group.eq.false)',
+    'select=id,name_common,category,image_url,nutrition_per_serving,dietary_info,health_score',
+    `and=(or(is_group.is.null,is_group.eq.false)${opts.drinksOnly ? ',or(category.ilike.drink,category.ilike.beverage)' : ''})`,
     'order=health_score.desc.nullslast',
     `limit=${opts.query ? 40 : 160}`,
   ];
@@ -301,7 +302,8 @@ export async function searchDietRecipes(accessToken: string, opts: { framework: 
   const res = await fetch(`${rest()}/catalog_recipes?${params.join('&')}`, { headers: headers(accessToken) });
   if (!res.ok) throw new Error(`Recipe search failed (${res.status})`);
   const rows = (await res.json()) as any[];
-  let picks = rows.map((r) => ({ source: 'catalog' as const, id: r.id, name: r.name_common || 'Recipe', image: r.image_url || null, nutrition: toMealNutrition(r.nutrition_per_serving) }));
+  let picks = rows.map((r) => ({ source: 'catalog' as const, id: r.id, name: r.name_common || 'Recipe', category: r.category, image: r.image_url || null, nutrition: toMealNutrition(r.nutrition_per_serving) }));
+  if (opts.drinksOnly) picks = picks.filter(isDrinkPick);
   if (opts.kcalTarget) {
     const t = opts.kcalTarget;
     const fit = (p: MealPick) => p.nutrition ? Math.abs((p.nutrition.energy_kcal - t) / t) - (opts.framework.id === 'high_protein' && p.nutrition.energy_kcal > 0 ? p.nutrition.protein_g * 4 / p.nutrition.energy_kcal : 0) : Number.MAX_VALUE;
