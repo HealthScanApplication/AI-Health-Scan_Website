@@ -3,6 +3,16 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 const migration = readFileSync(new URL('../supabase/migrations/20261016152128_verified_supplement_labels.sql', import.meta.url), 'utf8').replace(/^BEGIN;/m, '').replace(/COMMIT;\s*$/, '');
 const assertions = readFileSync(new URL('./test-verified-supplement-labels.sql', import.meta.url), 'utf8');
+const allRows = `DO $$ BEGIN
+IF EXISTS (SELECT 1 FROM verified_label_rows r JOIN verified_label_products p USING(product_id)
+ LEFT JOIN public.catalog_product_elements pe ON pe.product_id=r.product_id AND pe.element_id=r.element_id
+ WHERE pe.element_id IS NULL OR (pe.metadata->'verified_label_20261016')->>'source' IS DISTINCT FROM p.source
+ OR (pe.metadata->'verified_label_20261016')->>'ingredient' IS DISTINCT FROM r.ingredient
+ OR ((pe.metadata->'verified_label_20261016')->>'amount')::numeric IS DISTINCT FROM r.amount
+ OR (pe.metadata->'verified_label_20261016')->>'unit' IS DISTINCT FROM r.unit
+ OR (pe.metadata->'verified_label_20261016')->>'serving' IS DISTINCT FROM r.serving) THEN
+ RAISE EXCEPTION 'A sourced label identity, measurement, unit or serving was lost'; END IF;
+END $$;`;
 const sql = `BEGIN;
 SELECT set_config('fv1.skip_product_recompute','on',true);
 CREATE TEMP TABLE label_before_products AS SELECT id,is_published,barcode,brand FROM public.catalog_products;
@@ -11,6 +21,7 @@ VALUES('trelune_baja_gold_minerals','chloride',123,NULL,'{"serving_unit":"old un
 ON CONFLICT(product_id,element_id) DO UPDATE SET amount_per_serving=123,metadata=excluded.metadata;
 ${migration}
 ${assertions}
+${allRows}
 DO $$ BEGIN
 IF NOT EXISTS(SELECT 1 FROM public.catalog_product_elements WHERE product_id='trelune_baja_gold_minerals' AND element_id='chloride' AND amount_per_serving=123 AND metadata->>'serving_unit'='old unit' AND metadata->>'serving_size'='old serving' AND metadata->>'composition_source'='old source') THEN
  RAISE EXCEPTION 'Existing measurement/source was overwritten'; END IF;
@@ -20,6 +31,7 @@ END $$;
 DROP TABLE verified_label_rows,verified_label_products;
 ${migration}
 ${assertions}
+${allRows}
 ROLLBACK;`;
 const result = spawnSync('supabase', ['db', 'query', '--yes', '--linked', '--project-ref', 'mofhvoudjxinvpplsytd', sql], { encoding: 'utf8' });
 process.stdout.write(result.stdout || '');
