@@ -12,6 +12,7 @@ import { CombineProtocols, DietBuilder, FitnessBuilder } from './GuardianBuilder
 import { ProtocolChildrenPanel } from './ProtocolChildrenPanel';
 import { customizeProtocolRecipe } from '../../utils/protocolCopies';
 import { ContentBuilder } from './ContentBuilder';
+import { useGuardianPage } from './useGuardianPage';
 import { HazardList, NutrientCoverage, RecipeFiltersPanel } from './RecipeInsights';
 import { avoidViolations, filtersToBrief, type RecipeFilters, type Tier } from '../../utils/recipeNutrients';
 import { buildRecipePdf } from '../../utils/recipePdf';
@@ -75,6 +76,8 @@ function ExpertiseTags({ tags, color = '#667245', compact = false }: { tags: str
 }
 
 type Tab = 'home' | 'profile' | 'library' | 'leads' | 'value_ramps' | 'offer_builder' | 'recipes' | 'diet' | 'fitness' | 'content' | 'protocols' | 'admin';
+const WORKSPACE_TABS: readonly Tab[] = ['home', 'profile', 'library', 'leads', 'value_ramps', 'offer_builder', 'recipes', 'diet', 'fitness', 'content', 'protocols', 'admin'];
+const SETUP_STEPS = [1, 2, 3, 4, 5] as const;
 type FreeOfferKind = 'ebook' | 'one_to_one_call' | 'group_call' | 'recipe_book' | 'routine' | 'in_person';
 type UpsellKind = 'ebook' | 'routine' | 'routine_guidance' | 'recipe_book' | 'group_call' | 'one_to_one_call' | 'in_person' | 'festival';
 type DeliveryFormat = 'Downloadable PDF' | 'Interactive Protocol' | 'PDF + Interactive Protocol' | 'Live online' | 'In person' | 'Event';
@@ -1292,7 +1295,8 @@ function GuardianSiteHeader({ brandName, path, right }: { brandName?: string; pa
   </header>;
 }
 
-function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boolean }) {
+export function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boolean }) {
+  const pathSlug = window.location.pathname.match(/\/value-ramp\/([^/]+)\/?$/)?.[1];
   const [reviews, setReviews] = useState<GuardianReview[]>([]);
   const reviewToken = new URLSearchParams(window.location.search).get('review') || '';
   const [profile, setProfile] = useState<GuideProfile | null>(null);
@@ -1309,7 +1313,9 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
     }).catch(() => { setProfile(null); setOffers([]); }).finally(() => setLoading(false));
   }, [slug]);
   if (loading) return <div style={{ minHeight: '100vh', background: black, color: ink, display: 'grid', placeItems: 'center', fontFamily: sans }}>Building Guardian page…</div>;
-  if (!profile) return <div style={{ minHeight: '100vh', background: black, color: ink, display: 'grid', placeItems: 'center', padding: 24, fontFamily: sans, textAlign: 'center' }}><div><Brand /><h1 style={{ fontFamily: serif, fontSize: 48, fontWeight: 300, margin: '48px 0 12px' }}>This page is not published yet.</h1><a href="/guardians" style={{ color: acid }}>Return to Guardians</a></div></div>;
+  const publishedRamps = valueRamps.filter(ramp => ramp.status === 'published');
+  const selectedRamp = pathSlug ? publishedRamps.find(ramp => encodeURIComponent(ramp.slug) === pathSlug) : publishedRamps[0];
+  if (!profile || (pathSlug && !selectedRamp)) return <div style={{ minHeight: '100vh', background: black, color: ink, display: 'grid', placeItems: 'center', padding: 24, fontFamily: sans, textAlign: 'center' }}><div><Brand /><h1 style={{ fontFamily: serif, fontSize: 48, fontWeight: 300, margin: '48px 0 12px' }}>This page is not published yet.</h1><a href="/guardians" style={{ color: acid }}>Return to Guardians</a></div></div>;
   const freeOffers = offers.filter((offer) => offer.access_model === 'free');
   const socials = profile.social_links || {};
   const publicHeadingFont = serif;
@@ -1333,21 +1339,21 @@ function GuardianWebsite({ slug, isSignedIn }: { slug: string; isSignedIn: boole
         {socials.youtube && <a href={socials.youtube} aria-label="YouTube" title="YouTube" style={{ color: publicHeaderText, display: 'grid', placeItems: 'center' }}><Youtube size={16} /></a>}
         {socials.linktree && <a href={socials.linktree} aria-label="Linktree" title="Linktree" style={{ color: publicHeaderText, display: 'grid', placeItems: 'center' }}><Link2 size={15} /></a>}
         {socials.website && <a href={socials.website} aria-label="Website" title="Website" style={{ color: publicHeaderText, display: 'grid', placeItems: 'center' }}><Globe2 size={15} /></a>}
-        {isSignedIn && <a href="/guardians" style={{ color: publicHeaderText, fontSize: 10, fontWeight: 700 }}>Guardian workspace →</a>}
+        {isSignedIn && <a href="/guardians/workspace" style={{ color: publicHeaderText, fontSize: 10, fontWeight: 700 }}>Guardian workspace →</a>}
       </div>
     </header>}
     <main>
       {/* Shared with the builder preview, so what Guardians build is what they publish. */}
       <GuardianSiteHero audience={audienceLabel(profile.social_links?.audience_details)} reviewSummary={reviewStats(reviews)} headlineStyle={publicHeadlineStyle} name={profile.display_name} avatarUrl={profile.avatar_url} specialties={profile.specialties} headline={profile.headline || profile.display_name} tags={publicExpertiseTags} bio={profile.bio} accent={publicAccent} headingFont={publicHeadingFont} background={socials.theme_background} backgroundIsVideo={publicBackgroundIsVideo} greyscale={publicGreyscale}
-        cards={valueRamps.filter((ramp) => ramp.status === 'published').length ? valueRamps.filter((ramp) => ramp.status === 'published').map((ramp) => ({ key: ramp.id, eyebrow: ramp.problem || undefined, title: customerFacingOfferTitle(offers.find((offer) => offer.id === ramp.offer_ids[0])?.title || ramp.name), copy: offers.find((offer) => offer.id === ramp.offer_ids[0])?.description || '', kind: offers.find((offer) => offer.id === ramp.offer_ids[0])?.kind, price: offers.find((offer) => offer.id === ramp.offer_ids[0])?.access_model === 'free' ? 'Free' : undefined, href: '#offers' })) : freeOffers.slice(0, 1).map((offer) => ({ key: offer.id, eyebrow: profile.specialties.slice(0, 2).join(' · '), title: customerFacingOfferTitle(offer.title), copy: offer.description || '', kind: offer.kind, price: 'Free', href: '#start' }))} />
+        cards={valueRamps.filter((ramp) => ramp.status === 'published').length ? valueRamps.filter((ramp) => ramp.status === 'published').map((ramp) => ({ key: ramp.id, eyebrow: ramp.problem || undefined, title: customerFacingOfferTitle(offers.find((offer) => offer.id === ramp.offer_ids[0])?.title || ramp.name), copy: offers.find((offer) => offer.id === ramp.offer_ids[0])?.description || '', kind: offers.find((offer) => offer.id === ramp.offer_ids[0])?.kind, price: offers.find((offer) => offer.id === ramp.offer_ids[0])?.access_model === 'free' ? 'Free' : undefined, href: pathSlug === encodeURIComponent(ramp.slug) ? '#offers' : `/guardians/${profile.slug}/value-ramp/${encodeURIComponent(ramp.slug)}` })) : freeOffers.slice(0, 1).map((offer) => ({ key: offer.id, eyebrow: profile.specialties.slice(0, 2).join(' · '), title: customerFacingOfferTitle(offer.title), copy: offer.description || '', kind: offer.kind, price: 'Free', href: '#start' }))} />
       {reviewToken && <ReviewForm token={reviewToken} guardianName={profile.display_name} accent={publicAccent} />}
-      <GuardianFunnel headlineStyle={publicHeadlineStyle} reviews={reviews.filter((r) => r.status === 'published')} profile={profile} offers={offers} ramp={valueRamps.find((ramp) => ramp.status === 'published') || null} accent={publicAccent} headingFont={publicHeadingFont} />
+      <GuardianFunnel key={selectedRamp?.id || 'default'} headlineStyle={publicHeadlineStyle} reviews={reviews.filter((r) => r.status === 'published')} profile={profile} offers={offers} ramp={selectedRamp || null} accent={publicAccent} headingFont={publicHeadingFont} />
     </main>
   </div>;
 }
 
 function Onboarding({ userId, accessToken, name, email, accountAvatarUrl, onDone }: { userId: string; accessToken: string; name: string; email: string; accountAvatarUrl?: string | null; onDone: (p: GuideProfile) => void }) {
-  const [step, setStep] = useState(() => { const wanted = Number(new URLSearchParams(window.location.search).get('step')); return wanted >= 1 && wanted <= 5 ? wanted : 1; });
+  const [step, setStep] = useGuardianPage<number>('step', SETUP_STEPS, 1);
   const [displayName, setDisplayName] = useState(name);
   const [mainLanguage, setMainLanguage] = useState(defaultLanguage());
   const [contactEmail, setContactEmail] = useState(email);
@@ -3421,10 +3427,10 @@ function GuardianAdminPanel() {
   </>;
 }
 
-function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (p: GuideProfile) => void }) {
+export function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (p: GuideProfile) => void }) {
   const { user, accessToken, signOut } = useAuth();
   // Deep links from the public Guardians nav, e.g. /guardians/workspace?tab=protocols
-  const [tab, setTab] = useState<Tab>(() => { const wanted = new URLSearchParams(window.location.search).get('tab'); const tabs: Tab[] = ['home', 'profile', 'library', 'leads', 'value_ramps', 'offer_builder', 'recipes', 'diet', 'fitness', 'content', 'protocols', 'admin']; return tabs.includes(wanted as Tab) ? wanted as Tab : 'home'; });
+  const [tab, setTab] = useGuardianPage<Tab>('tab', WORKSPACE_TABS, 'home');
   const isAdminUser = ['true', '1', 'yes', true].includes((user?.app_metadata as any)?.is_admin) || (user?.app_metadata as any)?.role === 'admin';
   const navItems = isAdminUser ? [...nav, { id: 'admin' as Tab, label: 'Admin', Icon: ShieldCheck as typeof Users }] : nav;
   const [leads, setLeads] = useState<GuideLead[]>([]);
@@ -3451,12 +3457,20 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
     } catch (e) { setCopyError((e as Error).message); }
   };
   const [adding, setAdding] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newGoal, setNewGoal] = useState('');
+  useEffect(() => { setAdding(false); setNewTitle(''); setNewEmail(''); setNewGoal(''); setCreateError(''); }, [tab]);
   const [protocolId, setProtocolId] = useState<string | null>(null);
   const [protocolView, setProtocolView] = useState<'cards' | 'list'>('cards');
   const [recipeView, setRecipeView] = useState<'cards' | 'list'>('cards');
+  useEffect(() => {
+    const closeEditors = () => { setProtocolId(null); setEditorProtocolId(null); setRecipeId(null); setChildPlanId(null); setParentContext(null); setCombining(false); };
+    window.addEventListener('popstate', closeEditors);
+    return () => window.removeEventListener('popstate', closeEditors);
+  }, []);
   const [personalPeople, setPersonalPeople] = useState<Map<string, { name: string; imageUrl: string | null }>>(new Map());
   useEffect(() => { if (user) listPersonalProtocolPeople(user.id).then(setPersonalPeople).catch(() => {}); }, [user?.id, protocols.length]);
   useEffect(() => { setEditorProtocolId(null); }, [protocolId]);
@@ -3470,15 +3484,17 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
   useEffect(() => { if (!user) return; Promise.all([listGuideLeads(user.id), listGuideOffers(user.id), listGuideRecipes(user.id), accessToken ? listProtocols(accessToken, user.id) : Promise.resolve([])]).then(([l,o,r,p]) => { setLeads(l); setOffers(o); setRecipes(r); setProtocols(p); }).catch(() => {}); listGuideValueRamps(user.id).then(setValueRamps).catch(() => setValueRamps([])); listRoutineOwners(user.id, profile.display_name, profile.avatar_url).then(setRoutineOwners).catch(() => {}); }, [user?.id, accessToken]);
   const metric = useMemo(() => [{ n: leads.length, l: 'Leads' }, { n: valueRamps.length, l: 'Offers' }, { n: offers.length + recipes.length + protocols.length, l: 'Items' }, { n: protocols.length, l: 'R3 Protocols' }], [leads.length, offers.length, recipes.length, protocols.length, valueRamps.length]);
   async function quickAdd() {
-    if (!user || !newTitle.trim()) return;
-    setAdding(true);
+    if (!user || !newTitle.trim() || creating) return;
+    setCreating(true); setCreateError('');
     try {
       if (tab === 'leads') { const x = await createGuideLead(user.id, { name: newTitle, email: newEmail, goal: newGoal || null }); setLeads([x, ...leads]); }
       if (tab === 'value_ramps') { const base = newTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'value-ramp'; const x = await createGuideValueRamp(user.id, { name: newTitle.trim(), slug: `${base}-${Date.now().toString().slice(-5)}`, audience: 'Everyone', problem: newGoal.trim() || profile.specialties[0] || 'Wellbeing' }); setValueRamps([x, ...valueRamps]); }
       if (tab === 'recipes') { const x = await createGuideRecipe(user.id, { title: newTitle, description: newGoal || null, meal_slot: 'breakfast' }); setRecipes([x, ...recipes]); }
       if (tab === 'protocols' && accessToken) { const x = await createProtocol(accessToken, { user_id: user.id, name: newTitle }); setProtocols([x, ...protocols]); setProtocolId(x.id); }
       setNewTitle(''); setNewEmail(''); setNewGoal('');
-    } finally { setAdding(false); }
+      setAdding(false);
+    } catch (error) { setCreateError((error as Error).message || 'Could not create this item. Please try again.'); }
+    finally { setCreating(false); }
   }
   return <div style={{ minHeight: '100vh', background: black, color: ink, fontFamily: sans }}>
     <header style={{ borderBottom: `1px solid ${line}`, padding: '22px clamp(20px,6vw,90px) 0' }}>
@@ -3499,6 +3515,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
     <div style={{ display: 'grid', gridTemplateColumns: '210px minmax(0,1fr)', minHeight: 'calc(100vh - 63px)' }}>
       <aside style={{ borderRight: `1px solid ${line}`, padding: '25px 14px' }}><a href="/guardians/workspace" style={{ display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 12px', marginBottom: 10, borderBottom: `1px solid ${line}`, color: ink, textDecoration: 'none', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}>← Dashboard</a>{navItems.map(({ id, label: n, Icon }) => <button key={id} onClick={() => { setTab(id); setProtocolId(null); setRecipeId(null); setChildPlanId(null); setParentContext(null); }} style={{ width: '100%', height: 42, border: 0, background: (tab === id || (id === 'offer_builder' && tab === 'value_ramps')) ? '#1C1E19' : 'transparent', color: (tab === id || (id === 'offer_builder' && tab === 'value_ramps')) ? ink : muted, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', paddingLeft: id === 'recipes' ? 44 : ['diet', 'fitness'].includes(id) ? 28 : 12, cursor: 'pointer', fontFamily: sans, fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' }}><Icon size={14} />{n}</button>)}</aside>
       <main style={{ padding: 'clamp(26px,5vw,68px)', overflow: 'hidden' }}>
+        {createError && <p role="alert" style={{ color: '#E8B86A' }}>{createError}</p>}
         {tab === 'admin' && isAdminUser && <GuardianAdminPanel />}
         {tab === 'home' && <><div style={{ ...label, color: acid }}>Guardian workspace</div><h1 style={{ fontFamily: serif, fontWeight: 300, fontSize: 'clamp(44px,6vw,76px)', lineHeight: .95, margin: '15px 0 18px' }}>Build what people follow.</h1><p style={{ color: muted, maxWidth: 650, lineHeight: 1.6 }}>Create reusable offers, then arrange them into as many audience-specific offer paths as you need.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', borderTop: `1px solid ${line}`, marginTop: 55 }}>{metric.map((m) => <div key={m.l} style={{ borderRight: `1px solid ${line}`, padding: '25px 18px 25px 0' }}><div style={{ fontFamily: serif, fontSize: 42 }}>{m.n}</div><div style={{ ...label, margin: '7px 0 0' }}>{m.l}</div></div>)}</div><div style={{ marginTop: 48, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 }}>{nav.slice(1,5).map(({ id, label: title }) => <button key={id} onClick={() => setTab(id)} style={{ border: `1px solid ${line}`, background: panel, color: ink, minHeight: 210, padding: 22, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}><span><img src={guidePlates[id]} alt="" style={{ width: 86, height: 86, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.75)', opacity: .82 }} /><span style={{ display: 'block', fontFamily: serif, fontSize: 25, fontWeight: 300, marginTop: 12 }}>{title}</span></span><ChevronRight size={17} color={muted} /></button>)}</div></>}
         {tab === 'profile' && <>
@@ -3533,7 +3550,7 @@ function Workspace({ profile, onProfile }: { profile: GuideProfile; onProfile: (
         {tab === 'leads' && !protocolId && !recipeId && user && <ReviewsPanel userId={user.id} slug={profile.slug} />}
         {tab === 'protocols' && !protocolId && protocols.length > 1 && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}><button onClick={() => setCombining(!combining)} style={{ ...btn, background: 'transparent', color: ink }}><Combine size={14} /> Combine for a person</button></div>}
         {tab === 'protocols' && !protocolId && combining && accessToken && user && <CombineProtocols accessToken={accessToken} ownerId={user.id} protocols={protocols} leads={leads} onClose={() => setCombining(false)} onSaved={(saved) => setProtocols((current) => [saved, ...current])} onOpen={(id) => { setCombining(false); setProtocolId(id); }} />}
-        {(['leads','value_ramps','recipes','protocols'] as Tab[]).includes(tab) && !protocolId && !recipeId && <><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 20 }}><div style={{ display: 'flex', alignItems: 'center', gap: 18 }}><img src={guidePlates[tab]} alt="" style={{ width: 74, height: 74, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.74)', opacity: .86 }} /><div><div style={{ ...label, color: acid }}>{tab === 'value_ramps' ? 'Customer journeys' : 'Build'}</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '8px 0 0' }}>{tab === 'value_ramps' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)}</h1></div></div><button onClick={() => setAdding(!adding)} style={btn}><Plus size={14} /> Add {tab === 'value_ramps' ? 'Offer path' : tab === 'protocols' ? 'Protocol' : tab.slice(0,-1)}</button></div>{adding && <div style={{ display: 'grid', gridTemplateColumns: tab === 'leads' ? '1fr 1fr 1.2fr auto' : '1fr 1.4fr auto', gap: 9, margin: '28px 0' }}><input style={input} placeholder={tab === 'leads' ? 'Name' : tab === 'value_ramps' ? 'Ramp name' : 'Title'} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />{tab === 'leads' && <input style={input} type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />}<input style={input} placeholder={tab === 'value_ramps' ? 'Audience problem or goal' : tab === 'leads' ? 'Goal' : 'Short description'} value={newGoal} onChange={(e) => setNewGoal(e.target.value)} /><button onClick={quickAdd} disabled={adding && !newTitle} style={btn}>Create</button></div>}<div style={{ marginTop: 30 }}>{tab === 'leads' && (leads.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{leads.map((x) => <ProductCard key={x.id} kind="lead" imageUrl="/images/guides/lead-plate.png" eyebrow={[x.stage.charAt(0).toUpperCase() + x.stage.slice(1), new Date(x.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })].join(' · ')} title={x.name} copy={x.goal || 'No goal yet'} name={x.email} accent={acid} cta="Email" href={`mailto:${x.email}`} />)}</div> : <Empty image={guidePlates.leads} title="No leads yet" copy="Add a lead or share your public guide page." />)}{tab === 'value_ramps' && (valueRamps.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))', gap: 12 }}>{valueRamps.map((ramp) => <article key={ramp.id} style={{ border: `1px solid ${line}`, background: panel, padding: 22, minHeight: 220, display: 'flex', flexDirection: 'column' }}><Route size={24} color={acid} /><div style={{ ...label, color: acid, marginTop: 24 }}>{ramp.audience} · {ramp.problem}</div><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 29, margin: '4px 0 8px' }}>{ramp.name}</h2><p style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>{ramp.offer_ids.length} reusable offers · {ramp.status}</p><span style={{ marginTop: 'auto', color: ink, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>/guardians/{profile.slug}/value-ramp/{ramp.slug}</span></article>)}</div> : <Empty image={guidePlates.value_ramps} title="Create your first offer path" copy="Choose one audience problem, then arrange reusable offers from a free first win to deeper support." action={<button type="button" onClick={() => setAdding(true)} style={btn}>Create offer path</button>} />)}{tab === 'recipes' && accessToken && <GuardianRecipeAI userId={user.id} accessToken={accessToken} offers={offers} recipes={recipes} author={profile.display_name} onSaved={(saved) => setRecipes((current) => [saved, ...current.filter((r) => r.id !== saved.id)])} />}{tab === 'recipes' && (recipes.length ? (() => {
+        {(['leads','value_ramps','recipes','protocols'] as Tab[]).includes(tab) && !protocolId && !recipeId && <><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 20 }}><div style={{ display: 'flex', alignItems: 'center', gap: 18 }}><img src={guidePlates[tab]} alt="" style={{ width: 74, height: 74, objectFit: 'contain', filter: 'grayscale(1) contrast(.9) brightness(.74)', opacity: .86 }} /><div><div style={{ ...label, color: acid }}>{tab === 'value_ramps' ? 'Customer journeys' : 'Build'}</div><h1 style={{ fontFamily: serif, fontSize: 52, fontWeight: 300, margin: '8px 0 0' }}>{tab === 'value_ramps' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)}</h1></div></div><button onClick={() => setAdding(!adding)} style={btn}><Plus size={14} /> Add {tab === 'value_ramps' ? 'Offer path' : tab === 'protocols' ? 'Protocol' : tab.slice(0,-1)}</button></div>{adding && <div style={{ display: 'grid', gridTemplateColumns: tab === 'leads' ? '1fr 1fr 1.2fr auto' : '1fr 1.4fr auto', gap: 9, margin: '28px 0' }}><input style={input} placeholder={tab === 'leads' ? 'Name' : tab === 'value_ramps' ? 'Ramp name' : 'Title'} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />{tab === 'leads' && <input style={input} type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />}<input style={input} placeholder={tab === 'value_ramps' ? 'Audience problem or goal' : tab === 'leads' ? 'Goal' : 'Short description'} value={newGoal} onChange={(e) => setNewGoal(e.target.value)} /><button onClick={quickAdd} disabled={creating || !newTitle.trim()} style={btn}>{creating ? 'Creating…' : 'Create'}</button></div>}<div style={{ marginTop: 30 }}>{tab === 'leads' && (leads.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 18 }}>{leads.map((x) => <ProductCard key={x.id} kind="lead" imageUrl="/images/guides/lead-plate.png" eyebrow={[x.stage.charAt(0).toUpperCase() + x.stage.slice(1), new Date(x.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })].join(' · ')} title={x.name} copy={x.goal || 'No goal yet'} name={x.email} accent={acid} cta="Email" href={`mailto:${x.email}`} />)}</div> : <Empty image={guidePlates.leads} title="No leads yet" copy="Add a lead or share your public guide page." />)}{tab === 'value_ramps' && (valueRamps.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))', gap: 12 }}>{valueRamps.map((ramp) => <article key={ramp.id} style={{ border: `1px solid ${line}`, background: panel, padding: 22, minHeight: 220, display: 'flex', flexDirection: 'column' }}><Route size={24} color={acid} /><div style={{ ...label, color: acid, marginTop: 24 }}>{ramp.audience} · {ramp.problem}</div><h2 style={{ fontFamily: serif, fontWeight: 300, fontSize: 29, margin: '4px 0 8px' }}>{ramp.name}</h2><p style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>{ramp.offer_ids.length} reusable offers · {ramp.status}</p><a aria-label={`Open offer path ${ramp.name}`} href={`/guardians/${profile.slug}/value-ramp/${encodeURIComponent(ramp.slug)}`} style={{ marginTop: 'auto', color: ink, fontSize: 9, fontWeight: 800 }}>Open offer path →</a></article>)}</div> : <Empty image={guidePlates.value_ramps} title="Create your first offer path" copy="Choose one audience problem, then arrange reusable offers from a free first win to deeper support." action={<button type="button" onClick={() => setAdding(true)} style={btn}>Create offer path</button>} />)}{tab === 'recipes' && accessToken && <GuardianRecipeAI userId={user.id} accessToken={accessToken} offers={offers} recipes={recipes} author={profile.display_name} onSaved={(saved) => setRecipes((current) => [saved, ...current.filter((r) => r.id !== saved.id)])} />}{tab === 'recipes' && (recipes.length ? (() => {
           const kcal = (x: GuideRecipe) => { const v = Number((x.nutrition_per_serving as any)?.energy_kcal); return Number.isFinite(v) && v > 0 ? `${Math.round(v)} kcal` : ''; };
           const meta = (x: GuideRecipe) => [x.meal_slot && x.meal_slot !== 'any' ? x.meal_slot.charAt(0).toUpperCase() + x.meal_slot.slice(1) : 'Any meal', kcal(x), x.status === 'published' ? 'Published' : x.status === 'submitted' ? 'Ready for review' : 'Draft'].filter(Boolean).join(' · ');
           const short = (d?: string | null) => { const t = (d || '').replace(/\s+/g, ' ').trim(); return t.length > 110 ? `${t.slice(0, 110).replace(/\s+\S*$/, '')}…` : t || undefined; };
