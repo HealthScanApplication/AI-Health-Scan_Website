@@ -23,6 +23,11 @@ export async function customizeProtocolRecipe(token: string, protocolId: string,
   const result = await request(token, 'rpc/customize_protocol_recipe', { p_protocol: protocolId, p_item: itemId });
   const recipe: GuideRecipe = Array.isArray(result) ? result[0] : result;
   if (!recipe?.id) throw new Error('The private recipe copy could not be opened.');
-  return { ...recipe, ingredients: recipe.ingredients.map((item: any) => item?.per100 && !item.per100.micros ? { ...item, per100: per100FromRow({ nutrition_per_100g: item.per100 }) } : item) };
+  const ids = [...new Set(recipe.ingredients.filter((item: any) => item?.ingredient_id && !item.per100_source && !item.per100?.micros).map((item: any) => String(item.ingredient_id)))];
+  const rows = ids.length ? await request(token, `catalog_ingredients?select=id,nutrition_per_100g,elements_beneficial,elements_hazardous,allergens,calories_per_100g&id=${encodeURIComponent(`in.(${ids.map((id) => JSON.stringify(id)).join(',')})`)}`) : [];
+  const sources = new Map(rows.map((row: any) => [row.id, row]));
+  return { ...recipe, ingredients: recipe.ingredients.map((item: any) => item?.per100_source || sources.has(item?.ingredient_id)
+    ? { ...item, per100: per100FromRow(item.per100_source || sources.get(item.ingredient_id)) }
+    : item?.per100 && !item.per100.micros ? { ...item, per100: per100FromRow({ nutrition_per_100g: item.per100 }) } : item) };
 }
 export const ensureGuideRecipeCatalog = (token: string, id: string): Promise<string> => request(token, 'rpc/ensure_guide_recipe_catalog', { p_guide: id });
