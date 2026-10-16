@@ -103,6 +103,14 @@ it('keeps a lost upsell response unresolved and does not check the original paid
   expect(screen.queryByRole('heading',{name:'You’re all set!'})).toBeNull();
   expect(screen.queryByRole('button',{name:/Use another payment method/})).toBeNull();
 });
+it('does not skip a different unpurchased offer with the same title after recovery',async()=>{
+  const first={...offer,id:'bought',title:'Shared title'},second={...offer,id:'not-bought',title:'Shared title'};
+  saveCheckoutSession({offerId:offer.id,purchaseId:'initial-order',email:'qa@example.invalid',name:'QA',boughtOfferIds:[offer.id,first.id]});
+  render(<OfferCheckout offer={offer} upsells={[first,second]} profile={profile} accent="#000" onClose={()=>{}} />);
+  fireEvent.click(screen.getByRole('button',{name:'Check payment status'}));
+  await screen.findByRole('button',{name:/Get limited offer/});
+  expect(screen.queryByRole('heading',{name:'You’re all set!'})).toBeNull();
+});
 it('keeps payment disabled and explains a Stripe widget load failure',async()=>{
   api.autoReady=false;await checkout();
   await act(async()=>api.handlers.loaderror?.({error:{message:'External widget failed'}}));

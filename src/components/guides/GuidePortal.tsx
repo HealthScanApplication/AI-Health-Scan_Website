@@ -845,14 +845,14 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, onFres
   const [pendingUpsell, setPendingUpsell] = useState(recovery?.pendingUpsell);
   const [upsellFailed, setUpsellFailed] = useState(false);
   const [cardReady, setCardReady] = useState(false);
-  const [bought, setBought] = useState<string[]>(() => [offer, ...upsells].filter(item => recovery?.boughtOfferIds?.includes(item.id)).map(item => item.title));
+  const [bought, setBought] = useState<string[]>(() => [offer, ...upsells].filter(item => recovery?.boughtOfferIds?.includes(item.id)).map(item => item.id));
   const [upsellIndex, setUpsellIndex] = useState(0);
   const [seconds, setSeconds] = useState(600);
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const discountEndsAt = useRef(recovery?.discountEndsAt || 0);
-  const remember = (id = purchaseId, pending: typeof pendingUpsell = undefined, boughtOfferIds = [offer, ...upsells].filter(item => bought.includes(item.title)).map(item => item.id)) => saveCheckoutSession({ offerId: offer.id, purchaseId: id, email, name, pendingUpsell: pending, boughtOfferIds, discountEndsAt: discountEndsAt.current });
+  const remember = (id = purchaseId, pending: typeof pendingUpsell = undefined, boughtOfferIds = bought) => saveCheckoutSession({ offerId: offer.id, purchaseId: id, email, name, pendingUpsell: pending, boughtOfferIds, discountEndsAt: discountEndsAt.current });
   useEffect(() => { if (recovery) clearCheckoutReturnParameters(); }, [recovery]);
   const showPaymentForm = stage === 'card' || stage === 'paying';
   useEffect(() => {
@@ -931,18 +931,18 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, onFres
           const index = upsells.findIndex(item => item.id === pendingUpsell.offerId);
           const item = upsells[index];
           if (!item) throw new Error('The follow-on offer is no longer available.');
-          setBought(current => current.includes(item.title) ? current : [...current, item.title]);
+          setBought(current => current.includes(item.id) ? current : [...current, item.id]);
           setPendingUpsell(undefined);
-          const ids = [offer, ...upsells].filter(entry => bought.includes(entry.title) || entry.id === item.id).map(entry => entry.id);
+          const ids = [...new Set([...bought, item.id])];
           remember(purchaseId, undefined, ids);
           if (index + 1 < upsells.length) { setUpsellIndex(index + 1); setStage('upsell'); }
           else { clearCheckoutSession(); setStage('done'); }
           return;
         }
-        setBought(current => current.includes(offer.title) ? current : [offer.title, ...current]);
+        setBought(current => current.includes(offer.id) ? current : [offer.id, ...current]);
         discountEndsAt.current = 'discount_ends_at' in result && typeof result.discount_ends_at === 'number' ? result.discount_ends_at : 0;
         setSeconds(Math.max(0, Math.floor((discountEndsAt.current - Date.now()) / 1000)));
-        const purchasedIds = [offer.id, ...upsells.filter(item => bought.includes(item.title)).map(item => item.id)];
+        const purchasedIds = [...new Set([offer.id, ...bought])];
         remember(purchaseId, undefined, purchasedIds);
         const next = upsells.findIndex(item => !purchasedIds.includes(item.id));
         if (next < 0) { clearCheckoutSession(); setStage('done'); }
@@ -972,8 +972,8 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, onFres
       }
       if (result.status !== 'paid') { setUpsellFailed(result.status === 'failed'); setMessage(result.status === 'failed' ? 'The follow-on payment was not completed. Your original order is confirmed. Start a separate checkout at the listed price to use another method.' : 'Payment is processing. Check its status before attempting another payment.'); setStage('pending'); return; }
       setPendingUpsell(undefined);
-      setBought((current) => current.includes(upsell.title) ? current : [...current, upsell.title]);
-      remember(purchaseId, undefined, [offer, ...upsells].filter(item => bought.includes(item.title) || item.id === upsell.id).map(item => item.id));
+      setBought((current) => current.includes(upsell.id) ? current : [...current, upsell.id]);
+      remember(purchaseId, undefined, [...new Set([...bought, upsell.id])]);
       nextUpsell();
     } catch (err: any) {
       setMessage(err?.message || 'Payment status could not be verified. Check its status before attempting another payment.');
@@ -1017,7 +1017,7 @@ export function OfferCheckout({ offer, upsells, profile, accent, onClose, onFres
         <span style={{ width: 56, height: 56, margin: '0 auto 14px', borderRadius: '50%', background: APP.greenSoft, color: '#000', display: 'grid', placeItems: 'center' }}><Check size={26} /></span>
         <h2 style={{ fontFamily: APP.font, fontSize: 28, fontWeight: 600, margin: '0 0 4px' }}>You’re all set!</h2>
         <p style={{ color: APP.muted, fontSize: 16, fontWeight: 600, margin: '0 0 18px', overflowWrap: 'anywhere' }}>{message || `Payment confirmed for ${email}`}</p>
-        <div style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '6px 16px', textAlign: 'left', marginBottom: 18 }}>{bought.map((t) => <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{t}</div>)}</div>
+        <div style={{ background: APP.surface, border: `1px solid ${APP.border}`, borderRadius: 12, padding: '6px 16px', textAlign: 'left', marginBottom: 18 }}>{bought.map((id) => <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', fontSize: 15, fontWeight: 600 }}><span style={{ width: 22, height: 22, flex: '0 0 22px', borderRadius: '50%', border: '1.5px solid #262626', display: 'grid', placeItems: 'center' }}><Check size={13} strokeWidth={2.5} /></span>{[offer, ...upsells].find(item => item.id === id)?.title}</div>)}</div>
       </div> : <div style={{ padding: '44px 24px 24px' }}>
         <AppOfferImage kind={offer.kind} size={80} />
         <div style={{ margin: '12px 0 2px' }}><OfferFormatTag kind={offer.kind} /></div>
