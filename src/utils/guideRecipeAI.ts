@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabase/client';
 import { projectId, publicAnonKey } from './supabase/info';
+import { canonicalMicros, ingredientHazards, recipeHazards, type HazardPer100 } from './recipeNutrients';
 
 /**
  * AI recipe builder for Guardians.
@@ -12,12 +13,12 @@ import { projectId, publicAnonKey } from './supabase/info';
 
 export const MACRO_KEYS = ['energy_kcal', 'protein_g', 'carbohydrates_g', 'fats_g', 'fiber_g', 'sugar_g', 'saturated_fat_g'] as const;
 export type MacroKey = typeof MACRO_KEYS[number];
-export type Nutrition = Partial<Record<MacroKey, number>> & { micros?: Record<string, number> };
+export type Nutrition = Partial<Record<MacroKey, number>> & { micros?: Record<string, number>; hazards?: HazardPer100[]; allergens?: string[] };
 
 /** Key micronutrients shown in the builder, in display order (keys from elements_beneficial.per_100g). */
 export const KEY_MICROS: Array<[string, string]> = [
   ['iron_mg', 'Iron'], ['calcium_mg', 'Calcium'], ['magnesium_mg', 'Magnesium'], ['potassium_mg', 'Potassium'],
-  ['zinc_mg', 'Zinc'], ['sodium_mg', 'Sodium'], ['vitamin_c_mg', 'Vitamin C'], ['vitamin_a_iu', 'Vitamin A'],
+  ['zinc_mg', 'Zinc'], ['sodium_mg', 'Sodium'], ['vitamin_c_mg', 'Vitamin C'], ['vitamin_a_mcg', 'Vitamin A'],
   ['vitamin_e_mg', 'Vitamin E'], ['vitamin_k_mcg', 'Vitamin K'], ['folate_mcg', 'Folate'], ['vitamin_b12_mcg', 'Vitamin B12'],
 ];
 
@@ -75,13 +76,16 @@ export function per100FromRow(row: any): Nutrition | null {
     sugar_g: num(n.sugar_g) ?? num(m.sugars_g),
     saturated_fat_g: num(n.saturated_fat_g),
   };
-  const micros: Record<string, number> = {};
-  for (const group of [eb.minerals, eb.vitamins]) for (const [key, value] of Object.entries(group || {})) { const v = num(value); if (v != null) micros[key] = v; }
+  // Every micronutrient the row carries (all elements_beneficial groups + USDA gaps), on canonical keys.
+  const micros = canonicalMicros(row);
   if (Object.keys(micros).length) out.micros = micros;
+  const hazards = ingredientHazards(row);
+  if (hazards.length) out.hazards = hazards;
+  if (Array.isArray(row?.allergens) && row.allergens.length) out.allergens = row.allergens.map(String);
   return MACRO_KEYS.some((key) => out[key] != null) ? out : null;
 }
 
-const INGREDIENT_COLUMNS = 'id,name_common,image_url,piece_weight_g,piece_label,nutrition_per_100g,elements_beneficial,calories_per_100g';
+const INGREDIENT_COLUMNS = 'id,name_common,image_url,piece_weight_g,piece_label,nutrition_per_100g,elements_beneficial,elements_hazardous,allergens,calories_per_100g';
 const toCatalog = (row: any): CatalogIngredient => ({ id: row.id, name_common: row.name_common, image_url: row.image_url, piece_weight_g: num(row.piece_weight_g) ?? null, piece_label: row.piece_label, per100: per100FromRow(row) });
 
 /** Search catalog ingredients by name (the column is name_common; `name` does not exist). */
@@ -157,7 +161,9 @@ export function computeNutrition(ingredients: RecipeIngredient[], servings: numb
     if (n.micros) out.micros = Object.fromEntries(Object.entries(n.micros).map(([k, v]) => [k, round(v * f, 2)]));
     return out;
   };
-  return { total: scaleBy(total, 1), perServing: scaleBy(total, 1 / per), totalWeight: round(weight, 0), servingWeight: round(weight / per, 0), matched, microMatched, count: ingredients.length };
+  const hazards = recipeHazards(ingredients.map((i) => ({ name: i.catalog_name || i.name, grams: i.grams, hazards: i.per100?.hazards })), per);
+  const allergens = [...new Set(ingredients.flatMap((i) => i.per100?.allergens || []))];
+  return { total: scaleBy(total, 1), perServing: scaleBy(total, 1 / per), hazards, allergens, totalWeight: round(weight, 0), servingWeight: round(weight / per, 0), matched, microMatched, count: ingredients.length };
 }
 
 /** Ask the edge function for 1+ drafts, then match every ingredient to the catalog. */
