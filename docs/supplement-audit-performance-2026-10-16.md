@@ -41,7 +41,9 @@ IDs, duplicate links outside the supplement product set, a partial unique index
 that excludes duplicate rows, and a missing expected ingredient. Success requires
 the actual SQL audit to reject each case with the right error.
 
-First full repaired run: **31.372 database seconds**, all assertions passed.
+Two consecutive full repaired runs: **31.372** and **19.352 database seconds**,
+all assertions passed. All five corrupt fixtures were rejected as expected;
+154 application tests, the production build and all 135 public REST checks passed.
 Inventory: 135 supplements, 131 with verified declared-ingredient links and four
 correctly awaiting definite product labels/formulas. This audit is evidence for
 these database invariants, not a claim that every unrelated application workflow
