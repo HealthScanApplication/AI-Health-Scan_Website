@@ -39,3 +39,10 @@ Target catalogue: website staging project `mofhvoudjxinvpplsytd`. The separate
 production project has no supplement product records; this repair does not copy
 catalogue data between environments. Expected final inventory: 135 products,
 131 with declared ingredient links, four needing a definite label/formula.
+
+Verified results: pre-repair regression failed on missing Baja Gold chloride;
+enhanced rollback/reapply/preservation checks passed; applied-label SQL assertions
+passed; public REST audit checked all 135 records (131 linked, four unresolved),
+including raw-element readability and the picker's exact ingredient counts.
+All 154 application tests and the production build passed. Independent review
+found no blocking issues; its full-junction coverage suggestion was implemented.
