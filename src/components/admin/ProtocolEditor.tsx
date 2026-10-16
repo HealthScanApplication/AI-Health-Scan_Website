@@ -936,7 +936,16 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
   // An item shows on cycle day D when day_number is null (= every day) or === D.
   const allDayItems = items.filter((it) => (it.kind === 'action' || !it.kind) && !it.parent_protocol_item_id);
   const cycleLen = Math.max(selected?.total_days || 0, ...allDayItems.map((i) => i.day_number || 0), 1);
-  const showsOnDay = (it: AdminProtocolItem, d: number) => it.day_number == null || it.day_number === d;
+  // A viewed day passes both filters the app applies: the cycle day_number and, for weekly items, the weekday of
+  // that day's date (the Diet/Fitness planners save weekday repeats, e.g. "Kitchari Lunch Bowl" only on Tuesday).
+  const showsOnDay = (it: AdminProtocolItem, d: number) => {
+    if (it.day_number != null && it.day_number !== d && !(it.recurrence_type === 'weekly' && it.day_number === 1)) return false;
+    if (it.recurrence_type === 'weekly' && Array.isArray(it.recurrence_days_of_week) && it.recurrence_days_of_week.length) {
+      const date = new Date(`${previewStart}T12:00:00`); date.setDate(date.getDate() + d - 1);
+      return it.recurrence_days_of_week.includes(date.getDay());
+    }
+    return true;
+  };
   // the app only cycles when total_days is set — surface + one-click-fix when it isn't
   const totalDaysMissing = cycleLen > 1 && !(selected?.total_days && selected.total_days > 1);
   async function fixTotalDays() {
@@ -2175,7 +2184,7 @@ export function ProtocolEditor({ accessToken, onOpenCatalogRecord, initialProtoc
                   const wakeRows = sorted.filter((i) => isSleepRow(i) && isWakeName(i.display_name || ''));
                   const bedRows = sorted.filter((i) => isSleepRow(i) && !isWakeName(i.display_name || ''));
                   const dayRules = items.filter((i) => !i.parent_protocol_item_id && (i.kind === 'rule_do' || i.kind === 'rule_dont') && !i.hidden);
-                  const ruleList = (i: AdminProtocolItem) => i.subtype === 'drink' ? 'Drinks' : i.scope === 'consume' ? 'Consume' : i.scope === 'supplement' ? 'Supplements' : 'Day';
+                  const ruleList = (i: AdminProtocolItem) => i.subtype === 'drink' ? 'Drinks' : i.scope === 'consume' || (!i.scope && i.category === 'consume') ? 'Consume' : i.scope === 'supplement' || i.category === 'supplement' ? 'Supplements' : i.group_name && !/^(meal|day)$/i.test(i.group_name) ? i.group_name : 'Day';
                   const byPod = group(sorted.filter((i) => !isSleepRow(i)), (i) => partOfDay(i.scheduled_time));
                   const anchorBand = (rows: AdminProtocolItem[], label: string) => rows.length > 0 && (
                     <section style={{ border: '2px solid ' + C.ink, background: C.paper }}>
