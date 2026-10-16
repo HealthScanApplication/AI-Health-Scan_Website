@@ -313,7 +313,9 @@ export async function draftFitnessWeek(accessToken: string, goalId: string, leve
 
 /* ── saving ── */
 const hhmmss = (t: string) => (t.length === 5 ? `${t}:00` : t);
-const weekly = (day: number) => ({ recurrence_type: 'weekly', recurrence_days_of_week: [WEEK.find((w) => w.day === day)?.dow ?? 1] });
+// Weekly items carry no cycle day: in a 7-day Protocol the app also filters by day_number, so day_number 1 would show a
+// Tuesday meal only when cycle day 1 is a Tuesday. Empty day_number = every cycle day; the weekday decides.
+const weekly = (day: number) => ({ recurrence_type: 'weekly', recurrence_days_of_week: [WEEK.find((w) => w.day === day)?.dow ?? 1], day_number: null });
 
 async function clearItems(accessToken: string, protocolId: string) {
   const items = await listProtocolItems(accessToken, protocolId);
@@ -477,7 +479,7 @@ async function addRules(accessToken: string, protocolId: string, rules: string[]
     protocol_id: protocolId, display_name: rule, kind, item_type: 'activity', category: opts.category, subtype: null,
     parent_protocol_item_id: opts.parentId || null, group_name: opts.parentId ? null : opts.group || null, scheduled_time: null, day_number: 1,
     sort_order: opts.next() , has_children: false, enabled: true, hidden: false, notes: '',
-    ...(opts.days ? { recurrence_type: 'weekly', recurrence_days_of_week: opts.days } : { recurrence_type: 'daily' }),
+    ...(opts.days ? { recurrence_type: 'weekly', recurrence_days_of_week: opts.days, day_number: null } : { recurrence_type: 'daily' }),
   } as Partial<AdminProtocolItem>);
 }
 
