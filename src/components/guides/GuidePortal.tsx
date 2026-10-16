@@ -10,6 +10,8 @@ import { RoutineMark } from '../Header';
 import { ContentStudio } from './ContentStudio';
 import { CombineProtocols, DietBuilder, FitnessBuilder } from './GuardianBuilders';
 import { ContentBuilder } from './ContentBuilder';
+import { HazardList, NutrientCoverage, RecipeFiltersPanel } from './RecipeInsights';
+import { avoidViolations, filtersToBrief, type RecipeFilters, type Tier } from '../../utils/recipeNutrients';
 import { buildRecipePdf } from '../../utils/recipePdf';
 import { PhoneFrame } from '../mockups/PhoneFrame';
 import { buildRecipesWithAI, computeNutrition, gramsFor, searchCatalogIngredients, KEY_MICROS, UNITS, type CatalogIngredient, type MacroKey, type RecipeDraft, type RecipeIngredient } from '../../utils/guideRecipeAI';
@@ -2869,8 +2871,8 @@ function downloadRecipePdf(recipes: RecipeDraft[], opts: { bookTitle?: string; a
 }
 
 /** The recipe as it appears in the ROUTINE³ app (detail tray) or as the printable PDF, like the Protocol editor's preview. */
-function RecipePreview({ draft }: { draft: RecipeDraft }) {
-  const [mode, setMode] = useState<'app' | 'pdf'>('app');
+function RecipePreview({ draft, author = '', avatarUrl = null }: { draft: RecipeDraft; author?: string; avatarUrl?: string | null }) {
+  const [mode, setMode] = useState<'card' | 'app' | 'pdf'>('card');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   useEffect(() => {
     if (mode !== 'pdf') return;
@@ -2883,9 +2885,10 @@ function RecipePreview({ draft }: { draft: RecipeDraft }) {
   const chip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 10px', borderRadius: 12, background: APP.alt, border: `1px solid ${APP.border}`, fontSize: 11, fontWeight: 500, color: APP.text, textTransform: 'capitalize' };
   return <div style={{ position: 'sticky', top: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
     <div role="group" aria-label="Preview" style={{ display: 'inline-flex', border: `1px solid ${line}`, borderRadius: 6, overflow: 'hidden' }}>
-      {(['app', 'pdf'] as const).map((m, i) => <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} style={{ height: 30, padding: '0 16px', border: 0, borderLeft: i ? `1px solid ${line}` : 0, background: mode === m ? ink : 'transparent', color: mode === m ? black : ink, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', cursor: 'pointer' }}>{m === 'app' ? 'APP' : 'PDF'}</button>)}
+      {(['card', 'app', 'pdf'] as const).map((m, i) => <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} style={{ height: 30, padding: '0 16px', border: 0, borderLeft: i ? `1px solid ${line}` : 0, background: mode === m ? ink : 'transparent', color: mode === m ? black : ink, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', cursor: 'pointer' }}>{m === 'card' ? 'CARD' : m === 'app' ? 'APP' : 'PDF'}</button>)}
     </div>
-    {mode === 'pdf' ? <>
+    {mode === 'card' ? <div style={{ width: 300 }}><ProductCard kind="recipe_book" imageUrl={draft.image_url} eyebrow={[draft.meal_slot && draft.meal_slot !== 'any' ? draft.meal_slot.charAt(0).toUpperCase() + draft.meal_slot.slice(1) : 'Any meal', n.perServing.energy_kcal ? `${Math.round(n.perServing.energy_kcal)} kcal` : '', total ? `${total} min` : ''].filter(Boolean).join(' · ')} title={draft.title || 'Untitled recipe'} copy={draft.description.length > 110 ? `${draft.description.slice(0, 110).replace(/\s+\S*$/, '')}…` : draft.description || undefined} name={author} avatarUrl={avatarUrl} accent={acid} cta="Open recipe" /></div>
+    : mode === 'pdf' ? <>
       <div style={{ width: 290, aspectRatio: '210 / 297', background: '#FFF', border: `1px solid ${line}` }}>{pdfUrl ? <iframe title="Printable recipe PDF" src={`${pdfUrl}#toolbar=0&view=FitH`} style={{ width: '100%', height: '100%', border: 0 }} /> : <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: APP.faint, fontSize: 12 }}>Building PDF…</div>}</div>
       <button type="button" onClick={() => downloadRecipePdf([draft])} style={{ ...btn, minHeight: 34 }}><FileText size={12} /> Download PDF</button>
     </> : <PhoneFrame width={290} screenBg={APP.bg}>
@@ -2910,12 +2913,14 @@ function RecipePreview({ draft }: { draft: RecipeDraft }) {
         </div>
       </div>
     </PhoneFrame>}
-    <p style={{ fontSize: 10, fontStyle: 'italic', color: muted, margin: 0, textAlign: 'center', maxWidth: 270 }}>{mode === 'app' ? 'Live preview: the recipe as it appears in the ROUTINE³ app.' : 'Printable PDF, one page per recipe.'}</p>
+    <p style={{ fontSize: 10, fontStyle: 'italic', color: muted, margin: 0, textAlign: 'center', maxWidth: 270 }}>{mode === 'card' ? 'The recipe card as it shows in your recipe list, books and offers.' : mode === 'app' ? 'Live preview: the recipe as it appears in the ROUTINE³ app.' : 'Printable PDF, one page per recipe.'}</p>
   </div>;
 }
 
-function NutritionPanel({ draft }: { draft: RecipeDraft }) {
+function NutritionPanel({ draft, avoid = [] }: { draft: RecipeDraft; avoid?: string[] }) {
   const n = computeNutrition(draft.ingredients, draft.servings);
+  const [tier, setTier] = useState<Tier>(15);
+  const broken = avoidViolations(draft.ingredients, avoid);
   const macro: Array<[MacroKey, string, string]> = [['energy_kcal', 'kcal', ''], ['protein_g', 'Protein', 'g'], ['carbohydrates_g', 'Carbs', 'g'], ['fats_g', 'Fat', 'g'], ['fiber_g', 'Fibre', 'g'], ['sugar_g', 'Sugar', 'g']];
   const micros = KEY_MICROS.filter(([key]) => n.perServing.micros?.[key] != null);
   const cell = (value: number | undefined, unit: string) => value == null ? '—' : `${value}${unit}`;
@@ -2925,6 +2930,9 @@ function NutritionPanel({ draft }: { draft: RecipeDraft }) {
       <tbody>{macro.map(([key, name, unit]) => <tr key={key} style={{ borderTop: `1px solid ${line}`, textAlign: 'right' }}><td style={{ textAlign: 'left', padding: '6px 0', color: muted }}>{name}</td><td style={{ color: ink, fontWeight: key === 'energy_kcal' ? 700 : 400 }}>{cell(n.perServing[key], unit)}</td><td style={{ color: muted }}>{cell(n.total[key], unit)}</td></tr>)}
       {micros.length > 0 && <tr style={{ borderTop: `1px solid ${line}` }}><td colSpan={3} style={{ ...label, margin: 0, padding: '12px 0 4px', fontSize: 9, color: n.microMatched === n.matched ? muted : '#E8B86A' }}>Micronutrients · from {n.microMatched} of {n.count} ingredients with micronutrient data</td></tr>}{micros.map(([key, name]) => { const unit = key.split('_').pop() === 'iu' ? ' IU' : ` ${key.split('_').pop()}`; return <tr key={key} style={{ borderTop: `1px solid ${line}`, textAlign: 'right' }}><td style={{ textAlign: 'left', padding: '5px 0', color: muted }}>{name}</td><td>{n.perServing.micros![key]}{unit}</td><td style={{ color: muted }}>{n.total.micros![key]}{unit}</td></tr>; })}</tbody></table>
     {n.matched < n.count && <p style={{ color: muted, fontSize: 10, margin: '10px 0 0' }}>Unmatched ingredients add no nutrition. Pick a database match for each to complete the totals.</p>}
+    {broken.length > 0 && <p style={{ color: '#E88A7A', fontSize: 11, margin: '10px 0 0', fontWeight: 700 }}>Uses avoided ingredients: {broken.join(', ')}. Swap them before saving.</p>}
+    <NutrientCoverage micros={n.perServing.micros} macros={{ protein_g: n.perServing.protein_g, fiber_g: n.perServing.fiber_g }} tier={tier} onTier={setTier} />
+    <HazardList hazards={n.hazards} allergens={n.allergens} />
   </div>;
 }
 
@@ -2942,7 +2950,7 @@ function IngredientMatch({ item, onPick }: { item: RecipeIngredient; onPick: (ma
   </div>;
 }
 
-function RecipeDraftEditor({ draft, onChange, onRemove, onSave, saving, savedLabel }: { draft: RecipeDraft; onChange: (draft: RecipeDraft) => void; onRemove: () => void; onSave: () => void; saving: boolean; savedLabel?: string }) {
+function RecipeDraftEditor({ draft, onChange, onRemove, onSave, saving, savedLabel, avoid = [], author }: { author?: string; draft: RecipeDraft; onChange: (draft: RecipeDraft) => void; onRemove: () => void; onSave: () => void; saving: boolean; savedLabel?: string; avoid?: string[] }) {
   const set = (patch: Partial<RecipeDraft>) => onChange({ ...draft, ...patch });
   const setItem = (index: number, patch: Partial<RecipeIngredient>) => {
     const ingredients = draft.ingredients.map((item, i) => {
@@ -2981,7 +2989,7 @@ function RecipeDraftEditor({ draft, onChange, onRemove, onSave, saving, savedLab
         <label style={{ ...label, marginTop: 18 }}>Method · one step per line</label>
         <textarea style={{ ...input, height: 170, paddingTop: 10, lineHeight: 1.55, fontSize: 12 }} value={draft.instructions.join('\n')} onChange={(e) => set({ instructions: e.target.value.split('\n') })} />
       </div>
-      <NutritionPanel draft={draft} />
+      <NutritionPanel draft={draft} avoid={avoid} />
     </div>
     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
       <button type="button" onClick={onSave} disabled={saving || !draft.title.trim()} style={btn}>{saving ? 'Saving…' : savedLabel ? 'Save changes' : 'Save recipe'}</button>
@@ -2989,13 +2997,14 @@ function RecipeDraftEditor({ draft, onChange, onRemove, onSave, saving, savedLab
       {savedLabel && <span style={{ color: acid, fontSize: 11 }}>{savedLabel}</span>}
     </div>
     </div>
-    <RecipePreview draft={draft} />
+    <RecipePreview draft={draft} author={author} />
   </article>;
 }
 
 function GuardianRecipeAI({ userId, accessToken, offers, recipes, author, onSaved }: { userId: string; accessToken: string; offers: GuideOffer[]; recipes: GuideRecipe[]; author?: string; onSaved: (recipe: GuideRecipe) => void }) {
   const books = offers.filter((offer) => offer.kind === 'recipe_book');
-  const [brief, setBrief] = useState('');
+  // A recipe idea sent from the Diet planner arrives as a ready brief.
+  const [brief, setBrief] = useState(() => { try { const b = sessionStorage.getItem('guardian:recipe-brief') || ''; sessionStorage.removeItem('guardian:recipe-brief'); return b; } catch { return ''; } });
   const [count, setCount] = useState(3);
   const [mealSlot, setMealSlot] = useState('');
   const [urls, setUrls] = useState('');
@@ -3006,6 +3015,11 @@ function GuardianRecipeAI({ userId, accessToken, offers, recipes, author, onSave
   const [drafts, setDrafts] = useState<Array<RecipeDraft & { key: number; savedId?: string; saving?: boolean; savedLabel?: string }>>([]);
   const [bookId, setBookId] = useState(books[0]?.id || '');
   useEffect(() => { if (!bookId && books[0]) setBookId(books[0].id); }, [books.length]);
+  const [filters, setFilters] = useState<RecipeFilters>({ diets: [], useIngredients: [], avoidIngredients: [], boost: [], limit: [] });
+  const [tier, setTier] = useState<Tier>(15);
+  const [showFilters, setShowFilters] = useState(false);
+  const filterBrief = filtersToBrief(filters);
+  const activeFilters = filters.diets.length + filters.useIngredients.length + filters.avoidIngredients.length + filters.boost.length + filters.limit.length;
 
   async function addPhotos(files: FileList | null) {
     if (!files?.length) return;
@@ -3017,7 +3031,8 @@ function GuardianRecipeAI({ userId, accessToken, offers, recipes, author, onSave
   async function build() {
     setBuilding(true); setMessage('');
     try {
-      const result = await buildRecipesWithAI(accessToken, { message: brief, count, mealSlot: mealSlot || undefined, sourceUrls: urls.split(/\s+/).filter((u) => /^https?:\/\//.test(u)), imageUrls: photos });
+      const goal = filters.boost.length >= 10 ? `\nTogether the ${count} recipes should cover as many of these essential nutrients as possible, each recipe bringing different ones.` : '';
+      const result = await buildRecipesWithAI(accessToken, { message: [brief.trim() || `Create ${count} recipes.`, filterBrief, goal].filter(Boolean).join('\n'), count, mealSlot: mealSlot || undefined, sourceUrls: urls.split(/\s+/).filter((u) => /^https?:\/\//.test(u)), imageUrls: photos });
       setDrafts([...result.recipes.map((recipe, i) => ({ ...recipe, key: Date.now() + i })), ...drafts]);
       setMessage(result.summary || `${result.recipes.length} recipe${result.recipes.length === 1 ? '' : 's'} drafted. Review the amounts and database matches, then save.`);
     } catch (error: any) { setMessage(error?.message || 'Could not build recipes.'); }
@@ -3050,11 +3065,19 @@ function GuardianRecipeAI({ userId, accessToken, offers, recipes, author, onSave
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
       {photos.map((url) => <span key={url} style={{ position: 'relative', width: 56, height: 56, border: `1px solid ${line}` }}><img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /><button type="button" aria-label="Remove photo" onClick={() => setPhotos(photos.filter((p) => p !== url))} style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: 10, border: 0, background: ink, color: black, cursor: 'pointer', fontSize: 11 }}>×</button></span>)}
       {photos.length < 4 && <label style={{ ...btn, background: 'transparent', color: ink }}>{uploading ? 'Uploading…' : '+ Photos'}<input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} /></label>}
-      <button type="button" onClick={build} disabled={building || uploading || !brief.trim()} style={{ ...btn, marginLeft: 'auto' }}>{building ? 'Building recipes…' : `Build ${count} recipe${count === 1 ? '' : 's'}`}</button>
+      <button type="button" onClick={() => setShowFilters(!showFilters)} style={{ ...btn, background: 'transparent', color: activeFilters ? acid : ink }}>Filters{activeFilters ? ` · ${activeFilters}` : ''}</button>
+      <button type="button" onClick={build} disabled={building || uploading || (!brief.trim() && !activeFilters)} style={{ ...btn, marginLeft: 'auto' }}>{building ? 'Building recipes…' : `Build ${count} recipe${count === 1 ? '' : 's'}`}</button>
     </div>
+    {showFilters && <RecipeFiltersPanel value={filters} onChange={setFilters} tier={tier} onTier={setTier} />}
     {message && <p style={{ color: muted, fontSize: 12, marginTop: 12 }}>{message}</p>}
+    {drafts.length > 1 && (() => {
+      // The set of drafted recipes together: one serving of each, so a Guardian sees which essentials the set still misses.
+      const sums: Record<string, number> = {}; let protein = 0, fiber = 0;
+      for (const d of drafts) { const n = computeNutrition(d.ingredients, d.servings).perServing; protein += n.protein_g || 0; fiber += n.fiber_g || 0; for (const [k, v] of Object.entries(n.micros || {})) sums[k] = (sums[k] || 0) + v; }
+      return <div style={{ border: `1px solid ${line}`, padding: 14, marginTop: 12 }}><NutrientCoverage micros={sums} macros={{ protein_g: protein, fiber_g: fiber }} tier={tier} onTier={setTier} title={`These ${drafts.length} recipes together · one serving each · % daily value`} /></div>;
+    })()}
     {unsaved.length > 1 && <button type="button" onClick={() => unsaved.forEach((d) => save(d.key))} style={{ ...btn, marginTop: 10 }}>Save all {unsaved.length}</button>}
-    {drafts.map((draft) => <RecipeDraftEditor key={draft.key} draft={draft} saving={!!draft.saving} savedLabel={draft.savedLabel} onChange={(next) => setDrafts((current) => current.map((d) => d.key === draft.key ? { ...d, ...next } : d))} onRemove={() => setDrafts((current) => current.filter((d) => d.key !== draft.key))} onSave={() => save(draft.key)} />)}
+    {drafts.map((draft) => <RecipeDraftEditor key={draft.key} draft={draft} saving={!!draft.saving} savedLabel={draft.savedLabel} onChange={(next) => setDrafts((current) => current.map((d) => d.key === draft.key ? { ...d, ...next } : d))} onRemove={() => setDrafts((current) => current.filter((d) => d.key !== draft.key))} onSave={() => save(draft.key)} avoid={filters.avoidIngredients} author={author} />)}
   </section>;
 }
 

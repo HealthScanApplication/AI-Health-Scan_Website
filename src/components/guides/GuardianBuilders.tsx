@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Dumbbell, Loader2, Plus, Search, Sparkles, Trash2, Utensils, Users, X, Combine, AlertTriangle } from 'lucide-react';
 import { listProtocolItems, type AdminProtocol, type AdminProtocolItem } from '../../utils/protocolAdmin';
 import type { GuideLead, GuideRecipe } from '../../utils/guidePortal';
+import { dayReport, loadCandidates, smartFill, type Candidate, type RecipeIdea } from '../../utils/dietPlanner';
+import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
+import { TIERS, tierLabel } from './RecipeInsights';
 import {
-  DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, autoFillDiet, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
+  MUSCLE_GROUPS, dayNameFor, muscleGroupOf, type MuscleGroupId, DEFAULT_DRINKS, fitsSlot, DIET_FRAMEWORKS, FITNESS_GOALS, FRAMEWORK_RULES, mealTiming, resolveTiming, sessionTiming, type Anchor, type Timing, MEAL_SLOTS, WEEK, combineProtocols, draftFitnessWeek, findClashes, guideRecipeToPick,
   listBuilderMeta, macroGrams, saveDietProtocol, saveFitnessProtocol, searchActivities, searchDietRecipes, sumNutrition,
   reviewCombined, reviewDiet, reviewFitness, type Conflict, type Review, type ReviewNote, type ActivityPick, type BuilderKind, type Clash, type DietConfig, type FitnessConfig, type FitnessSession, type MealPick,
 } from '../../utils/protocolBuilders';
@@ -116,6 +119,9 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
   const [meta, setMeta] = useState<SavedMeta>({});
   const [picking, setPicking] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
+  const [tier, setTier] = useState<Tier>(15);
+  const [catalog, setCatalog] = useState<Map<string, Candidate>>(new Map());
+  const [ideas, setIdeas] = useState<RecipeIdea[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MealPick[]>([]);
   const [busy, setBusy] = useState(false);
@@ -145,7 +151,16 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
   const macroSum = cfg.protein + cfg.carbs + cfg.fat;
 
   const run = async (label: string, work: () => Promise<void>) => { setBusy(true); setMessage(label); try { await work(); } catch (e) { const failedId = (e as { protocolId?: string }).protocolId; if (failedId) setProtocolId(failedId); setMessage(`Failed: ${(e as Error).message}`); setBusy(false); return; } setBusy(false); };
-  const autoFill = () => run('Choosing recipes from the database…', async () => { setCfg({ ...cfg, plan: await autoFillDiet(accessToken, cfg, recipes) }); setMessage('Week filled. Swap any meal by clicking it.'); });
+  // Recipe nutrients + hazards from the junction records, for live day coverage (loaded per framework, cached).
+  useEffect(() => { let live = true; loadCandidates(accessToken, framework).then(({ candidates }) => { if (live) setCatalog(new Map(candidates.map((c) => [c.id, c]))); }).catch(() => {}); return () => { live = false; }; }, [cfg.framework, accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  const autoFill = () => run('Choosing recipes from the database…', async () => {
+    const res = await smartFill(accessToken, cfg, recipes, tier, setMessage);
+    setCfg({ ...cfg, plan: res.plan }); setIdeas(res.ideas);
+    const filled = Object.values(res.plan).filter(Boolean).length;
+    setMessage(`Week filled with ${new Set(Object.values(res.plan).filter(Boolean).map((p) => p!.id)).size} different recipes across ${filled} meals. Ranked by health score and ${tierLabel(tier)} coverage, gaps first.`);
+  });
+  const defs = nutrientsForTier(tier);
+  const reports = WEEK.map(({ day }) => dayReport(day, slots.map((s) => { const p = cfg.plan[`${day}:${s.id}`]; return p ? catalog.get(p.id) || { ...p, healthScore: null, mealSlot: null, tags: [], micros: {}, hazards: [], ingredientIds: [] } as Candidate : null; }).filter(Boolean) as Candidate[], defs));
   const save = () => run('Saving to Protocols…', async () => {
     const { protocol, metaSaved } = await saveDietProtocol(accessToken, ownerId, protocolId, name.trim() || `${framework.label} week`, cfg);
     setProtocolId(protocol.id); setMeta((m) => ({ ...m, [protocol.id]: { builder_kind: 'diet', builder_config: cfg } })); onSaved(protocol);
@@ -177,6 +192,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
     </div>
     {macroSum !== 100 && <p style={{ color: warn, fontSize: 12 }}>Macros add up to {macroSum}% of energy. Adjust them to 100%.</p>}
     <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+      <span style={{ display: 'flex', gap: 5 }}>{TIERS.map((t) => <button key={t} type="button" onClick={() => setTier(t)} title="Rank meals by this essential-nutrient set and show each day's coverage" style={{ ...chip(t === tier), padding: '6px 10px', fontSize: 10 }}>{tierLabel(t)}</button>)}</span>
       <button type="button" style={btn} disabled={busy || !slots.length} onClick={autoFill}><Sparkles size={13} /> Auto-fill week</button>
       <button type="button" style={ghost} disabled={busy} onClick={() => setCfg({ ...cfg, plan: {} })}>Clear</button>
       <button type="button" style={btn} disabled={busy || !Object.values(cfg.plan).some(Boolean)} onClick={() => setReview(reviewDiet(cfg))}>Review &amp; {protocolId ? 'update' : 'save'}</button>
@@ -186,20 +202,33 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
     {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: `132px repeat(7,minmax(118px,1fr))`, gap: 6, minWidth: 990 }}>
-        <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} /></div>)}
+        <div />{WEEK.map((w, i) => <div key={w.day} style={{ ...label, margin: 0 }}>{w.short}<div style={{ color: ink, fontSize: 11, letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>{Math.round(dayTotals[i].energy_kcal)} / {cfg.kcal} kcal</div><Bar value={dayTotals[i].energy_kcal} target={cfg.kcal} />
+          <div style={{ color: ink, fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4 }}>P {Math.round(dayTotals[i].protein_g)} / {targets.protein_g} g</div><Bar value={dayTotals[i].protein_g} target={targets.protein_g} />
+          {dayTotals[i].energy_kcal > 0 && <div title={reports[i].gaps.map((g) => g.label).join(', ')} style={{ fontSize: 10, letterSpacing: 0, textTransform: 'none', fontWeight: 400, marginTop: 4, color: reports[i].coverage >= 60 ? acid : warn }}>{tierLabel(tier)}: {reports[i].coverage}%{reports[i].gaps.length ? <span style={{ display: 'block', color: muted }}>low: {reports[i].gaps.slice(0, 3).map((g) => g.label).join(', ')}{reports[i].gaps.length > 3 ? ` +${reports[i].gaps.length - 3}` : ''}</span> : null}</div>}
+        </div>)}
         {slots.map((s) => [<div key={s.id} style={{ ...label, margin: 0, alignSelf: 'center' }}>{s.label}<div style={{ fontWeight: 400, margin: '4px 0 2px' }}><TimingField compact value={mealTiming(cfg, s.id)} onChange={(t) => setCfg({ ...cfg, timing: { ...cfg.timing, [s.id]: t } })} /></div><div style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>≈ {resolveTiming(mealTiming(cfg, s.id))}</div></div>, ...WEEK.map(({ day }) => {
           const key = `${day}:${s.id}`; const pick = cfg.plan[key];
           return <div key={key} onClick={() => { setPicking(key); setQuery(''); }} style={{ ...card, padding: 8, minHeight: 92, cursor: 'pointer', borderColor: picking === key ? acid : line, position: 'relative' }}>
             {pick ? <>
               {pick.image && <img src={pick.image} alt="" style={{ width: '100%', height: 44, objectFit: 'cover', marginBottom: 5 }} />}
               <div style={{ fontSize: 11, lineHeight: 1.25, paddingRight: 14 }}>{pick.name}</div>
-              <div style={{ color: muted, fontSize: 10, marginTop: 3 }}>{pick.nutrition ? `${Math.round(pick.nutrition.energy_kcal)} kcal · P ${Math.round(pick.nutrition.protein_g)}` : 'No nutrition data'}{pick.source === 'guide' ? ' · yours' : ''}</div>
+              <div style={{ color: muted, fontSize: 10, marginTop: 3 }}>{pick.nutrition ? `${Math.round(pick.nutrition.energy_kcal)} kcal · P ${Math.round(pick.nutrition.protein_g)}` : 'No nutrition data'}{pick.healthScore != null ? ` · ♥ ${pick.healthScore}` : ''}{pick.source === 'guide' ? ' · yours' : ''}</div>
+              {(pick.hazardFlags || catalog.get(pick.id)?.hazards.filter((h) => h.level === 'high' || h.level === 'moderate').map((h) => ({ label: h.label, level: h.level })) || []).slice(0, 2).map((h) => <div key={h.label} title="Hazard from the ingredient database" style={{ fontSize: 9, marginTop: 2, color: h.level === 'high' ? '#E88A7A' : warn, display: 'flex', gap: 3, alignItems: 'center' }}><AlertTriangle size={9} /> {h.label}</div>)}
               <button type="button" title="Remove" onClick={(e) => { e.stopPropagation(); setPick(key, null); }} style={{ ...iconBtn, position: 'absolute', top: 4, right: 4 }}><X size={12} /></button>
             </> : <span style={{ color: muted, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={12} /> Add</span>}
           </div>;
         })])}
       </div>
     </div>
+    {ideas.length > 0 && <div style={{ ...card, marginTop: 14 }}>
+      <div style={{ ...label, color: acid }}>Recipe ideas for this week's gaps · ingredients ranked by nutrients per kcal, fewest hazards</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 10 }}>{ideas.map((idea) => <div key={idea.title} style={{ border: `1px solid ${line}`, padding: 12 }}>
+        <div style={{ fontFamily: serif, fontSize: 20 }}>{idea.title}</div>
+        <div style={{ color: muted, fontSize: 11, margin: '4px 0' }}>{idea.ingredients.join(' · ')}</div>
+        <div style={{ fontSize: 11, color: acid }}>Brings: {idea.covers.join(', ')}</div>
+        <button type="button" style={{ ...btn, marginTop: 8, minHeight: 32 }} onClick={() => { try { sessionStorage.setItem('guardian:recipe-brief', idea.brief); } catch { /* storage blocked: the builder opens empty */ } window.location.href = '/guardians/workspace?tab=recipes'; }}>Draft in recipe builder</button>
+      </div>)}</div>
+    </div>}
     <div style={{ ...card, marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
       <RulesEditor title="Meal checklist for the week" rules={cfg.rules || []} onChange={(rules) => setCfg((c) => ({ ...c, rules }))} placeholder={'One rule per line, e.g.\nCook with olive oil'} />
       {slots.map((s) => <RulesEditor key={`${s.id}-drinks`} title={`${s.label} drinks`} rules={cfg.drinks?.[s.id] ?? DEFAULT_DRINKS[s.id] ?? []} onChange={(drinks) => setCfg((c) => ({ ...c, drinks: { ...c.drinks, [s.id]: drinks } }))} placeholder={'One drink per line, e.g.\nWater\nGreen tea'} />)}
@@ -224,6 +253,7 @@ export function DietBuilder({ accessToken, ownerId, protocols, recipes, onSaved,
 
 /* ───────────────────────── Fitness ───────────────────────── */
 
+const MUSCLE_ORDER = [...MUSCLE_GROUPS.map((g) => g.label as string), 'Cardio', 'Mobility', 'Other'];
 const emptyFitness = (): FitnessConfig => ({ goal: 'general', level: 'beginner', minutes: 40, sessions: [], rules: ['Drink water during every session'] });
 
 export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpen }: CommonProps) {
@@ -232,6 +262,7 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
   const [protocolId, setProtocolId] = useState<string | null>(null);
   const [meta, setMeta] = useState<SavedMeta>({});
   const [adding, setAdding] = useState<number | null>(null); // session index receiving an exercise
+  const [muscle, setMuscle] = useState<MuscleGroupId | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ActivityPick[]>([]);
@@ -242,9 +273,9 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
   useEffect(() => { listBuilderMeta(accessToken, ownerId).then(setMeta).catch(() => {}); }, [accessToken, ownerId]);
   useEffect(() => {
     if (adding == null) return;
-    const timer = setTimeout(() => { searchActivities(accessToken, { query, categories: query ? undefined : ['Strength', 'Gym', 'Calisthenics', 'Cardio', 'Hiit', 'Stretch', 'Fitness'], limit: 16 }).then(setResults).catch((e) => setMessage(String(e.message || e))); }, 250);
+    const timer = setTimeout(() => { searchActivities(accessToken, { query, muscle, categories: query || muscle ? undefined : ['Strength', 'Gym', 'Calisthenics', 'Cardio', 'Hiit', 'Stretch', 'Fitness'], limit: 24 }).then(setResults).catch((e) => { setResults([]); setMessage(String(e.message || e)); }); }, 250);
     return () => clearTimeout(timer);
-  }, [adding, query, accessToken]);
+  }, [adding, query, muscle, accessToken]);
 
   const run = async (label: string, work: () => Promise<void>) => { setBusy(true); setMessage(label); try { await work(); } catch (e) { const failedId = (e as { protocolId?: string }).protocolId; if (failedId) setProtocolId(failedId); setMessage(`Failed: ${(e as Error).message}`); setBusy(false); return; } setBusy(false); };
   const draft = () => run('Building the week from catalog activities…', async () => { setCfg({ ...cfg, sessions: await draftFitnessWeek(accessToken, cfg.goal, cfg.level, cfg.minutes) }); setMessage('Week drafted. Edit sessions, sets and reps below.'); });
@@ -278,6 +309,21 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
       <Status busy={busy} message={message} />
     </div>
     {review && <ReviewPanel notes={review.notes} conflicts={review.conflicts} blocking={review.blocking} busy={busy} onClose={() => setReview(null)} saveLabel={review.conflicts.length ? 'Save with conflicts flagged' : protocolId ? 'Update Protocol' : 'Save as Protocol'} onSave={() => { setReview(null); save(); }} />}
+    {cfg.sessions.some((x) => x.exercises.length) && (() => {
+      // Share of the week's exercises per muscle group; groups with none show 0% so gaps are visible.
+      const all = cfg.sessions.flatMap((x) => x.exercises.map(muscleGroupOf));
+      const muscles = MUSCLE_GROUPS.map((g) => g.label as string).filter((g) => g !== 'Full body' && (g !== 'Face' || all.includes('Face')) && (g !== 'Neck' || all.includes('Neck')));
+      const count = (g: string) => all.filter((x) => x === g || (x === 'Full body')).length;
+      const worked = muscles.filter((g) => count(g) > 0).length;
+      return <div style={{ ...card, marginBottom: 14 }}>
+        <div style={{ ...label, color: acid }}>Muscles worked this week · {worked} of {muscles.length} groups · {all.length} exercises</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '6px 16px' }}>{muscles.map((g) => { const pct = all.length ? Math.round(count(g) / all.length * 100) : 0; return <div key={g} style={{ fontSize: 11 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: pct ? ink : '#E88A7A' }}><span>{g}</span><span>{pct}%</span></div>
+          <div style={{ height: 4, background: 'rgba(245,242,234,.1)', marginTop: 3 }}><div style={{ height: 4, width: `${Math.min(100, pct * 2.5)}%`, background: pct ? acid : 'transparent' }} /></div>
+        </div>; })}</div>
+        {all.some((x) => x === 'Cardio' || x === 'Mobility') && <div style={{ color: muted, fontSize: 10, marginTop: 8 }}>Also {all.filter((x) => x === 'Cardio').length} cardio and {all.filter((x) => x === 'Mobility').length} mobility exercises. Full-body moves count toward every group.</div>}
+      </div>;
+    })()}
     <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(150px,1fr))', gap: 6, minWidth: 1080 }}>
         {WEEK.map(({ day, short }) => {
@@ -285,14 +331,15 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
           return <div key={day} style={{ border: `1px solid ${line}`, minHeight: 260, padding: 8, background: list.length ? panel : 'transparent' }}>
             <div style={{ ...label, display: 'flex', justifyContent: 'space-between' }}>{short}{!list.length && <span style={{ fontWeight: 400 }}>Rest</span>}</div>
             {list.map(({ s, i }) => <div key={i} style={{ borderTop: `1px solid ${line}`, paddingTop: 8, marginTop: 6 }}>
-              <div style={{ display: 'flex', gap: 4 }}><input style={{ ...input, height: 30, fontSize: 12, padding: '0 7px' }} value={s.title} onChange={(e) => patchSession(i, { title: e.target.value })} /><button type="button" title="Remove session" style={iconBtn} onClick={() => setCfg({ ...cfg, sessions: cfg.sessions.filter((_, j) => j !== i) })}><Trash2 size={12} /></button></div>
+              <div style={{ display: 'flex', gap: 4 }}><input style={{ ...input, height: 30, fontSize: 12, padding: '0 7px' }} value={s.title} onChange={(e) => patchSession(i, { title: e.target.value })} /><button type="button" title="Name the day from its muscles (Leg day, Upper body day…)" style={{ ...iconBtn, fontSize: 10 }} onClick={() => { const n = dayNameFor(s.exercises); if (n) patchSession(i, { title: n }); }}>Aa</button><button type="button" title="Remove session" style={iconBtn} onClick={() => setCfg({ ...cfg, sessions: cfg.sessions.filter((_, j) => j !== i) })}><Trash2 size={12} /></button></div>
               <div style={{ margin: '5px 0 3px' }}><TimingField compact value={sessionTiming(s)} onChange={(t) => patchSession(i, { anchor: t.anchor, time: t.time, offset: t.offset })} /></div>
               <div style={{ display: 'flex', gap: 4, marginBottom: 5, alignItems: 'center', color: muted, fontSize: 10 }}>≈ {resolveTiming(sessionTiming(s))} ·
                 <input style={{ ...input, height: 28, fontSize: 11, padding: '0 5px', width: 52 }} type="number" value={s.minutes} onChange={(e) => patchSession(i, { minutes: Number(e.target.value) || 0 })} title="Minutes" /> min
               </div>
               <select style={{ ...input, height: 28, fontSize: 11, padding: '0 5px', marginBottom: 6 }} value={s.intensity} onChange={(e) => patchSession(i, { intensity: e.target.value as FitnessSession['intensity'] })}><option value="low">Low intensity</option><option value="moderate">Moderate</option><option value="high">High</option></select>
-              {s.exercises.map((e, k) => <div key={`${e.id}-${k}`} style={{ fontSize: 11, padding: '5px 0', borderTop: '1px dashed rgba(245,242,234,.12)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}><span>{e.name}</span><button type="button" style={iconBtn} onClick={() => patchSession(i, { exercises: s.exercises.filter((_, m) => m !== k) })}><X size={11} /></button></div>
+              {s.exercises.map((e, k) => ({ e, k, g: muscleGroupOf(e) })).sort((a, b) => MUSCLE_ORDER.indexOf(a.g) - MUSCLE_ORDER.indexOf(b.g)).map(({ e, k, g }, idx, arr) => <div key={`${e.id}-${k}`} style={{ fontSize: 11, padding: '5px 0', borderTop: '1px dashed rgba(245,242,234,.12)' }}>
+                {(idx === 0 || arr[idx - 1].g !== g) && <div style={{ color: acid, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', margin: '2px 0 4px' }}>{g}</div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>{e.image ? <img src={e.image} alt="" loading="lazy" style={{ width: 34, height: 34, objectFit: 'cover', flex: 'none', border: `1px solid ${line}` }} /> : <span style={{ width: 34, height: 34, flex: 'none', border: `1px solid ${line}` }} />}<span style={{ flex: 1, minWidth: 0 }}>{e.name}</span><button type="button" style={iconBtn} onClick={() => patchSession(i, { exercises: s.exercises.filter((_, m) => m !== k) })}><X size={11} /></button></div>
                 <div style={{ display: 'flex', gap: 3, marginTop: 3, color: muted, alignItems: 'center' }}>
                   <input style={{ ...input, height: 24, width: 34, fontSize: 10, padding: '0 3px' }} value={e.sets ?? ''} placeholder="sets" onChange={(ev) => patchSession(i, { exercises: s.exercises.map((x, m) => m === k ? { ...x, sets: Number(ev.target.value) || null } : x) })} />×
                   <input style={{ ...input, height: 24, width: 48, fontSize: 10, padding: '0 3px' }} value={e.reps ?? ''} placeholder="reps" onChange={(ev) => patchSession(i, { exercises: s.exercises.map((x, m) => m === k ? { ...x, reps: ev.target.value || null } : x) })} />
@@ -310,11 +357,13 @@ export function FitnessBuilder({ accessToken, ownerId, protocols, onSaved, onOpe
     <div style={{ ...card, marginTop: 14 }}><RulesEditor title="Fitness checklist for the week" rules={cfg.rules || []} onChange={(rules) => setCfg((c) => ({ ...c, rules }))} placeholder="One rule per line" /></div>
     {adding != null && cfg.sessions[adding] && <div style={{ ...card, marginTop: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><span style={{ ...label, margin: 0 }}>Add to {WEEK.find((w) => w.day === cfg.sessions[adding].day)?.short} · {cfg.sessions[adding].title}</span><button type="button" style={iconBtn} onClick={() => setAdding(null)}><X size={14} /></button></div>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}><button type="button" onClick={() => setMuscle(null)} style={{ ...chip(!muscle), padding: '5px 10px', fontSize: 10 }}>All muscles</button>{MUSCLE_GROUPS.map((g) => <button key={g.id} type="button" onClick={() => setMuscle(muscle === g.id ? null : g.id)} style={{ ...chip(muscle === g.id), padding: '5px 10px', fontSize: 10 }}>{g.label}</button>)}</div>
       <div style={{ position: 'relative', marginBottom: 10 }}><Search size={13} color={muted} style={{ position: 'absolute', left: 10, top: 13 }} /><input autoFocus style={{ ...input, paddingLeft: 30 }} placeholder="Search catalog activities" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+      {muscle && !results.length && <p style={{ color: muted, fontSize: 12 }}>No catalog activities for {MUSCLE_GROUPS.find((g) => g.id === muscle)?.label} yet{muscle === 'face' ? '. Facial exercises need adding to the activity catalog.' : '.'}</p>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 7 }}>
-        {results.map((r) => <button key={r.id} type="button" onClick={() => { const s = cfg.sessions[adding]; const timed = /cardio|sports|stretch|recovery|yoga/i.test(r.category || ''); patchSession(adding, { exercises: [...s.exercises, { ...r, sets: timed ? null : 3, reps: timed ? null : '10', rest_seconds: timed ? null : 75, minutes: timed ? r.minutes || 10 : null }] }); }} style={{ ...card, padding: 8, display: 'flex', gap: 8, textAlign: 'left', color: ink, cursor: 'pointer' }}>
+        {results.map((r) => <button key={r.id} type="button" onClick={() => { const s = cfg.sessions[adding]; const timed = /cardio|sports|stretch|recovery|yoga/i.test(r.category || '') || muscleGroupOf(r) === 'Face'; patchSession(adding, { exercises: [...s.exercises, { ...r, sets: timed ? null : 3, reps: timed ? null : '10', rest_seconds: timed ? null : 75, minutes: timed ? r.minutes || 10 : null }] }); }} style={{ ...card, padding: 8, display: 'flex', gap: 8, textAlign: 'left', color: ink, cursor: 'pointer' }}>
           {r.image ? <img src={r.image} alt="" style={{ width: 38, height: 38, objectFit: 'cover', flex: 'none' }} /> : <div style={{ width: 38, height: 38, flex: 'none', border: `1px solid ${line}` }} />}
-          <span><span style={{ display: 'block', fontSize: 12 }}>{r.name}</span><span style={{ color: muted, fontSize: 10 }}>{r.category}</span></span>
+          <span><span style={{ display: 'block', fontSize: 12 }}>{r.name}</span><span style={{ color: muted, fontSize: 10 }}>{muscleGroupOf(r)} · {r.category}</span></span>
         </button>)}
       </div>
     </div>}

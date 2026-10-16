@@ -54,7 +54,7 @@ export function describeTiming(t: Timing): string {
 
 /* ── diet ── */
 export interface MealNutrition { energy_kcal: number; protein_g: number; carbohydrates_g: number; fats_g: number; fiber_g?: number }
-export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null }
+export interface MealPick { source: 'catalog' | 'guide'; id: string; name: string; image: string | null; nutrition: MealNutrition | null; healthScore?: number | null; hazardFlags?: Array<{ label: string; level: string }> }
 export interface DietFramework { id: string; label: string; protein: number; carbs: number; fat: number; flag: string | null; note: string }
 
 /** Macro splits are % of energy; `flag` is the catalog_recipes.dietary_info key a recipe must have set to true. */
@@ -251,41 +251,97 @@ export async function autoFillDiet(accessToken: string, cfg: DietConfig, guideRe
 }
 
 /* ── fitness ── */
-export interface ActivityPick { id: string; name: string; image: string | null; category: string | null; minutes: number | null }
+export interface ActivityPick { id: string; name: string; image: string | null; category: string | null; minutes: number | null; bodyParts?: string[] }
+
+/* ── muscle groups (from catalog_activities.body_parts) ── */
+export const MUSCLE_GROUPS = [
+  { id: 'legs', label: 'Legs', parts: ['legs', 'quadriceps', 'hamstrings', 'calves', 'adductors', 'abductors', 'soleus', 'gastrocnemius', 'hip_flexors'] },
+  { id: 'glutes', label: 'Glutes', parts: ['glutes', 'gluteus_maximus', 'gluteus_medius'] },
+  { id: 'chest', label: 'Chest', parts: ['chest', 'upper_chest', 'pectorals'] },
+  { id: 'back', label: 'Back', parts: ['back', 'latissimus_dorsi', 'rhomboids', 'lower_back', 'trapezius', 'upper_trapezius', 'middle_trapezius', 'erector_spinae', 'spine'] },
+  { id: 'shoulders', label: 'Shoulders', parts: ['shoulders', 'deltoids', 'anterior_deltoids', 'rear_deltoids', 'medial_deltoids', 'rotator_cuff'] },
+  { id: 'arms', label: 'Arms', parts: ['biceps', 'triceps', 'forearms', 'brachialis'] },
+  { id: 'core', label: 'Core', parts: ['core', 'abdominals', 'abdomen', 'obliques', 'rectus_abdominis', 'diaphragm', 'intercostals'] },
+  { id: 'neck', label: 'Neck', parts: ['neck', 'scalenes', 'cervical_spine'] },
+  { id: 'face', label: 'Face', parts: ['face', 'jaw', 'cheeks', 'mouth', 'forehead', 'eyes', 'lips', 'facial_muscles'] },
+  { id: 'full', label: 'Full body', parts: ['full_body'] },
+] as const;
+export type MuscleGroupId = typeof MUSCLE_GROUPS[number]['id'];
+/** An exercise's main muscle group: the group most of its body parts belong to (first listed part breaks ties). */
+export function muscleGroupOf(a: { bodyParts?: string[]; category?: string | null; name?: string }): string {
+  const parts = (a.bodyParts || []).map((p) => p.toLowerCase());
+  if (/\b(face|facial|jaw|cheek)\b/i.test(a.name || '') && !/pull/i.test(a.name || '')) return 'Face';
+  let best: string | null = null, bestScore = 0;
+  // The catalog lists the prime mover first (bench press: chest, then triceps/deltoids), so it weighs 3; others 1.
+  for (const g of MUSCLE_GROUPS) { const score = parts.reduce((sum, p, i) => sum + ((g.parts as readonly string[]).includes(p) ? (i === 0 ? 3 : 1) : 0), 0); if (score > bestScore) { bestScore = score; best = g.label; } }
+  if (best) return best;
+  if (/cardio|sports|hiit/i.test(a.category || '')) return 'Cardio';
+  if (/stretch|recovery|yoga|mobility/i.test(a.category || '')) return 'Mobility';
+  return 'Other';
+}
+const GROUP_ORDER = [...MUSCLE_GROUPS.map((g) => g.label as string), 'Cardio', 'Mobility', 'Other'];
+export const sortByMuscle = <T extends { bodyParts?: string[]; category?: string | null; name?: string }>(list: T[]) => [...list].sort((a, b) => GROUP_ORDER.indexOf(muscleGroupOf(a)) - GROUP_ORDER.indexOf(muscleGroupOf(b)));
+
+/** A day name from what its exercises train ("Leg day", "Upper body day", "Face workout"…). */
+export function dayNameFor(exercises: Array<{ bodyParts?: string[]; category?: string | null; name?: string }>): string | null {
+  if (!exercises.length) return null;
+  const groups = new Set(exercises.map(muscleGroupOf));
+  const has = (...g: string[]) => g.some((x) => groups.has(x));
+  const only = (...g: string[]) => [...groups].every((x) => g.includes(x));
+  if (only('Face', 'Neck')) return 'Face workout';
+  if (only('Cardio')) return 'Cardio day';
+  if (only('Mobility', 'Neck')) return 'Mobility day';
+  if (only('Legs', 'Glutes', 'Core')) return has('Legs', 'Glutes') ? 'Leg day' : 'Core day';
+  if (only('Chest', 'Shoulders', 'Arms', 'Back', 'Core')) {
+    if (only('Chest', 'Shoulders', 'Arms', 'Core') && has('Chest', 'Shoulders')) return 'Push day';
+    if (only('Back', 'Arms', 'Core') && has('Back')) return 'Pull day';
+    return 'Upper body day';
+  }
+  return 'Full body day';
+}
 export interface ExercisePick extends ActivityPick { sets: number | null; reps: string | null; rest_seconds: number | null }
 export interface FitnessSession { day: number; time: string; anchor?: Anchor; offset?: number; rules?: string[]; title: string; minutes: number; intensity: 'low' | 'moderate' | 'high'; exercises: ExercisePick[] }
 export interface FitnessConfig { goal: string; level: 'beginner' | 'intermediate' | 'advanced'; minutes: number; sessions: FitnessSession[]; rules?: string[] }
 export const sessionTiming = (s: FitnessSession): Timing => ({ anchor: s.anchor || 'clock', time: s.time, offset: s.offset || 0 });
 
-type Template = { title: string; categories: string[]; terms: string[]; intensity: FitnessSession['intensity'] };
+type Template = { title: string; categories: string[]; terms: string[]; muscles?: MuscleGroupId[]; intensity: FitnessSession['intensity'] };
 export interface FitnessGoal { id: string; label: string; note: string; days: number[]; pattern: Template[] }
 
-const STRENGTH_UPPER: Template = { title: 'Train upper body', categories: ['Strength', 'Gym', 'Calisthenics'], terms: ['push', 'press', 'row', 'pull'], intensity: 'moderate' };
-const STRENGTH_LOWER: Template = { title: 'Train lower body', categories: ['Strength', 'Gym', 'Calisthenics'], terms: ['squat', 'lunge', 'deadlift', 'bridge'], intensity: 'moderate' };
-const FULL_BODY: Template = { title: 'Train full body', categories: ['Strength', 'Gym', 'Calisthenics'], terms: ['squat', 'push', 'row', 'plank'], intensity: 'moderate' };
-const CARDIO: Template = { title: 'Do steady cardio', categories: ['Cardio', 'Sports'], terms: ['walk', 'run', 'cycl', 'swim'], intensity: 'moderate' };
-const HIIT: Template = { title: 'Do intervals', categories: ['Hiit', 'Cardio', 'Calisthenics'], terms: ['burpee', 'climber', 'jump', 'sprint'], intensity: 'high' };
-const MOBILITY: Template = { title: 'Practise mobility', categories: ['Stretch', 'Recovery', 'Yoga'], terms: ['hip', 'hamstring', 'shoulder', 'spine'], intensity: 'low' };
+const STRENGTH_UPPER: Template = { title: 'Upper body day', categories: ['Strength', 'Gym', 'Calisthenics'], terms: [], muscles: ['chest', 'back', 'shoulders', 'arms', 'back'], intensity: 'moderate' };
+const STRENGTH_LOWER: Template = { title: 'Leg day', categories: ['Strength', 'Gym', 'Calisthenics'], terms: [], muscles: ['legs', 'glutes', 'legs', 'core', 'glutes'], intensity: 'moderate' };
+const FULL_BODY: Template = { title: 'Full body day', categories: ['Strength', 'Gym', 'Calisthenics'], terms: [], muscles: ['legs', 'chest', 'back', 'core', 'shoulders'], intensity: 'moderate' };
+const CARDIO: Template = { title: 'Cardio day', categories: ['Cardio', 'Sports'], terms: ['walk', 'run', 'cycl', 'swim'], intensity: 'moderate' };
+const HIIT: Template = { title: 'Intervals day', categories: ['Hiit', 'Cardio', 'Calisthenics'], terms: ['burpee', 'climber', 'jump', 'sprint'], intensity: 'high' };
+const MOBILITY: Template = { title: 'Mobility day', categories: ['Stretch', 'Recovery', 'Yoga'], terms: ['hip', 'hamstring', 'shoulder', 'spine'], intensity: 'low' };
 
 /** Weekly splits per goal; days are WEEK.day numbers (1 = Mon). */
 export const FITNESS_GOALS: FitnessGoal[] = [
   { id: 'weight_loss', label: 'Weight loss', note: 'Strength to keep muscle plus regular cardio for energy use.', days: [1, 2, 4, 5, 6], pattern: [FULL_BODY, CARDIO, FULL_BODY, HIIT, CARDIO] },
   { id: 'muscle_gain', label: 'Muscle gain', note: 'Upper/lower split with progressive load and recovery days.', days: [1, 2, 4, 5], pattern: [STRENGTH_UPPER, STRENGTH_LOWER, STRENGTH_UPPER, STRENGTH_LOWER] },
-  { id: 'endurance', label: 'Endurance', note: 'Mostly easy aerobic volume, one interval day, one strength day.', days: [1, 3, 4, 6], pattern: [CARDIO, HIIT, FULL_BODY, { ...CARDIO, title: 'Do a long easy session' }] },
+  { id: 'endurance', label: 'Endurance', note: 'Mostly easy aerobic volume, one interval day, one strength day.', days: [1, 3, 4, 6], pattern: [CARDIO, HIIT, FULL_BODY, { ...CARDIO, title: 'Long easy cardio day' }] },
   { id: 'mobility', label: 'Mobility', note: 'Daily short mobility with gentle strength twice a week.', days: [1, 2, 3, 4, 5, 6], pattern: [MOBILITY, FULL_BODY, MOBILITY, MOBILITY, FULL_BODY, MOBILITY] },
+  { id: 'face', label: 'Face', note: 'Short facial muscle and jaw sessions, most days. Add your own face exercises where the catalog has none yet.', days: [1, 2, 3, 4, 5, 6], pattern: [{ title: 'Face workout', categories: [], terms: [], muscles: ['face', 'face', 'face', 'neck'], intensity: 'low' }] },
   { id: 'general', label: 'General fitness', note: 'Balanced week: strength, cardio and mobility.', days: [1, 3, 5], pattern: [FULL_BODY, CARDIO, MOBILITY] },
 ];
 
 const LEVEL = { beginner: { sets: 2, reps: '10', rest: 90, exercises: 3 }, intermediate: { sets: 3, reps: '8–12', rest: 75, exercises: 4 }, advanced: { sets: 4, reps: '6–10', rest: 60, exercises: 5 } };
 
-export async function searchActivities(accessToken: string, opts: { query?: string; categories?: string[]; limit?: number }): Promise<ActivityPick[]> {
-  const params = ['select=id,name,image_url,primary_image_url,category,default_duration_min', 'or=(is_group.is.null,is_group.eq.false)', `limit=${opts.limit || 12}`, 'order=health_score.desc.nullslast'];
+export async function searchActivities(accessToken: string, opts: { query?: string; categories?: string[]; limit?: number; muscle?: MuscleGroupId | null }): Promise<ActivityPick[]> {
+  const params = ['select=id,name,image_url,primary_image_url,category,default_duration_min,body_parts', 'is_group=not.is.true', `limit=${opts.limit || 12}`, 'order=health_score.desc.nullslast'];
+  const group = opts.muscle ? MUSCLE_GROUPS.find((g) => g.id === opts.muscle) : null;
+  if (group) {
+    // body_parts is a jsonb array: match any of the group's parts; face also matches by name.
+    const ors = group.parts.map((p) => `body_parts.cs.${encodeURIComponent(JSON.stringify([p]))}`);
+    if (group.id === 'face') ors.push('name.ilike.*facial*', 'name.ilike.*face%20yoga*', 'name.ilike.*jaw*', 'name.ilike.*cheek*');
+    params.push(`or=(${ors.join(',')})`);
+    params.push('category=not.in.(Beauty,Hygiene,Supplement,Consume)'); // muscle work only, not face mists or flossing
+  }
   if (opts.categories?.length) params.push(`category=in.(${opts.categories.map((c) => `"${c}"`).join(',')})`);
   const q = opts.query?.replace(/[%,()*]/g, ' ').trim();
   if (q) params.push(`name=ilike.*${encodeURIComponent(q)}*`);
   const res = await fetch(`${rest()}/catalog_activities?${params.join('&')}`, { headers: headers(accessToken) });
   if (!res.ok) throw new Error(`Activity search failed (${res.status})`);
-  return ((await res.json()) as any[]).map((r) => ({ id: r.id, name: r.name, image: r.image_url || r.primary_image_url || null, category: r.category, minutes: r.default_duration_min ?? null }));
+  return ((await res.json()) as any[]).map((r) => ({ id: r.id, name: r.name, image: r.image_url || r.primary_image_url || null, category: r.category, minutes: r.default_duration_min ?? null, bodyParts: Array.isArray(r.body_parts) ? r.body_parts.map(String) : [] }));
 }
 
 /** Build the goal's weekly split, filling each session with catalog exercises that match its pattern. */
@@ -297,16 +353,17 @@ export async function draftFitnessWeek(accessToken: string, goalId: string, leve
   for (const [index, day] of goal.days.entries()) {
     const t = goal.pattern[index % goal.pattern.length];
     const exercises: ExercisePick[] = [];
-    for (const term of t.terms) {
+    const picks: Array<{ term?: string; muscle?: MuscleGroupId }> = t.muscles?.length ? t.muscles.map((muscle) => ({ muscle })) : t.terms.map((term) => ({ term }));
+    for (const pick of picks) {
       if (exercises.length >= dose.exercises) break;
-      const hits = await searchActivities(accessToken, { query: term, categories: t.categories, limit: 6 }).catch(() => []);
+      const hits = await searchActivities(accessToken, { query: pick.term, muscle: pick.muscle, categories: t.categories.length ? t.categories : undefined, limit: 8 }).catch(() => []);
       const hit = hits.find((h) => !used.has(h.id) && !exercises.some((e) => e.id === h.id)) || hits.find((h) => !exercises.some((e) => e.id === h.id));
       if (!hit) continue;
       used.add(hit.id);
-      const timed = /cardio|sports|stretch|recovery|yoga/i.test(hit.category || '');
-      exercises.push({ ...hit, sets: timed ? null : dose.sets, reps: timed ? null : dose.reps, rest_seconds: timed ? null : dose.rest, minutes: timed ? Math.round(minutes / Math.max(1, t.terms.length / 2)) : null });
+      const timed = /cardio|sports|stretch|recovery|yoga/i.test(hit.category || '') || muscleGroupOf(hit) === 'Face';
+      exercises.push({ ...hit, sets: timed ? null : dose.sets, reps: timed ? null : dose.reps, rest_seconds: timed ? null : dose.rest, minutes: timed ? Math.max(2, Math.round(minutes / Math.max(1, picks.length))) : null });
     }
-    sessions.push({ day, time: '07:00', anchor: 'wake', offset: 30, rules: t.intensity === 'low' ? [] : ['Warm up for 5 minutes'], title: t.title, minutes, intensity: level === 'beginner' && t.intensity === 'high' ? 'moderate' : t.intensity, exercises });
+    sessions.push({ day, time: '07:00', anchor: 'wake', offset: 30, rules: t.intensity === 'low' ? [] : ['Warm up for 5 minutes'], title: dayNameFor(exercises) || t.title, minutes: t.muscles?.includes('face') ? Math.min(minutes, 15) : minutes, intensity: level === 'beginner' && t.intensity === 'high' ? 'moderate' : t.intensity, exercises });
   }
   return sessions;
 }
@@ -473,7 +530,7 @@ export function reviewCombined(itemsByProtocol: { name: string; items: AdminProt
 
 /** Do's as checkable rule_do items: under a parent item (its do-checklist) or top-level in a group (that group's checklist). */
 async function addRules(accessToken: string, protocolId: string, rules: string[] | RuleList | undefined, opts: { parentId?: string | null; group?: string | null; category: string; days?: number[]; next: () => number }) {
-  const list = Array.isArray(rules) || !rules ? splitRules(rules || []) : rules;
+  const list: RuleList = Array.isArray(rules) ? splitRules(rules) : rules || { dos: [], donts: [] };
   const all = [...list.dos.map((t) => ['rule_do', t]), ...list.donts.map((t) => ['rule_dont', t])];
   for (const [kind, rule] of all) await createProtocolItem(accessToken, {
     protocol_id: protocolId, display_name: rule, kind, item_type: 'activity', category: opts.category, subtype: null,
@@ -557,8 +614,9 @@ export async function saveFitnessProtocol(accessToken: string, ownerId: string, 
       has_children: s.exercises.length > 0 || !!(step?.dos.length || step?.donts.length), enabled: true, hidden: false,
       notes: [s.anchor && s.anchor !== 'clock' ? describeTiming(sessionTiming(s)) : '', s.exercises.map((e) => e.name).join(' · ')].filter(Boolean).join(' · '), ...weekly(s.day),
     } as Partial<AdminProtocolItem>);
-    for (const e of s.exercises) await createProtocolItem(accessToken, {
-      protocol_id: protocol.id, parent_protocol_item_id: parent.id, display_name: e.name, kind: 'action', item_type: 'activity', category: 'do', subtype: 'exercise',
+    // Exercises are saved grouped by muscle (Legs, Glutes, Chest…), like a smart list inside the session.
+    for (const e of sortByMuscle(s.exercises)) await createProtocolItem(accessToken, {
+      protocol_id: protocol.id, parent_protocol_item_id: parent.id, display_name: e.name, kind: 'action', item_type: 'activity', category: 'do', subtype: 'exercise', group_name: muscleGroupOf(e),
       catalog_activity_id: e.id, sets: e.sets, reps: e.reps ? parseInt(e.reps, 10) || null : null, reps_display: e.reps, rest_seconds: e.rest_seconds,
       duration_minutes: e.minutes, day_number: 1, sort_order: order++, has_children: false, enabled: true, hidden: false, notes: '', ...weekly(s.day),
     } as Partial<AdminProtocolItem>);
