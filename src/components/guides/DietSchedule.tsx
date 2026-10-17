@@ -43,12 +43,12 @@ export function FastingDayCell({ cfg,day }: { cfg:DietConfig;day:number }) {
   </div>;
 }
 
-export function WeeklySupplementRows({ cfg,setCfg,accessToken }: Props & {accessToken:string}) {
+export function WeeklySupplementRows({ cfg,setCfg,accessToken,periodId }: Props & {accessToken:string;periodId?:SupplementPeriod}) {
   const [editing,setEditing] = useState<{day:number;period:SupplementPeriod}|null>(null);
   const update = (day:number,period:SupplementPeriod,patch:Partial<ReturnType<typeof supplementCell>>) => setCfg(c => ({...c,supplementPlan:{...c.supplementPlan,[`${day}:${period}`]:{...supplementCell(c,day,period),...patch}}}));
   const selected = editing ? supplementCell(cfg,editing.day,editing.period) : null;
   return <>
-    {SUPPLEMENT_PERIODS.map(period => <Fragment key={period.id}>
+    {SUPPLEMENT_PERIODS.filter(p=>!periodId||p.id===periodId).map(period => <Fragment key={period.id}>
       <div style={{fontSize:11,color:acid,alignSelf:'center'}}>{period.label} supplements</div>
       {WEEK.map(w => { const cell=supplementCell(cfg,w.day,period.id);return <div key={w.day} aria-label={`${w.short} ${period.id} supplements`} style={{border,padding:8,minWidth:0}}>
         {cell.items.map((p,i)=><div key={i} style={{fontSize:11,marginBottom:5,overflowWrap:'anywhere'}}>{typeof p==='string'?p:p.name}</div>)}
