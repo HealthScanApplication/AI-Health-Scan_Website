@@ -1,40 +1,183 @@
 import { useState } from 'react';
-import { nutrientsForTier, type Tier } from '../../utils/recipeNutrients';
+import { ChevronRight } from 'lucide-react';
+import { nutrientsForTier, type HazardLevel, type NutrientDef, type Tier } from '../../utils/recipeNutrients';
 import { TIERS, tierLabel, useEssential90, Essential90Note } from './RecipeInsights';
-import { WEEK } from '../../utils/protocolBuilders';
-import type { aggregateDiet } from '../../utils/dietNutrition';
+import { WEEK, type PlanIngredient } from '../../utils/protocolBuilders';
+import type { aggregateDiet, DietTotals } from '../../utils/dietNutrition';
 
-const format = (n: number) => n.toLocaleString(undefined, { maximumSignificantDigits: 5 });
+// Guardian dark tokens (same values as RecipeInsights.tsx).
+const ink = '#F5F2EA';
+const muted = '#B8B6AF';
+const faint = 'rgba(184,182,175,.55)';
+const line = 'rgba(245,242,234,.12)';
+const acid = '#C7D8A3';
+const warn = '#E8B86A';
+const danger = '#E88A7A';
+const chip = (on: boolean, tone = acid): React.CSSProperties => ({ border: `1px solid ${on ? tone : 'rgba(245,242,234,.24)'}`, background: on ? `${tone}22` : 'transparent', color: on ? tone : ink, borderRadius: 999, padding: '4px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' });
+const row: React.CSSProperties = { display: 'grid', gridTemplateColumns: '14px minmax(0,1fr) auto', gap: 8, alignItems: 'center', width: '100%', padding: '6px 0', border: 0, borderTop: `1px solid ${line}`, background: 'transparent', color: ink, fontSize: 12, textAlign: 'left', cursor: 'pointer' };
+const sub: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 60px 80px 110px', gap: 8, fontSize: 11, padding: '3px 0' };
+
+const format = (n: number) => n.toLocaleString(undefined, { maximumSignificantDigits: 3 });
 const title = (key: string) => key.replace(/_(kcal|kj|g|mg|mcg|ug|iu)$/i,'').replace(/_/g,' ').replace(/^./,(c) => c.toUpperCase());
-const unit = (key: string) => /_(kcal|kj|g|mg|mcg|ug|iu)$/i.exec(key)?.[1] || 'source units';
+const unit = (key: string) => /_(kcal|kj|g|mg|mcg|ug|iu)$/i.exec(key)?.[1] || '';
+const LEVELS: HazardLevel[] = ['high','moderate','low','trace'];
+const tone = (l: HazardLevel) => l === 'high' ? danger : l === 'moderate' ? warn : muted;
+const LEVEL_NOTE: Record<HazardLevel, string> = {
+  high: 'Source records flag this ingredient as a frequent or high-concentration carrier.',
+  moderate: 'Source records show it regularly, at mid-range concentrations.',
+  low: 'Recorded occasionally or at low concentrations.',
+  trace: 'Trace detections only, or not yet assessed (likelihood only).',
+};
+// Short, neutral context for the hazards the catalog records most often.
+const AFFECTS: Record<string, string> = {
+  lead: 'Nervous system, kidneys, blood; children most sensitive.',
+  cadmium: 'Kidneys and bone; accumulates over years.',
+  arsenic: 'Skin, lungs, bladder; inorganic form is the concern.',
+  mercury: 'Nervous system; methylmercury in fish matters most.',
+  acrylamide: 'Forms in high-heat cooking; probable carcinogen (IARC 2A).',
+  bisphenol: 'Endocrine activity; migrates from can and packaging linings.',
+  nitrate: 'Can convert to nitrites and nitrosamines.',
+  aflatoxin: 'Liver; mould toxin in nuts and grains.',
+};
+const affects = (key: string) => Object.entries(AFFECTS).find(([k]) => key.toLowerCase().includes(k))?.[1];
+
+function Badge({ level }: { level: HazardLevel }) {
+  return <span style={{ color: tone(level), border: `1px solid ${tone(level)}`, borderRadius: 3, padding: '0 4px', fontSize: 9, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{level}</span>;
+}
+function Tabs({ tab, onTab }: { tab: 'ingredients' | 'health'; onTab: (t: 'ingredients' | 'health') => void }) {
+  return <div role="tablist" style={{ display: 'flex', gap: 5, margin: '4px 0 6px' }}>{(['ingredients','health'] as const).map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => onTab(t)} style={chip(tab === t)}>{t === 'ingredients' ? 'Ingredients' : 'Health'}</button>)}</div>;
+}
+function Sources({ items }: { items: string[] }) {
+  const [open, setOpen] = useState(false);
+  if (!items.length) return null;
+  return <div style={{ marginTop: 6 }}>
+    <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} style={{ border: 0, background: 'transparent', color: acid, fontSize: 10, padding: 0, cursor: 'pointer' }}>{open ? 'Hide' : 'Sources'} ({items.length})</button>
+    {open && <ul style={{ margin: '4px 0 0', paddingLeft: 16, color: muted, fontSize: 10, lineHeight: 1.45, maxHeight: 180, overflow: 'auto' }}>{items.map((s) => <li key={s}>{s}</li>)}</ul>}
+  </div>;
+}
+
+/** The flipped view: one ingredient → its recorded nutrients and hazards. */
+function IngredientDetail({ ing, defs }: { ing: PlanIngredient; defs: NutrientDef[] }) {
+  const g = ing.grams;
+  const nutrients = defs.filter((d) => ing.per100[d.key] != null);
+  return <div style={{ margin: '2px 0 8px 10px', paddingLeft: 10, borderLeft: `2px solid ${line}` }}>
+    <div style={{ color: muted, fontSize: 10, marginBottom: 3 }}>{g == null ? 'Portion unknown' : `${format(g)} g in this plan`} · {nutrients.length} nutrients in this group · {ing.hazards.length} hazards</div>
+    {nutrients.map((d) => <div key={d.key} style={sub}><span>{d.label}</span><span style={{ color: muted }}>{format(ing.per100[d.key])}/100 g</span><span style={{ textAlign: 'right' }}>{g == null ? '—' : `${format(ing.per100[d.key] * g / 100)} ${d.unit}`}</span><span /></div>)}
+    {ing.hazards.map((h) => <div key={h.key} style={sub}><span>{h.label}</span><span style={{ color: muted }}>{h.per100 == null ? '—' : `${format(h.per100)}/100 g`}</span><span style={{ textAlign: 'right' }}>{g == null || h.per100 == null ? '—' : `${format(h.per100 * g / 100)} ${unit(h.key)}`}</span><span style={{ textAlign: 'right' }}><Badge level={h.level} /></span></div>)}
+  </div>;
+}
+
+/** Contributing ingredients, largest contribution first; click one to flip to its own nutrients and hazards. */
+function IngredientTable({ rows, valueUnit, defs }: { rows: Array<{ ing: PlanIngredient; per100: number | null; level?: HazardLevel }>; valueUnit: string; defs: NutrientDef[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const contrib = (r: typeof rows[number]) => r.per100 == null || r.ing.grams == null ? null : r.per100 * r.ing.grams / 100;
+  const sum = rows.reduce((a, r) => a + (contrib(r) ?? 0), 0);
+  const sorted = [...rows].sort((a, b) => (contrib(b) ?? -1) - (contrib(a) ?? -1));
+  if (!rows.length) return <div style={{ color: muted, fontSize: 11 }}>No ingredient-level records for this item.</div>;
+  return <div>
+    <div style={{ ...sub, color: faint, fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em' }}><span>Ingredient</span><span>Portion</span><span>Per 100 g</span><span style={{ textAlign: 'right' }}>Contribution</span></div>
+    <div style={{ maxHeight: 260, overflow: 'auto' }}>{sorted.map((r) => { const c = contrib(r); return <div key={r.ing.name}>
+      <div style={sub}>
+        <button type="button" aria-expanded={open === r.ing.name} onClick={() => setOpen(open === r.ing.name ? null : r.ing.name)} style={{ border: 0, background: 'transparent', color: ink, padding: 0, fontSize: 11, textAlign: 'left', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{open === r.ing.name ? '▾' : '▸'} {r.ing.name}{r.level ? <> <Badge level={r.level} /></> : null}</button>
+        <span style={{ color: muted }}>{r.ing.grams == null ? '?' : `${format(r.ing.grams)} g`}</span>
+        <span style={{ color: muted }}>{r.per100 == null ? 'unknown' : `${format(r.per100)} ${valueUnit}`.trim()}</span>
+        <span style={{ textAlign: 'right' }}>{c == null ? '—' : `${format(c)} ${valueUnit}`}{c != null && sum > 0 && <span style={{ color: faint }}> · {Math.round(c / sum * 100)}%</span>}</span>
+      </div>
+      {open === r.ing.name && <IngredientDetail ing={r.ing} defs={defs} />}
+    </div>; })}</div>
+  </div>;
+}
+
+function NutrientRow({ k, def, cell, totals, period, defs }: { k: string; def?: NutrientDef; cell?: DietTotals['nutrients'][string]; totals: DietTotals; period: number; defs: NutrientDef[] }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<'ingredients' | 'health'>('ingredients');
+  const u = def?.unit || unit(k);
+  const incomplete = totals.count > 0 && (cell?.partial || (cell?.known ?? 0) !== totals.count);
+  const pct = cell?.amount != null && def?.dv ? Math.round(cell.amount / period / def.dv * 100) : null;
+  return <div>
+    <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} style={row}>
+      <ChevronRight size={12} style={{ transform: open ? 'rotate(90deg)' : undefined, color: muted }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: cell?.amount == null ? faint : ink }}>{def?.label || title(k)}{def?.safety === 'Hazardous' && <span style={{ color: danger }}> · hazardous</span>}{incomplete && <span style={{ color: faint }}> · {cell?.known || 0}/{totals.count}</span>}</span>
+      <span style={{ color: cell?.amount == null ? faint : ink, whiteSpace: 'nowrap' }}>{cell?.amount == null ? (totals.count ? 'unknown' : '—') : `${format(cell.amount)} ${u}`}{pct != null && <span style={{ color: muted }}> · {pct}%/day</span>}</span>
+    </button>
+    {open && <div style={{ padding: '0 0 8px 22px' }}>
+      <Tabs tab={tab} onTab={setTab} />
+      {tab === 'ingredients'
+        ? <IngredientTable rows={totals.ingredients.filter((i) => i.per100[k] != null).map((ing) => ({ ing, per100: ing.per100[k] }))} valueUnit={u} defs={defs} />
+        : <div style={{ fontSize: 11, color: muted, lineHeight: 1.5 }}>
+          <div><span style={{ color: ink }}>Reference:</span> {def?.dv ? `${format(def.dv)} ${u} per day` : 'no daily reference recorded'}{pct != null && ` · this plan averages ${pct}% per day`}</div>
+          <div><span style={{ color: ink }}>Data:</span> {cell?.known || 0} of {totals.count} selections have a value{incomplete ? '; the total is a lower bound' : ''}.</div>
+          {def?.safety === 'Hazardous' && <div style={{ color: danger }}>Listed historically, but hazardous; not an intake goal.</div>}
+          {def && <div>In the {def.tier === 90 ? 'Essential 90' : def.tier === 30 ? 'Extended 30' : 'Core 15'} group.</div>}
+        </div>}
+    </div>}
+  </div>;
+}
+
+function HazardRow({ h, totals, defs }: { h: DietTotals['hazards'][number]; totals: DietTotals; defs: NutrientDef[] }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<'ingredients' | 'health'>('ingredients');
+  const carriers = totals.ingredients.flatMap((ing) => ing.hazards.filter((hz) => hz.key === h.key).map((hz) => ({ ing, per100: hz.per100, level: hz.level })));
+  const u = unit(h.key);
+  return <div>
+    <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} style={row}>
+      <ChevronRight size={12} style={{ transform: open ? 'rotate(90deg)' : undefined, color: muted }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.label} <Badge level={h.level} /><span style={{ color: muted }}> · {carriers.length || h.sources.length} ingredients</span></span>
+      <span style={{ color: h.assessed ? muted : faint, whiteSpace: 'nowrap', fontSize: 11 }}>{h.amount != null ? `${format(h.amount)} ${u} · ` : ''}{h.assessed ? 'assessed' : 'likelihood only'}</span>
+    </button>
+    {open && <div style={{ padding: '0 0 8px 22px' }}>
+      <Tabs tab={tab} onTab={setTab} />
+      {tab === 'ingredients'
+        ? <IngredientTable rows={carriers} valueUnit={u} defs={defs} />
+        : <div style={{ fontSize: 11, color: muted, lineHeight: 1.5 }}>
+          {affects(h.key) && <div><span style={{ color: ink }}>Affects:</span> {affects(h.key)}</div>}
+          <div><span style={{ color: ink }}>Level <Badge level={h.level} />:</span> {LEVEL_NOTE[h.level]} Not a calculated exposure limit.</div>
+          <div><span style={{ color: ink }}>Quantity:</span> {h.amount == null ? 'not additive in the records' : `${format(h.amount)} ${u} recorded`}{h.unknown ? `; ${h.unknown} of ${h.occurrences} occurrences unquantified` : ''}.</div>
+          <div><span style={{ color: ink }}>Limits:</span> regulatory maxima are listed per food in the sources below.</div>
+        </div>}
+      <Sources items={h.reasons} />
+    </div>}
+  </div>;
+}
+
 export function DietNutritionPanel({ report, loading, error }: { report: ReturnType<typeof aggregateDiet>; loading: boolean; error: string }) {
   const [day,setDay] = useState('week');
   const [tier,setTier] = useState<Tier>(15);
+  const [levels,setLevels] = useState<HazardLevel[]>(LEVELS);
   const catalog = useEssential90();
   const defs = nutrientsForTier(tier,catalog);
+  const allDefs = nutrientsForTier(90,catalog);
   const totals = day === 'week' ? report.week : report.days[Number(day)-1];
+  const period = day === 'week' ? 7 : 1;
   const macros = ['energy_kcal','protein_g','carbohydrates_g','fats_g','fiber_g','sugars_g','saturated_fat_g','trans_fat_g','salt_g','alcohol_g'];
-  const keys = [...new Set([...macros, ...defs.map(d => d.key), ...Object.keys(totals.nutrients).filter(k => totals.nutrients[k].amount != null)])];
-  return <section aria-label="Meal and drink nutrition" style={{ border: '1px solid rgba(245,242,234,.24)', padding: 16, marginBottom: 18, background: '#11120F', color: '#F5F2EA' }}>
-    <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>All meals &amp; drinks · nutrition and hazards</h2>
-    <div aria-label="Nutrient groups" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>{TIERS.map(t => <button type="button" key={t} aria-pressed={tier === t} onClick={() => setTier(t)} style={{ border: '1px solid #B8B6AF', borderRadius: 20, padding: '6px 10px', color: tier === t ? '#C7D8A3' : '#F5F2EA', background: tier === t ? '#272C20' : 'transparent' }}>{tierLabel(t)}</button>)}</div>
-    <Essential90Note defs={catalog} />
-    <p style={{ fontSize: 12, color: '#B8B6AF' }}>{defs.length} entries in this group. All other measured nutrients remain visible separately.</p>
-    <label>Totals for <select aria-label="Nutrition totals period" value={day} onChange={(e) => setDay(e.target.value)} style={{ background: '#11120F', color: '#F5F2EA', padding: 6, marginLeft: 8 }}><option value="week">Whole week</option>{WEEK.map((w) => <option key={w.day} value={w.day}>{w.short}</option>)}</select></label>
-    <p style={{ fontSize: 12, color: '#B8B6AF' }}>{totals.count} planned selections, with serving quantities applied. Amounts are recorded subtotals; missing data is unknown, not zero. Supplements are listed separately and are not included in meal totals.</p>
-    {loading && <p role="status">Refreshing selected recipes’ nutrients and hazards…</p>}
-    {error && <p role="alert" style={{ color: '#E8B07A' }}>{error} Showing available saved data only; totals and hazards may be incomplete.</p>}
-    {!!totals.unlinked && <p style={{ color: '#E8B07A' }}>{totals.unlinked} text-only drink selections need a database recipe match before their nutrition can be counted.</p>}
-    <div style={{ maxHeight: 430, overflow: 'auto' }}><table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', textAlign: 'left' }}>
-      <thead><tr><th>Nutrient</th><th>Recorded total</th><th>Selections with data</th></tr></thead>
-      <tbody>{keys.map((key) => { const def = defs.find((d) => d.key === key); const cell = totals.nutrients[key]; return <tr key={key} style={{ borderTop: '1px solid rgba(245,242,234,.12)' }}><th style={{ padding: '6px 0', fontWeight: 400 }}>{def?.label || title(key)}{def?.safety === 'Hazardous' ? ' · hazardous; not an intake goal' : ''}</th><td>{cell?.amount == null ? (totals.count ? 'Unknown' : '—') : `${format(cell.amount)} ${def?.unit || unit(key)}`}</td><td>{cell?.known || 0}/{totals.count}{(cell?.partial || cell?.known !== totals.count) && totals.count > 0 ? ' · incomplete' : ''}</td></tr>; })}</tbody>
-    </table></div>
-    <h3 style={{ fontSize: 14 }}>All recorded hazards · including low and trace</h3>
-    <p style={{ color: '#B8B6AF', fontSize: 12 }}>Hazard levels describe source records, not calculated safe exposure limits. No recorded hazard does not mean a meal is hazard-free. {totals.unassessed} selections have incomplete ingredient analysis.</p>
-    {!totals.hazards.length && <p style={{ fontSize: 12 }}>No hazard records available for these selections.</p>}
-    {totals.hazards.map((h) => <div key={h.key} style={{ borderTop: '1px solid rgba(245,242,234,.12)', padding: '8px 0', fontSize: 12 }}>
-      <strong>{h.label}</strong> · {h.level} · {h.amount == null ? 'Additive quantity unknown' : `${format(h.amount)} ${unit(h.key)} recorded subtotal`}{h.unknown ? ` · ${h.unknown} occurrences with incomplete or non-additive quantities` : ''} · {h.assessed ? 'source assessed' : 'assessment incomplete'}
-      <div style={{ color: '#B8B6AF', marginTop: 3 }}>{h.sources.join(' · ')}</div>{h.reasons.length > 0 && <div>{h.reasons.join(' · ')}</div>}
-    </div>)}
+  const keys = [...new Set([...macros, ...defs.map(d => d.key)])];
+  const other = Object.keys(totals.nutrients).filter((k) => !keys.includes(k) && totals.nutrients[k].amount != null);
+  const hazards = totals.hazards.filter((h) => levels.includes(h.level));
+  return <section aria-label="Meal and drink nutrition" style={{ border: '1px solid rgba(245,242,234,.24)', padding: 16, marginBottom: 18, background: '#11120F', color: ink }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <h2 style={{ fontSize: 16, margin: 0 }}>All meals &amp; drinks · nutrition and hazards</h2>
+      <select aria-label="Nutrition totals period" value={day} onChange={(e) => setDay(e.target.value)} style={{ background: '#11120F', color: ink, padding: 5, fontSize: 12 }}><option value="week">Whole week</option>{WEEK.map((w) => <option key={w.day} value={w.day}>{w.short}</option>)}</select>
+    </div>
+    <p style={{ fontSize: 11, color: muted, margin: '6px 0 10px' }}>{totals.count} selections, servings applied. Missing data is unknown, not zero; supplements are listed separately.</p>
+    {loading && <p role="status" style={{ fontSize: 12 }}>Refreshing selected recipes’ nutrients and hazards…</p>}
+    {error && <p role="alert" style={{ color: warn, fontSize: 12 }}>{error} Showing saved data only; totals may be incomplete.</p>}
+    {!!totals.unlinked && <p style={{ color: warn, fontSize: 12 }}>{totals.unlinked} text-only drinks need a database match before they count.</p>}
+
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+      <h3 style={{ fontSize: 13, margin: 0 }}>Nutrients <span style={{ color: muted, fontWeight: 400 }}>· {keys.length}</span></h3>
+      <span aria-label="Nutrient groups" style={{ display: 'flex', gap: 5 }}>{TIERS.map(t => <button type="button" key={t} aria-pressed={tier === t} onClick={() => setTier(t)} style={chip(tier === t)}>{tierLabel(t)}</button>)}</span>
+    </div>
+    {tier === 90 && <Essential90Note defs={catalog} />}
+    <div style={{ maxHeight: 420, overflow: 'auto', marginBottom: 16 }}>{keys.map((k) => <NutrientRow key={k} k={k} def={allDefs.find((d) => d.key === k)} cell={totals.nutrients[k]} totals={totals} period={period} defs={allDefs} />)}
+      {other.length > 0 && <div style={{ color: muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em', padding: '10px 0 2px' }}>Other measured · {other.length}</div>}
+      {other.map((k) => <NutrientRow key={k} k={k} def={allDefs.find((d) => d.key === k)} cell={totals.nutrients[k]} totals={totals} period={period} defs={allDefs} />)}</div>
+
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+      <h3 style={{ fontSize: 13, margin: 0 }}>Recorded hazards <span style={{ color: muted, fontWeight: 400 }}>· {hazards.length} of {totals.hazards.length}</span></h3>
+      <span aria-label="Hazard levels" style={{ display: 'flex', gap: 5 }}>{LEVELS.map((l) => { const on = levels.includes(l); return <button type="button" key={l} aria-pressed={on} onClick={() => setLevels(on ? levels.filter((x) => x !== l) : [...levels, l])} style={chip(on, tone(l) === muted ? acid : tone(l))}>{l} {totals.hazards.filter((h) => h.level === l).length}</button>; })}</span>
+    </div>
+    <p style={{ color: muted, fontSize: 11, margin: '0 0 4px' }}>Levels describe source records, not safe-exposure limits. No record ≠ hazard-free.{totals.unassessed ? ` ${totals.unassessed} selections incompletely analysed.` : ''}</p>
+    {!totals.hazards.length && <p style={{ fontSize: 12 }}>No hazard records for these selections.</p>}
+    <div style={{ maxHeight: 420, overflow: 'auto' }}>{hazards.map((h) => <HazardRow key={h.key} h={h} totals={totals} defs={allDefs} />)}</div>
   </section>;
 }
